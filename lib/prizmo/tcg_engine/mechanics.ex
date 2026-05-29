@@ -1,0 +1,1101 @@
+defmodule Prizmo.TcgEngine.Mechanics do
+  @moduledoc """
+  Transactional mechanics operations for the persisted TCG engine.
+
+  This module is the first bridge from the old pure simulator toward composed Ash
+  state machines. Public functions only persist accepted actions; rejected actions
+  roll back before an event or snapshot is written.
+  """
+
+  import Prizmo.TcgEngine.BattleActions,
+    only: [
+      apply_attack_damage: 4,
+      attached_energy_cards_for_retreat: 3,
+      discard_retreat_energy: 3
+    ]
+
+  import Prizmo.TcgEngine.BoardState,
+    only: [
+      active_card: 2,
+      maybe_finish_for_empty_board: 3,
+      maybe_finish_for_last_prize: 2,
+      require_all_players_have_active: 1,
+      require_all_players_have_prizes: 2,
+      require_no_active: 2,
+      require_no_prizes_placed: 1,
+      require_no_tool_attached: 2
+    ]
+
+  import Prizmo.TcgEngine.CardMetadataRequirements
+
+  import Prizmo.TcgEngine.CardStore,
+    only: [
+      discard_cards_from_hand: 3,
+      discard_existing_stadiums: 1,
+      get_card: 2,
+      get_cards: 2,
+      move_deck_card_to_hand: 3,
+      move_deck_cards_to_bench: 4,
+      move_discard_card_to_hand: 3,
+      next_attachment_position: 2,
+      next_bench_position: 2,
+      next_discard_position: 2,
+      next_hand_position_result: 2
+    ]
+
+  import Prizmo.TcgEngine.EventLog,
+    only: [write_event: 4, write_event_and_snapshot: 4, write_snapshot: 3]
+
+  import Prizmo.TcgEngine.GameStore, only: [get_game: 1]
+  import Prizmo.TcgEngine.Operation, only: [create: 3, transaction: 1, update: 3]
+  import Prizmo.TcgEngine.PlayerStore, only: [get_player: 2]
+  import Prizmo.TcgEngine.PromptStore, only: [get_prompt: 2]
+  import Prizmo.TcgEngine.Requirements
+  import Prizmo.TcgEngine.SetupStore, only: [get_setup: 1, require_setup_status: 2]
+  import Prizmo.TcgEngine.TrainerPlay, only: [discard_trainer_card: 4, mark_trainer_flags: 2]
+  import Prizmo.TcgEngine.TurnDraw, only: [draw_one_for_turn: 2]
+
+  import Prizmo.TcgEngine.TurnFlow,
+    only: [
+      next_turn_number: 1,
+      next_turn_player_id: 1,
+      opponent_player_id: 2,
+      require_action_window_for_player: 2,
+      require_current_turn_status: 2
+    ]
+
+  import Prizmo.TcgEngine.TurnStore, only: [current_turn: 1]
+
+  alias Prizmo.Tcg.Sim.CardRegistry
+  alias Prizmo.TcgEngine.CardPlay
+  alias Prizmo.TcgEngine.Cards.Registry, as: EngineCardRegistry
+  alias Prizmo.TcgEngine.ChoiceValidator
+  alias Prizmo.TcgEngine.Game
+  alias Prizmo.TcgEngine.GameSetup
+  alias Prizmo.TcgEngine.PendingEffects
+  alias Prizmo.TcgEngine.Setup
+  alias Prizmo.TcgEngine.SnapshotRestorer
+  alias Prizmo.TcgEngine.Turn
+  alias Prizmo.TcgEngine.ZoneActions
+
+  require Ash.Query
+
+  @type player_deck :: {String.t(), module()}
+
+  @spec create_game([player_deck()], keyword()) :: {:ok, Game.t()} | {:error, term()}
+  def create_game(player_decks, opts \\ []) when is_list(player_decks) do
+    active_player_id =
+      Keyword.get(opts, :active_player_id, GameSetup.first_player_id(player_decks))
+
+    transaction(fn ->
+      with :ok <- GameSetup.require_two_players(player_decks),
+           {:ok, game} <- GameSetup.create_game_record(active_player_id),
+           {:ok, _players} <- GameSetup.create_players_and_cards(game, player_decks),
+           {:ok, _snapshot} <- write_snapshot(game.id, nil, 0) do
+        get_game(game.id)
+      end
+    end)
+  end
+
+  @spec start_setup(Game.t() | String.t()) :: {:ok, Game.t()} | {:error, term()}
+  def start_setup(game_or_id) do
+    transaction(fn ->
+      with {:ok, game} <- get_game(game_or_id),
+           {:ok, game} <- update(game, :start_setup, %{}),
+           {:ok, _setup} <- create(Setup, :create, %{game_id: game.id}),
+           {:ok, event} <- write_event(game, :start_setup, nil, %{}),
+           {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do
+        get_game(game.id)
+      end
+    end)
+  end
+
+  @spec draw_opening_hand(Game.t() | String.t()) :: {:ok, Game.t()} | {:error, term()}
+  def draw_opening_hand(game_or_id) do
+    transaction(fn ->
+      with {:ok, game} <- get_game(game_or_id),
+           {:ok, setup} <- get_setup(game.id),
+           {:ok, setup} <- update(setup, :draw_opening_hand, %{}),
+           :ok <- GameSetup.require_no_setup_cards_moved(game.id),
+           {:ok, _cards} <- GameSetup.draw_opening_cards(game.id),
+           {:ok, event} <- write_event(game, :draw_opening_hand, nil, %{setup_id: setup.id}),
+           {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do
+        get_game(game.id)
+      end
+    end)
+  end
+
+  @spec choose_active_from_hand(Game.t() | String.t(), String.t(), String.t()) ::
+          {:ok, Game.t()} | {:error, term()}
+  def choose_active_from_hand(game_or_id, player_id, card_instance_id)
+      when is_binary(player_id) and is_binary(card_instance_id) do
+    transaction(fn ->
+      with {:ok, game} <- get_game(game_or_id),
+           {:ok, _setup} <- require_setup_status(game.id, :hands_drawn),
+           {:ok, card} <- get_card(game.id, card_instance_id),
+           :ok <- require_card_owned_by_player(card, player_id),
+           :ok <- require_card_zone(card, :hand),
+           :ok <- require_basic_pokemon(card.card_id),
+           :ok <- require_no_active(game.id, player_id),
+           {:ok, _card} <- update(card, :choose_active, %{position: 1, turn_entered_play: 0}),
+           {:ok, event} <-
+             write_event(game, :choose_active_from_hand, player_id, %{card_instance_id: card.id}),
+           {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do
+        get_game(game.id)
+      end
+    end)
+  end
+
+  @spec choose_setup_bench_from_hand(Game.t() | String.t(), String.t(), String.t()) ::
+          {:ok, Game.t()} | {:error, term()}
+  def choose_setup_bench_from_hand(game_or_id, player_id, card_instance_id)
+      when is_binary(player_id) and is_binary(card_instance_id) do
+    transaction(fn ->
+      with {:ok, game} <- get_game(game_or_id),
+           {:ok, _setup} <- require_setup_status(game.id, :hands_drawn),
+           {:ok, card} <- get_card(game.id, card_instance_id),
+           :ok <- require_card_owned_by_player(card, player_id),
+           :ok <- require_card_zone(card, :hand),
+           :ok <- require_basic_pokemon(card.card_id),
+           {:ok, position} <- next_bench_position(game.id, player_id),
+           {:ok, _card} <-
+             update(card, :play_to_bench, %{position: position, turn_entered_play: 0}),
+           {:ok, event} <-
+             write_event(game, :choose_setup_bench_from_hand, player_id, %{
+               card_instance_id: card.id,
+               position: position
+             }),
+           {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do
+        get_game(game.id)
+      end
+    end)
+  end
+
+  @spec place_prizes(Game.t() | String.t()) :: {:ok, Game.t()} | {:error, term()}
+  def place_prizes(game_or_id) do
+    transaction(fn ->
+      with {:ok, game} <- get_game(game_or_id),
+           {:ok, setup} <- require_setup_status(game.id, :hands_drawn),
+           :ok <- require_all_players_have_active(game.id),
+           :ok <- require_no_prizes_placed(game.id),
+           {:ok, setup} <- update(setup, :place_prizes, %{}),
+           {:ok, _cards} <- GameSetup.place_prize_cards(game.id),
+           {:ok, event} <- write_event(game, :place_prizes, nil, %{setup_id: setup.id}),
+           {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do
+        get_game(game.id)
+      end
+    end)
+  end
+
+  @spec complete_setup(Game.t() | String.t()) :: {:ok, Game.t()} | {:error, term()}
+  def complete_setup(game_or_id) do
+    transaction(fn ->
+      with {:ok, game} <- get_game(game_or_id),
+           {:ok, setup} <- require_setup_status(game.id, :prizes_placed),
+           :ok <- require_all_players_have_active(game.id),
+           :ok <- require_all_players_have_prizes(game.id, 6),
+           {:ok, setup} <- update(setup, :complete_setup, %{}),
+           {:ok, game} <- update(game, :complete_setup, %{}),
+           {:ok, event} <- write_event(game, :complete_setup, nil, %{setup_id: setup.id}),
+           {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do
+        get_game(game.id)
+      end
+    end)
+  end
+
+  @spec start_next_turn(Game.t() | String.t()) :: {:ok, Game.t()} | {:error, term()}
+  def start_next_turn(game_or_id) do
+    transaction(fn ->
+      with {:ok, game} <- get_game(game_or_id),
+           :ok <- require_game_status(game, :in_progress),
+           {:ok, next_player_id} <- next_turn_player_id(game),
+           {:ok, turn_number} <- next_turn_number(game.id),
+           {:ok, next_player} <- get_player(game.id, next_player_id),
+           {:ok, _player} <- update(next_player, :reset_turn_flags, %{}),
+           {:ok, game} <- update(game, :set_active_player, %{active_player_id: next_player_id}),
+           {:ok, turn} <-
+             create(Turn, :create, %{
+               game_id: game.id,
+               turn_number: turn_number,
+               active_player_id: next_player_id
+             }),
+           {:ok, event} <-
+             write_event(game, :start_next_turn, next_player_id, %{turn_id: turn.id}),
+           {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do
+        get_game(game.id)
+      end
+    end)
+  end
+
+  @spec play_basic_to_bench(Game.t() | String.t(), String.t(), String.t()) ::
+          {:ok, Game.t()} | {:error, term()}
+  def play_basic_to_bench(game_or_id, player_id, card_instance_id)
+      when is_binary(player_id) and is_binary(card_instance_id) do
+    transaction(fn ->
+      with {:ok, game} <- get_game(game_or_id),
+           :ok <- require_game_status(game, :in_progress),
+           :ok <- require_active_player(game, player_id),
+           {:ok, turn} <- require_current_turn_status(game.id, :action_window),
+           {:ok, card} <- get_card(game.id, card_instance_id),
+           :ok <- require_card_owned_by_player(card, player_id),
+           :ok <- require_card_zone(card, :hand),
+           :ok <- require_basic_pokemon(card.card_id),
+           {:ok, position} <- next_bench_position(game.id, player_id),
+           {:ok, _card} <-
+             update(card, :play_to_bench, %{
+               position: position,
+               turn_entered_play: turn.turn_number
+             }),
+           {:ok, event} <-
+             write_event(game, :play_basic_to_bench, player_id, %{
+               turn_id: turn.id,
+               card_instance_id: card.id,
+               position: position
+             }),
+           {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do
+        get_game(game.id)
+      end
+    end)
+  end
+
+  @spec attach_energy(Game.t() | String.t(), String.t(), String.t(), String.t()) ::
+          {:ok, Game.t()} | {:error, term()}
+  def attach_energy(game_or_id, player_id, energy_card_instance_id, target_card_instance_id)
+      when is_binary(player_id) and is_binary(energy_card_instance_id) and
+             is_binary(target_card_instance_id) do
+    transaction(fn ->
+      with {:ok, game} <- get_game(game_or_id),
+           :ok <- require_game_status(game, :in_progress),
+           :ok <- require_active_player(game, player_id),
+           {:ok, turn} <- require_current_turn_status(game.id, :action_window),
+           {:ok, player} <- get_player(game.id, player_id),
+           :ok <- require_energy_not_attached_this_turn(player),
+           {:ok, energy_card} <- get_card(game.id, energy_card_instance_id),
+           {:ok, target_card} <- get_card(game.id, target_card_instance_id),
+           :ok <- require_card_owned_by_player(energy_card, player_id),
+           :ok <- require_card_owned_by_player(target_card, player_id),
+           :ok <- require_card_zone(energy_card, :hand),
+           :ok <- require_in_play_pokemon_zone(target_card),
+           :ok <- require_energy(energy_card.card_id),
+           {:ok, position} <- next_attachment_position(game.id, target_card.id),
+           {:ok, _energy_card} <-
+             update(energy_card, :attach, %{
+               attached_to_card_instance_id: target_card.id,
+               position: position
+             }),
+           {:ok, _player} <- update(player, :mark_energy_attached, %{}),
+           {:ok, event} <-
+             write_event(game, :attach_energy, player_id, %{
+               turn_id: turn.id,
+               energy_card_instance_id: energy_card.id,
+               target_card_instance_id: target_card.id,
+               position: position
+             }),
+           {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do
+        get_game(game.id)
+      end
+    end)
+  end
+
+  @spec play_trainer_to_discard(Game.t() | String.t(), String.t(), String.t()) ::
+          {:ok, Game.t()} | {:error, term()}
+  def play_trainer_to_discard(game_or_id, player_id, card_instance_id)
+      when is_binary(player_id) and is_binary(card_instance_id) do
+    transaction(fn ->
+      with {:ok, game} <- get_game(game_or_id),
+           :ok <- require_game_status(game, :in_progress),
+           :ok <- require_active_player(game, player_id),
+           {:ok, turn} <- require_current_turn_status(game.id, :action_window),
+           {:ok, player} <- get_player(game.id, player_id),
+           {:ok, card} <- get_card(game.id, card_instance_id),
+           :ok <- require_card_owned_by_player(card, player_id),
+           :ok <- require_card_zone(card, :hand),
+           {:ok, metadata} <- require_trainer_type(card.card_id, [:item, :supporter]),
+           :ok <- require_supporter_available(player, metadata),
+           :ok <- require_ace_spec_available(player, metadata),
+           {:ok, position} <- next_discard_position(game.id, player_id),
+           {:ok, _card} <- update(card, :discard, %{position: position}),
+           {:ok, _player} <- mark_trainer_flags(player, metadata),
+           {:ok, event} <-
+             write_event(game, :play_trainer_to_discard, player_id, %{
+               turn_id: turn.id,
+               card_instance_id: card.id,
+               trainer_type: Atom.to_string(metadata.trainer_type)
+             }),
+           {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do
+        get_game(game.id)
+      end
+    end)
+  end
+
+  @spec buddy_buddy_poffin(Game.t() | String.t(), String.t(), String.t(), [String.t()]) ::
+          {:ok, Game.t()} | {:error, term()}
+  def buddy_buddy_poffin(game_or_id, player_id, poffin_card_instance_id, target_card_instance_ids)
+      when is_binary(player_id) and is_binary(poffin_card_instance_id) and
+             is_list(target_card_instance_ids) do
+    transaction(fn ->
+      with {:ok, game} <- get_game(game_or_id),
+           {:ok, turn} <- require_action_window_for_player(game, player_id),
+           :ok <- require_max_count(target_card_instance_ids, 2, :too_many_poffin_targets),
+           {:ok, player} <- get_player(game.id, player_id),
+           {:ok, poffin_card} <- get_card(game.id, poffin_card_instance_id),
+           {:ok, targets} <- get_cards(game.id, target_card_instance_ids),
+           :ok <-
+             CardPlay.require_trainer_card(player, poffin_card, player_id, "TEF-144", [:item]),
+           :ok <- require_all_owned_in_zone(targets, player_id, :deck),
+           :ok <- require_poffin_targets(targets),
+           {:ok, _poffin_card} <- discard_trainer_card(game, player, poffin_card, %{}),
+           {:ok, moved_targets} <-
+             move_deck_cards_to_bench(game.id, player_id, targets, turn.turn_number),
+           {:ok, event} <-
+             write_event(game, :buddy_buddy_poffin, player_id, %{
+               turn_id: turn.id,
+               instance_id: poffin_card.id,
+               target_ids: Enum.map(moved_targets, & &1.id)
+             }),
+           {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do
+        get_game(game.id)
+      end
+    end)
+  end
+
+  @spec play_card(Game.t() | String.t(), String.t(), String.t(), map()) ::
+          {:ok, Game.t()} | {:error, term()}
+  def play_card(game_or_id, player_id, card_instance_id, opts \\ %{})
+      when is_binary(player_id) and is_binary(card_instance_id) and is_map(opts) do
+    transaction(fn ->
+      with {:ok, game} <- get_game(game_or_id),
+           {:ok, turn} <- require_action_window_for_player(game, player_id),
+           :ok <- CardPlay.require_no_awaiting_pending_effect(game.id),
+           {:ok, player} <- get_player(game.id, player_id),
+           {:ok, card} <- get_card(game.id, card_instance_id),
+           {:ok, definition} <- EngineCardRegistry.fetch(card.card_id),
+           {:ok, metadata} <-
+             CardPlay.require_playable_trainer_definition(player, card, player_id, definition),
+           {:ok, choices} <- ChoiceValidator.normalize_payload(opts, definition),
+           {:ok, _event} <-
+             write_event_and_snapshot(game.id, :card_play_started, player_id, %{
+               turn_id: turn.id,
+               card_instance_id: card.id,
+               card_id: card.card_id
+             }) do
+        CardPlay.resolve_play_card_costs(game, turn, player, card, metadata, definition, choices)
+      end
+    end)
+  end
+
+  @spec choose_prompt(Game.t() | String.t(), String.t(), String.t(), term()) ::
+          {:ok, Game.t()} | {:error, term()}
+  def choose_prompt(game_or_id, player_id, prompt_id, choice)
+      when is_binary(player_id) and is_binary(prompt_id) do
+    transaction(fn ->
+      with {:ok, game} <- get_game(game_or_id),
+           {:ok, prompt} <- get_prompt(game.id, prompt_id),
+           :ok <- require_prompt_awaiting_player(prompt, player_id),
+           {:ok, pending_effect} <- PendingEffects.get(game.id, prompt.pending_effect_id),
+           :ok <- require_pending_effect_status(pending_effect, :awaiting_prompt),
+           choice_key = prompt_choice_key(prompt),
+           {:ok, normalized_choice} <- ChoiceValidator.normalize_choice(choice),
+           {:ok, prompt} <-
+             update(prompt, :resolve, %{
+               payload: Map.put(prompt.payload, "resolved_choice", normalized_choice)
+             }),
+           {:ok, _event} <-
+             write_event_and_snapshot(game.id, :prompt_resolved, player_id, %{
+               prompt_id: prompt.id,
+               pending_effect_id: pending_effect.id,
+               choice_key: choice_key,
+               choice: normalized_choice
+             }),
+           {:ok, pending_effect} <-
+             update(pending_effect, :resume, %{
+               current_player_id: nil,
+               state: Map.put(pending_effect.state || %{}, "last_choice", normalized_choice)
+             }) do
+        CardPlay.resume_pending_effect(game, pending_effect, choice_key, normalized_choice)
+      end
+    end)
+  end
+
+  @spec ultra_ball(Game.t() | String.t(), String.t(), String.t(), [String.t()], String.t()) ::
+          {:ok, Game.t()} | {:error, term()}
+  def ultra_ball(
+        game_or_id,
+        player_id,
+        ultra_ball_card_instance_id,
+        discard_card_instance_ids,
+        target_card_instance_id
+      )
+      when is_binary(player_id) and is_binary(ultra_ball_card_instance_id) and
+             is_list(discard_card_instance_ids) and
+             is_binary(target_card_instance_id) do
+    transaction(fn ->
+      with {:ok, game} <- get_game(game_or_id),
+           {:ok, turn} <- require_action_window_for_player(game, player_id),
+           :ok <-
+             require_exact_count(discard_card_instance_ids, 2, :wrong_ultra_ball_discard_count),
+           :ok <- require_unique_ids(discard_card_instance_ids),
+           :ok <- require_id_not_in(ultra_ball_card_instance_id, discard_card_instance_ids),
+           {:ok, player} <- get_player(game.id, player_id),
+           {:ok, ultra_ball_card} <- get_card(game.id, ultra_ball_card_instance_id),
+           {:ok, discard_cards} <- get_cards(game.id, discard_card_instance_ids),
+           {:ok, target_card} <- get_card(game.id, target_card_instance_id),
+           :ok <-
+             CardPlay.require_trainer_card(player, ultra_ball_card, player_id, "MEG-131", [:item]),
+           :ok <- require_all_owned_in_zone(discard_cards, player_id, :hand),
+           :ok <- require_card_owned_by_player(target_card, player_id),
+           :ok <- require_card_zone(target_card, :deck),
+           :ok <- require_pokemon_card(target_card.card_id),
+           {:ok, _ultra_ball_card} <- discard_trainer_card(game, player, ultra_ball_card, %{}),
+           {:ok, _discarded_cards} <- discard_cards_from_hand(game.id, player_id, discard_cards),
+           {:ok, moved_target} <- move_deck_card_to_hand(game.id, player_id, target_card),
+           {:ok, event} <-
+             write_event(game, :ultra_ball, player_id, %{
+               turn_id: turn.id,
+               instance_id: ultra_ball_card.id,
+               discard_ids: Enum.map(discard_cards, & &1.id),
+               target_id: moved_target.id
+             }),
+           {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do
+        get_game(game.id)
+      end
+    end)
+  end
+
+  @spec boss_orders(Game.t() | String.t(), String.t(), String.t(), String.t()) ::
+          {:ok, Game.t()} | {:error, term()}
+  def boss_orders(game_or_id, player_id, boss_card_instance_id, target_bench_card_instance_id)
+      when is_binary(player_id) and is_binary(boss_card_instance_id) and
+             is_binary(target_bench_card_instance_id) do
+    transaction(fn ->
+      with {:ok, game} <- get_game(game_or_id),
+           {:ok, turn} <- require_action_window_for_player(game, player_id),
+           {:ok, player} <- get_player(game.id, player_id),
+           {:ok, boss_card} <- get_card(game.id, boss_card_instance_id),
+           {:ok, opponent_player_id} <- opponent_player_id(game.id, player_id),
+           {:ok, opponent_active_card} <- active_card(game.id, opponent_player_id),
+           {:ok, target_bench_card} <- get_card(game.id, target_bench_card_instance_id),
+           :ok <-
+             CardPlay.require_trainer_card(player, boss_card, player_id, "MEG-114", [:supporter]),
+           :ok <- require_card_owned_by_player(target_bench_card, opponent_player_id),
+           :ok <- require_card_zone(target_bench_card, :bench),
+           {:ok, _boss_card} <- discard_trainer_card(game, player, boss_card, %{}),
+           bench_position = target_bench_card.position,
+           {:ok, _opponent_active_card} <-
+             update(opponent_active_card, :move_active_to_bench, %{
+               position: bench_position,
+               status: nil
+             }),
+           {:ok, _target_bench_card} <-
+             update(target_bench_card, :promote_to_active, %{position: 1, status: nil}),
+           {:ok, event} <-
+             write_event(game, :boss_orders, player_id, %{
+               turn_id: turn.id,
+               instance_id: boss_card.id,
+               target_id: target_bench_card.id
+             }),
+           {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do
+        get_game(game.id)
+      end
+    end)
+  end
+
+  @spec night_stretcher(Game.t() | String.t(), String.t(), String.t(), String.t()) ::
+          {:ok, Game.t()} | {:error, term()}
+  def night_stretcher(game_or_id, player_id, stretcher_card_instance_id, target_card_instance_id)
+      when is_binary(player_id) and is_binary(stretcher_card_instance_id) and
+             is_binary(target_card_instance_id) do
+    transaction(fn ->
+      with {:ok, game} <- get_game(game_or_id),
+           {:ok, turn} <- require_action_window_for_player(game, player_id),
+           {:ok, player} <- get_player(game.id, player_id),
+           {:ok, stretcher_card} <- get_card(game.id, stretcher_card_instance_id),
+           {:ok, target_card} <- get_card(game.id, target_card_instance_id),
+           :ok <-
+             CardPlay.require_trainer_card(player, stretcher_card, player_id, "ASC-196", [:item]),
+           :ok <- require_card_owned_by_player(target_card, player_id),
+           :ok <- require_card_zone(target_card, :discard),
+           :ok <- require_night_stretcher_target(target_card.card_id),
+           {:ok, _stretcher_card} <- discard_trainer_card(game, player, stretcher_card, %{}),
+           {:ok, moved_target} <- move_discard_card_to_hand(game.id, player_id, target_card),
+           {:ok, event} <-
+             write_event(game, :night_stretcher, player_id, %{
+               turn_id: turn.id,
+               instance_id: stretcher_card.id,
+               target_id: moved_target.id
+             }),
+           {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do
+        get_game(game.id)
+      end
+    end)
+  end
+
+  @spec poke_pad(Game.t() | String.t(), String.t(), String.t(), String.t()) ::
+          {:ok, Game.t()} | {:error, term()}
+  def poke_pad(game_or_id, player_id, poke_pad_card_instance_id, target_card_instance_id)
+      when is_binary(player_id) and is_binary(poke_pad_card_instance_id) and
+             is_binary(target_card_instance_id) do
+    transaction(fn ->
+      with {:ok, game} <- get_game(game_or_id),
+           {:ok, turn} <- require_action_window_for_player(game, player_id),
+           {:ok, player} <- get_player(game.id, player_id),
+           {:ok, poke_pad_card} <- get_card(game.id, poke_pad_card_instance_id),
+           {:ok, target_card} <- get_card(game.id, target_card_instance_id),
+           :ok <-
+             CardPlay.require_trainer_card(player, poke_pad_card, player_id, "POR-081", [:item]),
+           :ok <- require_card_owned_by_player(target_card, player_id),
+           :ok <- require_card_zone(target_card, :deck),
+           :ok <- require_non_rule_box_pokemon_card(target_card.card_id),
+           {:ok, _poke_pad_card} <- discard_trainer_card(game, player, poke_pad_card, %{}),
+           {:ok, moved_target} <- move_deck_card_to_hand(game.id, player_id, target_card),
+           {:ok, event} <-
+             write_event(game, :poke_pad, player_id, %{
+               turn_id: turn.id,
+               instance_id: poke_pad_card.id,
+               target_id: moved_target.id
+             }),
+           {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do
+        get_game(game.id)
+      end
+    end)
+  end
+
+  @spec play_stadium(Game.t() | String.t(), String.t(), String.t()) ::
+          {:ok, Game.t()} | {:error, term()}
+  def play_stadium(game_or_id, player_id, card_instance_id)
+      when is_binary(player_id) and is_binary(card_instance_id) do
+    transaction(fn ->
+      with {:ok, game} <- get_game(game_or_id),
+           :ok <- require_game_status(game, :in_progress),
+           :ok <- require_active_player(game, player_id),
+           {:ok, turn} <- require_current_turn_status(game.id, :action_window),
+           {:ok, player} <- get_player(game.id, player_id),
+           {:ok, card} <- get_card(game.id, card_instance_id),
+           :ok <- require_card_owned_by_player(card, player_id),
+           :ok <- require_card_zone(card, :hand),
+           {:ok, metadata} <- require_trainer_type(card.card_id, [:stadium]),
+           :ok <- require_ace_spec_available(player, metadata),
+           {:ok, _discarded_stadiums} <- discard_existing_stadiums(game.id),
+           {:ok, _card} <- update(card, :play_stadium, %{position: 1}),
+           {:ok, _player} <- mark_trainer_flags(player, metadata),
+           {:ok, event} <-
+             write_event(game, :play_stadium, player_id, %{
+               turn_id: turn.id,
+               card_instance_id: card.id
+             }),
+           {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do
+        get_game(game.id)
+      end
+    end)
+  end
+
+  @spec attach_tool(Game.t() | String.t(), String.t(), String.t(), String.t()) ::
+          {:ok, Game.t()} | {:error, term()}
+  def attach_tool(game_or_id, player_id, tool_card_instance_id, target_card_instance_id)
+      when is_binary(player_id) and is_binary(tool_card_instance_id) and
+             is_binary(target_card_instance_id) do
+    transaction(fn ->
+      with {:ok, game} <- get_game(game_or_id),
+           :ok <- require_game_status(game, :in_progress),
+           :ok <- require_active_player(game, player_id),
+           {:ok, turn} <- require_current_turn_status(game.id, :action_window),
+           {:ok, player} <- get_player(game.id, player_id),
+           {:ok, tool_card} <- get_card(game.id, tool_card_instance_id),
+           {:ok, target_card} <- get_card(game.id, target_card_instance_id),
+           :ok <- require_card_owned_by_player(tool_card, player_id),
+           :ok <- require_card_owned_by_player(target_card, player_id),
+           :ok <- require_card_zone(tool_card, :hand),
+           :ok <- require_in_play_pokemon_zone(target_card),
+           {:ok, metadata} <- require_trainer_type(tool_card.card_id, [:tool]),
+           :ok <- require_ace_spec_available(player, metadata),
+           :ok <- require_no_tool_attached(game.id, target_card.id),
+           {:ok, position} <- next_attachment_position(game.id, target_card.id),
+           {:ok, _tool_card} <-
+             update(tool_card, :attach, %{
+               attached_to_card_instance_id: target_card.id,
+               position: position
+             }),
+           {:ok, _player} <- mark_trainer_flags(player, metadata),
+           {:ok, event} <-
+             write_event(game, :attach_tool, player_id, %{
+               turn_id: turn.id,
+               tool_card_instance_id: tool_card.id,
+               target_card_instance_id: target_card.id,
+               position: position
+             }),
+           {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do
+        get_game(game.id)
+      end
+    end)
+  end
+
+  @spec search_deck_to_hand(Game.t() | String.t(), String.t(), String.t()) ::
+          {:ok, Game.t()} | {:error, term()}
+  def search_deck_to_hand(game_or_id, player_id, card_instance_id)
+      when is_binary(player_id) and is_binary(card_instance_id) do
+    ZoneActions.move_owned_card_to_hand_from_zone(
+      game_or_id,
+      player_id,
+      card_instance_id,
+      :deck,
+      :search_deck_to_hand
+    )
+  end
+
+  @spec put_basic_from_deck_to_bench(Game.t() | String.t(), String.t(), String.t()) ::
+          {:ok, Game.t()} | {:error, term()}
+  def put_basic_from_deck_to_bench(game_or_id, player_id, card_instance_id)
+      when is_binary(player_id) and is_binary(card_instance_id) do
+    transaction(fn ->
+      with {:ok, game} <- get_game(game_or_id),
+           {:ok, turn} <- require_action_window_for_player(game, player_id),
+           {:ok, card} <- get_card(game.id, card_instance_id),
+           :ok <- require_card_owned_by_player(card, player_id),
+           :ok <- require_card_zone(card, :deck),
+           :ok <- require_basic_pokemon(card.card_id),
+           {:ok, position} <- next_bench_position(game.id, player_id),
+           {:ok, _card} <-
+             update(card, :put_basic_from_deck_to_bench, %{
+               position: position,
+               turn_entered_play: turn.turn_number
+             }),
+           {:ok, event} <-
+             write_event(game, :put_basic_from_deck_to_bench, player_id, %{
+               turn_id: turn.id,
+               card_instance_id: card.id,
+               position: position
+             }),
+           {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do
+        get_game(game.id)
+      end
+    end)
+  end
+
+  @spec evolve_from_hand(Game.t() | String.t(), String.t(), String.t(), String.t()) ::
+          {:ok, Game.t()} | {:error, term()}
+  def evolve_from_hand(game_or_id, player_id, evolution_card_instance_id, target_card_instance_id)
+      when is_binary(player_id) and is_binary(evolution_card_instance_id) and
+             is_binary(target_card_instance_id) do
+    transaction(fn ->
+      with {:ok, game} <- get_game(game_or_id),
+           {:ok, turn} <- require_action_window_for_player(game, player_id),
+           :ok <- require_evolution_allowed_this_turn(turn),
+           {:ok, evolution_card} <- get_card(game.id, evolution_card_instance_id),
+           {:ok, target_card} <- get_card(game.id, target_card_instance_id),
+           :ok <- require_card_owned_by_player(evolution_card, player_id),
+           :ok <- require_card_owned_by_player(target_card, player_id),
+           :ok <- require_card_zone(evolution_card, :hand),
+           :ok <- require_in_play_pokemon_zone(target_card),
+           :ok <- require_can_evolve_target(target_card, turn.turn_number),
+           :ok <- require_evolves_from(evolution_card.card_id, target_card.card_id),
+           evolve_action = evolve_action_for_zone(target_card.zone),
+           target_position = target_card.position,
+           {:ok, evolution_card} <-
+             update(evolution_card, evolve_action, %{
+               evolves_from_card_instance_id: target_card.id,
+               position: target_position,
+               turn_entered_play: turn.turn_number
+             }),
+           {:ok, _target_card} <-
+             update(target_card, :evolve_under, %{
+               attached_to_card_instance_id: evolution_card.id,
+               position: 1
+             }),
+           {:ok, event} <-
+             write_event(game, :evolve_from_hand, player_id, %{
+               turn_id: turn.id,
+               evolution_card_instance_id: evolution_card.id,
+               target_card_instance_id: target_card.id
+             }),
+           {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do
+        get_game(game.id)
+      end
+    end)
+  end
+
+  @spec discard_from_hand(Game.t() | String.t(), String.t(), String.t()) ::
+          {:ok, Game.t()} | {:error, term()}
+  def discard_from_hand(game_or_id, player_id, card_instance_id)
+      when is_binary(player_id) and is_binary(card_instance_id) do
+    ZoneActions.discard_owned_card_from_zone(
+      game_or_id,
+      player_id,
+      card_instance_id,
+      :hand,
+      :discard_from_hand
+    )
+  end
+
+  @spec discard_from_deck(Game.t() | String.t(), String.t(), String.t()) ::
+          {:ok, Game.t()} | {:error, term()}
+  def discard_from_deck(game_or_id, player_id, card_instance_id)
+      when is_binary(player_id) and is_binary(card_instance_id) do
+    ZoneActions.discard_owned_card_from_zone(
+      game_or_id,
+      player_id,
+      card_instance_id,
+      :deck,
+      :discard_from_deck
+    )
+  end
+
+  @spec recover_discard_to_hand(Game.t() | String.t(), String.t(), String.t()) ::
+          {:ok, Game.t()} | {:error, term()}
+  def recover_discard_to_hand(game_or_id, player_id, card_instance_id)
+      when is_binary(player_id) and is_binary(card_instance_id) do
+    ZoneActions.move_owned_card_to_hand_from_zone(
+      game_or_id,
+      player_id,
+      card_instance_id,
+      :discard,
+      :recover_discard_to_hand
+    )
+  end
+
+  @spec switch_active_with_bench(Game.t() | String.t(), String.t(), String.t()) ::
+          {:ok, Game.t()} | {:error, term()}
+  def switch_active_with_bench(game_or_id, player_id, bench_card_instance_id)
+      when is_binary(player_id) and is_binary(bench_card_instance_id) do
+    transaction(fn ->
+      with {:ok, game} <- get_game(game_or_id),
+           {:ok, turn} <- require_action_window_for_player(game, player_id),
+           {:ok, active_card} <- active_card(game.id, player_id),
+           {:ok, bench_card} <- get_card(game.id, bench_card_instance_id),
+           :ok <- require_card_owned_by_player(bench_card, player_id),
+           :ok <- require_card_zone(bench_card, :bench),
+           bench_position = bench_card.position,
+           {:ok, _active_card} <-
+             update(active_card, :move_active_to_bench, %{position: bench_position, status: nil}),
+           {:ok, _bench_card} <-
+             update(bench_card, :promote_to_active, %{position: 1, status: nil}),
+           {:ok, event} <-
+             write_event(game, :switch_active_with_bench, player_id, %{
+               turn_id: turn.id,
+               active_card_instance_id: active_card.id,
+               bench_card_instance_id: bench_card.id
+             }),
+           {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do
+        get_game(game.id)
+      end
+    end)
+  end
+
+  @spec retreat(Game.t() | String.t(), String.t(), String.t(), [String.t()]) ::
+          {:ok, Game.t()} | {:error, term()}
+  def retreat(game_or_id, player_id, bench_card_instance_id, energy_card_instance_ids)
+      when is_binary(player_id) and is_binary(bench_card_instance_id) and
+             is_list(energy_card_instance_ids) do
+    transaction(fn ->
+      with {:ok, game} <- get_game(game_or_id),
+           {:ok, turn} <- require_action_window_for_player(game, player_id),
+           {:ok, player} <- get_player(game.id, player_id),
+           :ok <- require_not_retreated_this_turn(player),
+           {:ok, active_card} <- active_card(game.id, player_id),
+           :ok <- require_can_retreat(active_card),
+           {:ok, bench_card} <- get_card(game.id, bench_card_instance_id),
+           :ok <- require_card_owned_by_player(bench_card, player_id),
+           :ok <- require_card_zone(bench_card, :bench),
+           {:ok, retreat_cost} <- retreat_cost(active_card.card_id),
+           :ok <- require_retreat_cost_paid(retreat_cost, energy_card_instance_ids),
+           {:ok, energy_cards} <-
+             attached_energy_cards_for_retreat(game.id, active_card.id, energy_card_instance_ids),
+           {:ok, _discarded_energy} <- discard_retreat_energy(game.id, player_id, energy_cards),
+           bench_position = bench_card.position,
+           {:ok, _active_card} <-
+             update(active_card, :move_active_to_bench, %{position: bench_position, status: nil}),
+           {:ok, _bench_card} <-
+             update(bench_card, :promote_to_active, %{position: 1, status: nil}),
+           {:ok, _player} <- update(player, :mark_retreated, %{}),
+           {:ok, event} <-
+             write_event(game, :retreat, player_id, %{
+               turn_id: turn.id,
+               active_card_instance_id: active_card.id,
+               bench_card_instance_id: bench_card.id,
+               discarded_energy_card_instance_ids: Enum.map(energy_cards, & &1.id)
+             }),
+           {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do
+        get_game(game.id)
+      end
+    end)
+  end
+
+  @spec choose_prize(Game.t() | String.t(), String.t(), String.t()) ::
+          {:ok, Game.t()} | {:error, term()}
+  def choose_prize(game_or_id, player_id, prize_card_instance_id)
+      when is_binary(player_id) and is_binary(prize_card_instance_id) do
+    transaction(fn ->
+      with {:ok, game} <- get_game(game_or_id),
+           :ok <- require_game_status(game, :in_progress),
+           {:ok, prize_card} <- get_card(game.id, prize_card_instance_id),
+           :ok <- require_card_owned_by_player(prize_card, player_id),
+           :ok <- require_card_zone(prize_card, :prize),
+           {:ok, position} <- next_hand_position_result(game.id, player_id),
+           {:ok, _prize_card} <- update(prize_card, :take_prize, %{position: position}),
+           {:ok, game} <- maybe_finish_for_last_prize(game, player_id),
+           {:ok, event} <-
+             write_event(game, :choose_prize, player_id, %{
+               prize_card_instance_id: prize_card.id,
+               position: position
+             }),
+           {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do
+        get_game(game.id)
+      end
+    end)
+  end
+
+  @spec choose_replacement_active(Game.t() | String.t(), String.t(), String.t()) ::
+          {:ok, Game.t()} | {:error, term()}
+  def choose_replacement_active(game_or_id, player_id, bench_card_instance_id)
+      when is_binary(player_id) and is_binary(bench_card_instance_id) do
+    transaction(fn ->
+      with {:ok, game} <- get_game(game_or_id),
+           :ok <- require_game_status(game, :in_progress),
+           :ok <- require_no_active(game.id, player_id),
+           {:ok, bench_card} <- get_card(game.id, bench_card_instance_id),
+           :ok <- require_card_owned_by_player(bench_card, player_id),
+           :ok <- require_card_zone(bench_card, :bench),
+           {:ok, _bench_card} <-
+             update(bench_card, :promote_to_active, %{position: 1, status: nil}),
+           {:ok, event} <-
+             write_event(game, :choose_replacement_active, player_id, %{
+               bench_card_instance_id: bench_card.id
+             }),
+           {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do
+        get_game(game.id)
+      end
+    end)
+  end
+
+  @spec resolve_attack_damage(Game.t() | String.t(), String.t(), String.t(), non_neg_integer()) ::
+          {:ok, Game.t()} | {:error, term()}
+  def resolve_attack_damage(game_or_id, attacking_player_id, target_card_instance_id, damage)
+      when is_binary(attacking_player_id) and is_binary(target_card_instance_id) and
+             is_integer(damage) and damage >= 0 do
+    transaction(fn ->
+      with {:ok, game} <- get_game(game_or_id),
+           :ok <- require_game_status(game, :in_progress),
+           {:ok, target_card} <- get_card(game.id, target_card_instance_id),
+           :ok <- require_in_play_pokemon_zone(target_card),
+           {:ok, damage_result} <-
+             apply_attack_damage(game.id, attacking_player_id, target_card, damage),
+           {:ok, game} <-
+             maybe_finish_for_empty_board(game, attacking_player_id, target_card.owner_player_id),
+           {:ok, event} <-
+             write_event(game, :resolve_attack_damage, attacking_player_id, %{
+               target_card_instance_id: target_card.id,
+               damage: damage,
+               resulting_damage: damage_result.resulting_damage,
+               knocked_out?: damage_result.knocked_out?
+             }),
+           {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do
+        get_game(game.id)
+      end
+    end)
+  end
+
+  @spec set_pokemon_status(Game.t() | String.t(), String.t(), String.t(), atom() | nil) ::
+          {:ok, Game.t()} | {:error, term()}
+  def set_pokemon_status(game_or_id, player_id, target_card_instance_id, status)
+      when is_binary(player_id) and is_binary(target_card_instance_id) and
+             (is_atom(status) or is_nil(status)) do
+    transaction(fn ->
+      with {:ok, game} <- get_game(game_or_id),
+           :ok <- require_game_status(game, :in_progress),
+           {:ok, target_card} <- get_card(game.id, target_card_instance_id),
+           :ok <- require_in_play_pokemon_zone(target_card),
+           :ok <- require_supported_status(status),
+           {:ok, _target_card} <- update(target_card, :set_status, %{status: status}),
+           {:ok, event} <-
+             write_event(game, :set_pokemon_status, player_id, %{
+               target_card_instance_id: target_card.id,
+               status: if(status, do: Atom.to_string(status))
+             }),
+           {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do
+        get_game(game.id)
+      end
+    end)
+  end
+
+  @spec declare_attack(Game.t() | String.t(), String.t(), atom()) ::
+          {:ok, Game.t()} | {:error, term()}
+  def declare_attack(game_or_id, player_id, attack_id)
+      when is_binary(player_id) and is_atom(attack_id) do
+    transaction(fn ->
+      with {:ok, game} <- get_game(game_or_id),
+           {:ok, turn} <- require_action_window_for_player(game, player_id),
+           {:ok, attacker_card} <- active_card(game.id, player_id),
+           :ok <- require_can_attack(attacker_card),
+           {:ok, defender_player_id} <- opponent_player_id(game.id, player_id),
+           {:ok, defender_card} <- active_card(game.id, defender_player_id),
+           {:ok, _attack} <- CardRegistry.fetch_attack(attacker_card.card_id, attack_id),
+           {:ok, turn} <-
+             update(turn, :declare_attack, %{
+               pending_attack_id: attack_id,
+               pending_attacker_card_instance_id: attacker_card.id,
+               pending_defender_card_instance_id: defender_card.id
+             }),
+           {:ok, event} <-
+             write_event(game, :declare_attack, player_id, %{
+               turn_id: turn.id,
+               attacker_card_instance_id: attacker_card.id,
+               defender_card_instance_id: defender_card.id,
+               attack_id: Atom.to_string(attack_id)
+             }),
+           {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do
+        get_game(game.id)
+      end
+    end)
+  end
+
+  @spec resolve_declared_attack(Game.t() | String.t(), String.t()) ::
+          {:ok, Game.t()} | {:error, term()}
+  def resolve_declared_attack(game_or_id, player_id) when is_binary(player_id) do
+    transaction(fn ->
+      with {:ok, game} <- get_game(game_or_id),
+           :ok <- require_game_status(game, :in_progress),
+           :ok <- require_active_player(game, player_id),
+           {:ok, turn} <- require_current_turn_status(game.id, :attack_declared),
+           :ok <- require_turn_player(turn, player_id),
+           {:ok, attacker_card} <- get_card(game.id, turn.pending_attacker_card_instance_id),
+           {:ok, defender_card} <- get_card(game.id, turn.pending_defender_card_instance_id),
+           {:ok, attack} <-
+             CardRegistry.fetch_attack(attacker_card.card_id, turn.pending_attack_id),
+           {:ok, turn} <- update(turn, :resolve_attack, %{}),
+           {:ok, damage_result} <-
+             apply_attack_damage(game.id, player_id, defender_card, Map.get(attack, :damage, 0)),
+           {:ok, game} <-
+             maybe_finish_for_empty_board(game, player_id, defender_card.owner_player_id),
+           {:ok, event} <-
+             write_event(game, :resolve_declared_attack, player_id, %{
+               turn_id: turn.id,
+               attack_id: Atom.to_string(turn.pending_attack_id),
+               defender_card_instance_id: defender_card.id,
+               damage: damage_result.damage,
+               resulting_damage: damage_result.resulting_damage,
+               knocked_out?: damage_result.knocked_out?
+             }),
+           {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do
+        get_game(game.id)
+      end
+    end)
+  end
+
+  @spec finish_attack(Game.t() | String.t(), String.t()) :: {:ok, Game.t()} | {:error, term()}
+  def finish_attack(game_or_id, player_id) when is_binary(player_id) do
+    transaction(fn ->
+      with {:ok, game} <- get_game(game_or_id),
+           :ok <- require_game_status(game, :in_progress),
+           :ok <- require_active_player(game, player_id),
+           {:ok, turn} <- require_current_turn_status(game.id, :attack_resolving),
+           :ok <- require_turn_player(turn, player_id),
+           {:ok, turn} <- update(turn, :finish_attack, %{}),
+           {:ok, event} <- write_event(game, :finish_attack, player_id, %{turn_id: turn.id}),
+           {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do
+        get_game(game.id)
+      end
+    end)
+  end
+
+  @spec draw_for_turn(Game.t() | String.t(), String.t()) :: {:ok, Game.t()} | {:error, term()}
+  def draw_for_turn(game_or_id, player_id) when is_binary(player_id) do
+    transaction(fn ->
+      with {:ok, game} <- get_game(game_or_id),
+           :ok <- require_game_status(game, :in_progress),
+           :ok <- require_active_player(game, player_id),
+           {:ok, turn} <- current_turn(game.id),
+           :ok <- require_turn_player(turn, player_id),
+           {:ok, turn} <- update(turn, :draw_for_turn, %{}) do
+        case draw_one_for_turn(game.id, player_id) do
+          {:ok, _card} ->
+            with {:ok, event} <- write_event(game, :draw_for_turn, player_id, %{turn_id: turn.id}),
+                 {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do
+              get_game(game.id)
+            end
+
+          {:error, :cannot_draw_from_empty_deck} ->
+            with {:ok, winner_player_id} <- opponent_player_id(game.id, player_id),
+                 {:ok, game} <- update(game, :finish, %{winner_player_id: winner_player_id}),
+                 {:ok, event} <-
+                   write_event(game, :deck_out, player_id, %{
+                     turn_id: turn.id,
+                     winner_player_id: winner_player_id
+                   }),
+                 {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do
+              get_game(game.id)
+            end
+
+          {:error, reason} ->
+            {:error, reason}
+        end
+      end
+    end)
+  end
+
+  @spec skip_draw_for_turn(Game.t() | String.t(), String.t()) ::
+          {:ok, Game.t()} | {:error, term()}
+  def skip_draw_for_turn(game_or_id, player_id) when is_binary(player_id) do
+    transaction(fn ->
+      with {:ok, game} <- get_game(game_or_id),
+           :ok <- require_game_status(game, :in_progress),
+           :ok <- require_active_player(game, player_id),
+           {:ok, turn} <- current_turn(game.id),
+           :ok <- require_turn_player(turn, player_id),
+           {:ok, turn} <- update(turn, :skip_draw_for_turn, %{}),
+           {:ok, event} <- write_event(game, :skip_draw_for_turn, player_id, %{turn_id: turn.id}),
+           {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do
+        get_game(game.id)
+      end
+    end)
+  end
+
+  @spec open_action_window(Game.t() | String.t()) :: {:ok, Game.t()} | {:error, term()}
+  def open_action_window(game_or_id) do
+    transaction(fn ->
+      with {:ok, game} <- get_game(game_or_id),
+           :ok <- require_game_status(game, :in_progress),
+           {:ok, turn} <- current_turn(game.id),
+           {:ok, turn} <- update(turn, :open_action_window, %{}),
+           {:ok, event} <-
+             write_event(game, :open_action_window, turn.active_player_id, %{turn_id: turn.id}),
+           {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do
+        get_game(game.id)
+      end
+    end)
+  end
+
+  @spec end_turn(Game.t() | String.t(), String.t()) :: {:ok, Game.t()} | {:error, term()}
+  def end_turn(game_or_id, player_id) when is_binary(player_id) do
+    transaction(fn ->
+      with {:ok, game} <- get_game(game_or_id),
+           :ok <- require_game_status(game, :in_progress),
+           :ok <- require_active_player(game, player_id),
+           {:ok, turn} <- current_turn(game.id),
+           :ok <- require_turn_player(turn, player_id),
+           {:ok, turn} <- update(turn, :end_turn, %{}),
+           {:ok, event} <- write_event(game, :end_turn, player_id, %{turn_id: turn.id}),
+           {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do
+        get_game(game.id)
+      end
+    end)
+  end
+
+  @spec undo(Game.t() | String.t()) :: {:ok, Game.t()} | {:error, term()}
+  def undo(game_or_id) do
+    transaction(fn ->
+      with {:ok, game} <- get_game(game_or_id),
+           true <- game.cursor_index > 0 || {:error, :nothing_to_undo} do
+        SnapshotRestorer.restore(game.id, game.cursor_index - 1)
+      end
+    end)
+  end
+
+  @spec redo(Game.t() | String.t()) :: {:ok, Game.t()} | {:error, term()}
+  def redo(game_or_id) do
+    transaction(fn ->
+      with {:ok, game} <- get_game(game_or_id),
+           true <- game.cursor_index < game.latest_event_index || {:error, :nothing_to_redo} do
+        SnapshotRestorer.restore(game.id, game.cursor_index + 1)
+      end
+    end)
+  end
+end

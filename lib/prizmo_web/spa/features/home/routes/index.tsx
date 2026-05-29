@@ -1,3 +1,5 @@
+import { Link } from '@tanstack/react-router'
+
 export function HomeRoute() {
   return (
     <main className="grid min-h-screen place-items-center">
@@ -9,6 +11,12 @@ export function HomeRoute() {
         <p className="mt-4 text-slate-600">
           A React SPA powered by Phoenix, Ash, AshTypescript, and Volt.
         </p>
+        <Link
+          className="mt-8 inline-flex rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-stone-50 hover:bg-emerald-800"
+          to="/tcg"
+        >
+          Open TCG table
+        </Link>
       </div>
     </main>
   )

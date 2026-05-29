@@ -21,6 +21,8 @@ defmodule PrizmoWeb.VoltReactTanstackPlugin do
     "use-sync-external-store/shim/with-selector" => "use_sync_external_store_with_selector.js"
   }
 
+  @prebundle_externals Map.keys(@virtual_modules) -- ["scheduler"]
+
   @react_exports ~w(
     Activity
     Children
@@ -165,6 +167,9 @@ defmodule PrizmoWeb.VoltReactTanstackPlugin do
       {:ok, code}
     end
   end
+
+  @impl true
+  def prebundle_externals, do: @prebundle_externals
 
   @impl true
   def prebundle_alias("react-dom"), do: "react"

@@ -1,6 +1,7 @@
 import { Link, Outlet, createRootRoute, createRoute, createRouter } from '@tanstack/react-router'
 
 import { HomeRoute } from '@/features/home/routes'
+import { TcgRoute } from '@/features/tcg/routes'
 
 function NotFoundRoute() {
   return (
@@ -24,7 +25,13 @@ const indexRoute = createRoute({
   component: HomeRoute
 })
 
-const routeTree = rootRoute.addChildren([indexRoute])
+const tcgRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/tcg',
+  component: TcgRoute
+})
+
+const routeTree = rootRoute.addChildren([indexRoute, tcgRoute])
 
 export const router = createRouter({ routeTree })
 

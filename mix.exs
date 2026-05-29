@@ -55,11 +55,12 @@ defmodule Prizmo.MixProject do
   # Type `mix help deps` for examples and options.
   defp deps do
     [
-      {:volt, "== 0.14.0"},
+      {:volt, github: "kosciak9/volt", ref: "eaab374b180fc9f848914a9ddeb7ea1dfe410a22"},
       {:picosat_elixir, "~> 0.2"},
       {:sourceror, "~> 1.8", only: [:dev, :test]},
       {:oban, "~> 2.0"},
       {:ash_typescript, "~> 0.17"},
+      {:ash_state_machine, "~> 0.2"},
       {:usage_rules, "~> 1.0", only: [:dev]},
       {:tidewave, "~> 0.5", only: [:dev]},
       {:oban_web, "~> 2.0"},
