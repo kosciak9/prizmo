@@ -121,6 +121,8 @@ mix prizmo.cards.coverage
 mix prizmo.cards.check
 ```
 
+Current import-path decision: checked-in static deck modules are the accepted path for the first playable meta-deck milestone. A future `mix prizmo.deck.import` task remains desirable for repeatability, but it is not required before the UI phase as long as each supported deck has a committed `Decklist` module, committed TCGdex metadata, and pairwise smoke coverage through `Prizmo.Tcg.Data.TCGdex.known_deck_modules/0`.
+
 Generated deck modules should be committed and use a deck macro with fields such as:
 
 ```elixir
