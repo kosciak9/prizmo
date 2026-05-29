@@ -32,6 +32,7 @@ defmodule Prizmo.Tcg.Cards.Behaviors.DRI do
     )
 
     attack(:dark_frost,
+      damage: 60,
       effect: %{type: :bonus_damage_if_attacker_has_team_rocket_energy, bonus_damage: 60}
     )
   end

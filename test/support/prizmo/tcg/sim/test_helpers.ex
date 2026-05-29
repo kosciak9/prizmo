@@ -13,12 +13,15 @@ defmodule Prizmo.Tcg.Sim.TestHelpers do
     active_a = Keyword.get_lazy(opts, :active_a, fn -> first_basic_card_id!(deck_a) end)
     active_b = Keyword.get_lazy(opts, :active_b, fn -> first_basic_card_id!(deck_b) end)
 
+    opening_a = Keyword.get(opts, :opening_a)
+    opening_b = Keyword.get(opts, :opening_b)
+
     state =
       Engine.new_game(
         active_player: active_player,
         players: [
-          {player_a, deck_with_opening_active(deck_a, active_a)},
-          {player_b, deck_with_opening_active(deck_b, active_b)}
+          {player_a, deck_with_opening_active(deck_a, active_a, opening_a)},
+          {player_b, deck_with_opening_active(deck_b, active_b, opening_b)}
         ]
       )
 
@@ -34,14 +37,18 @@ defmodule Prizmo.Tcg.Sim.TestHelpers do
     end
   end
 
-  def deck_with_opening_active(deck_module, active_card_id) do
+  def deck_with_opening_active(deck_module, active_card_id, opening_ids \\ nil) do
     full_deck_ids = deck_module.card_ids()
 
     opening =
-      full_deck_ids
-      |> Enum.reject(&(&1 == active_card_id))
-      |> Enum.take(6)
-      |> then(&[active_card_id | &1])
+      if opening_ids do
+        opening_ids
+      else
+        full_deck_ids
+        |> Enum.reject(&(&1 == active_card_id))
+        |> Enum.take(6)
+        |> then(&[active_card_id | &1])
+      end
 
     deck_with_prefix(opening, full_deck_ids)
   end

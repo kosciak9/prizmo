@@ -60,6 +60,7 @@ defmodule Prizmo.Tcg.Sim.CardRegistry do
       },
       attacks: %{
         dark_frost: %{
+          damage: 60,
           effect: %{type: :bonus_damage_if_attacker_has_team_rocket_energy, bonus_damage: 60}
         }
       }
