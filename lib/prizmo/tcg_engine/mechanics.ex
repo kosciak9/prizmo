@@ -66,7 +66,7 @@ defmodule Prizmo.TcgEngine.Mechanics do
 
   import Prizmo.TcgEngine.TurnStore, only: [current_turn: 1]
 
-  alias Prizmo.Tcg.Sim.CardRegistry
+  alias Prizmo.TcgEngine.CardCatalog
   alias Prizmo.TcgEngine.CardPlay
   alias Prizmo.TcgEngine.Cards.Registry, as: EngineCardRegistry
   alias Prizmo.TcgEngine.ChoiceValidator
@@ -927,7 +927,7 @@ defmodule Prizmo.TcgEngine.Mechanics do
            :ok <- require_can_attack(attacker_card),
            {:ok, defender_player_id} <- opponent_player_id(game.id, player_id),
            {:ok, defender_card} <- active_card(game.id, defender_player_id),
-           {:ok, _attack} <- CardRegistry.fetch_attack(attacker_card.card_id, attack_id),
+           {:ok, _attack} <- CardCatalog.fetch_attack(attacker_card.card_id, attack_id),
            {:ok, turn} <-
              update(turn, :declare_attack, %{
                pending_attack_id: attack_id,
@@ -959,7 +959,7 @@ defmodule Prizmo.TcgEngine.Mechanics do
            {:ok, attacker_card} <- get_card(game.id, turn.pending_attacker_card_instance_id),
            {:ok, defender_card} <- get_card(game.id, turn.pending_defender_card_instance_id),
            {:ok, attack} <-
-             CardRegistry.fetch_attack(attacker_card.card_id, turn.pending_attack_id),
+             CardCatalog.fetch_attack(attacker_card.card_id, turn.pending_attack_id),
            {:ok, turn} <- update(turn, :resolve_attack, %{}),
            {:ok, damage_result} <-
              apply_attack_damage(game.id, player_id, defender_card, Map.get(attack, :damage, 0)),

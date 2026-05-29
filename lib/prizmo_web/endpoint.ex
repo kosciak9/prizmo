@@ -15,10 +15,6 @@ defmodule PrizmoWeb.Endpoint do
     websocket: [connect_info: [session: @session_options]],
     longpoll: [connect_info: [session: @session_options]]
 
-  socket "/socket", PrizmoWeb.UserSocket,
-    websocket: true,
-    longpoll: false
-
   if code_reloading? do
     plug PrizmoWeb.VoltDevServer, root: "."
   end

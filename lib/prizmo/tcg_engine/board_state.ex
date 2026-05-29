@@ -3,7 +3,7 @@ defmodule Prizmo.TcgEngine.BoardState do
 
   import Prizmo.TcgEngine.Operation, only: [update: 3]
 
-  alias Prizmo.Tcg.Sim.CardRegistry
+  alias Prizmo.TcgEngine.CardCatalog
   alias Prizmo.TcgEngine.CardStore
   alias Prizmo.TcgEngine.Game
   alias Prizmo.TcgEngine.PlayerStore
@@ -99,7 +99,7 @@ defmodule Prizmo.TcgEngine.BoardState do
 
   defp tool_attached?(attachments) do
     Enum.reduce_while(attachments, {:ok, false}, fn attachment, {:ok, false} ->
-      case CardRegistry.fetch(attachment.card_id) do
+      case CardCatalog.fetch(attachment.card_id) do
         {:ok, %{supertype: :trainer, trainer_type: :tool}} -> {:halt, {:ok, true}}
         {:ok, _card} -> {:cont, {:ok, false}}
         {:error, reason} -> {:halt, {:error, reason}}

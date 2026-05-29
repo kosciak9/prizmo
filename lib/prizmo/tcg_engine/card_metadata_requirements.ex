@@ -1,10 +1,10 @@
 defmodule Prizmo.TcgEngine.CardMetadataRequirements do
   @moduledoc false
 
-  alias Prizmo.Tcg.Sim.CardRegistry
+  alias Prizmo.TcgEngine.CardCatalog
 
   def require_basic_pokemon(card_id) do
-    if CardRegistry.basic_pokemon?(card_id) do
+    if CardCatalog.basic_pokemon?(card_id) do
       :ok
     else
       {:error, :not_basic_pokemon}
@@ -12,7 +12,7 @@ defmodule Prizmo.TcgEngine.CardMetadataRequirements do
   end
 
   def require_energy(card_id) do
-    case CardRegistry.fetch(card_id) do
+    case CardCatalog.fetch(card_id) do
       {:ok, %{supertype: :energy}} -> :ok
       {:ok, _card} -> {:error, :not_energy}
       {:error, reason} -> {:error, reason}
@@ -20,7 +20,7 @@ defmodule Prizmo.TcgEngine.CardMetadataRequirements do
   end
 
   def require_pokemon_card(card_id) do
-    case CardRegistry.fetch(card_id) do
+    case CardCatalog.fetch(card_id) do
       {:ok, %{supertype: :pokemon}} -> :ok
       {:ok, metadata} -> {:error, {:not_pokemon, metadata.id}}
       {:error, reason} -> {:error, reason}
@@ -28,7 +28,7 @@ defmodule Prizmo.TcgEngine.CardMetadataRequirements do
   end
 
   def require_non_rule_box_pokemon_card(card_id) do
-    case CardRegistry.fetch(card_id) do
+    case CardCatalog.fetch(card_id) do
       {:ok, %{supertype: :pokemon, rule_box?: true} = metadata} ->
         {:error, {:pokemon_has_rule_box, metadata.id}}
 
@@ -44,7 +44,7 @@ defmodule Prizmo.TcgEngine.CardMetadataRequirements do
   end
 
   def require_night_stretcher_target(card_id) do
-    case CardRegistry.fetch(card_id) do
+    case CardCatalog.fetch(card_id) do
       {:ok, %{supertype: :pokemon}} -> :ok
       {:ok, %{supertype: :energy, energy_type: :basic}} -> :ok
       {:ok, metadata} -> {:error, {:invalid_night_stretcher_target, metadata.id}}
@@ -65,7 +65,7 @@ defmodule Prizmo.TcgEngine.CardMetadataRequirements do
   end
 
   def require_trainer_type(card_id, allowed_types) do
-    case CardRegistry.fetch(card_id) do
+    case CardCatalog.fetch(card_id) do
       {:ok, %{supertype: :trainer, trainer_type: trainer_type} = metadata} ->
         if trainer_type in allowed_types do
           {:ok, metadata}
@@ -82,8 +82,8 @@ defmodule Prizmo.TcgEngine.CardMetadataRequirements do
   end
 
   def require_evolves_from(evolution_card_id, target_card_id) do
-    with {:ok, evolution_card} <- CardRegistry.fetch(evolution_card_id),
-         {:ok, target_card} <- CardRegistry.fetch(target_card_id) do
+    with {:ok, evolution_card} <- CardCatalog.fetch(evolution_card_id),
+         {:ok, target_card} <- CardCatalog.fetch(target_card_id) do
       cond do
         evolution_card.supertype != :pokemon ->
           {:error, :evolution_card_is_not_pokemon}
@@ -101,7 +101,7 @@ defmodule Prizmo.TcgEngine.CardMetadataRequirements do
   end
 
   def retreat_cost(card_id) do
-    case CardRegistry.fetch(card_id) do
+    case CardCatalog.fetch(card_id) do
       {:ok, %{supertype: :pokemon, retreat_count: retreat_count}}
       when is_integer(retreat_count) ->
         {:ok, retreat_count}
@@ -118,7 +118,7 @@ defmodule Prizmo.TcgEngine.CardMetadataRequirements do
   end
 
   def pokemon_hp(card_id) do
-    case CardRegistry.fetch(card_id) do
+    case CardCatalog.fetch(card_id) do
       {:ok, %{supertype: :pokemon, hp: hp}} when is_integer(hp) -> {:ok, hp}
       {:ok, %{supertype: :pokemon, hp: hp}} when is_binary(hp) -> parse_hp(hp)
       {:ok, %{supertype: :pokemon}} -> {:error, :pokemon_hp_unknown}

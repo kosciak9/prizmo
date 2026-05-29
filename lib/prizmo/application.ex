@@ -17,7 +17,6 @@ defmodule Prizmo.Application do
          Application.fetch_env!(:prizmo, Oban)
        )},
       {Phoenix.PubSub, name: Prizmo.PubSub},
-      Prizmo.Tcg.Sim.GameStore,
       # Start a worker by calling: Prizmo.Worker.start_link(arg)
       # {Prizmo.Worker, arg},
       # Start to serve requests, typically the last entry
