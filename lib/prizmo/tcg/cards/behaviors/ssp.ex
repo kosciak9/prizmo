@@ -3,6 +3,26 @@ defmodule Prizmo.Tcg.Cards.Behaviors.SSP do
 
   use Prizmo.Tcg.Cards.DSL
 
+  card "SSP-056" do
+    ability(:snow_sink,
+      effect: %{type: :discard_stadium_when_benched_from_hand}
+    )
+
+    attack(:icicle_loop,
+      effect: %{type: :return_attached_energy_to_hand}
+    )
+  end
+
+  card "SSP-076" do
+    ability(:skyliner,
+      effect: %{type: :basic_pokemon_have_no_retreat_cost}
+    )
+
+    attack(:eon_blade,
+      effect: %{type: :attacker_cannot_attack_next_turn}
+    )
+  end
+
   card "SSP-087" do
     attack(:electromagnetic_sonar,
       effect: %{type: :recover_trainer_from_discard_to_hand}

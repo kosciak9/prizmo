@@ -3,6 +3,17 @@ defmodule Prizmo.Tcg.Cards.Behaviors.JTG do
 
   use Prizmo.Tcg.Cards.DSL
 
+  card "JTG-056" do
+    ability(:fairy_zone,
+      effect: %{type: :opponent_darkness_pokemon_weakness_becomes_psychic}
+    )
+
+    attack(:full_moon_rondo,
+      damage: 20,
+      effect: %{type: :bonus_damage_per_benched_pokemon, bonus_damage: 20}
+    )
+  end
+
   card "JTG-120" do
     attack(:trading_places,
       effect: %{type: :switch_self_with_bench}

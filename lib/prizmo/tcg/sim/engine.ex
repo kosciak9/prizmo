@@ -2182,6 +2182,34 @@ defmodule Prizmo.Tcg.Sim.Engine do
     end
   end
 
+  defp discard_own_attached_cards_by_id(state, _player_id, []), do: {:ok, state}
+
+  defp discard_own_attached_cards_by_id(state, player_id, [attachment_id | rest]) do
+    with {:ok, {target, attachment}} <- find_own_attached_card(state, player_id, attachment_id),
+         {:ok, attachment_metadata} <- CardRegistry.fetch(attachment.card_id),
+         :ok <- require_energy(attachment_metadata),
+         {:ok, state} <- discard_attached_card(state, player_id, target, attachment) do
+      discard_own_attached_cards_by_id(state, player_id, rest)
+    end
+  end
+
+  defp find_own_attached_card(state, player_id, attachment_id) do
+    with {:ok, player} <- fetch_player(state, player_id) do
+      player
+      |> in_play_pokemon()
+      |> Enum.find_value(fn pokemon ->
+        case find_attachment(pokemon, attachment_id) do
+          {:ok, attachment} -> {pokemon, attachment}
+          {:error, _reason} -> nil
+        end
+      end)
+      |> case do
+        nil -> {:error, {:attachment_not_found, player_id, attachment_id}}
+        target_and_attachment -> {:ok, target_and_attachment}
+      end
+    end
+  end
+
   defp move_attached_card_between_own_pokemon(
          state,
          player_id,
@@ -2921,6 +2949,84 @@ defmodule Prizmo.Tcg.Sim.Engine do
 
   defp base_attack_damage(state, %{
          attack: %{
+           damage: damage,
+           effect: %{type: :bonus_damage_per_energy_attached_to_both_active} = effect
+         },
+         player_id: player_id,
+         target_player_id: target_player_id
+       }) do
+    own_active_energy_count = active_pokemon_energy_count(state, player_id)
+    opponent_active_energy_count = active_pokemon_energy_count(state, target_player_id)
+
+    damage +
+      (own_active_energy_count + opponent_active_energy_count) * Map.fetch!(effect, :bonus_damage)
+  end
+
+  defp base_attack_damage(state, %{
+         attack: %{damage: damage, effect: %{type: :bonus_damage_per_benched_pokemon} = effect}
+       }) do
+    damage + total_benched_pokemon_count(state) * Map.fetch!(effect, :bonus_damage)
+  end
+
+  defp base_attack_damage(state, %{
+         attack: %{
+           effect: %{
+             type: :damage_per_own_benched_pokemon,
+             damage_per_pokemon: damage_per_pokemon
+           }
+         },
+         player_id: player_id
+       }) do
+    own_benched_pokemon_count(state, player_id) * damage_per_pokemon
+  end
+
+  defp base_attack_damage(state, %{
+         attack: %{
+           damage: damage,
+           effect: %{
+             type: :bonus_damage_if_attacker_has_team_rocket_energy,
+             bonus_damage: bonus_damage
+           }
+         },
+         player_id: player_id,
+         attacker_id: attacker_id
+       }) do
+    if attacker_has_team_rocket_energy?(state, player_id, attacker_id) do
+      damage + bonus_damage
+    else
+      damage
+    end
+  end
+
+  defp base_attack_damage(_state, %{
+         attack: %{
+           damage: damage,
+           effect: %{
+             type: :discard_energy_from_own_bench_for_bonus_damage,
+             bonus_damage: bonus_damage
+           }
+         },
+         params: %{attachment_ids: attachment_ids}
+       })
+       when is_list(attachment_ids) do
+    damage + length(attachment_ids) * bonus_damage
+  end
+
+  defp base_attack_damage(_state, %{
+         attack: %{
+           effect: %{
+             type: :damage_per_discarded_own_basic_energy,
+             damage_per_energy: damage_per_energy
+           }
+         },
+         params: %{attachment_ids: attachment_ids}
+       })
+       when is_list(attachment_ids) do
+    length(attachment_ids) * damage_per_energy
+  end
+
+  defp base_attack_damage(state, %{
+         attack: %{
            effect: %{
              type: :damage_per_own_basic_pokemon_in_play,
              damage_per_pokemon: damage_per_pokemon
@@ -3019,6 +3125,27 @@ defmodule Prizmo.Tcg.Sim.Engine do
     end
   end
 
+  defp active_pokemon_energy_count(state, player_id) do
+    case fetch_player(state, player_id) do
+      {:ok, %{active: active}} when not is_nil(active) -> attached_energy_count(active)
+      _ -> 0
+    end
+  end
+
+  defp own_benched_pokemon_count(state, player_id) do
+    case fetch_player(state, player_id) do
+      {:ok, player} -> length(player.bench)
+      {:error, _reason} -> 0
+    end
+  end
+
+  defp total_benched_pokemon_count(state) do
+    state.players
+    |> Map.values()
+    |> Enum.map(&length(&1.bench))
+    |> Enum.sum()
+  end
+
   defp team_rocket_pokemon_in_play_count(state, player_id) do
     case fetch_player(state, player_id) do
       {:ok, player} ->
@@ -3080,6 +3207,18 @@ defmodule Prizmo.Tcg.Sim.Engine do
     Enum.count(pokemon.attachments, fn attachment ->
       match?({:ok, %{supertype: :energy}}, CardRegistry.fetch(attachment.card_id))
     end)
+  end
+
+  defp attacker_has_team_rocket_energy?(state, player_id, attacker_id) do
+    case find_in_play(state, player_id, attacker_id) do
+      {:ok, attacker} ->
+        Enum.any?(attacker.attachments, fn attachment ->
+          match?({:ok, %{name: "Team Rocket's Energy"}}, CardRegistry.fetch(attachment.card_id))
+        end)
+
+      {:error, _reason} ->
+        false
+    end
   end
 
   defp apply_weakness_and_resistance(0, _state, _pending_attack), do: 0
@@ -3286,6 +3425,39 @@ defmodule Prizmo.Tcg.Sim.Engine do
          {:ok, state} <- discard_hand_cards(state, player_id, player.hand) do
       draw_cards(state, player_id, count)
     end
+  end
+
+  defp resolve_attack_effect(state, %{
+         attack: %{effect: %{type: :draw_after_attack, count: count}},
+         player_id: player_id
+       }) do
+    draw_cards(state, player_id, count)
+  end
+
+  defp resolve_attack_effect(state, %{
+         attack: %{effect: %{type: :return_attached_energy_to_hand}},
+         player_id: player_id,
+         attacker_id: attacker_id
+       }) do
+    return_attached_energy_to_hand(state, player_id, attacker_id)
+  end
+
+  defp resolve_attack_effect(state, %{
+         attack: %{effect: %{type: :damage_per_discarded_own_basic_energy}},
+         player_id: player_id,
+         params: %{attachment_ids: attachment_ids}
+       })
+       when is_list(attachment_ids) do
+    discard_own_attached_cards_by_id(state, player_id, attachment_ids)
+  end
+
+  defp resolve_attack_effect(state, %{
+         attack: %{effect: %{type: :discard_energy_from_own_bench_for_bonus_damage}},
+         player_id: player_id,
+         params: %{attachment_ids: attachment_ids}
+       })
+       when is_list(attachment_ids) do
+    discard_own_attached_cards_by_id(state, player_id, attachment_ids)
   end
 
   defp resolve_attack_effect(state, %{

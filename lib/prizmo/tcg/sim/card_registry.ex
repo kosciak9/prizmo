@@ -54,6 +54,37 @@ defmodule Prizmo.Tcg.Sim.CardRegistry do
         }
       }
     },
+    "DRI-051" => %{
+      abilities: %{
+        repelling_veil: %{effect: %{type: :prevent_attack_effects_to_basic_team_rocket_pokemon}}
+      },
+      attacks: %{
+        dark_frost: %{
+          effect: %{type: :bonus_damage_if_attacker_has_team_rocket_energy, bonus_damage: 60}
+        }
+      }
+    },
+    "DRI-081" => %{
+      abilities: %{
+        power_saver: %{
+          effect: %{type: :cannot_attack_unless_own_team_rocket_pokemon_in_play, count: 4}
+        }
+      },
+      attacks: %{
+        erasure_ball: %{
+          effect: %{
+            type: :discard_energy_from_own_bench_for_bonus_damage,
+            max_discards: 2,
+            bonus_damage: 60
+          }
+        }
+      }
+    },
+    "DRI-087" => %{
+      attacks: %{
+        gemstone_mimicry: %{effect: %{type: :copy_opponent_active_tera_pokemon_attack}}
+      }
+    },
     "TWM-014" => %{
       attacks: %{
         smash_kick: %{effect: nil},
@@ -76,6 +107,51 @@ defmodule Prizmo.Tcg.Sim.CardRegistry do
         tumbling_attack: %{
           damage: 10,
           effect: %{type: :bonus_damage_on_coin_heads, bonus_damage: 20}
+        }
+      }
+    },
+    "TWM-018" => %{
+      evolves_from: "TWM-017",
+      abilities: %{
+        festival_lead: %{effect: %{type: :may_attack_twice_if_festival_grounds_in_play}}
+      },
+      attacks: %{
+        do_the_wave: %{
+          damage: 0,
+          effect: %{type: :damage_per_own_benched_pokemon, damage_per_pokemon: 20}
+        }
+      }
+    },
+    "TWM-025" => %{
+      abilities: %{
+        teal_dance: %{
+          effect: %{type: :attach_basic_grass_energy_from_hand_to_self_then_draw, count: 1}
+        }
+      },
+      attacks: %{
+        myriad_leaf_shower: %{
+          damage: 30,
+          effect: %{type: :bonus_damage_per_energy_attached_to_both_active, bonus_damage: 30}
+        }
+      }
+    },
+    "TWM-044" => %{
+      abilities: %{
+        festival_lead: %{effect: %{type: :may_attack_twice_if_festival_grounds_in_play}}
+      },
+      attacks: %{
+        whirlpool: %{effect: %{type: :discard_defending_energy_on_coin_heads}}
+      }
+    },
+    "TWM-064" => %{
+      attacks: %{
+        sob: %{effect: %{type: :defending_pokemon_cannot_retreat_next_turn}},
+        torrential_pump: %{
+          effect: %{
+            type: :shuffle_attached_energy_into_deck_then_damage_opponent_bench,
+            energy_count: 3,
+            bench_damage: 120
+          }
         }
       }
     },
@@ -109,6 +185,15 @@ defmodule Prizmo.Tcg.Sim.CardRegistry do
       },
       attacks: %{
         assault_landing: %{effect: %{type: :damage_only_if_stadium_in_play}}
+      }
+    },
+    "SCR-131" => %{
+      effect: %{type: :bench_limit_8_with_tera_in_play_else_discard_to_5}
+    },
+    "SCR-135" => %{
+      effect: %{
+        type: :attach_basic_energy_from_discard_to_benched_colorless_if_tera_in_play,
+        max_targets: 2
       }
     },
     "PFL-083" => %{
@@ -424,6 +509,17 @@ defmodule Prizmo.Tcg.Sim.CardRegistry do
         }
       }
     },
+    "JTG-056" => %{
+      abilities: %{
+        fairy_zone: %{effect: %{type: :opponent_darkness_pokemon_weakness_becomes_psychic}}
+      },
+      attacks: %{
+        full_moon_rondo: %{
+          damage: 20,
+          effect: %{type: :bonus_damage_per_benched_pokemon, bonus_damage: 20}
+        }
+      }
+    },
     "JTG-120" => %{
       name: "Dunsparce",
       supertype: :pokemon,
@@ -446,6 +542,10 @@ defmodule Prizmo.Tcg.Sim.CardRegistry do
     },
     "TEF-123" => %{
       attacks: %{
+        bellowing_thunder: %{
+          damage: 0,
+          effect: %{type: :damage_per_discarded_own_basic_energy, damage_per_energy: 70}
+        },
         burst_roar: %{damage: 0, effect: %{type: :discard_hand_then_draw, count: 6}}
       }
     },
@@ -525,6 +625,16 @@ defmodule Prizmo.Tcg.Sim.CardRegistry do
         }
       }
     },
+    "TEF-025" => %{
+      abilities: %{
+        rapid_vernier: %{
+          effect: %{type: :switch_self_with_active_when_benched_and_move_energy_to_self}
+        }
+      },
+      attacks: %{
+        prism_edge: %{effect: %{type: :attacker_cannot_attack_next_turn}}
+      }
+    },
     "SFA-040" => %{
       name: "Genesect",
       supertype: :pokemon,
@@ -568,6 +678,22 @@ defmodule Prizmo.Tcg.Sim.CardRegistry do
       },
       attacks: %{
         ram: %{name: "Ram", cost: [:colorless, :colorless], damage: 20, effect: nil}
+      }
+    },
+    "SSP-056" => %{
+      abilities: %{
+        snow_sink: %{effect: %{type: :discard_stadium_when_benched_from_hand}}
+      },
+      attacks: %{
+        icicle_loop: %{effect: %{type: :return_attached_energy_to_hand}}
+      }
+    },
+    "SSP-076" => %{
+      abilities: %{
+        skyliner: %{effect: %{type: :basic_pokemon_have_no_retreat_cost}}
+      },
+      attacks: %{
+        eon_blade: %{effect: %{type: :attacker_cannot_attack_next_turn}}
       }
     },
     "SSP-087" => %{
@@ -682,6 +808,18 @@ defmodule Prizmo.Tcg.Sim.CardRegistry do
       }
     },
     "MEG-117" => %{name: "Forest of Vitality", supertype: :trainer, trainer_type: :stadium},
+    "PRE-021" => %{
+      abilities: %{
+        festival_lead: %{effect: %{type: :may_attack_twice_if_festival_grounds_in_play}}
+      },
+      attacks: %{
+        rapid_draw: %{effect: %{type: :draw_after_attack, count: 2}}
+      }
+    },
+    "POR-086" => %{
+      provides: [:grass],
+      effect: %{type: :grass_pokemon_hp_plus_20_energy}
+    },
     "POR-088" => %{
       name: "Telepathic Psychic Energy",
       supertype: :energy,
@@ -695,6 +833,10 @@ defmodule Prizmo.Tcg.Sim.CardRegistry do
       energy_type: :special,
       provides: [:colorless],
       effect: %{type: :draw_when_attached_from_hand, count: 4}
+    },
+    "DRI-182" => %{
+      provides: [:psychic, :darkness],
+      effect: %{type: :team_rocket_energy_attachment_and_dual_provides}
     }
   }
 

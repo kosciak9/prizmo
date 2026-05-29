@@ -26,6 +26,36 @@ defmodule Prizmo.Tcg.Cards.Behaviors.DRI do
     )
   end
 
+  card "DRI-051" do
+    ability(:repelling_veil,
+      effect: %{type: :prevent_attack_effects_to_basic_team_rocket_pokemon}
+    )
+
+    attack(:dark_frost,
+      effect: %{type: :bonus_damage_if_attacker_has_team_rocket_energy, bonus_damage: 60}
+    )
+  end
+
+  card "DRI-081" do
+    ability(:power_saver,
+      effect: %{type: :cannot_attack_unless_own_team_rocket_pokemon_in_play, count: 4}
+    )
+
+    attack(:erasure_ball,
+      effect: %{
+        type: :discard_energy_from_own_bench_for_bonus_damage,
+        max_discards: 2,
+        bonus_damage: 60
+      }
+    )
+  end
+
+  card "DRI-087" do
+    attack(:gemstone_mimicry,
+      effect: %{type: :copy_opponent_active_tera_pokemon_attack}
+    )
+  end
+
   card "DRI-170" do
     card_effect(
       effect: %{
@@ -64,5 +94,9 @@ defmodule Prizmo.Tcg.Cards.Behaviors.DRI do
 
   card "DRI-178" do
     card_effect(effect: %{type: :search_team_rocket_supporter_to_hand})
+  end
+
+  card "DRI-182" do
+    card_effect(effect: %{type: :team_rocket_energy_attachment_and_dual_provides})
   end
 end

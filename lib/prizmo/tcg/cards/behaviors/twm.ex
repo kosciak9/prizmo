@@ -23,6 +23,52 @@ defmodule Prizmo.Tcg.Cards.Behaviors.TWM do
     )
   end
 
+  card "TWM-018" do
+    ability(:festival_lead,
+      effect: %{type: :may_attack_twice_if_festival_grounds_in_play}
+    )
+
+    attack(:do_the_wave,
+      damage: 0,
+      effect: %{type: :damage_per_own_benched_pokemon, damage_per_pokemon: 20}
+    )
+  end
+
+  card "TWM-025" do
+    ability(:teal_dance,
+      effect: %{type: :attach_basic_grass_energy_from_hand_to_self_then_draw, count: 1}
+    )
+
+    attack(:myriad_leaf_shower,
+      damage: 30,
+      effect: %{type: :bonus_damage_per_energy_attached_to_both_active, bonus_damage: 30}
+    )
+  end
+
+  card "TWM-044" do
+    ability(:festival_lead,
+      effect: %{type: :may_attack_twice_if_festival_grounds_in_play}
+    )
+
+    attack(:whirlpool,
+      effect: %{type: :discard_defending_energy_on_coin_heads}
+    )
+  end
+
+  card "TWM-064" do
+    attack(:sob,
+      effect: %{type: :defending_pokemon_cannot_retreat_next_turn}
+    )
+
+    attack(:torrential_pump,
+      effect: %{
+        type: :shuffle_attached_energy_into_deck_then_damage_opponent_bench,
+        energy_count: 3,
+        bench_damage: 120
+      }
+    )
+  end
+
   card "TWM-080" do
     ability(:teleporter, effect: %{type: :shuffle_self_and_attached_into_deck})
     attack(:beam, effect: nil)

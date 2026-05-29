@@ -13,7 +13,22 @@ defmodule Prizmo.Tcg.Cards.Behaviors.TEF do
     )
   end
 
+  card "TEF-025" do
+    ability(:rapid_vernier,
+      effect: %{type: :switch_self_with_active_when_benched_and_move_energy_to_self}
+    )
+
+    attack(:prism_edge,
+      effect: %{type: :attacker_cannot_attack_next_turn}
+    )
+  end
+
   card "TEF-123" do
+    attack(:bellowing_thunder,
+      damage: 0,
+      effect: %{type: :damage_per_discarded_own_basic_energy, damage_per_energy: 70}
+    )
+
     attack(:burst_roar,
       damage: 0,
       effect: %{type: :discard_hand_then_draw, count: 6}
