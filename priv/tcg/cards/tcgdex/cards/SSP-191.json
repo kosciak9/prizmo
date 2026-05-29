@@ -1,5 +1,5 @@
 {
-  "brock_id": "SSP-191",
+  "prizmo_id": "SSP-191",
   "source": {
     "base_url": "https://api.tcgdex.net/v2/en",
     "dynamic_fields_removed": [

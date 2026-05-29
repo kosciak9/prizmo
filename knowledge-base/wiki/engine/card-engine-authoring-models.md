@@ -26,7 +26,7 @@ For this Phoenix/Elixir app, the TypeScript projects' source-stub generators sho
 For example, a future Elixir authoring surface might look more like a card DSL than a folder of generated classes:
 
 ```elixir
-defset Brock.Tcg.Standard.SurgingSparks do
+defset Prizmo.Tcg.Standard.SurgingSparks do
   defcard "Pikachu ex", set: "SSP", number: "057", hp: 200 do
     attack "Topaz Bolt", cost: [:lightning, :lightning, :lightning], damage: 300 do
       discard_all_energy_from_this_pokemon()
@@ -34,7 +34,7 @@ defset Brock.Tcg.Standard.SurgingSparks do
   end
 
   reprint "Nest Ball",
-    from: Brock.Tcg.Standard.ScarletViolet.NestBall,
+    from: Prizmo.Tcg.Standard.ScarletViolet.NestBall,
     set: "SSP",
     number: "183"
 end

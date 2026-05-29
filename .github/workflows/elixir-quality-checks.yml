@@ -1,0 +1,66 @@
+name: Elixir quality checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    env:
+      MIX_ENV: test
+      DB_PORT: 5432
+      S3_PORT: 8333
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+    services:
+      db:
+        image: paradedb/paradedb:0.23.4-pg18@sha256:52345be0965458c7b8e8e94657db5060aa8880dfaa10e3cc3c0c90115a7a309f
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: prizmo_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      seaweedfs:
+        image: docker.io/chrislusf/seaweedfs:4.17@sha256:186de7ef977a20343ee9a5544073f081976a29e2d29ecf8379891e7bf177fbe9
+        ports:
+          - 8333:8333
+        options: >-
+          --health-cmd "curl -f http://localhost:8333/healthz"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Read tool versions
+        id: versions
+        shell: bash
+        run: |
+          echo "elixir=$(awk '/^elixir / {print $2}' .tool-versions)" >> "$GITHUB_OUTPUT"
+          echo "otp=$(awk '/^erlang / {print $2}' .tool-versions)" >> "$GITHUB_OUTPUT"
+      - uses: ./.github/actions/elixir-setup
+        with:
+          elixir-version: ${{ steps.versions.outputs.elixir }}
+          otp-version: ${{ steps.versions.outputs.otp }}
+          cache-key: quality
+      - run: mix compile --warnings-as-errors
+      - run: mix deps.unlock --check-unused
+      - run: mix format --check-formatted
+      - run: mix xref graph --label compile-connected --fail-above 50
+      - run: mix check.filenames
+      - run: mix check.service_images
+      - run: mix ash_typescript.codegen --check
+      - run: mix sobelow --config --compact --private
+      - run: mix credo --strict
+      - run: mix dialyzer

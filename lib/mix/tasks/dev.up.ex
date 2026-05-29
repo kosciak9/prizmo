@@ -8,7 +8,7 @@ defmodule Mix.Tasks.Dev.Up do
   2. Verifies .env exists (copied by `wt step copy-ignored`)
   3. Starts Podman Compose services via local/compose.yml (Postgres, SeaweedFS S3)
   4. Runs mix setup
-  5. Registers Caddy route for `{branch}.brock.localhost`
+  5. Registers Caddy route for `{branch}.prizmo.localhost`
   6. Starts Phoenix server in background
   """
 
@@ -17,11 +17,11 @@ defmodule Mix.Tasks.Dev.Up do
   alias Mix.Tasks.Dev.Shared
 
   @defaults %{
-    "PORT" => "4001",
-    "DB_PORT" => "5434",
-    "S3_PORT" => "4567",
+    "PORT" => "4003",
+    "DB_PORT" => "5435",
+    "S3_PORT" => "4570",
     "BRANCH" => "main",
-    "DATABASE_URL" => "postgresql://postgres:postgres@localhost:5434/brock_dev",
+    "DATABASE_URL" => "postgresql://postgres:postgres@localhost:5435/prizmo_dev",
     "AWS_ACCESS_KEY_ID" => "test",
     "AWS_SECRET_ACCESS_KEY" => "test"
   }
@@ -48,7 +48,7 @@ defmodule Mix.Tasks.Dev.Up do
     Mix.shell().info("Environment ready:")
 
     Mix.shell().info(
-      "  Phoenix:   https://#{sanitize_branch(branch)}.brock.localhost (or http://localhost:#{port})"
+      "  Phoenix:   https://#{sanitize_branch(branch)}.prizmo.localhost (or http://localhost:#{port})"
     )
 
     Mix.shell().info("  Tidewave:  http://localhost:#{port}/tidewave/mcp")
@@ -106,7 +106,7 @@ defmodule Mix.Tasks.Dev.Up do
     Mix.shell().info("Starting Podman Compose services...")
 
     compose_env = [
-      {"COMPOSE_PROJECT_NAME", "brock-#{branch}"},
+      {"COMPOSE_PROJECT_NAME", "prizmo-#{branch}"},
       {"PORT", to_string(port)},
       {"DB_PORT", to_string(db_port)},
       {"S3_PORT", to_string(s3_port)}
@@ -175,7 +175,7 @@ defmodule Mix.Tasks.Dev.Up do
 
     pid_file = "tmp/phoenix.pid"
     log_file = "tmp/phoenix.log"
-    session = "brock-#{port}"
+    session = "prizmo-#{port}"
 
     if System.find_executable("tmux") do
       case System.cmd("tmux", ["has-session", "-t", session], stderr_to_stdout: true) do
@@ -187,7 +187,10 @@ defmodule Mix.Tasks.Dev.Up do
           )
 
         _ ->
-          cmd = "tmux new -d -s #{session} \"sh -lc 'env TERM=xterm-256color mix phx.server'\""
+          File.write!(log_file, "")
+
+          cmd =
+            "tmux new -d -s #{session} \"sh -lc 'env TERM=xterm-256color mix phx.server 2>&1 | tee -a #{log_file}'\""
 
           case System.cmd("sh", ["-c", cmd], stderr_to_stdout: true) do
             {_output, 0} ->
@@ -237,7 +240,7 @@ defmodule Mix.Tasks.Dev.Up do
 
     if System.user_home!() =~ "kosciak" do
       route_config = %{
-        "id" => branch,
+        "id" => local_caddy_route_id(branch),
         "hostname" => hostname,
         "upstream" => "127.0.0.1:#{port}"
       }
@@ -245,7 +248,7 @@ defmodule Mix.Tasks.Dev.Up do
       case Req.post("http://localhost:11190/api/routes", json: route_config) do
         {:ok, %{status: status}} when status in 200..299 ->
           Mix.shell().info(
-            "Caddy route registered: https://#{branch}.brock.localhost -> localhost:#{port}"
+            "Caddy route registered: https://#{branch}.prizmo.localhost -> localhost:#{port}"
           )
 
         {:ok, %{status: status, body: body}} ->
@@ -275,7 +278,9 @@ defmodule Mix.Tasks.Dev.Up do
 
   defp sanitize_branch(branch), do: Shared.sanitize_branch(branch)
 
-  defp dev_hostname(branch), do: "#{branch}.brock.localhost"
+  defp dev_hostname(branch), do: "#{branch}.prizmo.localhost"
+
+  defp local_caddy_route_id(branch), do: "prizmo-#{branch}"
 
   defp ensure_wt_server_exists(admin_base_url, branch, port) do
     wt_server_config = %{
@@ -286,10 +291,10 @@ defmodule Mix.Tasks.Dev.Up do
 
     maybe_create_wt_server(admin_base_url, wt_server_config)
 
-    _ = Req.delete("#{admin_base_url}/id/wt:brock:#{branch}")
+    _ = Req.delete("#{admin_base_url}/id/wt:prizmo:#{branch}")
 
     route_config = %{
-      "@id" => "wt:brock:#{branch}",
+      "@id" => "wt:prizmo:#{branch}",
       "match" => [%{"host" => [dev_hostname(branch)]}],
       "handle" => [
         %{"handler" => "reverse_proxy", "upstreams" => [%{"dial" => "127.0.0.1:#{port}"}]}

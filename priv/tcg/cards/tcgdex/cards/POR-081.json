@@ -1,5 +1,5 @@
 {
-  "brock_id": "POR-081",
+  "prizmo_id": "POR-081",
   "source": {
     "base_url": "https://api.tcgdex.net/v2/en",
     "dynamic_fields_removed": [

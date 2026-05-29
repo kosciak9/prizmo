@@ -98,7 +98,7 @@
     "global": null,
     "strategy": null
   },
-  "repo": "Elixir.Brock.Repo",
+  "repo": "Elixir.Prizmo.Repo",
   "schema": null,
   "table": "tokens"
 }

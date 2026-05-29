@@ -1,5 +1,5 @@
 {
-  "brock_id": "MEE-004",
+  "prizmo_id": "MEE-004",
   "source": {
     "base_url": "https://api.tcgdex.net/v2/en",
     "dynamic_fields_removed": [

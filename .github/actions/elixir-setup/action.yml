@@ -1,0 +1,44 @@
+name: Elixir setup
+description: Sets up Elixir, Erlang, Hex, Rebar, and cached Mix artifacts.
+
+inputs:
+  elixir-version:
+    required: true
+    description: Elixir version
+  otp-version:
+    required: true
+    description: Erlang/OTP version
+  cache-key:
+    required: false
+    default: ${{ github.job }}
+    description: Extra cache key segment
+
+runs:
+  using: composite
+  steps:
+    - name: Set up BEAM
+      uses: erlef/setup-beam@v1
+      with:
+        elixir-version: ${{ inputs.elixir-version }}
+        otp-version: ${{ inputs.otp-version }}
+
+    - name: Restore deps cache
+      uses: actions/cache@v4
+      with:
+        path: |
+          deps
+          _build
+          ~/.hex
+          ~/.mix
+        key: mix-${{ runner.os }}-${{ inputs.cache-key }}-${{ inputs.elixir-version }}-${{ inputs.otp-version }}-${{ hashFiles('mix.lock') }}
+        restore-keys: |
+          mix-${{ runner.os }}-${{ inputs.cache-key }}-${{ inputs.elixir-version }}-${{ inputs.otp-version }}-
+          mix-${{ runner.os }}-${{ inputs.cache-key }}-
+
+    - name: Install Hex and Rebar
+      shell: bash
+      run: mix local.hex --force && mix local.rebar --force
+
+    - name: Fetch dependencies
+      shell: bash
+      run: mix deps.get

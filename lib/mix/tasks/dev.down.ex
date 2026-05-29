@@ -15,9 +15,9 @@ defmodule Mix.Tasks.Dev.Down do
   alias Mix.Tasks.Dev.Shared
 
   @defaults %{
-    "PORT" => "4001",
-    "DB_PORT" => "5434",
-    "S3_PORT" => "4567",
+    "PORT" => "4003",
+    "DB_PORT" => "5435",
+    "S3_PORT" => "4570",
     "BRANCH" => "main"
   }
 
@@ -88,7 +88,7 @@ defmodule Mix.Tasks.Dev.Down do
     Mix.shell().info("Unregistering Caddy route...")
 
     if System.user_home!() =~ "kosciak" do
-      case Req.delete("http://localhost:11190/api/routes/#{branch}") do
+      case Req.delete("http://localhost:11190/api/routes/#{local_caddy_route_id(branch)}") do
         {:ok, %{status: status}} when status in 200..299 ->
           Mix.shell().info("Caddy route unregistered")
 
@@ -101,7 +101,7 @@ defmodule Mix.Tasks.Dev.Down do
     else
       admin_base_url = System.get_env("CADDY_ADMIN_URL") || "http://localhost:2019"
 
-      case Req.delete("#{admin_base_url}/id/wt:brock:#{branch}") do
+      case Req.delete("#{admin_base_url}/id/wt:prizmo:#{branch}") do
         {:ok, %{status: status}} when status in 200..299 ->
           Mix.shell().info("Caddy route unregistered")
 
@@ -116,7 +116,7 @@ defmodule Mix.Tasks.Dev.Down do
 
   defp stop_services(branch, port, db_port, s3_port) do
     compose_env = [
-      {"COMPOSE_PROJECT_NAME", "brock-#{branch}"},
+      {"COMPOSE_PROJECT_NAME", "prizmo-#{branch}"},
       {"PORT", port},
       {"DB_PORT", db_port},
       {"S3_PORT", s3_port}
@@ -146,4 +146,6 @@ defmodule Mix.Tasks.Dev.Down do
   end
 
   defp sanitize_branch(branch), do: Shared.sanitize_branch(branch)
+
+  defp local_caddy_route_id(branch), do: "prizmo-#{branch}"
 end

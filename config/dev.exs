@@ -1,9 +1,28 @@
 import Config
+
 config :ash, policies: [show_policy_breakdowns?: true]
 
+# Do not include metadata nor timestamps in development logs
+config :logger, :default_formatter, format: "[$level] $message\n"
+
+# Initialize plugs at runtime for faster development compilation
+config :phoenix, :plug_init_mode, :runtime
+
+# Set a higher stacktrace during development. Avoid configuring such
+# in production as building large stacktraces may be expensive.
+config :phoenix, :stacktrace_depth, 20
+
+config :phoenix_live_view,
+  # Include debug annotations and locations in rendered markup.
+  # Changing this configuration will require mix clean and a full recompile.
+  debug_heex_annotations: true,
+  debug_attributes: true,
+  # Enable helpful, but potentially expensive runtime checks
+  enable_expensive_runtime_checks: true
+
 # Configure your database
-config :brock, Brock.Repo,
-  url: "postgresql://postgres:postgres@localhost:5434/brock_dev",
+config :prizmo, Prizmo.Repo,
+  url: "postgresql://postgres:postgres@localhost:5435/prizmo_dev",
   stacktrace: true,
   show_sensitive_data_on_connection_error: true,
   pool_size: 10
@@ -14,17 +33,16 @@ config :brock, Brock.Repo,
 # The watchers configuration can be used to run external
 # watchers to your application. For example, we can use it
 # to bundle .js and .css sources.
-config :brock, BrockWeb.Endpoint,
+config :prizmo, PrizmoWeb.Endpoint,
   # Binding to loopback ipv4 address prevents access from other machines.
   # Change to `ip: {0, 0, 0, 0}` to allow access from other machines.
-  http: [ip: {127, 0, 0, 1}, port: 4001],
+  http: [ip: {127, 0, 0, 1}, port: 4003],
   check_origin: false,
   code_reloader: true,
   debug_errors: true,
   secret_key_base: "UmmIKkw9/D04JY9aMf6EsTxx1lM6NzTSt/Whkzils0kiCFVRJwkjKbs5pYVM6oNG",
   watchers: [
-    esbuild: {Esbuild, :install_and_run, [:brock, ~w(--sourcemap=inline --watch)]},
-    tailwind: {Tailwind, :install_and_run, [:brock, ~w(--watch)]}
+    volt: {Mix.Tasks.Volt.Dev, :run, [~w(--tailwind)]}
   ]
 
 # ## SSL Support
@@ -40,7 +58,7 @@ config :brock, BrockWeb.Endpoint,
 # The `http:` config above can be replaced with:
 #
 #     https: [
-#       port: 4001,
+#       port: 4003,
 #       cipher_suite: :strong,
 #       keyfile: "priv/cert/selfsigned_key.pem",
 #       certfile: "priv/cert/selfsigned.pem"
@@ -51,51 +69,45 @@ config :brock, BrockWeb.Endpoint,
 # different ports.
 
 # Reload browser tabs when matching files change.
-config :brock, BrockWeb.Endpoint,
+config :prizmo, PrizmoWeb.Endpoint,
   live_reload: [
     web_console_logger: true,
     patterns: [
       # Static assets, except user uploads
       ~r"priv/static/(?!uploads/).*\.(js|css|png|jpeg|jpg|gif|svg)$",
-      # Gettext translations
-      ~r"priv/gettext/.*\.po$",
       # Router, Controllers, LiveViews and LiveComponents
-      ~r"lib/brock_web/router\.ex$",
-      ~r"lib/brock_web/(controllers|live|components)/.*\.(ex|heex)$"
+      ~r"lib/prizmo_web/router\.ex$",
+      ~r"lib/prizmo_web/(controllers|live|components)/.*\.(ex|heex)$"
     ]
   ]
 
-# Enable dev routes for dashboard and mailbox
-config :brock, dev_routes: true, token_signing_secret: "sZxU4jjmrwnHgkhHoV4XRr/S5FX7fTzD"
-
-config :brock, :s3,
+config :prizmo, :s3,
   host: "localhost",
   scheme: "http://",
-  port: 4567,
+  port: 4570,
   region: "us-east-1",
   access_key_id: "test",
   secret_access_key: "test"
 
-config :brock,
-  uploads_bucket: "brock-uploads"
+config :prizmo, :spa_assets, mode: :dev
 
-# Do not include metadata nor timestamps in development logs
-config :logger, :default_formatter, format: "[$level] $message\n"
+# Enable dev routes for dashboard and mailbox
+config :prizmo, dev_routes: true, token_signing_secret: "sZxU4jjmrwnHgkhHoV4XRr/S5FX7fTzD"
 
-# Set a higher stacktrace during development. Avoid configuring such
-# in production as building large stacktraces may be expensive.
-config :phoenix, :stacktrace_depth, 20
-
-# Initialize plugs at runtime for faster development compilation
-config :phoenix, :plug_init_mode, :runtime
-
-config :phoenix_live_view,
-  # Include debug annotations and locations in rendered markup.
-  # Changing this configuration will require mix clean and a full recompile.
-  debug_heex_annotations: true,
-  debug_attributes: true,
-  # Enable helpful, but potentially expensive runtime checks
-  enable_expensive_runtime_checks: true
+config :prizmo,
+  uploads_bucket: "prizmo-uploads"
 
 # Disable swoosh api client as it is only required for production adapters.
 config :swoosh, :api_client, false
+
+config :volt, :server,
+  prefix: "/assets",
+  watch_dirs: ["lib/"]
+
+config :volt,
+  aliases: %{
+    "@tanstack/react-db" => "node_modules/@tanstack/react-db/dist/esm/index.js",
+    "@tanstack/react-query" => "node_modules/@tanstack/react-query/build/modern/index.js",
+    "@tanstack/react-router" => "node_modules/@tanstack/react-router/dist/esm/index.js",
+    "@tanstack/react-store" => "node_modules/@tanstack/react-store/dist/esm/index.js"
+  }

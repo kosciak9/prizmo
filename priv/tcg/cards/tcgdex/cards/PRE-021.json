@@ -1,5 +1,5 @@
 {
-  "brock_id": "PRE-021",
+  "prizmo_id": "PRE-021",
   "source": {
     "base_url": "https://api.tcgdex.net/v2/en",
     "dynamic_fields_removed": [

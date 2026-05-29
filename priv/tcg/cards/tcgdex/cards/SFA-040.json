@@ -1,5 +1,5 @@
 {
-  "brock_id": "SFA-040",
+  "prizmo_id": "SFA-040",
   "source": {
     "base_url": "https://api.tcgdex.net/v2/en",
     "dynamic_fields_removed": [

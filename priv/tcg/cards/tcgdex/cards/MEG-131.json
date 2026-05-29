@@ -1,5 +1,5 @@
 {
-  "brock_id": "MEG-131",
+  "prizmo_id": "MEG-131",
   "source": {
     "base_url": "https://api.tcgdex.net/v2/en",
     "dynamic_fields_removed": [

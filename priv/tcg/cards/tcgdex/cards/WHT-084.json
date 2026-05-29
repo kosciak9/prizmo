@@ -1,5 +1,5 @@
 {
-  "brock_id": "WHT-084",
+  "prizmo_id": "WHT-084",
   "source": {
     "base_url": "https://api.tcgdex.net/v2/en",
     "dynamic_fields_removed": [

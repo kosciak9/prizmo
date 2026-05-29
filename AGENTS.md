@@ -1,4 +1,4 @@
-This is a web application written using the Phoenix web framework.
+Prizmo is a Phoenix/Ash application with a React SPA built by Volt.
 
 ## Development server
 
@@ -8,9 +8,10 @@ host, so they use different ports stored in `.env.local` and `.server.port`.
 
 **Accessing the dev server:**
 
-- Check `.server.port` for the current Phoenix port, for example `http://localhost:4001`
+- Check `.server.port` for the current Phoenix port, for example `http://localhost:4003`
 - Use `mix dev.up` to start local services and `mix dev.down` to stop them
 - Worktrunk generates `.env.local` with hashed ports for feature branches
+- The default local domain is `prizmo.localhost`; worktrees use `{branch}.prizmo.localhost`
 - Tidewave MCP should be available at `http://localhost:{PORT}/tidewave/mcp`
 
 Avoid starting or restarting shared local servers blindly. You can interfere
@@ -18,8 +19,27 @@ with other active worktrees if you kill the wrong process.
 
 ## Project guidelines
 
-- Use `mix precommit` alias when you are done with all changes and fix any pending issues
+- Use `mix check` when you are done with all changes and fix any pending issues
 - Use the already included and available `:req` (`Req`) library for HTTP requests, **avoid** `:httpoison`, `:tesla`, and `:httpc`. Req is included by default and is the preferred HTTP client for Phoenix apps
+
+## Quality gate
+
+`mix check` is the canonical local and CI quality gate. It runs:
+
+1. `mix format`
+2. `mix sobelow --config --compact --private`
+3. `mix compile --warnings-as-errors`
+4. `mix deps.unlock --check-unused`
+5. `mix xref graph --label compile-connected --fail-above 50`
+6. `mix check.filenames`
+7. `mix check.service_images`
+8. `mix ash_typescript.codegen --check`
+9. `mix credo --strict`
+10. `mix dialyzer`
+11. `mix test`
+
+Use `mix check --no-test` only when tests are being run separately. Use
+`mix check --verbose` when you need full output for debugging.
 
 ## Commit policy
 
@@ -28,43 +48,29 @@ with other active worktrees if you kill the wrong process.
 - Use Conventional Commit style. For knowledge-base/wiki-only documentation changes, use the `docs` type with `wiki` scope, for example `docs(wiki): capture renderer research`.
 - If a code change also updates wiki/log documentation, commit those docs with the related code change instead of making a separate docs-only commit.
 
-### Phoenix v1.8 guidelines
+## Frontend
 
-- **Always** begin your LiveView templates with `<Layouts.app flash={@flash} ...>` which wraps all inner content
-- The `MyAppWeb.Layouts` module is aliased in the `my_app_web.ex` file, so you can use it without needing to alias it again
-- Anytime you run into errors with no `current_scope` assign:
-  - You failed to follow the Authenticated Routes guidelines, or you failed to pass `current_scope` to `<Layouts.app>`
-  - **Always** fix the `current_scope` error by moving your routes to the proper `live_session` and ensure you pass `current_scope` as needed
-- Phoenix v1.8 moved the `<.flash_group>` component to the `Layouts` module. You are **forbidden** from calling `<.flash_group>` outside of the `layouts.ex` module
-- Out of the box, `core_components.ex` imports an `<.icon name="hero-x-mark" class="w-5 h-5"/>` component for for hero icons. **Always** use the `<.icon>` component for icons, **never** use `Heroicons` modules or similar
-- **Always** use the imported `<.input>` component for form inputs from `core_components.ex` when available. `<.input>` is imported and using it will save steps and prevent errors
-- If you override the default input classes (`<.input class="myclass px-2 py-1 rounded-lg">)`) class with your own values, no default classes are inherited, so your
-custom classes must fully style the input
+- Product UI lives in the Volt React SPA under `lib/prizmo_web/spa/`.
+- Root JavaScript/TypeScript configuration lives at the repository root.
+- Use `npm ci` via `mix assets.setup`; do not add a second package manager workflow.
+- Generated AshTypescript files live under `lib/prizmo_web/spa/lib/ash/generated/` and must stay in sync with Ash resources.
 
-### JS and CSS guidelines
+## Ash migrations
 
-- **Use Tailwind CSS classes and custom CSS rules** to create polished, responsive, and visually stunning interfaces.
-- Tailwindcss v4 **no longer needs a tailwind.config.js** and uses a new import syntax in `app.css`:
+- Prefer Ash-generated migrations and snapshots for resource changes.
+- Do not hand-edit generated migrations unless the generated SQL is demonstrably wrong or incomplete.
+- After changing Ash resources, run the appropriate Ash migration/codegen tasks and verify snapshots are updated intentionally.
 
-      @import "tailwindcss" source(none);
-      @source "../css";
-      @source "../js";
-      @source "../../lib/my_app_web";
+## Sobelow findings
 
-- **Always use and maintain this import syntax** in the app.css file for projects generated with `phx.new`
-- **Never** use `@apply` when writing raw css
-- **Always** manually write your own tailwind-based components instead of using daisyUI for a unique, world-class design
-- Out of the box **only the app.js and app.css bundles are supported**
-  - You cannot reference an external vendor'd script `src` or link `href` in the layouts
-  - You must import the vendor deps into app.js and app.css to use them
-  - **Never write inline <script>custom js</script> tags within templates**
+- Fix Sobelow findings when possible.
+- If a finding is intentionally safe, add a narrow `sobelow_skip` with a clear reason near the code being skipped.
 
-### UI/UX & design guidelines
+## Repository boundaries
 
-- **Produce world-class UI designs** with a focus on usability, aesthetics, and modern design principles
-- Implement **subtle micro-interactions** (e.g., button hover effects, and smooth transitions)
-- Ensure **clean typography, spacing, and layout balance** for a refined, premium look
-- Focus on **delightful details** like hover effects, loading states, and smooth page transitions
+- Keep generated runtime data, local uploads, credentials, and dependency caches out of git.
+- Use `/tmp/opencode` for scratch work outside the repository.
+- Verify APIs against the installed dependency versions before relying on examples from the internet.
 
 
 <!-- usage-rules-start -->

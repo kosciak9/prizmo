@@ -1,5 +1,5 @@
 {
-  "brock_id": "SVI-186",
+  "prizmo_id": "SVI-186",
   "source": {
     "base_url": "https://api.tcgdex.net/v2/en",
     "dynamic_fields_removed": [

@@ -1,4 +1,4 @@
-defmodule Brock.Repo.Migrations.AddOban do
+defmodule Prizmo.Repo.Migrations.AddOban do
   use Ecto.Migration
 
   def up, do: Oban.Migration.up()

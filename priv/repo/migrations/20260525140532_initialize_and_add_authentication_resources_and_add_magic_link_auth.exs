@@ -1,4 +1,4 @@
-defmodule Brock.Repo.Migrations.InitializeAndAddAuthenticationResourcesAndAddMagicLinkAuth do
+defmodule Prizmo.Repo.Migrations.InitializeAndAddAuthenticationResourcesAndAddMagicLinkAuth do
   @moduledoc """
   Updates resources based on their most recent snapshots.
 

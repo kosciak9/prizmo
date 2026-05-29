@@ -1,15 +1,19 @@
-defmodule Brock.MixProject do
+defmodule Prizmo.MixProject do
   use Mix.Project
 
   def project do
     [
-      app: :brock,
+      app: :prizmo,
       version: "0.1.0",
-      elixir: "~> 1.15",
+      elixir: "~> 1.19",
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
       aliases: aliases(),
       deps: deps(),
+      dialyzer: [
+        plt_add_apps: [:mix, :ex_unit],
+        ignore_warnings: ".dialyzer_ignore.exs"
+      ],
       compilers: [:phoenix_live_view] ++ Mix.compilers(),
       listeners: [Phoenix.CodeReloader],
       usage_rules: usage_rules(),
@@ -22,14 +26,23 @@ defmodule Brock.MixProject do
   # Type `mix help compile.app` for more information.
   def application do
     [
-      mod: {Brock.Application, []},
+      mod: {Prizmo.Application, []},
       extra_applications: [:logger, :runtime_tools]
     ]
   end
 
   def cli do
     [
-      preferred_envs: [precommit: :test]
+      preferred_envs: [
+        check: :test,
+        coveralls: :test,
+        "coveralls.detail": :test,
+        "coveralls.html": :test,
+        "coveralls.json": :test,
+        "coveralls.xml": :test,
+        "coveralls.cobertura": :test,
+        "coveralls.lcov": :test
+      ]
     ]
   end
 
@@ -42,6 +55,7 @@ defmodule Brock.MixProject do
   # Type `mix help deps` for examples and options.
   defp deps do
     [
+      {:volt, "== 0.14.0"},
       {:picosat_elixir, "~> 0.2"},
       {:sourceror, "~> 1.8", only: [:dev, :test]},
       {:oban, "~> 2.0"},
@@ -66,25 +80,24 @@ defmodule Brock.MixProject do
       {:phoenix_live_view, "~> 1.1.0"},
       {:lazy_html, ">= 0.1.0", only: :test},
       {:phoenix_live_dashboard, "~> 0.8.3"},
-      {:esbuild, "~> 0.10", runtime: Mix.env() == :dev},
-      {:tailwind, "~> 0.3", runtime: Mix.env() == :dev},
-      {:heroicons,
-       github: "tailwindlabs/heroicons",
-       tag: "v2.2.0",
-       sparse: "optimized",
-       app: false,
-       compile: false,
-       depth: 1},
       {:swoosh, "~> 1.16"},
       {:req, "~> 0.5"},
       {:req_s3, "~> 0.2.3"},
       {:telemetry_metrics, "~> 1.0"},
       {:telemetry_poller, "~> 1.0"},
-      {:gettext, "~> 1.0"},
       {:jason, "~> 1.2"},
       {:dns_cluster, "~> 0.2.0"},
       {:bandit, "~> 1.5"},
-      {:dotenv, "~> 3.1", only: [:dev, :test]}
+      {:dotenv, "~> 3.1", only: [:dev, :test]},
+      {:sobelow, "~> 0.13", only: [:dev, :test], runtime: false},
+      {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
+      {:excoveralls, "~> 0.18", only: :test},
+      {:styler, "~> 1.5", only: [:dev, :test], runtime: false},
+      {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
+      {:ash_credo, "~> 0.12", only: [:dev, :test], runtime: false},
+      {:credo_naming, "~> 2.1", only: [:dev, :test], runtime: false},
+      {:ex_slop, "~> 0.4.0", only: [:dev, :test], runtime: false},
+      {:ex_dna, "~> 1.5.1", only: [:dev, :test], runtime: false}
     ]
   end
 
@@ -133,18 +146,10 @@ defmodule Brock.MixProject do
       "ecto.setup": ["ecto.create", "ecto.migrate", "run priv/repo/seeds.exs"],
       "ecto.reset": ["ecto.drop", "ecto.setup"],
       test: ["ash.setup --quiet", "test"],
-      "assets.setup": [
-        "tailwind.install --if-missing",
-        "esbuild.install --if-missing",
-        "ash_typescript.npm_install"
-      ],
-      "assets.build": ["compile", "tailwind brock", "esbuild brock"],
-      "assets.deploy": [
-        "tailwind brock --minify",
-        "esbuild brock --minify",
-        "phx.digest"
-      ],
-      precommit: ["compile --warnings-as-errors", "deps.unlock --unused", "format", "test"]
+      codegen: ["ash_typescript.codegen"],
+      "assets.setup": ["cmd npm ci"],
+      "assets.build": ["compile", "volt.build --tailwind"],
+      "assets.deploy": ["volt.build --tailwind", "phx.digest"]
     ]
   end
 end

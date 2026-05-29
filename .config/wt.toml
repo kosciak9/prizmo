@@ -12,11 +12,11 @@ deps = "mix deps.get"
 env = """
 {% if branch == 'main' %}
 cat > .env.local << 'EOF'
-PORT=4001
-DB_PORT=5434
-S3_PORT=4567
+PORT=4003
+DB_PORT=5435
+S3_PORT=4570
 BRANCH=main
-DATABASE_URL=postgresql://postgres:postgres@localhost:5434/brock_dev
+DATABASE_URL=postgresql://postgres:postgres@localhost:5435/prizmo_dev
 
 # AWS credentials for SeaweedFS S3 (required by req_s3)
 AWS_ACCESS_KEY_ID=test
@@ -28,7 +28,7 @@ PORT={{ branch | hash_port }}
 DB_PORT={{ ('db-' ~ branch) | hash_port }}
 S3_PORT={{ ('s3-' ~ branch) | hash_port }}
 BRANCH={{ branch | sanitize }}
-DATABASE_URL=postgresql://postgres:postgres@localhost:{{ ('db-' ~ branch) | hash_port }}/brock_dev
+DATABASE_URL=postgresql://postgres:postgres@localhost:{{ ('db-' ~ branch) | hash_port }}/prizmo_dev
 
 # AWS credentials for SeaweedFS S3 (required by req_s3)
 AWS_ACCESS_KEY_ID=test
@@ -38,7 +38,7 @@ EOF
 """
 
 [[pre-start]]
-opencode = "{% if branch == 'main' %}echo '4001'{% else %}echo '{{ branch | hash_port }}'{% endif %} > .server.port"
+opencode = "{% if branch == 'main' %}echo '4003'{% else %}echo '{{ branch | hash_port }}'{% endif %} > .server.port"
 
 [[pre-start]]
 up = "mix dev.up"
@@ -47,4 +47,4 @@ up = "mix dev.up"
 down = "mix dev.down"
 
 [list]
-url = "https://{% if branch == 'main' %}main{% else %}{{ branch | sanitize }}{% endif %}.brock.localhost"
+url = "https://{% if branch == 'main' %}main{% else %}{{ branch | sanitize }}{% endif %}.prizmo.localhost"

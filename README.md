@@ -1,4 +1,4 @@
-# Brock
+# Prizmo
 
 ## Local development
 
@@ -18,9 +18,9 @@ mix dev.up
 
 This starts:
 
-- Phoenix on [`localhost:4001`](http://localhost:4001)
-- Postgres on `localhost:5434`
-- SeaweedFS S3 on `localhost:4567`
+- Phoenix on [`localhost:4003`](http://localhost:4003)
+- Postgres on `localhost:5435`
+- SeaweedFS S3 on `localhost:4570`
 
 Useful commands:
 
@@ -42,8 +42,8 @@ Worktrunk will:
 
 Each worktree gets isolated local services and a Caddy route at:
 
-- `https://main.brock.localhost`
-- `https://feature-auth.brock.localhost`
+- `https://main.prizmo.localhost`
+- `https://feature-auth.prizmo.localhost`
 
 Remove a worktree and stop its services with:
 

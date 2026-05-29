@@ -1,5 +1,5 @@
 {
-  "brock_id": "ASC-181",
+  "prizmo_id": "ASC-181",
   "source": {
     "base_url": "https://api.tcgdex.net/v2/en",
     "dynamic_fields_removed": [

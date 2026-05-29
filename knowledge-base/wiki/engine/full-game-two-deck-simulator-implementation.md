@@ -15,13 +15,13 @@ The first interface is ExUnit-only. No Phoenix UI, Ash persistence, AI opponent,
 
 The implementation starts with explicit state machines rather than card effects:
 
-- `Brock.Tcg.Sim.StateMachines.GameLifecycle`
-- `Brock.Tcg.Sim.StateMachines.TurnLifecycle`
-- `Brock.Tcg.Sim.StateMachines.PromptLifecycle`
-- `Brock.Tcg.Sim.StateMachines.CardLifecycle`
-- `Brock.Tcg.Sim.StateMachines.ZoneMovement`
+- `Prizmo.Tcg.Sim.StateMachines.GameLifecycle`
+- `Prizmo.Tcg.Sim.StateMachines.TurnLifecycle`
+- `Prizmo.Tcg.Sim.StateMachines.PromptLifecycle`
+- `Prizmo.Tcg.Sim.StateMachines.CardLifecycle`
+- `Prizmo.Tcg.Sim.StateMachines.ZoneMovement`
 
-The first reducer lives in `Brock.Tcg.Sim.Engine` and supports:
+The first reducer lives in `Prizmo.Tcg.Sim.Engine` and supports:
 
 - constructing a deterministic game from card IDs,
 - starting setup,
@@ -82,7 +82,7 @@ The first reducer lives in `Brock.Tcg.Sim.Engine` and supports:
 
 ## Undo/redo requirement
 
-The simulator includes `Brock.Tcg.Sim.History`.
+The simulator includes `Prizmo.Tcg.Sim.History`.
 
 Every successful `Engine.apply_action/2` records:
 
@@ -96,7 +96,7 @@ Undo/redo is currently tested across setup actions, including opening-hand draw 
 
 ## State invariants
 
-`Brock.Tcg.Sim.Invariants` validates card accounting for each player:
+`Prizmo.Tcg.Sim.Invariants` validates card accounting for each player:
 
 - all card instances are counted across deck, hand, prizes, discard, lost zone, active, bench, attachments, Pokémon Tools, evolution stacks, and the global Stadium,
 - the count must match the player's original deck size,
@@ -108,10 +108,10 @@ This is the first guardrail for exact simulation and for future rewind/branching
 
 Static deck modules exist for the two target decklists:
 
-- `Brock.Tcg.Sim.Decks.Dragapult27431`
-- `Brock.Tcg.Sim.Decks.Alakazam27147`
+- `Prizmo.Tcg.Sim.Decks.Dragapult27431`
+- `Prizmo.Tcg.Sim.Decks.Alakazam27147`
 
-`Brock.Tcg.Sim.CardRegistry` lists the supported card IDs and minimal metadata needed by the current engine slice. A small number of card-specific effects are implemented directly in the reducer. Remaining unsupported card IDs, effects, and states fail explicitly.
+`Prizmo.Tcg.Sim.CardRegistry` lists the supported card IDs and minimal metadata needed by the current engine slice. A small number of card-specific effects are implemented directly in the reducer. Remaining unsupported card IDs, effects, and states fail explicitly.
 
 The current exact-text slice was checked against Limitless card pages for:
 
@@ -194,12 +194,12 @@ Current tests cover:
 Focused validation command used:
 
 ```sh
-mix format && mix test test/brock/tcg/sim
+mix format && mix test test/prizmo/tcg/sim
 ```
 
 Result on 2026-05-28 after Munkidori/Fezandipiti ex batch: 64 simulator tests, 0 failures.
 
-Full project validation also passed via `mix precommit`: 69 tests, 0 failures.
+Full project validation also passed via `mix check`: 69 tests, 0 failures.
 
 ## Next implementation questions
 

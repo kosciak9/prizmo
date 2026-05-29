@@ -1,5 +1,5 @@
 {
-  "brock_id": "TEF-024",
+  "prizmo_id": "TEF-024",
   "source": {
     "base_url": "https://api.tcgdex.net/v2/en",
     "dynamic_fields_removed": [

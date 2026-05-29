@@ -1,5 +1,5 @@
 {
-  "brock_id": "JTG-120",
+  "prizmo_id": "JTG-120",
   "source": {
     "base_url": "https://api.tcgdex.net/v2/en",
     "dynamic_fields_removed": [

@@ -17,7 +17,7 @@ Goals:
 
 ## Current baseline
 
-- The current simulator is pure Elixir under `lib/brock/tcg/sim`.
+- The current simulator is pure Elixir under `lib/prizmo/tcg/sim`.
 - It supports Dragapult 27431 vs Alakazam/Dudunsparce 27147 end-to-end as scripted engine actions.
 - The existing hand-written registry is the thing to replace or refactor behind a compatibility facade.
 - There is no UI yet.
@@ -40,15 +40,15 @@ The target is pairwise support: any two supported deck modules can start a game,
 
 ## Data and source-of-truth policy
 
-- Brock card IDs remain public simulator IDs in `SET-localId` form, for example `TEF-123`.
+- Prizmo card IDs remain public simulator IDs in `SET-localId` form, for example `TEF-123`.
 - Limitless is the deck source and provides deck quantities plus `SET`/`localId` extracted from card links.
-- TCGdex uses IDs like `sv05-123`; map Brock set abbreviations through TCGdex `set.abbreviation.official`.
-- Store external source IDs, but keep Brock IDs as public simulator IDs.
+- TCGdex uses IDs like `sv05-123`; map Prizmo set abbreviations through TCGdex `set.abbreviation.official`.
+- Store external source IDs, but keep Prizmo IDs as public simulator IDs.
 - Commit the TCGdex cache and use it in normal tests.
 - Network access is opt-in only; normal tests must not hit the network.
 - Use `Req` for HTTP clients.
 
-The key architectural decision is that TCGdex owns **static card facts** and Brock owns **executable semantics**.
+The key architectural decision is that TCGdex owns **static card facts** and Prizmo owns **executable semantics**.
 
 TCGdex/cache should provide:
 
@@ -61,7 +61,7 @@ TCGdex/cache should provide:
 - image and set identity;
 - raw printed attack, Ability, and Trainer text.
 
-Brock-authored behavior should provide:
+Prizmo-authored behavior should provide:
 
 - exact attack execution;
 - exact Ability execution;
@@ -82,10 +82,10 @@ Suggested cache layout:
 
 Candidate modules:
 
-- `Brock.Tcg.Data.LimitlessDeck`
-- `Brock.Tcg.Data.TCGdex`
-- `Brock.Tcg.Cards.Metadata`
-- `Brock.Tcg.Cards.Registry`
+- `Prizmo.Tcg.Data.LimitlessDeck`
+- `Prizmo.Tcg.Data.TCGdex`
+- `Prizmo.Tcg.Cards.Metadata`
+- `Prizmo.Tcg.Cards.Registry`
 
 Metadata structs should be generated or normalized from cached TCGdex JSON. `CardRegistry.fetch/1` becomes a compatibility facade that combines the authored behavior overlay with metadata cache records.
 
@@ -95,8 +95,8 @@ Manual metadata overrides are allowed only for API gaps. Each override needs an 
 
 Recommended resolution order for `CardRegistry.fetch/1` during migration:
 
-1. Load normalized metadata for the Brock card ID from cache.
-2. Load behavior overlay for the same Brock card ID, if present.
+1. Load normalized metadata for the Prizmo card ID from cache.
+2. Load behavior overlay for the same Prizmo card ID, if present.
 3. Merge metadata plus behavior into the current engine-compatible shape.
 4. If a requested attack, Ability, or effect has raw text but no behavior overlay, return an explicit unsupported-behavior error at action time.
 
@@ -113,12 +113,12 @@ The TCGdex resolver should map set abbreviations to TCGdex set IDs and fetch all
 Planned mix tasks:
 
 ```sh
-mix brock.deck.import 27599
-mix brock.deck.import 27599 --module RagingBolt27599
-mix brock.deck.import 27599 --refresh
-mix brock.cards.sync
-mix brock.cards.coverage
-mix brock.cards.check
+mix prizmo.deck.import 27599
+mix prizmo.deck.import 27599 --module RagingBolt27599
+mix prizmo.deck.import 27599 --refresh
+mix prizmo.cards.sync
+mix prizmo.cards.coverage
+mix prizmo.cards.check
 ```
 
 Generated deck modules should be committed and use a deck macro with fields such as:
@@ -139,8 +139,8 @@ Important decision: the DSL must not hand-write static card data. Static metadat
 Desired shape:
 
 ```elixir
-defmodule Brock.Tcg.Cards.Behaviors.TWM do
-  use Brock.Tcg.Cards.DSL
+defmodule Prizmo.Tcg.Cards.Behaviors.TWM do
+  use Prizmo.Tcg.Cards.DSL
 
   card "TWM-130" do
     attack :phantom_dive do
@@ -151,13 +151,13 @@ defmodule Brock.Tcg.Cards.Behaviors.TWM do
 end
 ```
 
-The DSL may validate that referenced attacks and abilities exist in TCGdex metadata by name or generated slug. It should compile behavior overlay manifests keyed by Brock card ID and attack/ability IDs.
+The DSL may validate that referenced attacks and abilities exist in TCGdex metadata by name or generated slug. It should compile behavior overlay manifests keyed by Prizmo card ID and attack/ability IDs.
 
 The DSL should produce coverage metadata and clear compile/runtime errors. Runtime errors should identify the card, behavior family, deck, and missing primitive or ruling where possible.
 
 DSL responsibilities:
 
-- reference a Brock card ID that already exists in metadata cache;
+- reference a Prizmo card ID that already exists in metadata cache;
 - bind behavior to printed attacks, Abilities, or play effects;
 - validate that referenced names/slugs exist in the cached raw metadata;
 - define executable behavior using primitives and hooks;
@@ -233,7 +233,7 @@ Coverage statuses:
 
 Coverage is tracked per card and per behavior family. Supported decks cannot contain `behavior_missing` or `unsupported_effect` for reachable normal-play effects.
 
-`mix brock.cards.coverage` should report card, decks, metadata status, behavior status, tests, and final status.
+`mix prizmo.cards.coverage` should report card, decks, metadata status, behavior status, tests, and final status.
 
 A deck is **supported** only when:
 
@@ -251,36 +251,36 @@ Cards may exist as `metadata_cached` before their deck is supported. This is exp
 ### Phase 0: freeze baseline
 
 - Keep Dragapult 27431 vs Alakazam/Dudunsparce 27147 green.
-- Added `mix brock.cards.coverage` for the current registry: reports the two fixed decks, legacy-registry metadata status, behavior status, and generic-damage-only attack coverage.
+- Added `mix prizmo.cards.coverage` for the current registry: reports the two fixed decks, legacy-registry metadata status, behavior status, and generic-damage-only attack coverage.
 
 ### Phase 1: import decks and metadata
 
 - Added a deck macro foundation for generated/static deck modules: source identity,
   names, quantities, `card_ids/0`, and compile-time 60-card validation now live in
-  `Brock.Tcg.Sim.Decklist`.
+  `Prizmo.Tcg.Sim.Decklist`.
 - Imported Raging Bolt Ogerpon 27599 as a static deck module using the deck macro.
 - Imported Festival Lead 27445 as a static deck module using the deck macro.
 - Imported Lopunny Dudunsparce 27514 as a static deck module using the deck macro.
 - Imported Rocket's Mewtwo 27459 as a static deck module using the deck macro.
-- Added `Brock.Tcg.Data.TCGdex` plus opt-in `mix brock.cards.sync` network sync for cache generation.
+- Added `Prizmo.Tcg.Data.TCGdex` plus opt-in `mix prizmo.cards.sync` network sync for cache generation.
 - Cached TCGdex set metadata for the 15 deck-pool sets and card metadata for 101 unique cards across all six known deck modules under `priv/tcg/cards/tcgdex`.
 - Keep importer/cache tests offline by default; tag network tests as `:external`.
 
 ### Phase 2: metadata-backed registry facade
 
-- Added `Brock.Tcg.Cards.Metadata` to read normalized static facts from the committed TCGdex cache for representative Pokémon, Trainer, and Energy cards without changing engine behavior yet.
+- Added `Prizmo.Tcg.Cards.Metadata` to read normalized static facts from the committed TCGdex cache for representative Pokémon, Trainer, and Energy cards without changing engine behavior yet.
 - Converted `CardRegistry.fetch/1` into a compatibility facade for the existing supported registry IDs.
 - Static card data now comes from normalized cached TCGdex metadata in the facade, including raw printed attack, Ability, Trainer, and Energy text.
 - Existing authored attack, Ability, and Energy behavior is overlaid onto the metadata-backed base.
-- The old hand-written registry entries are now temporary behavior overlays plus explicit compatibility shims for current reducer gaps such as Brock-ID evolution links and weakness/resistance cache gaps.
+- The old hand-written registry entries are now temporary behavior overlays plus explicit compatibility shims for current reducer gaps such as Prizmo-ID evolution links and weakness/resistance cache gaps.
 - Added tests proving fetched registry metadata comes from cache for representative Pokémon, Trainer, and Energy cards, and that cached raw attack text without an executable overlay fails explicitly.
-- Updated `mix brock.cards.coverage` to report `metadata_backed_registry` and `metadata_cached` for the 44 current fixed-deck cards.
+- Updated `mix prizmo.cards.coverage` to report `metadata_backed_registry` and `metadata_cached` for the 44 current fixed-deck cards.
 
 ### Phase 3: behavior DSL foundation
 
-- Added initial `Brock.Tcg.Cards.DSL` executable-behavior manifest foundation.
+- Added initial `Prizmo.Tcg.Cards.DSL` executable-behavior manifest foundation.
 - DSL `card` declarations now validate referenced card IDs and attack/Ability IDs against cached TCGdex metadata at compile time.
-- Added first representative behavior manifest module, `Brock.Tcg.Cards.Behaviors.TWM`, declaring Dragapult ex `Phantom Dive` executable effect overlay without moving static facts out of the metadata cache.
+- Added first representative behavior manifest module, `Prizmo.Tcg.Cards.Behaviors.TWM`, declaring Dragapult ex `Phantom Dive` executable effect overlay without moving static facts out of the metadata cache.
 - Ported Dragapult ex `Jet Headbutt` as the first representative plain-damage DSL manifest entry, relying on cached TCGdex damage/cost metadata without adding a static overlay.
 - Ported Drakloak `Recon Directive` as the first representative Ability DSL manifest entry, relying on cached TCGdex Ability metadata and adding only the executable effect overlay.
 - Ported Unfair Stamp as the first representative Item card-effect DSL manifest entry, relying on cached TCGdex Trainer metadata and adding only the executable shuffle/draw eligibility overlay.
@@ -293,7 +293,7 @@ Cards may exist as `metadata_cached` before their deck is supported. This is exp
 
 ### Phase 4: effect primitives and hooks
 
-- Added first hook runner, `Brock.Tcg.Sim.Hooks`, with a `:before_play_trainer` phase.
+- Added first hook runner, `Prizmo.Tcg.Sim.Hooks`, with a `:before_play_trainer` phase.
 - Migrated Genesect `ACE Nullifier` ACE SPEC prevention out of the engine reducer-specific check and into the `:before_play_trainer` hook path while preserving existing reducer error behavior.
 - Migrated Budew `Itchy Pollen` Item-card prevention into the `:before_play_trainer` hook path while preserving existing reducer error behavior.
 - Migrated Team Rocket's Watchtower Colorless Ability prevention into the `:before_ability` hook path while preserving existing reducer error behavior.
@@ -306,7 +306,7 @@ Cards may exist as `metadata_cached` before their deck is supported. This is exp
 ### Phase 5: new meta-deck behavior families
 
 - Implemented Rabsca `Psychic` as a variable-damage attack primitive and TEF DSL manifest entry, closing the remaining fixed-deck `behavior_missing` coverage gap before broader new-deck behavior-family work.
-- Expanded `mix brock.cards.coverage` to report all six known deck modules and all 101 cached cards, exposing imported-deck `behavior_missing` and `generic_damage_only` gaps for Phase 5 prioritization.
+- Expanded `mix prizmo.cards.coverage` to report all six known deck modules and all 101 cached cards, exposing imported-deck `behavior_missing` and `generic_damage_only` gaps for Phase 5 prioritization.
 - Implemented Energy Switch `MEG-115` as the first new imported-deck Item behavior slice, with a DSL manifest entry and reducer action for moving a Basic Energy between the player's Pokémon.
 - Registered all deck-pool Basic Energy cards through metadata-only registry overlays, allowing `MEE-001`, `MEE-003`, `MEE-004`, and `MEE-006` to use cache-derived static facts and inferred provided Energy types.
 - Implemented Pokégear 3.0 `SVI-186` as a top-seven Supporter search Item behavior slice, with a DSL manifest entry and reducer action that keeps static Trainer text in the TCGdex cache.
@@ -424,14 +424,14 @@ Agent workflow rules:
 - Verify exact text from cached TCGdex plus official/Limitless references before coding behavior.
 - Add or update coverage reports with every new deck/card behavior slice.
 - Keep normal tests offline.
-- Run `mix test test/brock/tcg/sim` and `mix precommit` for simulator-impacting changes.
+- Run `mix test test/prizmo/tcg/sim` and `mix check` for simulator-impacting changes.
 - Use Conventional Commit messages and stage only intended files.
 
 ## Validation
 
-- `mix test test/brock/tcg/sim`
-- `mix brock.cards.coverage`
-- `mix precommit`
+- `mix test test/prizmo/tcg/sim`
+- `mix prizmo.cards.coverage`
+- `mix check`
 - Importer/cache tests are offline by default.
 - External/network tests are tagged `:external`.
 - No normal test should depend on the network.
@@ -453,7 +453,7 @@ Agent workflow rules:
 - Coverage reports identify missing behavior, tests, and rulings.
 - Any supported deck can play any other supported deck in pairwise smoke tests.
 - Basic LiveView hotseat UI can play a supported match.
-- `mix precommit` passes.
+- `mix check` passes.
 
 No deck should be called supported merely because its 60 card IDs import successfully. Import success means the deck is known. Supported means it is playable through exact implemented behavior for normal match play.
 

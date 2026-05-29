@@ -1,5 +1,5 @@
 {
-  "brock_id": "TWM-130",
+  "prizmo_id": "TWM-130",
   "source": {
     "base_url": "https://api.tcgdex.net/v2/en",
     "dynamic_fields_removed": [

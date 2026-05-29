@@ -23,7 +23,7 @@ erl_crash.dump
 /tmp/
 
 # Ignore package tarball (built via "mix hex.build").
-brock-*.tar
+prizmo-*.tar
 
 # Ignore assets that are produced by build tools.
 /priv/static/assets/
@@ -33,7 +33,7 @@ brock-*.tar
 
 # In case you use Node.js/npm, you want to ignore these.
 npm-debug.log
-/assets/node_modules/
+/node_modules/
 
 .env
 .env.local

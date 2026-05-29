@@ -1,5 +1,5 @@
 {
-  "brock_id": "DRI-010",
+  "prizmo_id": "DRI-010",
   "source": {
     "base_url": "https://api.tcgdex.net/v2/en",
     "dynamic_fields_removed": [
