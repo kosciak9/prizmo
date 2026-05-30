@@ -65,6 +65,37 @@ defmodule Prizmo.TcgEngine.Game.ActionCommands do
       end
     end
 
+    action :attach_energy_command, :struct do
+      description "Attach one Energy from hand to a Pokémon in play through the mechanics layer."
+
+      constraints instance_of: Game
+
+      argument :game_id, :uuid do
+        allow_nil? false
+      end
+
+      argument :player_id, :string do
+        allow_nil? false
+      end
+
+      argument :energy_card_instance_id, :uuid do
+        allow_nil? false
+      end
+
+      argument :target_card_instance_id, :uuid do
+        allow_nil? false
+      end
+
+      run fn input, _context ->
+        Mechanics.attach_energy(
+          input.arguments.game_id,
+          input.arguments.player_id,
+          input.arguments.energy_card_instance_id,
+          input.arguments.target_card_instance_id
+        )
+      end
+    end
+
     action :choose_prompt_command, :struct do
       description "Resolve a select-cards prompt through the generic mechanics layer."
 

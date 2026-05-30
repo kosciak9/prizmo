@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
 
 import {
+  runAttachTcgEngineEnergy,
   buildAshRpcHeaders,
   runChooseTcgEngineActiveFromHand,
   runChooseTcgEnginePrompt,
@@ -223,6 +224,19 @@ type PlayBasicToBenchCommand = {
   cardInstanceId: string
 }
 
+type AttachEnergyInput = {
+  gameId: string
+  playerId: PlayerId
+  energyCardInstanceId: string
+  targetCardInstanceId: string
+}
+
+type AttachEnergyCommand = {
+  playerId: string
+  energyCardInstanceId: string
+  targetCardInstanceId: string
+}
+
 type ChoosePromptInput = {
   gameId: string
   playerId: PlayerId
@@ -397,6 +411,13 @@ export function HomeRoute() {
 
   const playBasicToBenchMutation = useMutation({
     mutationFn: (input: PlayBasicToBenchInput) => playBasicToBench(input),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['tcg-engine', 'game-state'] })
+    }
+  })
+
+  const attachEnergyMutation = useMutation({
+    mutationFn: (input: AttachEnergyInput) => attachEnergy(input),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['tcg-engine', 'game-state'] })
     }
@@ -955,6 +976,12 @@ export function HomeRoute() {
                   </InlineNotice>
                 ) : null}
 
+                {attachEnergyMutation.error ? (
+                  <InlineNotice tone="error" title="Attach Energy command failed">
+                    {errorMessage(attachEnergyMutation.error)}
+                  </InlineNotice>
+                ) : null}
+
                 {choosePromptMutation.error ? (
                   <InlineNotice tone="error" title="Prompt choice command failed">
                     {errorMessage(choosePromptMutation.error)}
@@ -1013,6 +1040,16 @@ export function HomeRoute() {
                     })
                   }
                 }}
+                onAttachEnergy={({ playerId, energyCardInstanceId, targetCardInstanceId }) => {
+                  if (isPlayerId(playerId)) {
+                    attachEnergyMutation.mutate({
+                      gameId: normalisedGameId,
+                      playerId,
+                      energyCardInstanceId,
+                      targetCardInstanceId
+                    })
+                  }
+                }}
                 onPlayCard={({ playerId, cardInstanceId }) => {
                   if (isPlayerId(playerId)) {
                     playCardMutation.mutate({
@@ -1033,6 +1070,14 @@ export function HomeRoute() {
                 }}
                 playBasicToBenchPendingCardId={
                   playBasicToBenchMutation.isPending ? playBasicToBenchMutation.variables?.cardInstanceId ?? null : null
+                }
+                attachEnergyPendingKey={
+                  attachEnergyMutation.isPending && attachEnergyMutation.variables
+                    ? attachEnergyPairKey(
+                        attachEnergyMutation.variables.energyCardInstanceId,
+                        attachEnergyMutation.variables.targetCardInstanceId
+                      )
+                    : null
                 }
                 promptPendingId={choosePromptMutation.isPending ? choosePromptMutation.variables?.promptId ?? null : null}
                 playCardPendingCardId={playCardMutation.isPending ? playCardMutation.variables?.cardInstanceId ?? null : null}
@@ -1271,6 +1316,20 @@ async function playBasicToBench(input: PlayBasicToBenchInput): Promise<CreatedGa
   return result.data as CreatedGame
 }
 
+async function attachEnergy(input: AttachEnergyInput): Promise<CreatedGame> {
+  const result = await runAttachTcgEngineEnergy({
+    input,
+    fields: GAME_RESOURCE_FIELDS,
+    headers: buildAshRpcHeaders()
+  })
+
+  if (!result.success) {
+    throw new Error(rpcErrorMessage(result.errors))
+  }
+
+  return result.data as CreatedGame
+}
+
 async function choosePrompt(input: ChoosePromptInput): Promise<CreatedGame> {
   const result = await runChooseTcgEnginePrompt({
     input,
@@ -1289,8 +1348,10 @@ function GameStateWorkbench({
   gameState,
   deckNamesByKey,
   onChoosePrompt,
+  onAttachEnergy,
   onPlayBasicToBench,
   onPlayCard,
+  attachEnergyPendingKey,
   playBasicToBenchPendingCardId,
   promptPendingId,
   playCardPendingCardId
@@ -1298,8 +1359,10 @@ function GameStateWorkbench({
   gameState: GameState
   deckNamesByKey: Map<string, string>
   onChoosePrompt: (input: ChoosePromptCommand) => void
+  onAttachEnergy: (input: AttachEnergyCommand) => void
   onPlayBasicToBench: (input: PlayBasicToBenchCommand) => void
   onPlayCard: (input: PlayCardCommand) => void
+  attachEnergyPendingKey: string | null
   playBasicToBenchPendingCardId: string | null
   promptPendingId: string | null
   playCardPendingCardId: string | null
@@ -1337,8 +1400,10 @@ function GameStateWorkbench({
       <ActionAffordancesPanel
         actions={gameState.actionAffordances}
         cardsById={cardsById}
+        onAttachEnergy={onAttachEnergy}
         onPlayBasicToBench={onPlayBasicToBench}
         onPlayCard={onPlayCard}
+        attachEnergyPendingKey={attachEnergyPendingKey}
         playBasicToBenchPendingCardId={playBasicToBenchPendingCardId}
         playCardPendingCardId={playCardPendingCardId}
       />
@@ -1533,19 +1598,23 @@ function PromptChoiceCard({
 function ActionAffordancesPanel({
   actions,
   cardsById,
+  onAttachEnergy,
   onPlayBasicToBench,
   onPlayCard,
+  attachEnergyPendingKey,
   playBasicToBenchPendingCardId,
   playCardPendingCardId
 }: {
   actions: ActionAffordance[]
   cardsById: Map<string, CardSummary>
+  onAttachEnergy: (input: AttachEnergyCommand) => void
   onPlayBasicToBench: (input: PlayBasicToBenchCommand) => void
   onPlayCard: (input: PlayCardCommand) => void
+  attachEnergyPendingKey: string | null
   playBasicToBenchPendingCardId: string | null
   playCardPendingCardId: string | null
 }) {
-  const actionCommandPending = Boolean(playCardPendingCardId || playBasicToBenchPendingCardId)
+  const actionCommandPending = Boolean(playCardPendingCardId || playBasicToBenchPendingCardId || attachEnergyPendingKey)
 
   return (
     <Panel
@@ -1621,6 +1690,43 @@ function ActionAffordancesPanel({
                       </button>
                     )
                   })}
+                </div>
+              ) : null}
+
+              {action.key === 'attach_energy' &&
+              action.sourceCardInstanceIds.length > 0 &&
+              action.targetCardInstanceIds.length > 0 ? (
+                <div className="mt-3 space-y-2">
+                  {action.sourceCardInstanceIds.flatMap(energyCardInstanceId =>
+                    action.targetCardInstanceIds.map(targetCardInstanceId => {
+                      const energyCard = cardsById.get(energyCardInstanceId)
+                      const targetCard = cardsById.get(targetCardInstanceId)
+                      const pairKey = attachEnergyPairKey(energyCardInstanceId, targetCardInstanceId)
+                      const isPending = attachEnergyPendingKey === pairKey
+
+                      return (
+                        <button
+                          className="w-full rounded-xl border border-emerald-700 px-3 py-2 text-left text-sm font-semibold text-emerald-800 transition hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:border-stone-300 disabled:text-stone-400 disabled:hover:bg-transparent"
+                          disabled={actionCommandPending || !isPlayerId(action.playerId)}
+                          key={pairKey}
+                          onClick={() =>
+                            onAttachEnergy({
+                              playerId: action.playerId,
+                              energyCardInstanceId,
+                              targetCardInstanceId
+                            })
+                          }
+                          type="button"
+                        >
+                          {isPending
+                            ? `Attaching ${energyCard?.name ?? 'Energy'}...`
+                            : `Attach ${energyCard?.name ?? formatCardInstanceId(energyCardInstanceId)} to ${
+                                targetCard?.name ?? formatCardInstanceId(targetCardInstanceId)
+                              }`}
+                        </button>
+                      )
+                    })
+                  )}
                 </div>
               ) : null}
             </li>
@@ -2006,6 +2112,10 @@ function actionKey(action: ActionAffordance) {
     ...action.promptIds,
     ...action.choiceKeys
   ].join(':')
+}
+
+function attachEnergyPairKey(energyCardInstanceId: string, targetCardInstanceId: string) {
+  return `${energyCardInstanceId}:${targetCardInstanceId}`
 }
 
 function visibleCardsById(gameState: GameState) {

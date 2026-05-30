@@ -83,17 +83,20 @@ Updated: 2026-05-30
 - Iteration 28 added `Prizmo.TcgEngine.Game.ActionCommands.play_basic_to_bench_command`, exposed through the domain as `Prizmo.TcgEngine.play_basic_to_bench_for_game/3` and through AshTypescript RPC as `playTcgEngineBasicToBench`.
 - The SPA Ash client re-exports the generated Bench command as `runPlayTcgEngineBasicToBench`, with `PlayTcgEngineBasicToBenchInput` and `PlayTcgEngineBasicToBenchResult` types.
 - The Viewer legal actions panel now renders `Bench ...` buttons for visible `play_basic_to_bench` source cards, calls the new command, and invalidates the viewer-scoped game-state query. Basic Pokémon can now move from hand to the next Bench slot from the browser action window.
+- Iteration 29 added `Prizmo.TcgEngine.Game.ActionCommands.attach_energy_command`, exposed through the domain as `Prizmo.TcgEngine.attach_energy_for_game/4` and through AshTypescript RPC as `attachTcgEngineEnergy`.
+- The SPA Ash client re-exports the generated Attach Energy command as `runAttachTcgEngineEnergy`, with `AttachTcgEngineEnergyInput` and `AttachTcgEngineEnergyResult` types.
+- The Viewer legal actions panel now renders one `Attach ... to ...` button for each visible Energy-from-hand/source and in-play Pokémon/target pair, calls the new command, and invalidates the viewer-scoped game-state query. The persisted mechanics layer enforces active-player/action-window state and the once-per-turn Energy attachment flag.
 
 ## Last commit
 
-- Baseline entering iteration 28: `b099351 feat(spa): wire prompt choice submission`.
-- This handoff was written before committing iteration 28; expected commit message is `feat(spa): wire bench basic command`.
+- Baseline entering iteration 29: `6dc4606 feat(spa): wire bench basic command`.
+- This handoff was written before committing iteration 29; expected commit message is `feat(spa): wire attach energy command`.
 
 ## Remaining tasks
 
 - Decide whether old `Prizmo.Tcg.Sim` tests are kept as historical reference, quarantined, or ported scenario-by-scenario.
-- Build the minimal playable React SPA loop beyond prompt resolution and Bench commands: continue execution controls for remaining visible legal action affordances and run two-browser refresh/reconnect validation.
-- Expand persisted Ash engine mechanics: bench Basic Pokémon, one Energy attachment per turn, evolution timing, retreat/switch, attacks/damage/KO/prizes/replacement Active, turn transitions, and snapshot-backed undo/debug support.
+- Build the minimal playable React SPA loop beyond prompt resolution, Bench commands, and Attach Energy: continue execution controls for remaining visible legal action affordances and run two-browser refresh/reconnect validation.
+- Expand persisted Ash engine mechanics: evolution timing, retreat/switch, attacks/damage/KO/prizes/replacement Active, turn transitions, and snapshot-backed undo/debug support.
 - Continue migrating executable card behavior into engine-owned definitions with explicit unsupported-behavior tracking.
 - Spike Electric Streams only after the command/read loop has enough event shape to publish safely.
 
@@ -103,4 +106,4 @@ Updated: 2026-05-30
 
 ## Recommended next atomic task
 
-- Expose and wire the existing persisted `attach_energy` mechanic as an Ash/RPC command and SPA legal-action control so the active viewer can choose an Energy from hand and a Pokémon in play during the action window.
+- Expose and wire the existing persisted `end_turn` mechanic as an Ash/RPC command and SPA legal-action control so the active viewer can end the current action window from the browser.

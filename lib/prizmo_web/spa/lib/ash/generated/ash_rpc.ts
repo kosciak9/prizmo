@@ -208,6 +208,53 @@ export async function listUsers<Fields extends ListUsersFields, Config extends L
 }
 
 
+export type AttachTcgEngineEnergyInput = {
+  gameId: UUID;
+  playerId: string;
+  energyCardInstanceId: UUID;
+  targetCardInstanceId: UUID;
+};
+
+export type AttachTcgEngineEnergyFields = UnifiedFieldSelection<TcgEngineGameResourceSchema>[];
+
+export type InferAttachTcgEngineEnergyResult<
+  Fields extends AttachTcgEngineEnergyFields | undefined,
+> = InferResult<TcgEngineGameResourceSchema, Fields>;
+
+export type AttachTcgEngineEnergyResult<Fields extends AttachTcgEngineEnergyFields | undefined = undefined> = | { success: true; data: InferAttachTcgEngineEnergyResult<Fields>; }
+| { success: false; errors: AshRpcError[]; }
+
+;
+
+/**
+ * Execute generic action on Game
+ *
+ * @ashActionType :action
+ */
+export async function attachTcgEngineEnergy<Fields extends AttachTcgEngineEnergyFields | undefined = undefined>(
+  config: {
+  tenant?: string;
+  input: AttachTcgEngineEnergyInput;
+  fields: Fields;
+  headers?: Record<string, string>;
+  fetchOptions?: RequestInit;
+  customFetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+}
+): Promise<AttachTcgEngineEnergyResult<Fields extends undefined ? [] : Fields>> {
+  const payload = {
+    action: "attach_tcg_engine_energy",
+    ...(config.tenant !== undefined && { tenant: config.tenant }),
+    input: config.input,
+    ...(config.fields !== undefined && { fields: config.fields })
+  };
+
+  return executeActionRpcRequest<AttachTcgEngineEnergyResult<Fields extends undefined ? [] : Fields>>(
+    payload,
+    config
+  );
+}
+
+
 export type ChooseTcgEngineActiveFromHandInput = {
   gameId: UUID;
   playerId: string;

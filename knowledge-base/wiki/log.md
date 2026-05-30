@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-30] iteration 29 | SPA Attach Energy action command
+- Task attempted: exposed the persisted engine's `attach_energy` mechanic as an Ash/RPC command and wired the React SPA Viewer legal actions panel to attach a visible Energy from hand to one of the active viewer's Pokémon in play during the action window.
+- Files changed: updated `lib/prizmo/tcg_engine/game/action_commands.ex`, `lib/prizmo/tcg_engine.ex`, `lib/prizmo_web/spa/features/home/routes/index.tsx`, `lib/prizmo_web/spa/lib/ash/client.ts`, generated `lib/prizmo_web/spa/lib/ash/generated/ash_rpc.ts`, this log, and the TCG engine playtest handoff.
+- Validation: `MIX_ENV=test mix run -e ...` attach-energy boundary smoke passed by moving an Energy from hand to `:attached` through `Prizmo.TcgEngine.attach_energy_for_game/4`, verifying `attached_to_card_instance_id`, the player's once-per-turn Energy flag, and the persisted `attach_energy` event; `mix format` passed; `mix assets.build` passed; `mix test test/prizmo/tcg_engine/mechanics_test.exs` passed (4 tests); `mix ash_typescript.codegen --check` passed; `mix check --no-test` passed.
+- Remaining/blocking notes: no blocker; the active viewer can now attach one Energy from hand to an in-play Pokémon from the browser action window, while execution controls for ending the turn and broader persisted mechanics remain pending.
+
 ## [2026-05-30] iteration 28 | SPA Bench Basic action command
 - Task attempted: exposed the persisted engine's `play_basic_to_bench` mechanic as an Ash/RPC command and wired the React SPA Viewer legal actions panel to bench visible Basic Pokémon from hand during the active player's action window.
 - Files changed: updated `lib/prizmo/tcg_engine/game/action_commands.ex`, `lib/prizmo/tcg_engine.ex`, `lib/prizmo/tcg_engine/game.ex`, `lib/prizmo_web/spa/features/home/routes/index.tsx`, `lib/prizmo_web/spa/lib/ash/client.ts`, generated `lib/prizmo_web/spa/lib/ash/generated/ash_rpc.ts`, this log, and the TCG engine playtest handoff.

@@ -1,4 +1,5 @@
 export {
+  attachTcgEngineEnergy as runAttachTcgEngineEnergy,
   buildCSRFHeaders as buildAshRpcHeaders,
   chooseTcgEnginePrompt as runChooseTcgEnginePrompt,
   chooseTcgEngineActiveFromHand as runChooseTcgEngineActiveFromHand,
@@ -20,6 +21,8 @@ export {
 } from './generated/ash_rpc'
 
 export type {
+  AttachTcgEngineEnergyInput,
+  AttachTcgEngineEnergyResult,
   ChooseTcgEngineActiveFromHandInput,
   ChooseTcgEngineActiveFromHandResult,
   ChooseTcgEnginePromptInput,
