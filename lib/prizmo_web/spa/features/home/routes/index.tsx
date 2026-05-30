@@ -1945,16 +1945,14 @@ function GameStateWorkbench({
         viewerPlayerId={viewerPlayerId}
       />
 
-      <div className="grid gap-5 xl:grid-cols-2">
-        {gameState.players.map(player => (
-          <PlayerPanel
-            deckName={deckNamesByKey.get(player.deckKey)}
-            isViewer={player.playerId === viewerPlayerId}
-            key={player.playerId}
-            player={player}
-          />
-        ))}
-      </div>
+      <BattlefieldPanel
+        activePlayerId={gameState.activePlayerId}
+        currentTurn={gameState.currentTurn}
+        deckNamesByKey={deckNamesByKey}
+        players={gameState.players}
+        stadium={gameState.stadium}
+        viewerPlayerId={viewerPlayerId}
+      />
 
       <div className="grid gap-5 xl:grid-cols-[1fr_minmax(18rem,24rem)]">
         <Panel title="Event log">
@@ -3411,45 +3409,234 @@ function actionHasMetadata(action: ActionAffordance) {
   )
 }
 
-function PlayerPanel({
-  player,
-  deckName,
-  isViewer
+function BattlefieldPanel({
+  activePlayerId,
+  currentTurn,
+  deckNamesByKey,
+  players,
+  stadium,
+  viewerPlayerId
 }: {
-  player: PlayerView
-  deckName?: string
-  isViewer: boolean
+  activePlayerId: string
+  currentTurn: GameState['currentTurn']
+  deckNamesByKey: Map<string, string>
+  players: PlayerView[]
+  stadium: CardSummary | null
+  viewerPlayerId: PlayerId
 }) {
+  const viewerPlayer = players.find(player => player.playerId === viewerPlayerId)
+  const opponentPlayer = players.find(player => player.playerId !== viewerPlayerId)
+  const topPlayer = opponentPlayer ?? players[0]
+  const bottomPlayer = viewerPlayer ?? players.find(player => player.playerId !== topPlayer?.playerId)
+  const turnLabel = currentTurn ? `Turn ${currentTurn.turnNumber}, ${formatEventType(currentTurn.status)}` : 'No turn'
+
   return (
     <Panel
-      title={formatPlayerId(player.playerId)}
-      trailing={isViewer ? <StatusBadge tone="active">viewer</StatusBadge> : <StatusBadge>opponent</StatusBadge>}
+      title="Battlefield"
+      trailing={<StatusBadge tone={currentTurn ? 'active' : 'neutral'}>{turnLabel}</StatusBadge>}
     >
-      <div className="space-y-5">
-        <div>
-          <p className="text-sm font-medium text-stone-950">{deckName ?? player.deckKey}</p>
-          <p className="mt-1 font-mono text-xs text-stone-500">{player.deckKey}</p>
-        </div>
-
-        <div className="grid grid-cols-4 gap-2">
-          <ZoneCount label="Deck" value={player.deckCount} />
-          <ZoneCount label="Hand" value={player.handCount} />
-          <ZoneCount label="Prize" value={player.prizeCount} />
-          <ZoneCount label="Discard" value={player.discardCount} />
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
-          <ZoneList cards={player.active ? [player.active] : []} emptyLabel="No Active Pokémon" title="Active" />
-          <ZoneList cards={player.bench} emptyLabel="Bench is empty" title="Bench" />
-          <ZoneList
-            cards={player.hand}
-            emptyLabel={isViewer ? 'Hand is empty' : 'Hidden from this viewer'}
-            title={isViewer ? 'Viewer hand' : 'Opponent hand'}
+      <div className="rounded-[2rem] border border-stone-300 bg-[oklch(0.965_0.006_155)] p-3 shadow-inner shadow-stone-300/50 sm:p-4">
+        {topPlayer ? (
+          <PlayerBattleSide
+            activePlayerId={activePlayerId}
+            deckName={deckNamesByKey.get(topPlayer.deckKey)}
+            isViewer={topPlayer.playerId === viewerPlayerId}
+            player={topPlayer}
+            side="top"
           />
-          <ZoneList cards={player.discard} emptyLabel="Discard is empty" title="Discard" />
+        ) : null}
+
+        <div className="my-3 grid items-center gap-3 sm:grid-cols-[1fr_auto_1fr]">
+          <div className="hidden h-px bg-stone-300 sm:block" />
+          <div className="rounded-full border border-stone-300 bg-[oklch(0.985_0.004_155)] px-4 py-2 text-center text-xs font-medium text-stone-600 shadow-sm shadow-stone-300/40">
+            {stadium ? `Stadium: ${stadium.name}` : 'No Stadium in play'}
+          </div>
+          <div className="hidden h-px bg-stone-300 sm:block" />
         </div>
+
+        {bottomPlayer ? (
+          <PlayerBattleSide
+            activePlayerId={activePlayerId}
+            deckName={deckNamesByKey.get(bottomPlayer.deckKey)}
+            isViewer={bottomPlayer.playerId === viewerPlayerId}
+            player={bottomPlayer}
+            side="bottom"
+          />
+        ) : null}
       </div>
     </Panel>
+  )
+}
+
+function PlayerBattleSide({
+  activePlayerId,
+  deckName,
+  isViewer,
+  player,
+  side
+}: {
+  activePlayerId: string
+  deckName?: string
+  isViewer: boolean
+  player: PlayerView
+  side: 'top' | 'bottom'
+}) {
+  const isActivePlayer = player.playerId === activePlayerId
+  const activeZone = (
+    <BattleZone
+      cards={player.active ? [player.active] : []}
+      emptyLabel="No Active Pokémon"
+      title="Active Spot"
+      variant="active"
+    />
+  )
+  const benchZone = <BattleZone cards={player.bench} emptyLabel="Bench is empty" title="Bench" variant="bench" />
+
+  return (
+    <section
+      className={`rounded-[1.5rem] border p-3 sm:p-4 ${
+        isViewer
+          ? 'border-emerald-300 bg-[oklch(0.985_0.012_155)]'
+          : 'border-stone-300 bg-[oklch(0.978_0.006_155)]'
+      }`}
+    >
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="text-base font-semibold tracking-tight text-stone-950">{formatPlayerId(player.playerId)}</h3>
+            {isViewer ? <StatusBadge tone="active">viewer</StatusBadge> : <StatusBadge>opponent</StatusBadge>}
+            {isActivePlayer ? <StatusBadge tone="warning">turn owner</StatusBadge> : null}
+          </div>
+          <p className="mt-1 truncate text-sm text-stone-600">{deckName ?? player.deckKey}</p>
+        </div>
+        <p className="font-mono text-xs text-stone-500">{player.deckKey}</p>
+      </div>
+
+      <div className="mt-4 grid gap-3 xl:grid-cols-[8rem_minmax(0,1fr)_minmax(12rem,18rem)]">
+        <div className="grid grid-cols-4 gap-2 xl:grid-cols-1">
+          <ZoneStack label="Deck" value={player.deckCount} />
+          <ZoneStack label="Prizes" value={player.prizeCount} />
+          <ZoneStack label="Discard" value={player.discardCount} />
+          <ZoneStack label="Hand" value={player.handCount} tone={isViewer ? 'active' : 'hidden'} />
+        </div>
+
+        <div className="space-y-3">
+          {side === 'top' ? (
+            <>
+              {benchZone}
+              {activeZone}
+            </>
+          ) : (
+            <>
+              {activeZone}
+              {benchZone}
+            </>
+          )}
+        </div>
+
+        <PrivateHandZone isViewer={isViewer} player={player} />
+      </div>
+    </section>
+  )
+}
+
+function BattleZone({
+  cards,
+  emptyLabel,
+  title,
+  variant
+}: {
+  cards: CardSummary[]
+  emptyLabel: string
+  title: string
+  variant: 'active' | 'bench'
+}) {
+  const cardVariant = variant === 'active' ? 'active' : 'compact'
+
+  return (
+    <div className="rounded-2xl border border-stone-300 bg-[oklch(0.99_0.004_155)] p-3">
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <h4 className="text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">{title}</h4>
+        <span className="rounded-full bg-stone-200 px-2 py-0.5 text-xs font-medium text-stone-600">
+          {cards.length}
+        </span>
+      </div>
+
+      {cards.length > 0 ? (
+        <div
+          className={
+            variant === 'active'
+              ? 'mx-auto grid max-w-sm gap-2'
+              : 'grid gap-2 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5'
+          }
+        >
+          {cards.map(card => (
+            <CardPill card={card} key={card.id} variant={cardVariant} />
+          ))}
+        </div>
+      ) : (
+        <p className="rounded-xl border border-dashed border-stone-300 px-3 py-5 text-center text-sm text-stone-500">
+          {emptyLabel}
+        </p>
+      )}
+    </div>
+  )
+}
+
+function ZoneStack({
+  label,
+  tone = 'neutral',
+  value
+}: {
+  label: string
+  tone?: 'active' | 'hidden' | 'neutral'
+  value: number
+}) {
+  const toneClassName =
+    tone === 'active'
+      ? 'border-emerald-200 bg-emerald-50 text-emerald-950'
+      : tone === 'hidden'
+        ? 'border-stone-300 bg-stone-100 text-stone-600'
+        : 'border-stone-200 bg-stone-50 text-stone-950'
+
+  return (
+    <div className={`rounded-2xl border px-3 py-2.5 text-center ${toneClassName}`}>
+      <p className="text-xl font-semibold tabular-nums">{value}</p>
+      <p className="mt-0.5 text-[0.68rem] font-semibold uppercase tracking-[0.14em] opacity-70">{label}</p>
+    </div>
+  )
+}
+
+function PrivateHandZone({ isViewer, player }: { isViewer: boolean; player: PlayerView }) {
+  return (
+    <div className="rounded-2xl border border-stone-300 bg-[oklch(0.99_0.004_155)] p-3">
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <h4 className="text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">
+          {isViewer ? 'Your hand' : 'Opponent hand'}
+        </h4>
+        <span className="rounded-full bg-stone-200 px-2 py-0.5 text-xs font-medium text-stone-600">
+          {player.handCount}
+        </span>
+      </div>
+
+      {isViewer ? (
+        player.hand.length > 0 ? (
+          <div className="max-h-80 space-y-2 overflow-auto pr-1">
+            {player.hand.map(card => (
+              <CardPill card={card} key={card.id} variant="hand" />
+            ))}
+          </div>
+        ) : (
+          <p className="rounded-xl border border-dashed border-stone-300 px-3 py-5 text-center text-sm text-stone-500">
+            Your hand is empty.
+          </p>
+        )
+      ) : (
+        <div className="rounded-xl border border-dashed border-stone-300 bg-stone-100 px-3 py-5 text-center text-sm text-stone-500">
+          {player.handCount} hidden {player.handCount === 1 ? 'card' : 'cards'}
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -3504,46 +3691,23 @@ function DeckSelect({
   )
 }
 
-function ZoneList({
-  title,
-  cards,
-  emptyLabel
-}: {
-  title: string
-  cards: CardSummary[]
-  emptyLabel: string
-}) {
-  return (
-    <div>
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <h3 className="text-sm font-medium text-stone-800">{title}</h3>
-        <span className="rounded-full bg-stone-200 px-2 py-0.5 text-xs font-medium text-stone-600">
-          {cards.length}
-        </span>
-      </div>
-      {cards.length > 0 ? (
-        <div className="space-y-2">
-          {cards.map(card => (
-            <CardPill card={card} key={card.id} />
-          ))}
-        </div>
-      ) : (
-        <p className="rounded-xl border border-dashed border-stone-300 px-3 py-4 text-center text-sm text-stone-500">
-          {emptyLabel}
-        </p>
-      )}
-    </div>
-  )
-}
-
-function CardPill({ card }: { card: CardSummary }) {
+function CardPill({ card, variant = 'default' }: { card: CardSummary; variant?: 'active' | 'compact' | 'default' | 'hand' }) {
   const attachedCards = card.attachedCards ?? []
+  const cardClassName =
+    variant === 'active'
+      ? 'rounded-2xl border border-emerald-200 bg-[oklch(0.985_0.01_155)] p-4 shadow-sm shadow-emerald-200/60'
+      : variant === 'compact'
+        ? 'rounded-xl border border-stone-200 bg-stone-50 p-2.5'
+        : variant === 'hand'
+          ? 'rounded-xl border border-stone-200 bg-[oklch(0.992_0.004_155)] p-2.5'
+          : 'rounded-xl border border-stone-200 bg-stone-50 p-3'
+  const titleClassName = variant === 'active' ? 'text-base' : 'text-sm'
 
   return (
-    <div className="rounded-xl border border-stone-200 bg-stone-50 p-3">
+    <div className={cardClassName}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="truncate text-sm font-medium text-stone-950">{card.name}</p>
+          <p className={`truncate font-medium text-stone-950 ${titleClassName}`}>{card.name}</p>
           <p className="mt-1 font-mono text-xs text-stone-500">{card.cardId}</p>
         </div>
         {card.damage > 0 ? <StatusBadge tone="warning">{card.damage} dmg</StatusBadge> : null}
@@ -3590,15 +3754,6 @@ function StateRow({ label, value }: { label: string; value: string }) {
     <div className="flex items-center justify-between gap-4 rounded-xl bg-stone-50 px-3 py-2 text-sm">
       <span className="text-stone-500">{label}</span>
       <span className="text-right font-medium text-stone-950">{value}</span>
-    </div>
-  )
-}
-
-function ZoneCount({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="rounded-xl bg-stone-50 px-3 py-2 text-center">
-      <p className="text-lg font-semibold text-stone-950">{value}</p>
-      <p className="mt-0.5 text-xs text-stone-500">{label}</p>
     </div>
   )
 }

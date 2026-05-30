@@ -304,16 +304,19 @@ Updated: 2026-05-31
 - Iteration 84 ran an isolated two-browser-context Playwright validation of that queued cross-player KO Prize prompt path against staged game `03c60ed4-9e3f-422b-94a3-f84546650ae7`.
 - The diagnostic used separate Playwright browser contexts for `player_1` and `player_2`: Player 1 saw the first face-down `choose_knockout_prizes` prompt with queued-prompt guidance, Player 2 initially saw no private Player 1 prompt, Player 1 resolved Prize 1 and saw `Waiting for player 2 prompt` finish blocking, Player 2 refreshed into the queued face-down Prize prompt and resolved it, then Player 1 refreshed, finished the attack, and the UI showed turn 1 ended.
 - This validates the browser prompt/finish-blocking behavior for the staged queued-Prize scenario, but it is not the formal two-manual-tester milestone because the scenario was staged through project code and the manual-tester harness still needs guaranteed independent browser contexts.
+- Iteration 85 started the substantial Web UI polish pass with a narrow Battlefield layout slice in the React SPA.
+- The normal game-state surface now replaces the generic two-column player panels with a PTCGL-adjacent Battlefield panel: opponent side above viewer side, centered Stadium separator, clearer Active Spot and Bench zones, Deck/Prizes/Discard/Hand counters, private viewer hand cards, hidden opponent hand count, and attached-card summaries. Existing command, attack, prompt, and event-log controls were left intact.
+- Validation for the slice passed with `mix format && mix assets.build`, a browser smoke on `http://localhost:4003` against an existing persisted game, no browser console warnings or errors, and `mix check --no-test`.
 
 ## Last commit
 
-- Baseline entering iteration 84: `0758a44 feat(tcg-engine): surface queued prize prompt blockers`.
-- This handoff was written before committing iteration 84; expected commit message is `docs(wiki): record queued prize prompt playtest`.
+- Baseline entering iteration 85: `ee11ed7 docs(wiki): record queued prize prompt playtest`.
+- This handoff was written before committing iteration 85; expected commit message is `feat(spa): reshape tcg battlefield layout`.
 
 ## Remaining tasks
 
 - Decide whether old `Prizmo.Tcg.Sim` tests are kept as historical reference, quarantined, or ported scenario-by-scenario.
-- Build the minimal playable React SPA loop beyond prompt resolution, Bench commands, Attach Energy, attached-card board visibility, Retreat, paid attack declaration, static/executable attack resolution/finish controls, switch-self target choice, one-Bench KO follow-up, multi-Bench replacement Active choice, explicit/queued KO Prize prompt choice with read-model finish blocking, isolated two-context queued-Prize browser validation, evolution from hand, End Turn, next-turn progression, deterministic playtest fixture order, hardened tab-scoped viewer identity, and reduced prompt/action debug noise: rerun the full two-browser/manual-tester playtest milestone only after the validation harness can guarantee separate browser contexts and the target path can run without project-code staging.
+- Build the minimal playable React SPA loop beyond prompt resolution, Bench commands, Attach Energy, attached-card board visibility, Retreat, paid attack declaration, static/executable attack resolution/finish controls, switch-self target choice, one-Bench KO follow-up, multi-Bench replacement Active choice, explicit/queued KO Prize prompt choice with read-model finish blocking, isolated two-context queued-Prize browser validation, evolution from hand, End Turn, next-turn progression, deterministic playtest fixture order, hardened tab-scoped viewer identity, reduced prompt/action debug noise, and the first spatial Battlefield layout slice: rerun the full two-browser/manual-tester playtest milestone only after the validation harness can guarantee separate browser contexts and the target path can run without project-code staging.
 - Complete a substantial Web UI polish pass before handoff: the browser surface should feel much closer to Pokémon TCG Live (PTCGL) than an internal test bench, with spatial board zones, card-like battlefield objects, readable hand/action areas, guided prompt resolution, product-quality errors/empty states, and raw payloads or debug-only affordances removed from or isolated outside the normal play path.
 - Expand persisted Ash engine mechanics: continue KO/prize handling beyond same-attacker active+Bench, multiple-Bench aggregation, and narrow cross-player queued Prize prompts, especially richer simultaneous-KO edge cases, status/marker lifecycle semantics, turn transitions, remaining card-level effect semantics, and snapshot-backed undo/debug support now that the first executable copy-attack path and authored Tera tag boundary are in place.
 - Continue migrating executable card behavior into engine-owned definitions with explicit unsupported-behavior tracking.
@@ -365,4 +368,4 @@ Updated: 2026-05-31
 
 ## Recommended next atomic task
 
-- Start the substantial Web UI polish pass with one narrow slice: reshape the normal game-state surface away from the generic two-column test bench and toward a PTCGL-adjacent battlefield, beginning with spatial player sides and clearer Active/Bench/Prize/Deck/Discard zones while keeping existing commands and prompt controls intact.
+- Continue the substantial Web UI polish pass with one narrow slice: improve where legal actions, attack resolution, and prompts live relative to the new Battlefield panel, keeping the normal play path clear while leaving debug disclosures collapsed or isolated.

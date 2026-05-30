@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-31] iteration 85 | Battlefield layout polish
+- Task attempted: started the substantial Web UI polish pass with a narrow normal-path board slice, replacing the generic two-column player state panels with a PTCGL-adjacent Battlefield panel that places the opponent above the viewer and clarifies Active, Bench, Deck, Prizes, Discard, Hand, attached cards, and Stadium zones while leaving existing command and prompt controls intact.
+- Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.
+- Validation: `mix format && mix assets.build` passed; browser smoke on `http://localhost:4003` rendered the new Battlefield panel for an existing persisted game, showing spatial player sides, hidden opponent hand, visible viewer hand, attached Energy, and no browser console warnings or errors; `mix check --no-test` passed.
+- Remaining/blocking notes: no code blocker for the first battlefield layout slice. Further UI polish should continue moving the play path away from a test bench by refining action and prompt placement, card surfaces, empty states, and debug disclosure boundaries.
+
 ## [2026-05-31] iteration 84 | Queued Prize prompt browser validation
 - Task attempted: ran an isolated two-browser-context Playwright validation of the queued cross-player KO Prize prompt path for `DRI-019` `Take Down`, covering Player 1's first face-down Prize prompt, Player 2's queued prompt, active-player finish blocking, and final attack finish after both prompts resolve.
 - Files changed: updated this log and the TCG engine playtest handoff.
