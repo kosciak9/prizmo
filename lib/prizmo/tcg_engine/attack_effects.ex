@@ -19,6 +19,7 @@ defmodule Prizmo.TcgEngine.AttackEffects do
     :damage_only_if_stadium_in_play,
     :damage_per_own_basic_pokemon_in_play,
     :damage_per_own_benched_pokemon,
+    :damage_per_own_team_rocket_pokemon_in_play,
     :switch_self_with_bench
   ]
 
@@ -65,6 +66,9 @@ defmodule Prizmo.TcgEngine.AttackEffects do
         {:ok, %{}}
 
       %{type: :damage_only_if_stadium_in_play} ->
+        {:ok, %{}}
+
+      %{type: :damage_per_own_team_rocket_pokemon_in_play} ->
         {:ok, %{}}
 
       nil ->
