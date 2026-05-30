@@ -165,6 +165,13 @@ const GAME_STATE_FIELDS = [
 
 type PlayerId = (typeof PLAYER_IDS)[number]
 type CoinResult = 'heads' | 'tails'
+type ResolutionChecklistTone = 'blocked' | 'ready' | 'waiting'
+
+type ResolutionChecklistItem = {
+  label: string
+  tone: ResolutionChecklistTone
+  value: string
+}
 
 type PlaytestSession = {
   gameId: string
@@ -2649,6 +2656,133 @@ function AttackProgressPanel({
                           : headsCountRequired
                             ? `Enter a heads count for ${attackLabel}`
                             : `Resolve ${attackLabel}`
+  const resolutionChecklistItems: ResolutionChecklistItem[] = []
+
+  if (turn.pendingAttackRequiresCopiedAttack) {
+    resolutionChecklistItems.push({
+      label: 'Copied attack',
+      tone: copiedAttackUnavailable ? 'blocked' : copiedAttackRequiresChoice ? 'waiting' : 'ready',
+      value: copiedAttackUnavailable
+        ? 'No executable Tera attacks'
+        : copiedAttackOptions.length === 1
+          ? `Auto: ${copiedAttackOptions[0]?.attackName ?? 'only copied attack'}`
+          : selectedCopiedAttackChoice
+            ? selectedCopiedAttackChoice.attackName
+            : `${copiedAttackOptions.length} copy choices`
+    })
+  }
+
+  if (pendingAttackRequiresCoinResult) {
+    resolutionChecklistItems.push({
+      label: 'Coin result',
+      tone: coinResultRequired ? 'waiting' : 'ready',
+      value: coinResultForResolve
+        ? coinResultForResolve === 'heads'
+          ? 'Heads selected'
+          : 'Tails selected'
+        : 'Choose Heads or Tails'
+    })
+  }
+
+  if (pendingAttackRequiresHeadsCount) {
+    resolutionChecklistItems.push({
+      label: 'Heads count',
+      tone: headsCountRequired ? 'waiting' : 'ready',
+      value: headsCountForResolve === null ? 'Enter a count' : `${headsCountForResolve} heads`
+    })
+  }
+
+  if (pendingAttackRequiresSwitchTarget) {
+    resolutionChecklistItems.push({
+      label: 'Switch target',
+      tone: switchTargetRequired && !selectedSwitchTargetIsValid ? 'waiting' : 'ready',
+      value: switchTargetOptions.length > 1
+        ? selectedSwitchTargetIsValid
+          ? cardsById.get(selectedSwitchBenchCardInstanceId)?.name ?? 'Bench target selected'
+          : `${switchTargetOptions.length} Bench choices`
+        : switchTargetOptions.length === 1
+          ? `Auto: ${switchTargetOptions[0]?.name ?? 'only Bench target'}`
+          : 'No switch target needed'
+    })
+  }
+
+  if (pendingAttackRequiresDiscardedEnergy) {
+    const selectedDiscardedEnergyCount = selectedDiscardedEnergyIdsForResolve.length
+    const discardedEnergyValue =
+      resolutionEffectType === DISCARD_DEFENDING_ENERGY_ON_COIN_HEADS_EFFECT && coinResultForResolve !== 'heads'
+        ? 'Only after Heads'
+        : resolutionEffectType === DISCARD_DEFENDING_ENERGY_ON_COIN_HEADS_EFFECT && discardedEnergyOptions.length === 1
+          ? `Auto: ${discardedEnergyOptions[0]?.energyCard.name ?? 'only Energy'}`
+          : discardedEnergyOptions.length === 0
+            ? 'No visible Energy'
+            : discardedEnergyMaxSelection
+              ? `${selectedDiscardedEnergyCount} / ${discardedEnergyMaxSelection} selected`
+              : `${selectedDiscardedEnergyCount} selected`
+
+    resolutionChecklistItems.push({
+      label: 'Discarded Energy',
+      tone: defendingEnergyDiscardRequiresChoice ? 'waiting' : 'ready',
+      value: discardedEnergyValue
+    })
+  }
+
+  if (pendingAttackRequiresReturnedEnergy) {
+    resolutionChecklistItems.push({
+      label: 'Returned Energy',
+      tone: returnedEnergyUnavailable
+        ? 'blocked'
+        : returnedEnergyRequiresChoice && !selectedReturnedEnergyIsValid
+          ? 'waiting'
+          : 'ready',
+      value: returnedEnergyUnavailable
+        ? 'No Energy to return'
+        : returnedEnergyOptions.length > 1
+          ? selectedReturnedEnergyIsValid
+            ? cardsById.get(selectedReturnedEnergyCardInstanceId)?.name ?? 'Energy selected'
+            : `${returnedEnergyOptions.length} Energy choices`
+          : `Auto: ${returnedEnergyOptions[0]?.name ?? 'only Energy'}`
+    })
+  }
+
+  if (pendingAttackRequiresShuffledEnergy) {
+    resolutionChecklistItems.push({
+      label: 'Shuffled Energy',
+      tone: shuffledEnergyPartialSelection ? 'waiting' : 'ready',
+      value: shuffledEnergySelectedCount === 0
+        ? 'Optional effect skipped'
+        : `${shuffledEnergySelectedCount} / ${shuffledEnergyRequiredCount} selected`
+    })
+  }
+
+  if (pendingAttackRequiresBenchDamageTarget && shuffledEnergySelectedCount === shuffledEnergyRequiredCount) {
+    resolutionChecklistItems.push({
+      label: 'Bench damage target',
+      tone: benchDamageTargetUnavailable
+        ? 'blocked'
+        : benchDamageTargetRequired && !selectedBenchDamageTargetIsValid
+          ? 'waiting'
+          : 'ready',
+      value: benchDamageTargetUnavailable
+        ? 'No opponent Bench'
+        : benchDamageTargetOptions.length > 1
+          ? selectedBenchDamageTargetIsValid
+            ? cardsById.get(selectedBenchDamageTargetCardInstanceId)?.name ?? 'Bench target selected'
+            : `${benchDamageTargetOptions.length} Bench choices`
+          : `Auto: ${benchDamageTargetOptions[0]?.name ?? 'only Bench target'}`
+    })
+  }
+
+  if (pendingAttackRequiresBenchDamageCounters) {
+    resolutionChecklistItems.push({
+      label: 'Bench counters',
+      tone: benchDamageCounterAllocationIncomplete ? 'waiting' : 'ready',
+      value: benchDamageCounterOptions.length > 0
+        ? `${selectedBenchDamageCounterTotal} / ${benchDamageCounterRequiredCount} counters`
+        : 'No Bench targets'
+    })
+  }
+
+  const resolutionChecklistReadyCount = resolutionChecklistItems.filter(item => item.tone === 'ready').length
   const toggleDiscardedEnergyCard = (energyCardInstanceId: string) => {
     setSelectedDiscardedEnergyCardInstanceIds(previousSelectedIds => {
       if (previousSelectedIds.includes(energyCardInstanceId)) {
@@ -2710,6 +2844,45 @@ function AttackProgressPanel({
         </p>
 
         {commandError ? <InlineNotice tone="error" title={commandError.title}>{commandError.message}</InlineNotice> : null}
+
+        {resolutionChecklistItems.length > 0 ? (
+          <div className="rounded-xl border border-stone-200 bg-stone-50/80 p-3">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-stone-600">
+                  Resolve requirements
+                </p>
+                <p className="mt-1 text-xs leading-5 text-stone-500">
+                  Pick only the missing inputs, then resolve the attack in one engine command.
+                </p>
+              </div>
+              <StatusBadge
+                tone={resolutionChecklistReadyCount === resolutionChecklistItems.length ? 'active' : 'warning'}
+              >
+                {resolutionChecklistReadyCount}/{resolutionChecklistItems.length} ready
+              </StatusBadge>
+            </div>
+
+            <ul className="mt-3 grid gap-1.5">
+              {resolutionChecklistItems.map(item => (
+                <li
+                  className={`flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-2 text-xs ${resolutionChecklistItemClassName(item.tone)}`}
+                  key={item.label}
+                >
+                  <span className="font-medium">{item.label}</span>
+                  <span className="flex flex-wrap items-center justify-end gap-2 text-right">
+                    <span>{item.value}</span>
+                    <span
+                      className={`rounded-full px-2 py-0.5 font-semibold ${resolutionChecklistToneClassName(item.tone)}`}
+                    >
+                      {formatResolutionChecklistTone(item.tone)}
+                    </span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
 
         {turn.pendingAttackRequiresCopiedAttack ? (
           <div className="rounded-xl border border-cyan-200 bg-cyan-50/70 p-3">
@@ -4136,6 +4309,39 @@ function StateRow({ label, value }: { label: string; value: string }) {
       <span className="text-right font-medium text-stone-950">{value}</span>
     </div>
   )
+}
+
+function resolutionChecklistItemClassName(tone: ResolutionChecklistTone) {
+  switch (tone) {
+    case 'blocked':
+      return 'border-red-200 bg-red-50/80 text-red-950'
+    case 'ready':
+      return 'border-emerald-200 bg-emerald-50/80 text-emerald-950'
+    case 'waiting':
+      return 'border-amber-200 bg-amber-50/80 text-amber-950'
+  }
+}
+
+function resolutionChecklistToneClassName(tone: ResolutionChecklistTone) {
+  switch (tone) {
+    case 'blocked':
+      return 'bg-red-100 text-red-800'
+    case 'ready':
+      return 'bg-emerald-100 text-emerald-800'
+    case 'waiting':
+      return 'bg-amber-100 text-amber-800'
+  }
+}
+
+function formatResolutionChecklistTone(tone: ResolutionChecklistTone) {
+  switch (tone) {
+    case 'blocked':
+      return 'blocked'
+    case 'ready':
+      return 'ready'
+    case 'waiting':
+      return 'needed'
+  }
 }
 
 function StatusBadge({
