@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-30] iteration 20 | SPA setup completion command
+- Task attempted: added the final setup command to the React SPA playtest shell so a selected persisted game can complete setup through `runCompleteTcgEngineSetup` after Prize placement, then invalidate the viewer-scoped game-state query and show completed setup/game status updates.
+- Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`; updated this log and the TCG engine playtest handoff.
+- Validation: `mix assets.build` passed; `mix check --no-test` passed.
+- Remaining/blocking notes: no blocker; setup start, opening-hand draw, setup Active choice, setup Bench choice, setup Prize placement, and setup completion are now clickable from the shell, while turn commands, legal action affordances, and prompt resolution controls remain pending.
+
 ## [2026-05-30] iteration 19 | SPA setup Prize placement command
 - Task attempted: added the next setup command to the React SPA playtest shell so a selected persisted game can place setup Prize cards through `runPlaceTcgEnginePrizes` once both players have chosen Active Pokémon, then invalidate the viewer-scoped game-state query and show Prize count/setup status updates.
 - Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`; updated this log and the TCG engine playtest handoff.

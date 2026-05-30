@@ -5,6 +5,7 @@ import {
   buildAshRpcHeaders,
   runChooseTcgEngineActiveFromHand,
   runChooseTcgEngineSetupBenchFromHand,
+  runCompleteTcgEngineSetup,
   runCreateTcgEngineGame,
   runDrawTcgEngineOpeningHand,
   runGetTcgEngineGameState,
@@ -284,6 +285,13 @@ export function HomeRoute() {
     }
   })
 
+  const completeSetupMutation = useMutation({
+    mutationFn: (gameId: string) => completeSetup(gameId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['tcg-engine', 'game-state'] })
+    }
+  })
+
   const gameState = gameStateQuery.data
   const viewerPlayer = gameState?.players.find(player => player.playerId === gameState.viewerPlayerId)
   const setupActiveCandidates = viewerPlayer?.hand.filter(isSetupActiveCandidate) ?? []
@@ -324,6 +332,8 @@ export function HomeRoute() {
         allPlayersHaveSetupActive &&
         setupPrizesAreUnplaced
     ) && !placePrizesMutation.isPending
+  const canCompleteSetup =
+    Boolean(normalisedGameId && gameState?.setup?.status === 'prizes_placed') && !completeSetupMutation.isPending
 
   function updateSession(nextSession: PlaytestSession) {
     setStoredSession(nextSession)
@@ -607,6 +617,20 @@ export function HomeRoute() {
                               : 'Choose both Active Pokémon first'
                             : 'Choose Active Pokémon first'}
                     </button>
+                    <button
+                      className="w-full rounded-xl border border-emerald-700 px-3 py-2 text-sm font-semibold text-emerald-800 transition hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:border-stone-300 disabled:text-stone-400 disabled:hover:bg-transparent"
+                      disabled={!canCompleteSetup}
+                      onClick={() => completeSetupMutation.mutate(normalisedGameId)}
+                      type="button"
+                    >
+                      {completeSetupMutation.isPending
+                        ? 'Completing setup...'
+                        : gameState?.setup?.status === 'prizes_placed'
+                          ? 'Complete setup'
+                          : gameState?.setup?.status === 'completed'
+                            ? 'Setup completed'
+                            : 'Place prizes first'}
+                    </button>
                   </div>
                 </div>
 
@@ -637,6 +661,12 @@ export function HomeRoute() {
                 {placePrizesMutation.error ? (
                   <InlineNotice tone="error" title="Prize placement command failed">
                     {errorMessage(placePrizesMutation.error)}
+                  </InlineNotice>
+                ) : null}
+
+                {completeSetupMutation.error ? (
+                  <InlineNotice tone="error" title="Setup completion command failed">
+                    {errorMessage(completeSetupMutation.error)}
                   </InlineNotice>
                 ) : null}
               </div>
@@ -804,6 +834,20 @@ async function chooseSetupBenchFromHand(input: {
 
 async function placePrizes(gameId: string): Promise<CreatedGame> {
   const result = await runPlaceTcgEnginePrizes({
+    input: { gameId },
+    fields: GAME_RESOURCE_FIELDS,
+    headers: buildAshRpcHeaders()
+  })
+
+  if (!result.success) {
+    throw new Error(rpcErrorMessage(result.errors))
+  }
+
+  return result.data as CreatedGame
+}
+
+async function completeSetup(gameId: string): Promise<CreatedGame> {
+  const result = await runCompleteTcgEngineSetup({
     input: { gameId },
     fields: GAME_RESOURCE_FIELDS,
     headers: buildAshRpcHeaders()
