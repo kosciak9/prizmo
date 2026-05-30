@@ -389,6 +389,51 @@ export async function createTcgEngineGame<Fields extends CreateTcgEngineGameFiel
 }
 
 
+export type DrawTcgEngineCardForTurnInput = {
+  gameId: UUID;
+  playerId: string;
+};
+
+export type DrawTcgEngineCardForTurnFields = UnifiedFieldSelection<TcgEngineGameResourceSchema>[];
+
+export type InferDrawTcgEngineCardForTurnResult<
+  Fields extends DrawTcgEngineCardForTurnFields | undefined,
+> = InferResult<TcgEngineGameResourceSchema, Fields>;
+
+export type DrawTcgEngineCardForTurnResult<Fields extends DrawTcgEngineCardForTurnFields | undefined = undefined> = | { success: true; data: InferDrawTcgEngineCardForTurnResult<Fields>; }
+| { success: false; errors: AshRpcError[]; }
+
+;
+
+/**
+ * Execute generic action on Game
+ *
+ * @ashActionType :action
+ */
+export async function drawTcgEngineCardForTurn<Fields extends DrawTcgEngineCardForTurnFields | undefined = undefined>(
+  config: {
+  tenant?: string;
+  input: DrawTcgEngineCardForTurnInput;
+  fields: Fields;
+  headers?: Record<string, string>;
+  fetchOptions?: RequestInit;
+  customFetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+}
+): Promise<DrawTcgEngineCardForTurnResult<Fields extends undefined ? [] : Fields>> {
+  const payload = {
+    action: "draw_tcg_engine_card_for_turn",
+    ...(config.tenant !== undefined && { tenant: config.tenant }),
+    input: config.input,
+    ...(config.fields !== undefined && { fields: config.fields })
+  };
+
+  return executeActionRpcRequest<DrawTcgEngineCardForTurnResult<Fields extends undefined ? [] : Fields>>(
+    payload,
+    config
+  );
+}
+
+
 export type DrawTcgEngineOpeningHandInput = {
   gameId: UUID;
 };

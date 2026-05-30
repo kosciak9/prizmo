@@ -58,6 +58,7 @@ defmodule Prizmo.TcgEngine.Game do
     define :place_prizes_command, args: [:game_id]
     define :complete_setup_command, args: [:game_id]
     define :start_next_turn_command, args: [:game_id]
+    define :draw_for_turn_command, args: [:game_id, :player_id]
     define :start_setup
     define :complete_setup
     define :finish
@@ -223,6 +224,24 @@ defmodule Prizmo.TcgEngine.Game do
 
       run fn input, _context ->
         Mechanics.start_next_turn(input.arguments.game_id)
+      end
+    end
+
+    action :draw_for_turn_command, :struct do
+      description "Draw a card for the active player's current turn through the mechanics layer."
+
+      constraints instance_of: Game
+
+      argument :game_id, :uuid do
+        allow_nil? false
+      end
+
+      argument :player_id, :string do
+        allow_nil? false
+      end
+
+      run fn input, _context ->
+        Mechanics.draw_for_turn(input.arguments.game_id, input.arguments.player_id)
       end
     end
 
