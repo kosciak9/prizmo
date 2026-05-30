@@ -39,7 +39,7 @@ defmodule Prizmo.TcgEngine.CardMetadataRequirements do
   def require_tera_pokemon_card(card_id) do
     case CardCatalog.fetch(card_id) do
       {:ok, %{supertype: :pokemon} = metadata} ->
-        if CardCatalog.tera_pokemon?(card_id) do
+        if metadata.tera? do
           :ok
         else
           {:error, {:not_tera_pokemon, metadata.id}}

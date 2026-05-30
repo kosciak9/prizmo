@@ -15,6 +15,8 @@ defmodule Prizmo.Tcg.Cards.Behaviors.TEF do
   end
 
   card "TEF-025" do
+    tag(:tera)
+
     ability(:rapid_vernier,
       effect: %{type: :switch_self_with_active_when_benched_and_move_energy_to_self}
     )

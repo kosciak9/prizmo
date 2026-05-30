@@ -35,16 +35,6 @@ defmodule Prizmo.TcgEngine.CardCatalog do
     Prizmo.Tcg.Cards.Behaviors.WHT
   ]
 
-  # TCGdex's cached card payloads do not currently expose Tera status as a
-  # structured field, so keep this engine-owned predicate deliberately narrow
-  # and limited to supported fixture cards whose Tera status is needed by rules.
-  @tera_pokemon_card_ids MapSet.new([
-                           "TEF-025",
-                           "TWM-025",
-                           "TWM-064",
-                           "TWM-130"
-                         ])
-
   @behaviors @behavior_modules
              |> Enum.flat_map(& &1.behavior_manifest())
              |> Map.new()
@@ -90,7 +80,7 @@ defmodule Prizmo.TcgEngine.CardCatalog do
   end
 
   def tera_pokemon?(card_id) when is_binary(card_id) do
-    MapSet.member?(@tera_pokemon_card_ids, card_id)
+    match?({:ok, %{supertype: :pokemon, tera?: true}}, fetch(card_id))
   end
 
   def tera_pokemon?(_card_id), do: false
@@ -127,7 +117,8 @@ defmodule Prizmo.TcgEngine.CardCatalog do
       stage: metadata.stage,
       suffix: metadata.suffix,
       supertype: metadata.category,
-      tera?: tera_pokemon?(metadata.id),
+      tags: [],
+      tera?: false,
       tcgdex_energy_type: metadata.energy_type,
       tcgdex_id: metadata.tcgdex_id,
       trainer_type: metadata.trainer_type,
@@ -142,8 +133,15 @@ defmodule Prizmo.TcgEngine.CardCatalog do
     card
     |> merge_attack_overlays(behavior |> Map.get(:attacks, %{}) |> behavior_entry_overlays())
     |> merge_ability_overlays(behavior |> Map.get(:abilities, %{}) |> behavior_entry_overlays())
+    |> merge_card_tags(Map.get(behavior, :tags, []))
     |> maybe_put_overlay(:effect, card_effect(behavior))
     |> maybe_put_overlay(:provides, inferred_provides(card))
+  end
+
+  defp merge_card_tags(card, tags) do
+    tags = Enum.uniq(card.tags ++ tags)
+
+    %{card | tags: tags, tera?: :tera in tags}
   end
 
   defp behavior_entry_overlays(entries) do

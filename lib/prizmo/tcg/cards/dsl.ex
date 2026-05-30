@@ -3,11 +3,13 @@ defmodule Prizmo.Tcg.Cards.DSL do
   Compile-time DSL for executable card-behavior overlays.
 
   Static card facts stay in `Prizmo.Tcg.Cards.Metadata`. This DSL only records
-  authored behavior entries and validates that referenced cards, attacks, and
-  Abilities exist in the committed TCGdex cache.
+  authored behavior entries/tags and validates that referenced cards, attacks,
+  and Abilities exist in the committed TCGdex cache.
   """
 
   alias Prizmo.Tcg.Cards.Metadata
+
+  @supported_tags [:tera]
 
   defmacro __using__(_opts) do
     quote do
@@ -125,6 +127,20 @@ defmodule Prizmo.Tcg.Cards.DSL do
     }
   end
 
+  defp parse_entry!({:tag, meta, [tag]}, card_id, metadata, caller) do
+    tag = literal_id!(tag, :tag, caller, meta)
+    validate_tag!(tag, card_id)
+
+    %{
+      family: :tag,
+      id: tag,
+      metadata_id: nil,
+      name: metadata.name,
+      overlay: %{},
+      source: source(caller, meta)
+    }
+  end
+
   defp parse_entry!(expression, card_id, _metadata, _caller) do
     raise ArgumentError,
           "unsupported behavior DSL expression for card #{card_id}: #{Macro.to_string(expression)}"
@@ -160,6 +176,15 @@ defmodule Prizmo.Tcg.Cards.DSL do
   end
 
   defp validate_executable_effect!(_overlay, _family, _card_id, _id, _raw_effect), do: :ok
+
+  defp validate_tag!(tag, card_id) do
+    if tag in @supported_tags do
+      :ok
+    else
+      raise ArgumentError,
+            "unsupported card tag #{inspect(tag)} for card #{card_id}; supported tags: #{inspect(@supported_tags)}"
+    end
+  end
 
   defp literal_id!(value, family, caller, meta) do
     case literal!(value, caller, meta) do
@@ -231,7 +256,8 @@ defmodule Prizmo.Tcg.Cards.DSL do
       card_id: card_id,
       attacks: %{},
       abilities: %{},
-      card_effects: []
+      card_effects: [],
+      tags: []
     }
   end
 
@@ -245,6 +271,14 @@ defmodule Prizmo.Tcg.Cards.DSL do
 
   defp put_entry!(card_manifest, %{family: :card_effect} = entry) do
     %{card_manifest | card_effects: [entry | card_manifest.card_effects]}
+  end
+
+  defp put_entry!(card_manifest, %{family: :tag, id: tag}) do
+    if tag in card_manifest.tags do
+      raise ArgumentError, "duplicate card tag #{inspect(tag)} for card #{card_manifest.card_id}"
+    end
+
+    %{card_manifest | tags: [tag | card_manifest.tags]}
   end
 
   defp put_nested_entry!(card_manifest, field, entry) do

@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-30] iteration 78 | Authored Tera card tags
+- Task attempted: hardened the Gemstone Mimicry copy/Tera boundary by moving supported-fixture Tera status out of `Prizmo.TcgEngine.CardCatalog`'s hard-coded list and into authored card behavior tags.
+- Files changed: updated `lib/prizmo/tcg/cards/dsl.ex`, `lib/prizmo/tcg/cards/behaviors/tef.ex`, `lib/prizmo/tcg/cards/behaviors/twm.ex`, `lib/prizmo/tcg_engine/card_catalog.ex`, `lib/prizmo/tcg_engine/card_metadata_requirements.ex`, this log, and the TCG engine playtest handoff.
+- Validation: `mix format` passed; `mix compile --warnings-as-errors` passed; Tidewave project eval verified `TEF-025`, `TWM-025`, `TWM-064`, and `TWM-130` now expose `tags: [:tera]`/`tera?: true` while `DRI-087` remains untagged; `mix test test/prizmo/tcg_engine/mechanics_test.exs` passed; `mix prizmo.cards.coverage` passed; `mix check --no-test` passed.
+- Remaining/blocking notes: no code blocker for authored Tera tags. Broader Tera hardening still needs card-level rules such as Bench damage prevention and any additional supported Tera fixtures should declare `tag(:tera)` in their behavior manifests.
+
 ## [2026-05-30] iteration 77 | Gemstone Mimicry copy attack
 - Task attempted: continued the rejected authored attack-effect inventory and implemented Team Rocket's Mimikyu `DRI-087` `Gemstone Mimicry`, letting it copy one executable attack from the opponent's Active engine-known Tera Pokémon through an explicit `copied_attack_id` resolution input.
 - Files changed: updated `lib/prizmo/tcg_engine/attack_effects.ex`, `lib/prizmo/tcg_engine/attack_damage.ex`, `lib/prizmo/tcg_engine/card_catalog.ex`, `lib/prizmo/tcg_engine/card_metadata_requirements.ex`, `lib/prizmo/tcg_engine/mechanics.ex`, `lib/prizmo/tcg_engine/game/action_commands.ex`, `lib/prizmo/tcg_engine/game_view.ex`, `lib/prizmo/tcg_engine/game_view/action_affordances.ex`, `lib/prizmo/tcg_engine/game_view/fields.ex`, `lib/prizmo_web/spa/features/home/routes/index.tsx`, generated `lib/prizmo_web/spa/lib/ash/generated/ash_rpc.ts`, this log, and the TCG engine playtest handoff.

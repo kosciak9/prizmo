@@ -35,6 +35,8 @@ defmodule Prizmo.Tcg.Cards.Behaviors.TWM do
   end
 
   card "TWM-025" do
+    tag(:tera)
+
     ability(:teal_dance,
       effect: %{type: :attach_basic_grass_energy_from_hand_to_self_then_draw, count: 1}
     )
@@ -56,6 +58,8 @@ defmodule Prizmo.Tcg.Cards.Behaviors.TWM do
   end
 
   card "TWM-064" do
+    tag(:tera)
+
     attack(:sob,
       effect: %{type: :defending_pokemon_cannot_retreat_next_turn}
     )
@@ -101,6 +105,8 @@ defmodule Prizmo.Tcg.Cards.Behaviors.TWM do
   end
 
   card "TWM-130" do
+    tag(:tera)
+
     attack(:jet_headbutt, effect: nil)
 
     attack(:phantom_dive,

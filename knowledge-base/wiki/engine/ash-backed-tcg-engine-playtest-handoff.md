@@ -277,17 +277,21 @@ Updated: 2026-05-30
 - `resolve_declared_attack` records both copy metadata (`copied_by_effect_type`, source card, copied attack id/name/effect type) and the actual copied effect payload, preserving downstream semantics such as `effect_type: "opponent_bench_damage_counters"` when Gemstone Mimicry copies `Phantom Dive`.
 - `resolveTcgEngineDeclaredAttack` now accepts optional `copiedAttackId`; the viewer read model exposes `pending_attack_requires_copied_attack` plus `pending_attack_copy_choices`, and the React attack-resolution panel renders a copied-attack radio chooser before surfacing any copied effect's existing resolution controls.
 - A Tidewave rollback smoke verified `DRI-087` declaring against Tera `TWM-130`, exposing `jet_headbutt` and `phantom_dive` choices, resolving copied `phantom_dive` for 200 damage with no copied-cost check, and recording copied-attack payload plus actual copied `opponent_bench_damage_counters` effect type.
+- Iteration 78 hardened the copy/Tera boundary by moving the supported-fixture Tera predicate out of `Prizmo.TcgEngine.CardCatalog`'s hard-coded list and into authored behavior manifest tags.
+- `Prizmo.Tcg.Cards.DSL` now accepts `tag(:tera)` card-level entries, stores unique tags in each behavior manifest, and validates tags against the currently supported authored tag set.
+- `Prizmo.TcgEngine.CardCatalog` now exposes `tags` and derives `tera?` from behavior tags after applying overlays; `Prizmo.TcgEngine.CardMetadataRequirements.require_tera_pokemon_card/1` uses the fetched card's authored `tera?` field.
+- `TEF-025`, `TWM-025`, `TWM-064`, and `TWM-130` now declare `tag(:tera)` in their behavior modules. A Tidewave project eval verified those four cards expose `tags: [:tera]`/`tera?: true`, while `DRI-087` remains untagged.
 
 ## Last commit
 
-- Baseline entering iteration 77: `4db659c feat(tcg-engine): resolve whirlpool energy discard`.
-- This handoff was written before committing iteration 77; expected commit message is `feat(tcg-engine): resolve gemstone mimicry copy attack`.
+- Baseline entering iteration 78: `53aa401 feat(tcg-engine): resolve gemstone mimicry copy attack`.
+- This handoff was written before committing iteration 78; expected commit message is `feat(tcg-engine): author tera card tags`.
 
 ## Remaining tasks
 
 - Decide whether old `Prizmo.Tcg.Sim` tests are kept as historical reference, quarantined, or ported scenario-by-scenario.
 - Build the minimal playable React SPA loop beyond prompt resolution, Bench commands, Attach Energy, attached-card board visibility, Retreat, paid attack declaration, static/executable attack resolution/finish controls, switch-self target choice, one-Bench KO follow-up, multi-Bench replacement Active choice, explicit KO Prize prompt choice, evolution from hand, End Turn, next-turn progression, deterministic playtest fixture order, hardened tab-scoped viewer identity, and reduced prompt/action debug noise: rerun the full two-browser/manual-tester playtest milestone only after the validation harness can guarantee separate browser contexts.
-- Expand persisted Ash engine mechanics: continue multi-KO/prize handling, richer status/marker lifecycle semantics, turn transitions, remaining card-level effect semantics, and snapshot-backed undo/debug support now that the first executable copy-attack path is in place.
+- Expand persisted Ash engine mechanics: continue multi-KO/prize handling, richer status/marker lifecycle semantics, turn transitions, remaining card-level effect semantics, and snapshot-backed undo/debug support now that the first executable copy-attack path and authored Tera tag boundary are in place.
 - Continue migrating executable card behavior into engine-owned definitions with explicit unsupported-behavior tracking.
 - Spike Electric Streams only after the command/read loop has enough event shape to publish safely.
 
@@ -329,9 +333,9 @@ Updated: 2026-05-30
 - Goldeen `TWM-044` `Whirlpool` is now executable in the persisted engine and deals its printed 10 damage before applying a command-provided, engine-validated coin result. Heads discards one selected or implicitly sole Energy attached to the opponent's Active Pokémon; tails records no discard. The browser attack-resolution panel now prompts for Heads/Tails and visible opponent-Active Energy selection when needed.
 - Team Rocket's Mimikyu `DRI-087` `Gemstone Mimicry` is now executable in the persisted engine when the opponent's Active Pokémon is an engine-known Tera Pokémon with executable attacks. It copies a selected or implicitly sole copied attack through the attack-resolution command, reuses that copied attack's existing persisted damage/effect semantics, and exposes copied attack choices plus copied effect controls in the browser.
 - Damage-dealing attack effects that truly require a new pending prompt still need a sequencing design before implementation because the engine currently enforces one awaiting pending effect per game and KO Prize prompts also use that continuation slot. `SSP-056` `Icicle Loop` avoided that blocker by using a resolve-command input rather than a pending prompt.
-- Tera status is currently modeled as a narrow engine-owned supported-fixture predicate in `Prizmo.TcgEngine.CardCatalog`; broader authored Tera tagging and the Tera Bench damage-prevention rule remain future hardening before relying on this beyond known playtest fixtures.
+- Tera status is now modeled as authored `tag(:tera)` behavior metadata for supported fixtures instead of a hard-coded `CardCatalog` list; broader Tera hardening still needs card-level rules such as Bench damage prevention before relying on this beyond known playtest fixtures.
 - Validation blocker: the available manual-tester subagents still appear to share/contend over one browser/session, so their reported viewer flips are not reliable proof of independent-browser behavior. The documented manual-tester milestone needs a harness that guarantees separate browser contexts before it can be marked formally complete.
 
 ## Recommended next atomic task
 
-- Harden the new copy/Tera boundary by moving the narrow engine-owned Tera predicate toward authored card metadata/tag definitions for supported Tera fixtures, or pick the next small mechanics blocker for Bench-damage multi-KO/prize sequencing if prioritizing attack resolution correctness.
+- Pick the next small mechanics blocker for Bench-damage multi-KO/prize sequencing, or continue Tera hardening by modeling the Tera Bench damage-prevention rule now that supported fixtures can declare authored Tera tags.
