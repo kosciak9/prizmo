@@ -171,23 +171,26 @@ Updated: 2026-05-30
 - Iteration 52 continued the rejected authored attack-effect inventory and picked Teal Mask Ogerpon ex `TWM-025` `Myriad Leaf Shower` as another narrow deterministic persisted effect.
 - `Prizmo.TcgEngine.AttackEffects` and `Prizmo.TcgEngine.AttackDamage` now support `:bonus_damage_per_energy_attached_to_both_active`, adding the authored bonus once for each Energy card attached to either Active Pokémon.
 - A Tidewave rollback smoke verified `Myriad Leaf Shower` fetches as executable, appears as a browser declare-attack affordance, and resolves for 180 damage against Fezandipiti ex with three Energy attached to Ogerpon plus two Energy attached to the defender and no KO.
+- Iteration 53 continued the rejected authored attack-effect inventory and picked Dipplin `TWM-018` `Do the Wave` as another narrow deterministic persisted effect.
+- `Prizmo.TcgEngine.AttackEffects` and `Prizmo.TcgEngine.AttackDamage` now support `:damage_per_own_benched_pokemon`, using the authored per-Pokémon damage value for each Pokémon on the attacker's own Bench.
+- A Tidewave rollback smoke verified `Do the Wave` fetches as executable, appears as a browser declare-attack affordance, and resolves for 60 damage against Fezandipiti ex with three own Benched Pokémon and no KO.
 
 ## Last commit
 
-- Baseline entering iteration 52: `5abbf22 feat(tcg-engine): resolve bench-count bonus damage`.
-- This handoff was written before committing iteration 52; expected commit message is `feat(tcg-engine): resolve both-active energy bonus damage`.
+- Baseline entering iteration 53: `96948d7 feat(tcg-engine): resolve both-active energy bonus damage`.
+- This handoff was written before committing iteration 53; expected commit message is `feat(tcg-engine): resolve own-bench attack damage`.
 
 ## Remaining tasks
 
 - Decide whether old `Prizmo.Tcg.Sim` tests are kept as historical reference, quarantined, or ported scenario-by-scenario.
 - Build the minimal playable React SPA loop beyond prompt resolution, Bench commands, Attach Energy, attached-card board visibility, Retreat, paid attack declaration, static/executable attack resolution/finish controls, switch-self target choice, one-Bench KO follow-up, multi-Bench replacement Active choice, explicit KO Prize prompt choice, evolution from hand, End Turn, next-turn progression, deterministic playtest fixture order, hardened tab-scoped viewer identity, and reduced prompt/action debug noise: rerun the full two-browser/manual-tester playtest milestone only after the validation harness can guarantee separate browser contexts.
-- Expand persisted Ash engine mechanics: implement explicit support for one rejected authored attack effect at a time beyond Moltres's Pokémon ex bonus, switch-self effects, Rabsca's defender-Energy bonus damage, Clefairy's bench-count bonus damage, and Ogerpon's both-Active Energy bonus damage; continue multi-KO/prize handling, richer status/marker lifecycle semantics, turn transitions, and snapshot-backed undo/debug support.
+- Expand persisted Ash engine mechanics: implement explicit support for one rejected authored attack effect at a time beyond Moltres's Pokémon ex bonus, switch-self effects, Rabsca's defender-Energy bonus damage, Clefairy's bench-count bonus damage, Ogerpon's both-Active Energy bonus damage, and Dipplin's own-Bench damage; continue multi-KO/prize handling, richer status/marker lifecycle semantics, turn transitions, and snapshot-backed undo/debug support.
 - Continue migrating executable card behavior into engine-owned definitions with explicit unsupported-behavior tracking.
 - Spike Electric Streams only after the command/read loop has enough event shape to publish safely.
 
 ## Blockers
 
-- No known code blocker after the iteration 33 viewer hardening, isolated-context playtest pass, iteration 34 action/prompt clarity pass, iteration 35 retreat command pass, iteration 36 attached-card visibility pass, iteration 37 paid attack declaration pass, iteration 38 static/executable attack resolution/finish pass, iteration 39 Moltres `Fighting Wings` behavior pass, iteration 40 unsupported attack declaration guard, iteration 41 unsupported authored-effect guard, iteration 42 switch-self attack resolution, iteration 43 switch target chooser, iteration 44 one-Bench KO follow-up, iteration 45 multi-Bench replacement Active continuation, iteration 46 explicit KO Prize prompt, iteration 47 evolution command/browser affordance, iteration 48 evolution attachment preservation, iteration 49 evolution damage/status preservation, iteration 50 Rabsca defender-Energy bonus damage, and iteration 51 Clefairy bench-count bonus damage.
+- No known code blocker after the iteration 33 viewer hardening, isolated-context playtest pass, iteration 34 action/prompt clarity pass, iteration 35 retreat command pass, iteration 36 attached-card visibility pass, iteration 37 paid attack declaration pass, iteration 38 static/executable attack resolution/finish pass, iteration 39 Moltres `Fighting Wings` behavior pass, iteration 40 unsupported attack declaration guard, iteration 41 unsupported authored-effect guard, iteration 42 switch-self attack resolution, iteration 43 switch target chooser, iteration 44 one-Bench KO follow-up, iteration 45 multi-Bench replacement Active continuation, iteration 46 explicit KO Prize prompt, iteration 47 evolution command/browser affordance, iteration 48 evolution attachment preservation, iteration 49 evolution damage/status preservation, iteration 50 Rabsca defender-Energy bonus damage, iteration 51 Clefairy bench-count bonus damage, iteration 52 Ogerpon both-Active Energy bonus damage, and iteration 53 Dipplin own-Bench damage.
 - Raw printed attacks with missing authored behavior and authored attacks with unsupported effect types are hidden/rejected before declaration; new attack-effect slices should opt into `Prizmo.TcgEngine.AttackEffects` only when persisted resolution semantics are implemented.
 - Switch-self attacks are executable from the browser, including the multiple-Bench case where the active viewer must choose a visible Bench target before resolving.
 - Multi-Bench KO replacement now exposes `choose_replacement_active/3` through Ash/RPC and the React SPA, and attack finish remains blocked until every player has an Active Pokémon.
@@ -196,6 +199,7 @@ Updated: 2026-05-30
 - Rabsca `TEF-024` `Psychic` is now executable in the persisted engine and deals 10 plus 30 more damage per Energy card attached to the opponent's Active Pokémon.
 - Lillie's Clefairy ex `JTG-056` `Full Moon Rondo` is now executable in the persisted engine and deals 20 plus 20 more damage for each Benched Pokémon controlled by either player.
 - Teal Mask Ogerpon ex `TWM-025` `Myriad Leaf Shower` is now executable in the persisted engine and deals 30 plus 30 more damage for each Energy card attached to either Active Pokémon.
+- Dipplin `TWM-018` `Do the Wave` is now executable in the persisted engine and deals 20 damage for each Pokémon on the attacker's own Bench.
 - Validation blocker: the available manual-tester subagents still appear to share/contend over one browser/session, so their reported viewer flips are not reliable proof of independent-browser behavior. The documented manual-tester milestone needs a harness that guarantees separate browser contexts before it can be marked formally complete.
 
 ## Recommended next atomic task

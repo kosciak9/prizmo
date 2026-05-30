@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-30] iteration 53 | Dipplin own-Bench attack damage
+- Task attempted: continued the rejected authored attack-effect inventory and implemented the narrow persisted `:damage_per_own_benched_pokemon` slice for Dipplin `TWM-018` `Do the Wave`, counting only the attacker's own Benched Pokémon for authored attack damage.
+- Files changed: updated `lib/prizmo/tcg_engine/attack_effects.ex`, `lib/prizmo/tcg_engine/attack_damage.ex`, this log, and the TCG engine playtest handoff.
+- Validation: `mix format && mix compile --warnings-as-errors` passed; Tidewave rollback smoke passed for `TWM-018` `Do the Wave` fetching as executable, surfacing a browser declare-attack affordance, and resolving for 60 damage against Fezandipiti ex with three own Benched Pokémon and no KO; `mix test test/prizmo/tcg_engine/mechanics_test.exs` passed (4 tests); `mix prizmo.cards.coverage` passed; `mix check --no-test` passed.
+- Remaining/blocking notes: no code blocker for Dipplin's own-Bench damage path; additional rejected authored attack effects remain and should continue to be enabled one deterministic persisted effect at a time.
+
 ## [2026-05-30] iteration 52 | Ogerpon both-Active Energy bonus damage
 - Task attempted: continued the rejected authored attack-effect inventory and implemented the narrow persisted `:bonus_damage_per_energy_attached_to_both_active` slice for Teal Mask Ogerpon ex `TWM-025` `Myriad Leaf Shower`, counting Energy cards attached to both Active Pokémon for the authored bonus damage.
 - Files changed: updated `lib/prizmo/tcg_engine/attack_effects.ex`, `lib/prizmo/tcg_engine/attack_damage.ex`, this log, and the TCG engine playtest handoff.

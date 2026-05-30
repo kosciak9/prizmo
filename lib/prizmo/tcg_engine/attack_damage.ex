@@ -44,6 +44,16 @@ defmodule Prizmo.TcgEngine.AttackDamage do
     end
   end
 
+  defp apply_effect(damage, %CardInstance{} = attacker_card, _defender_card, %{
+         type: :damage_per_own_benched_pokemon,
+         damage_per_pokemon: damage_per_pokemon
+       })
+       when is_integer(damage_per_pokemon) and damage_per_pokemon >= 0 do
+    with {:ok, benched_pokemon_count} <- own_benched_pokemon_count(attacker_card) do
+      {:ok, damage + damage_per_pokemon * benched_pokemon_count}
+    end
+  end
+
   defp apply_effect(damage, %CardInstance{} = attacker_card, %CardInstance{} = defender_card, %{
          type: :bonus_damage_per_energy_attached_to_both_active,
          bonus_damage: bonus_damage
@@ -122,5 +132,11 @@ defmodule Prizmo.TcgEngine.AttackDamage do
         {:error, reason} -> {:halt, {:error, reason}}
       end
     end)
+  end
+
+  defp own_benched_pokemon_count(%CardInstance{game_id: game_id, owner_player_id: player_id}) do
+    with {:ok, cards} <- CardStore.cards_in_zone(game_id, player_id, :bench) do
+      {:ok, length(cards)}
+    end
   end
 end
