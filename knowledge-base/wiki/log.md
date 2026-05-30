@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-30] iteration 44 | Attack KO prize and replacement follow-up
+- Task attempted: added a minimal persisted attack knockout follow-up path so resolved attack damage can discard a KO'd Pokémon stack, take the attacking player's knockout Prize cards, auto-promote the defender's only Benched Pokémon as replacement Active, and block attack finish while a replacement Active is still missing.
+- Files changed: updated `lib/prizmo/tcg_engine/battle_actions.ex`, `lib/prizmo/tcg_engine/mechanics.ex`, this log, and the TCG engine playtest handoff.
+- Validation: `mix compile --warnings-as-errors` passed; `mix test test/prizmo/tcg_engine/mechanics_test.exs` passed (4 tests); Tidewave rollback smoke passed for Moltres `Fighting Wings` KOing an already-damaged Abra, moving one Prize to Player 1's hand, auto-promoting Player 2's only Bench Pokémon, emitting `take_knockout_prizes`/`auto_replacement_active`, and finishing the attack; `mix check --no-test` passed.
+- Remaining/blocking notes: no code blocker for the one-Bench KO path; multiple-Bench KO replacement now emits `replacement_active_required` and `finish_attack` is blocked until replacement is chosen, but `choose_replacement_active` still needs Ash/RPC and SPA affordance wiring. Prize taking is currently deterministic from persisted Prize order for this minimal path; explicit player Prize selection remains future work.
+
 ## [2026-05-30] iteration 43 | Switch attack target chooser
 - Task attempted: added an engine-backed read-model hint and minimal React attack-resolution chooser so switch-self attacks such as `Run Around` / `Trading Places` can pass an explicit `switchBenchCardInstanceId` from the browser when multiple Bench targets are visible.
 - Files changed: updated `lib/prizmo/tcg_engine/game_view.ex`, `lib/prizmo/tcg_engine/game_view/fields.ex`, `lib/prizmo_web/spa/features/home/routes/index.tsx`, generated `lib/prizmo_web/spa/lib/ash/generated/ash_rpc.ts`, this log, and the TCG engine playtest handoff.

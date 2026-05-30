@@ -13,7 +13,10 @@ defmodule Prizmo.TcgEngine.Mechanics do
     only: [
       apply_attack_damage: 4,
       attached_energy_cards_for_retreat: 3,
-      discard_retreat_energy: 3
+      discard_retreat_energy: 3,
+      knockout_prize_count: 1,
+      resolve_replacement_active_after_knockout: 2,
+      take_knockout_prizes: 3
     ]
 
   import Prizmo.TcgEngine.BoardState,
@@ -882,8 +885,6 @@ defmodule Prizmo.TcgEngine.Mechanics do
            :ok <- require_in_play_pokemon_zone(target_card),
            {:ok, damage_result} <-
              apply_attack_damage(game.id, attacking_player_id, target_card, damage),
-           {:ok, game} <-
-             maybe_finish_for_empty_board(game, attacking_player_id, target_card.owner_player_id),
            {:ok, event} <-
              write_event(game, :resolve_attack_damage, attacking_player_id, %{
                target_card_instance_id: target_card.id,
@@ -892,7 +893,13 @@ defmodule Prizmo.TcgEngine.Mechanics do
                knocked_out?: damage_result.knocked_out?
              }),
            {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do
-        get_game(game.id)
+        resolve_knockout_after_attack_damage(
+          game.id,
+          attacking_player_id,
+          target_card.owner_player_id,
+          target_card,
+          damage_result
+        )
       end
     end)
   end
@@ -975,8 +982,6 @@ defmodule Prizmo.TcgEngine.Mechanics do
            {:ok, turn} <- update(turn, :resolve_attack, %{}),
            {:ok, damage_result} <-
              apply_attack_damage(game.id, player_id, defender_card, damage),
-           {:ok, game} <-
-             maybe_finish_for_empty_board(game, player_id, defender_card.owner_player_id),
            {:ok, effect_payload} <-
              AttackEffects.resolve_after_damage(game.id, player_id, attacker_card, attack, opts),
            {:ok, event} <-
@@ -997,7 +1002,13 @@ defmodule Prizmo.TcgEngine.Mechanics do
                )
              ),
            {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do
-        get_game(game.id)
+        resolve_knockout_after_attack_damage(
+          game.id,
+          player_id,
+          defender_card.owner_player_id,
+          defender_card,
+          damage_result
+        )
       end
     end)
   end
@@ -1010,12 +1021,115 @@ defmodule Prizmo.TcgEngine.Mechanics do
            :ok <- require_active_player(game, player_id),
            {:ok, turn} <- require_current_turn_status(game.id, :attack_resolving),
            :ok <- require_turn_player(turn, player_id),
+           :ok <- require_all_players_have_active(game.id),
            {:ok, turn} <- update(turn, :finish_attack, %{}),
            {:ok, event} <- write_event(game, :finish_attack, player_id, %{turn_id: turn.id}),
            {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do
         get_game(game.id)
       end
     end)
+  end
+
+  defp resolve_knockout_after_attack_damage(
+         game_id,
+         attacking_player_id,
+         knocked_out_player_id,
+         target_card,
+         %{
+           knocked_out?: true
+         }
+       ) do
+    with {:ok, prize_count} <- knockout_prize_count(target_card),
+         {:ok, prize_cards} <- take_knockout_prizes(game_id, attacking_player_id, prize_count),
+         {:ok, game} <- get_game(game_id),
+         {:ok, game} <- maybe_finish_for_last_prize(game, attacking_player_id),
+         {:ok, event} <-
+           write_event(game, :take_knockout_prizes, attacking_player_id, %{
+             prize_count: prize_count,
+             taken_prize_card_instance_ids: Enum.map(prize_cards, & &1.id),
+             knocked_out_card_instance_id: target_card.id,
+             knocked_out_player_id: knocked_out_player_id,
+             winner_player_id: game.winner_player_id
+           }),
+         {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index),
+         {:ok, game} <- get_game(game_id) do
+      resolve_replacement_after_knockout(game, attacking_player_id, knocked_out_player_id)
+    end
+  end
+
+  defp resolve_knockout_after_attack_damage(
+         game_id,
+         _attacking_player_id,
+         _knocked_out_player_id,
+         _target_card,
+         _damage_result
+       ) do
+    get_game(game_id)
+  end
+
+  defp resolve_replacement_after_knockout(
+         %Game{status: :finished} = game,
+         _attacking_player_id,
+         _knocked_out_player_id
+       ) do
+    {:ok, game}
+  end
+
+  defp resolve_replacement_after_knockout(
+         %Game{} = game,
+         attacking_player_id,
+         knocked_out_player_id
+       ) do
+    with {:ok, replacement_result} <-
+           resolve_replacement_active_after_knockout(game.id, knocked_out_player_id) do
+      cond do
+        replacement_result.empty_board? ->
+          write_empty_board_win(game, attacking_player_id, knocked_out_player_id)
+
+        replacement_result.promoted_card_instance_id ->
+          write_auto_replacement_active(game, knocked_out_player_id, replacement_result)
+
+        replacement_result.replacement_required? ->
+          write_replacement_required(game, knocked_out_player_id, replacement_result)
+
+        true ->
+          {:ok, game}
+      end
+    end
+  end
+
+  defp write_empty_board_win(%Game{} = game, attacking_player_id, knocked_out_player_id) do
+    with {:ok, game} <-
+           maybe_finish_for_empty_board(game, attacking_player_id, knocked_out_player_id),
+         {:ok, event} <-
+           write_event(game, :empty_board_win, attacking_player_id, %{
+             winner_player_id: game.winner_player_id,
+             knocked_out_player_id: knocked_out_player_id
+           }),
+         {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do
+      get_game(game.id)
+    end
+  end
+
+  defp write_auto_replacement_active(%Game{} = game, player_id, replacement_result) do
+    with {:ok, event} <-
+           write_event(game, :auto_replacement_active, player_id, %{
+             bench_card_instance_id: replacement_result.promoted_card_instance_id
+           }),
+         {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do
+      get_game(game.id)
+    end
+  end
+
+  defp write_replacement_required(%Game{} = game, player_id, replacement_result) do
+    with {:ok, event} <-
+           write_event(game, :replacement_active_required, player_id, %{
+             candidate_card_instance_ids:
+               replacement_result.replacement_candidate_card_instance_ids
+           }),
+         {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do
+      get_game(game.id)
+    end
   end
 
   @spec draw_for_turn(Game.t() | String.t(), String.t()) :: {:ok, Game.t()} | {:error, term()}
