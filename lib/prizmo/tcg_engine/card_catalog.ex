@@ -58,19 +58,9 @@ defmodule Prizmo.TcgEngine.CardCatalog do
 
   def fetch_attack(card_id, attack_id) do
     with {:ok, %{attacks: attacks}} <- fetch(card_id),
+         {:ok, attack_id} <- find_attack_id(attacks, attack_id),
          {:ok, attack} <- Map.fetch(attacks, attack_id),
          :ok <- require_executable_attack(card_id, attack_id, attack) do
-      {:ok, Map.put(attack, :id, attack_id)}
-    else
-      :error -> {:error, {:unsupported_attack, card_id, attack_id}}
-      {:error, reason} -> {:error, reason}
-    end
-  end
-
-  def fetch_attack_for_declaration(card_id, attack_id) do
-    with {:ok, %{attacks: attacks}} <- fetch(card_id),
-         {:ok, attack_id} <- find_attack_id(attacks, attack_id),
-         {:ok, attack} <- Map.fetch(attacks, attack_id) do
       {:ok, Map.put(attack, :id, attack_id)}
     else
       :error -> {:error, {:unsupported_attack, card_id, attack_id}}

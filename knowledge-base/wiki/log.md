@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-30] iteration 40 | Unsupported attack declaration guard
+- Task attempted: made unsupported persisted attack declarations fail before entering `attack_declared` by routing declaration and viewer affordances through executable `CardCatalog.fetch_attack/2` lookup, while preserving binary attack IDs from the SPA/RPC boundary.
+- Files changed: updated `lib/prizmo/tcg_engine/card_catalog.ex`, `lib/prizmo/tcg_engine/mechanics.ex`, `lib/prizmo/tcg_engine/game_view/action_affordances.ex`, this log, and the TCG engine playtest handoff.
+- Validation: Tidewave rollback smokes verified unsupported free Budew `ASC-016` `itchy_pollen` is hidden from attack affordances and rejected with `{:missing_executable_attack_behavior, "ASC-016", :itchy_pollen}`, while supported Dreepy `TWM-128` `petty_grudge` still appears as a declare-attack affordance and accepts a binary attack ID; `mix test test/prizmo/tcg_engine/mechanics_test.exs` passed (4 tests); `git diff --check` passed; `mix check --no-test` passed.
+- Remaining/blocking notes: raw printed attacks with missing authored behavior are no longer exposed for declaration, but authored attack effect types accepted by `fetch_attack/2` still need effect-specific execution semantics or explicit rejection before broad attack playtesting.
+
 ## [2026-05-30] iteration 39 | Moltres Fighting Wings engine behavior
 - Task attempted: migrated the deterministic playtest fixture's `PFL-014` Moltres `Fighting Wings` attack into authored engine behavior and taught persisted attack resolution to apply its Pokémon ex bonus damage.
 - Files changed: added `lib/prizmo/tcg_engine/attack_damage.ex`; updated `lib/prizmo/tcg/cards/behaviors/pfl.ex`, `lib/prizmo/tcg_engine/mechanics.ex`, `test/prizmo/tcg/sim/scenario_test.exs`, this log, and the TCG engine playtest handoff.

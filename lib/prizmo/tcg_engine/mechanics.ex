@@ -930,8 +930,7 @@ defmodule Prizmo.TcgEngine.Mechanics do
            :ok <- require_can_attack(attacker_card),
            {:ok, defender_player_id} <- opponent_player_id(game.id, player_id),
            {:ok, defender_card} <- active_card(game.id, defender_player_id),
-           {:ok, attack} <-
-             CardCatalog.fetch_attack_for_declaration(attacker_card.card_id, attack_id),
+           {:ok, attack} <- CardCatalog.fetch_attack(attacker_card.card_id, attack_id),
            :ok <- require_attack_cost_paid(game.id, attacker_card, attack),
            {:ok, turn} <-
              update(turn, :declare_attack, %{

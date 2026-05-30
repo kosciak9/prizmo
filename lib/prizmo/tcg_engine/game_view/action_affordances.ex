@@ -154,11 +154,15 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
 
       attacks
       |> Enum.sort_by(fn {attack_id, _attack} -> Atom.to_string(attack_id) end)
-      |> Enum.filter(fn {_attack_id, attack} ->
-        attack |> AttackCosts.attack_cost() |> AttackCosts.paid?(attached_cards)
-      end)
-      |> Enum.map(fn {attack_id, attack} ->
-        attack_affordance(player, active_card, defender_card, attack_id, attack)
+      |> Enum.flat_map(fn {attack_id, attack} ->
+        maybe_attack_affordance(
+          player,
+          active_card,
+          defender_card,
+          attached_cards,
+          attack_id,
+          attack
+        )
       end)
     else
       _other -> []
@@ -273,6 +277,22 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
       attack_damage: attack_damage(attack),
       note: attack_note(cost)
     )
+  end
+
+  defp maybe_attack_affordance(
+         player,
+         active_card,
+         defender_card,
+         attached_cards,
+         attack_id,
+         attack
+       ) do
+    with true <- attack |> AttackCosts.attack_cost() |> AttackCosts.paid?(attached_cards),
+         {:ok, executable_attack} <- CardCatalog.fetch_attack(active_card.card_id, attack_id) do
+      [attack_affordance(player, active_card, defender_card, attack_id, executable_attack)]
+    else
+      _other -> []
+    end
   end
 
   defp attack_damage(%{damage: damage}) when is_integer(damage), do: Integer.to_string(damage)
