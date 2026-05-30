@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-30] iteration 27 | SPA prompt choice submission
+- Task attempted: exposed the persisted engine's generic prompt resolution mechanic as an Ash/RPC command and wired the React SPA Viewer prompts panel to select legal card choices and submit them, including Ultra Ball's `discard_two_from_hand` cost prompt and `search_deck_for_pokemon` effect prompt.
+- Files changed: updated `lib/prizmo/tcg_engine/game/action_commands.ex`, `lib/prizmo/tcg_engine.ex`, `lib/prizmo/tcg_engine/game_view.ex`, `lib/prizmo_web/spa/features/home/routes/index.tsx`, `lib/prizmo_web/spa/lib/ash/client.ts`, generated `lib/prizmo_web/spa/lib/ash/generated/ash_rpc.ts`, this log, and the TCG engine playtest handoff.
+- Validation: `MIX_ENV=test mix run -e ...` prompt command smoke passed by resolving both Ultra Ball prompts through `Prizmo.TcgEngine.choose_prompt_for_game/4` and verifying viewer-scoped `legal_choice_cards`; `mix assets.build` passed; `mix test test/prizmo/tcg_engine/mechanics_test.exs` passed (4 tests); initial `mix check --no-test` failed on Credo module length after adding a resource-level code-interface define, then `mix format && mix check --no-test` passed after relying on the domain-level define/RPC action.
+- Remaining/blocking notes: no blocker; the browser can now complete the generic Ultra Ball prompt flow, while execution controls for remaining legal action affordances such as benching Basics, attaching Energy, and ending the turn remain pending.
+
 ## [2026-05-30] iteration 26 | SPA play-card action command
 - Task attempted: exposed the persisted engine's generic `play_card` mechanic as an Ash/RPC command and wired the React SPA legal-actions panel to execute visible `play_card` affordance sources with empty upfront choices, allowing Ultra Ball-style cards to start their prompt flow from the browser.
 - Files changed: added `lib/prizmo/tcg_engine/game/action_commands.ex`; updated `lib/prizmo/tcg_engine.ex`, `lib/prizmo/tcg_engine/game.ex`, `lib/prizmo_web/spa/features/home/routes/index.tsx`, `lib/prizmo_web/spa/lib/ash/client.ts`, generated `lib/prizmo_web/spa/lib/ash/generated/ash_rpc.ts`, this log, and the TCG engine playtest handoff.

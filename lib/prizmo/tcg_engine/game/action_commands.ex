@@ -38,5 +38,36 @@ defmodule Prizmo.TcgEngine.Game.ActionCommands do
         )
       end
     end
+
+    action :choose_prompt_command, :struct do
+      description "Resolve a select-cards prompt through the generic mechanics layer."
+
+      constraints instance_of: Game
+
+      argument :game_id, :uuid do
+        allow_nil? false
+      end
+
+      argument :player_id, :string do
+        allow_nil? false
+      end
+
+      argument :prompt_id, :uuid do
+        allow_nil? false
+      end
+
+      argument :selected_card_instance_ids, {:array, :uuid} do
+        allow_nil? false
+      end
+
+      run fn input, _context ->
+        Mechanics.choose_prompt(
+          input.arguments.game_id,
+          input.arguments.player_id,
+          input.arguments.prompt_id,
+          input.arguments.selected_card_instance_ids
+        )
+      end
+    end
   end
 end

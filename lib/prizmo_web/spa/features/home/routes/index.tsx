@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react'
 import {
   buildAshRpcHeaders,
   runChooseTcgEngineActiveFromHand,
+  runChooseTcgEnginePrompt,
   runChooseTcgEngineSetupBenchFromHand,
   runCompleteTcgEngineSetup,
   runCreateTcgEngineGame,
@@ -210,6 +211,19 @@ type PlayCardCommand = {
   cardInstanceId: string
 }
 
+type ChoosePromptInput = {
+  gameId: string
+  playerId: PlayerId
+  promptId: string
+  selectedCardInstanceIds: string[]
+}
+
+type ChoosePromptCommand = {
+  playerId: string
+  promptId: string
+  selectedCardInstanceIds: string[]
+}
+
 type GameState = {
   gameId: string
   viewerPlayerId: string
@@ -364,6 +378,13 @@ export function HomeRoute() {
 
   const playCardMutation = useMutation({
     mutationFn: (input: PlayCardInput) => playCard(input),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['tcg-engine', 'game-state'] })
+    }
+  })
+
+  const choosePromptMutation = useMutation({
+    mutationFn: (input: ChoosePromptInput) => choosePrompt(input),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['tcg-engine', 'game-state'] })
     }
@@ -908,6 +929,12 @@ export function HomeRoute() {
                     {errorMessage(playCardMutation.error)}
                   </InlineNotice>
                 ) : null}
+
+                {choosePromptMutation.error ? (
+                  <InlineNotice tone="error" title="Prompt choice command failed">
+                    {errorMessage(choosePromptMutation.error)}
+                  </InlineNotice>
+                ) : null}
               </div>
             </Panel>
 
@@ -951,6 +978,16 @@ export function HomeRoute() {
               <GameStateWorkbench
                 deckNamesByKey={deckNamesByKey}
                 gameState={gameState}
+                onChoosePrompt={({ playerId, promptId, selectedCardInstanceIds }) => {
+                  if (isPlayerId(playerId)) {
+                    choosePromptMutation.mutate({
+                      gameId: normalisedGameId,
+                      playerId,
+                      promptId,
+                      selectedCardInstanceIds
+                    })
+                  }
+                }}
                 onPlayCard={({ playerId, cardInstanceId }) => {
                   if (isPlayerId(playerId)) {
                     playCardMutation.mutate({
@@ -960,6 +997,7 @@ export function HomeRoute() {
                     })
                   }
                 }}
+                promptPendingId={choosePromptMutation.isPending ? choosePromptMutation.variables?.promptId ?? null : null}
                 playCardPendingCardId={playCardMutation.isPending ? playCardMutation.variables?.cardInstanceId ?? null : null}
               />
             ) : null}
@@ -1182,15 +1220,33 @@ async function playCard(input: PlayCardInput): Promise<CreatedGame> {
   return result.data as CreatedGame
 }
 
+async function choosePrompt(input: ChoosePromptInput): Promise<CreatedGame> {
+  const result = await runChooseTcgEnginePrompt({
+    input,
+    fields: GAME_RESOURCE_FIELDS,
+    headers: buildAshRpcHeaders()
+  })
+
+  if (!result.success) {
+    throw new Error(rpcErrorMessage(result.errors))
+  }
+
+  return result.data as CreatedGame
+}
+
 function GameStateWorkbench({
   gameState,
   deckNamesByKey,
+  onChoosePrompt,
   onPlayCard,
+  promptPendingId,
   playCardPendingCardId
 }: {
   gameState: GameState
   deckNamesByKey: Map<string, string>
+  onChoosePrompt: (input: ChoosePromptCommand) => void
   onPlayCard: (input: PlayCardCommand) => void
+  promptPendingId: string | null
   playCardPendingCardId: string | null
 }) {
   const cardsById = useMemo(() => visibleCardsById(gameState), [gameState])
@@ -1265,26 +1321,154 @@ function GameStateWorkbench({
           )}
         </Panel>
 
-        <Panel title="Viewer prompts">
-          {gameState.prompts.length > 0 ? (
-            <div className="space-y-3">
-              {gameState.prompts.map(prompt => (
-                <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3" key={prompt.id}>
-                  <p className="text-sm font-medium text-emerald-950">{formatEventType(prompt.promptType)}</p>
-                  <p className="mt-1 text-xs text-emerald-800">{prompt.status}</p>
-                  <pre className="mt-3 max-h-48 overflow-auto rounded-lg bg-stone-950 p-3 text-xs text-stone-100">
-                    {JSON.stringify(prompt.payload, null, 2)}
-                  </pre>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <EmptyState title="No prompt is awaiting this viewer">
-              Prompt resolution UI can attach here once the next command boundary is exposed.
-            </EmptyState>
-          )}
-        </Panel>
+        <ViewerPromptsPanel
+          cardsById={cardsById}
+          onChoosePrompt={onChoosePrompt}
+          promptPendingId={promptPendingId}
+          prompts={gameState.prompts}
+        />
       </div>
+    </div>
+  )
+}
+
+function ViewerPromptsPanel({
+  cardsById,
+  onChoosePrompt,
+  promptPendingId,
+  prompts
+}: {
+  cardsById: Map<string, CardSummary>
+  onChoosePrompt: (input: ChoosePromptCommand) => void
+  promptPendingId: string | null
+  prompts: GameState['prompts']
+}) {
+  return (
+    <Panel title="Viewer prompts">
+      {prompts.length > 0 ? (
+        <div className="space-y-3">
+          {prompts.map(prompt => (
+            <PromptChoiceCard
+              cardsById={cardsById}
+              isPending={promptPendingId === prompt.id}
+              key={prompt.id}
+              onChoosePrompt={onChoosePrompt}
+              prompt={prompt}
+              promptPendingId={promptPendingId}
+            />
+          ))}
+        </div>
+      ) : (
+        <EmptyState title="No prompt is awaiting this viewer">
+          Pending card effects will appear here with selectable legal choices.
+        </EmptyState>
+      )}
+    </Panel>
+  )
+}
+
+function PromptChoiceCard({
+  cardsById,
+  isPending,
+  onChoosePrompt,
+  prompt,
+  promptPendingId
+}: {
+  cardsById: Map<string, CardSummary>
+  isPending: boolean
+  onChoosePrompt: (input: ChoosePromptCommand) => void
+  prompt: GameState['prompts'][number]
+  promptPendingId: string | null
+}) {
+  const legalChoiceIds = promptLegalChoiceIds(prompt.payload)
+  const legalChoiceCards = promptLegalChoiceCards(prompt.payload)
+  const legalChoiceCardsById = useMemo(() => new Map(legalChoiceCards.map(card => [card.id, card])), [legalChoiceCards])
+  const [selectedCardInstanceIds, setSelectedCardInstanceIds] = useState<string[]>([])
+  const min = promptChoiceCount(prompt.payload, 'min', 1)
+  const max = promptChoiceCount(prompt.payload, 'max', min)
+  const canSubmit =
+    selectedCardInstanceIds.length >= min &&
+    selectedCardInstanceIds.length <= max &&
+    !promptPendingId &&
+    isPlayerId(prompt.playerId)
+
+  function toggleChoice(cardInstanceId: string) {
+    setSelectedCardInstanceIds(current => {
+      if (current.includes(cardInstanceId)) {
+        return current.filter(id => id !== cardInstanceId)
+      }
+
+      if (current.length >= max) {
+        return max === 1 ? [cardInstanceId] : current
+      }
+
+      return [...current, cardInstanceId]
+    })
+  }
+
+  return (
+    <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-medium text-emerald-950">{formatEventType(prompt.promptType)}</p>
+          <p className="mt-1 text-xs text-emerald-800">
+            {formatEventType(promptChoiceKey(prompt.payload))} · choose {min === max ? min : `${min}-${max}`} card
+            {max === 1 ? '' : 's'}
+          </p>
+        </div>
+        <StatusBadge tone="warning">{prompt.status}</StatusBadge>
+      </div>
+
+      {legalChoiceIds.length > 0 ? (
+        <div className="mt-3 space-y-2">
+          {legalChoiceIds.map(cardInstanceId => {
+            const card = legalChoiceCardsById.get(cardInstanceId) ?? cardsById.get(cardInstanceId)
+            const selected = selectedCardInstanceIds.includes(cardInstanceId)
+
+            return (
+              <button
+                className={`w-full rounded-xl border px-3 py-2 text-left text-sm transition focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 ${
+                  selected
+                    ? 'border-emerald-700 bg-emerald-100 text-emerald-950'
+                    : 'border-emerald-200 bg-stone-50 text-stone-700 hover:border-emerald-500 hover:bg-emerald-50'
+                }`}
+                disabled={Boolean(promptPendingId)}
+                key={cardInstanceId}
+                onClick={() => toggleChoice(cardInstanceId)}
+                type="button"
+              >
+                <span className="block font-semibold">{card?.name ?? formatCardInstanceId(cardInstanceId)}</span>
+                <span className="mt-0.5 block text-xs text-stone-500">
+                  {promptChoiceCardDetail(card, cardInstanceId)}
+                </span>
+              </button>
+            )
+          })}
+
+          <button
+            className="w-full rounded-xl bg-emerald-700 px-3 py-2 text-sm font-semibold text-stone-50 transition hover:bg-emerald-800 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:bg-stone-300 disabled:text-stone-600"
+            disabled={!canSubmit}
+            onClick={() =>
+              onChoosePrompt({
+                playerId: prompt.playerId,
+                promptId: prompt.id,
+                selectedCardInstanceIds
+              })
+            }
+            type="button"
+          >
+            {isPending ? 'Submitting choice...' : `Submit ${selectedCardInstanceIds.length}/${max}`}
+          </button>
+        </div>
+      ) : (
+        <p className="mt-3 rounded-lg border border-dashed border-emerald-200 px-3 py-3 text-sm text-emerald-900">
+          This prompt did not include selectable card choices.
+        </p>
+      )}
+
+      <pre className="mt-3 max-h-32 overflow-auto rounded-lg bg-stone-950 p-3 text-xs text-stone-100">
+        {JSON.stringify(prompt.payload, null, 2)}
+      </pre>
     </div>
   )
 }
@@ -1674,6 +1858,58 @@ function isSetupActiveCandidate(card: CardSummary) {
 
 function isSetupBenchCandidate(card: CardSummary) {
   return isSetupActiveCandidate(card)
+}
+
+function promptLegalChoiceIds(payload: Record<string, unknown>) {
+  const value = payload.legal_choices
+
+  if (!Array.isArray(value)) {
+    return []
+  }
+
+  return value.filter((cardInstanceId): cardInstanceId is string => typeof cardInstanceId === 'string')
+}
+
+function promptLegalChoiceCards(payload: Record<string, unknown>) {
+  const value = payload.legal_choice_cards
+
+  if (!Array.isArray(value)) {
+    return []
+  }
+
+  return value.filter(isCardSummary)
+}
+
+function isCardSummary(value: unknown): value is CardSummary {
+  if (!value || typeof value !== 'object') {
+    return false
+  }
+
+  const card = value as Partial<CardSummary>
+
+  return typeof card.id === 'string' && typeof card.name === 'string'
+}
+
+function promptChoiceCount(payload: Record<string, unknown>, key: 'min' | 'max', fallback: number) {
+  const value = payload[key]
+
+  return typeof value === 'number' && Number.isFinite(value) ? value : fallback
+}
+
+function promptChoiceKey(payload: Record<string, unknown>) {
+  const value = payload.choice_key
+
+  return typeof value === 'string' ? value : 'prompt_choice'
+}
+
+function promptChoiceCardDetail(card: CardSummary | undefined, cardInstanceId: string) {
+  if (!card) {
+    return formatCardInstanceId(cardInstanceId)
+  }
+
+  return [card.cardId, card.category ? formatEventType(card.category) : null, formatEventType(card.zone)]
+    .filter(Boolean)
+    .join(' · ')
 }
 
 function actionKey(action: ActionAffordance) {

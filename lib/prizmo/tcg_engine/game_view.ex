@@ -51,7 +51,7 @@ defmodule Prizmo.TcgEngine.GameView do
          stadium: stadium_view(cards),
          players: player_views(players, cards, viewer_player_id),
          events: Enum.map(events, &event_view/1),
-         prompts: Enum.map(prompts, &prompt_view/1)
+         prompts: Enum.map(prompts, &prompt_view(&1, cards))
        }}
     end
   end
@@ -197,14 +197,41 @@ defmodule Prizmo.TcgEngine.GameView do
     }
   end
 
-  defp prompt_view(%Prompt{} = prompt) do
+  defp prompt_view(%Prompt{} = prompt, cards) do
     %{
       id: prompt.id,
       prompt_type: prompt.prompt_type,
       status: stringify(prompt.status),
       player_id: prompt.player_id,
-      payload: prompt.payload
+      payload: prompt_payload(prompt, cards)
     }
+  end
+
+  defp prompt_payload(%Prompt{payload: payload} = prompt, cards) do
+    choice_cards = legal_choice_cards(prompt, cards)
+
+    if Enum.empty?(choice_cards) do
+      payload
+    else
+      Map.put(payload, "legal_choice_cards", choice_cards)
+    end
+  end
+
+  defp legal_choice_cards(%Prompt{payload: payload, player_id: player_id}, cards) do
+    cards_by_id = Map.new(cards, &{&1.id, &1})
+
+    payload
+    |> Map.get("legal_choices", [])
+    |> case do
+      ids when is_list(ids) -> ids
+      _other -> []
+    end
+    |> Enum.map(&Map.get(cards_by_id, &1))
+    |> Enum.filter(fn
+      %CardInstance{owner_player_id: ^player_id} -> true
+      _other -> false
+    end)
+    |> Enum.map(&card_view/1)
   end
 
   defp catalog_card(card_id) do
