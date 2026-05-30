@@ -23,6 +23,7 @@ defmodule Prizmo.TcgEngine do
       rpc_action :complete_tcg_engine_setup, :complete_setup_command
       rpc_action :start_next_tcg_engine_turn, :start_next_turn_command
       rpc_action :draw_tcg_engine_card_for_turn, :draw_for_turn_command
+      rpc_action :open_tcg_engine_action_window, :open_action_window_command
     end
   end
 
@@ -48,6 +49,7 @@ defmodule Prizmo.TcgEngine do
       define :complete_setup_for_game, action: :complete_setup_command, args: [:game_id]
       define :start_next_turn_for_game, action: :start_next_turn_command, args: [:game_id]
       define :draw_for_turn_for_game, action: :draw_for_turn_command, args: [:game_id, :player_id]
+      define :open_action_window_for_game, action: :open_action_window_command, args: [:game_id]
     end
 
     resource Prizmo.TcgEngine.GameEvent

@@ -59,6 +59,7 @@ defmodule Prizmo.TcgEngine.Game do
     define :complete_setup_command, args: [:game_id]
     define :start_next_turn_command, args: [:game_id]
     define :draw_for_turn_command, args: [:game_id, :player_id]
+    define :open_action_window_command, args: [:game_id]
     define :start_setup
     define :complete_setup
     define :finish
@@ -242,6 +243,20 @@ defmodule Prizmo.TcgEngine.Game do
 
       run fn input, _context ->
         Mechanics.draw_for_turn(input.arguments.game_id, input.arguments.player_id)
+      end
+    end
+
+    action :open_action_window_command, :struct do
+      description "Open the active player's current turn action window through the mechanics layer."
+
+      constraints instance_of: Game
+
+      argument :game_id, :uuid do
+        allow_nil? false
+      end
+
+      run fn input, _context ->
+        Mechanics.open_action_window(input.arguments.game_id)
       end
     end
 

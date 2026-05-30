@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-30] iteration 11 | Open action window RPC boundary
+- Task attempted: exposed the next turn-progress command through an engine-owned Ash/RPC action so SPA callers can move a persisted turn from `:drawn` into `:action_window` by `game_id` without bypassing `Prizmo.TcgEngine.Mechanics.open_action_window/1`.
+- Files changed: updated `lib/prizmo/tcg_engine/game.ex`, `lib/prizmo/tcg_engine.ex`, `lib/prizmo_web/spa/lib/ash/client.ts`, and regenerated `lib/prizmo_web/spa/lib/ash/generated/ash_rpc.ts`; updated this log and the TCG engine playtest handoff.
+- Validation: `MIX_ENV=test mix run -e ...` open-action-window boundary smoke passed after creating a supported game, completing setup, starting turn 1, drawing for the active player, opening the action window, and verifying `:in_progress`, turn status `:action_window`, `open_action_window` event, and cursor/latest event index 9; `mix ash_typescript.codegen --check` passed; `mix test test/prizmo/tcg_engine/mechanics_test.exs` passed (4 tests); `mix check --no-test` passed.
+- Remaining/blocking notes: no blocker; the SPA can now import `runOpenTcgEngineActionWindow`, but skip-draw, legal action affordances, game-state/read-model UI, prompt resolution, and turn-ending/action commands remain missing.
+
 ## [2026-05-30] iteration 10 | Draw-for-turn RPC boundary
 - Task attempted: exposed the next turn-progress command through an engine-owned Ash/RPC action so SPA callers can draw the active player's card for turn by `game_id` and `player_id` without bypassing `Prizmo.TcgEngine.Mechanics.draw_for_turn/2`.
 - Files changed: updated `lib/prizmo/tcg_engine/game.ex`, `lib/prizmo/tcg_engine.ex`, `lib/prizmo_web/spa/lib/ash/client.ts`, and regenerated `lib/prizmo_web/spa/lib/ash/generated/ash_rpc.ts`; updated this log and the TCG engine playtest handoff.

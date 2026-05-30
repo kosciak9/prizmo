@@ -516,6 +516,50 @@ export async function listSupportedTcgDecks<Fields extends ListSupportedTcgDecks
 }
 
 
+export type OpenTcgEngineActionWindowInput = {
+  gameId: UUID;
+};
+
+export type OpenTcgEngineActionWindowFields = UnifiedFieldSelection<TcgEngineGameResourceSchema>[];
+
+export type InferOpenTcgEngineActionWindowResult<
+  Fields extends OpenTcgEngineActionWindowFields | undefined,
+> = InferResult<TcgEngineGameResourceSchema, Fields>;
+
+export type OpenTcgEngineActionWindowResult<Fields extends OpenTcgEngineActionWindowFields | undefined = undefined> = | { success: true; data: InferOpenTcgEngineActionWindowResult<Fields>; }
+| { success: false; errors: AshRpcError[]; }
+
+;
+
+/**
+ * Execute generic action on Game
+ *
+ * @ashActionType :action
+ */
+export async function openTcgEngineActionWindow<Fields extends OpenTcgEngineActionWindowFields | undefined = undefined>(
+  config: {
+  tenant?: string;
+  input: OpenTcgEngineActionWindowInput;
+  fields: Fields;
+  headers?: Record<string, string>;
+  fetchOptions?: RequestInit;
+  customFetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+}
+): Promise<OpenTcgEngineActionWindowResult<Fields extends undefined ? [] : Fields>> {
+  const payload = {
+    action: "open_tcg_engine_action_window",
+    ...(config.tenant !== undefined && { tenant: config.tenant }),
+    input: config.input,
+    ...(config.fields !== undefined && { fields: config.fields })
+  };
+
+  return executeActionRpcRequest<OpenTcgEngineActionWindowResult<Fields extends undefined ? [] : Fields>>(
+    payload,
+    config
+  );
+}
+
+
 export type PlaceTcgEnginePrizesInput = {
   gameId: UUID;
 };
