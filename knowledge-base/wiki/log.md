@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-31] iteration 82 | Queued cross-player Prize prompts
+- Task attempted: implemented queued knockout Prize prompt sequencing for cross-player simultaneous KOs, so an attack that KOs the defender and self-KOs the attacker can create one awaiting Prize prompt and queue the other player's prompt without violating the single-awaiting-pending-effect invariant.
+- Files changed: updated `lib/prizmo/tcg_engine/mechanics.ex`, this log, and the TCG engine playtest handoff.
+- Validation: `mix format` passed; `mix compile --warnings-as-errors` passed; `mix test test/prizmo/tcg_engine/mechanics_test.exs` passed; Tidewave rollback smoke passed for `DRI-019` `Take Down` KOing both Player 2's Active `MEG-054` and the attacking `DRI-019`, creating Player 1's Prize prompt with Player 2 queued, creating Player 2's Prize prompt after Player 1 resolved, auto-promoting both replacement Active Pokémon, resolving both Prize prompts, and finishing the attack; `mix check --no-test` passed.
+- Remaining/blocking notes: no code blocker for the narrow defender-KO plus attacker self-KO queued Prize prompt path. Broader simultaneous-KO edge cases still need browser/read-model playtest coverage, especially last-Prize, empty-board, and any future effects that can produce more than two prize-taking players or tie-like outcomes.
+
 ## [2026-05-31] iteration 81 | Aggregated multi-KO Prize prompt
 - Task attempted: removed the remaining active+Bench and multiple-Bench KO rejection in the persisted attack resolver by aggregating same-attacker knockout prize records into one `choose_knockout_prizes` pending effect/prompt with plural knockout metadata while preserving replacement-Active follow-up for Active KOs.
 - Files changed: updated `lib/prizmo/tcg_engine/mechanics.ex`, this log, and the TCG engine playtest handoff.
