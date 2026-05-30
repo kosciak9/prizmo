@@ -34,6 +34,16 @@ defmodule Prizmo.TcgEngine.AttackDamage do
     end
   end
 
+  defp apply_effect(damage, %CardInstance{} = attacker_card, %CardInstance{} = defender_card, %{
+         type: :bonus_damage_per_benched_pokemon,
+         bonus_damage: bonus_damage
+       })
+       when is_integer(bonus_damage) and bonus_damage >= 0 do
+    with {:ok, benched_pokemon_count} <- benched_pokemon_count(attacker_card, defender_card) do
+      {:ok, damage + bonus_damage * benched_pokemon_count}
+    end
+  end
+
   defp apply_effect(damage, _attacker_card, _defender_card, nil), do: {:ok, damage}
 
   defp apply_effect(damage, _attacker_card, %CardInstance{} = defender_card, %{
@@ -82,6 +92,17 @@ defmodule Prizmo.TcgEngine.AttackDamage do
       {:ok, true}, {:ok, count} -> {:cont, {:ok, count + 1}}
       {:ok, false}, {:ok, count} -> {:cont, {:ok, count}}
       {:error, reason}, _acc -> {:halt, {:error, reason}}
+    end)
+  end
+
+  defp benched_pokemon_count(%CardInstance{game_id: game_id} = attacker_card, defender_card) do
+    [attacker_card.owner_player_id, defender_card.owner_player_id]
+    |> Enum.uniq()
+    |> Enum.reduce_while({:ok, 0}, fn player_id, {:ok, count} ->
+      case CardStore.cards_in_zone(game_id, player_id, :bench) do
+        {:ok, cards} -> {:cont, {:ok, count + length(cards)}}
+        {:error, reason} -> {:halt, {:error, reason}}
+      end
     end)
   end
 end

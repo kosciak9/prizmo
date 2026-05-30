@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-30] iteration 51 | Clefairy bench-count attack effect
+- Task attempted: continued the rejected authored attack-effect inventory and implemented the narrow persisted `:bonus_damage_per_benched_pokemon` slice for Lillie's Clefairy ex `JTG-056` `Full Moon Rondo`, counting both players' Benched Pokémon for the authored bonus damage.
+- Files changed: updated `lib/prizmo/tcg_engine/attack_effects.ex`, `lib/prizmo/tcg_engine/attack_damage.ex`, this log, and the TCG engine playtest handoff.
+- Validation: `mix format && mix compile --warnings-as-errors` passed; Tidewave rollback smoke passed for `JTG-056` `Full Moon Rondo` fetching as executable, surfacing a browser declare-attack affordance, and resolving for 100 damage against Fezandipiti ex with four total Benched Pokémon and no KO; `mix test test/prizmo/tcg_engine/mechanics_test.exs` passed (4 tests); `mix prizmo.cards.coverage` passed; `mix check --no-test` passed.
+- Remaining/blocking notes: no code blocker for Clefairy's bench-count bonus damage path; additional rejected authored attack effects remain and should continue to be enabled one deterministic persisted effect at a time.
+
 ## [2026-05-30] iteration 50 | Rabsca Psychic attack effect
 - Task attempted: inventoried currently rejected authored attack effects in supported deck fixtures and implemented the narrow persisted `:bonus_damage_per_energy_attached_to_defender` slice for Rabsca `TEF-024` `Psychic`, including executable base damage from the authored overlay.
 - Files changed: updated `lib/prizmo/tcg/cards/behaviors/tef.ex`, `lib/prizmo/tcg_engine/attack_damage.ex`, `lib/prizmo/tcg_engine/attack_effects.ex`, this log, and the TCG engine playtest handoff.
