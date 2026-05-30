@@ -26,6 +26,7 @@ defmodule Prizmo.TcgEngine do
       rpc_action :draw_tcg_engine_card_for_turn, :draw_for_turn_command
       rpc_action :skip_tcg_engine_draw_for_turn, :skip_draw_for_turn_command
       rpc_action :open_tcg_engine_action_window, :open_action_window_command
+      rpc_action :play_tcg_engine_card, :play_card_command
     end
   end
 
@@ -58,6 +59,10 @@ defmodule Prizmo.TcgEngine do
         args: [:game_id, :player_id]
 
       define :open_action_window_for_game, action: :open_action_window_command, args: [:game_id]
+
+      define :play_card_for_game,
+        action: :play_card_command,
+        args: [:game_id, :player_id, :card_instance_id]
     end
 
     resource Prizmo.TcgEngine.GameEvent

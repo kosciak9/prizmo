@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-30] iteration 26 | SPA play-card action command
+- Task attempted: exposed the persisted engine's generic `play_card` mechanic as an Ash/RPC command and wired the React SPA legal-actions panel to execute visible `play_card` affordance sources with empty upfront choices, allowing Ultra Ball-style cards to start their prompt flow from the browser.
+- Files changed: added `lib/prizmo/tcg_engine/game/action_commands.ex`; updated `lib/prizmo/tcg_engine.ex`, `lib/prizmo/tcg_engine/game.ex`, `lib/prizmo_web/spa/features/home/routes/index.tsx`, `lib/prizmo_web/spa/lib/ash/client.ts`, generated `lib/prizmo_web/spa/lib/ash/generated/ash_rpc.ts`, this log, and the TCG engine playtest handoff.
+- Validation: `MIX_ENV=test mix run -e ...` play-card command smoke passed by staging Ultra Ball and verifying an awaiting `discard_two_from_hand` prompt; `mix assets.build` passed; `mix test test/prizmo/tcg_engine/mechanics_test.exs` passed (4 tests); initial `mix check --no-test` failed on Credo module length for `Prizmo.TcgEngine.Game`, then passed after extracting the new action into a Spark DSL fragment.
+- Remaining/blocking notes: no blocker; the browser can start the generic play-card prompt flow, but prompt choice submission UI remains pending before Ultra Ball can complete end-to-end from the SPA.
+
 ## [2026-05-30] iteration 25 | Viewer legal action affordances
 - Task attempted: added a viewer-scoped legal action affordance shape to the persisted TCG game-state read model and rendered it in the React SPA shell. Awaiting prompts take precedence; otherwise the active viewer in the action window can see informational affordances for engine-defined card play, benching Basic Pokémon, attaching Energy, and ending the turn.
 - Files changed: added `lib/prizmo/tcg_engine/game_view/action_affordances.ex`; updated `lib/prizmo/tcg_engine/game_view.ex`, `lib/prizmo/tcg_engine/game_view/fields.ex`, `lib/prizmo_web/spa/features/home/routes/index.tsx`, generated `lib/prizmo_web/spa/lib/ash/generated/ash_rpc.ts`, this log, and the TCG engine playtest handoff.

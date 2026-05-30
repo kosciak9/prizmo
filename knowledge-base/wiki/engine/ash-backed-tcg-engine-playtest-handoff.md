@@ -73,16 +73,20 @@ Updated: 2026-05-30
 - Awaiting prompts now surface as `choose_prompt` affordances for the prompted viewer before any other action-window affordance. Otherwise, only the active viewer during `action_window` receives informational command affordances for engine-defined card play, benching Basic Pokémon, attaching Energy, and ending the turn.
 - The SPA now requests `actionAffordances` through `getTcgEngineGameState` and renders a Viewer legal actions panel with source/target/prompt/choice-key counts. These affordances are not execution controls yet.
 - Setup start, opening-hand draw, setup Active choice, setup Bench choice, setup Prize placement, setup completion, first turn start, draw-for-turn, skip-draw, and open-action-window are clickable in the browser shell; action-window affordances are visible, while execution controls for those actions and prompt resolution controls still need UI wiring.
+- Iteration 26 added `Prizmo.TcgEngine.Game.ActionCommands` as an Ash resource fragment for the new `play_card_command`, keeping `Prizmo.TcgEngine.Game` under the Credo module-length limit while exposing generic card play through the existing persisted mechanics layer.
+- `Prizmo.TcgEngine` now exposes `play_card_for_game/3` and AshTypescript RPC `playTcgEngineCard`; the SPA Ash client re-exports it as `runPlayTcgEngineCard`.
+- The Viewer legal actions panel now renders `Play ...` buttons for visible `play_card` source cards and calls the new command with empty upfront choices. This starts Ultra Ball's persisted pending-effect/prompt flow from the browser, then invalidates the viewer-scoped game-state query.
+- Prompt choice submission is still not wired, so the browser can start Ultra Ball's `discard_two_from_hand` prompt but cannot complete the cost/effect choices yet.
 
 ## Last commit
 
-- Baseline entering iteration 25: `3dd05fe feat(spa): wire action window`.
-- This handoff was written before committing iteration 25; expected commit message is `feat(spa): show legal action affordances`.
+- Baseline entering iteration 26: `e3b0a9a feat(spa): show legal action affordances`.
+- This handoff was written before committing iteration 26; expected commit message is `feat(spa): wire generic play-card command`.
 
 ## Remaining tasks
 
 - Decide whether old `Prizmo.Tcg.Sim` tests are kept as historical reference, quarantined, or ported scenario-by-scenario.
-- Build the minimal playable React SPA loop beyond opening the action window: wire execution controls for visible legal action affordances, prompt resolution controls, and two-browser refresh/reconnect validation.
+- Build the minimal playable React SPA loop beyond opening the action window: wire prompt resolution controls, continue execution controls for remaining visible legal action affordances, and run two-browser refresh/reconnect validation.
 - Expand persisted Ash engine mechanics: bench Basic Pokémon, one Energy attachment per turn, evolution timing, retreat/switch, attacks/damage/KO/prizes/replacement Active, turn transitions, and snapshot-backed undo/debug support.
 - Continue migrating executable card behavior into engine-owned definitions with explicit unsupported-behavior tracking.
 - Spike Electric Streams only after the command/read loop has enough event shape to publish safely.
@@ -93,4 +97,4 @@ Updated: 2026-05-30
 
 ## Recommended next atomic task
 
-- Expose and wire the first action-window execution control, preferably starting with engine-owned generic `play_card` so Ultra Ball can create its prompt flow through the SPA; keep prompt choice submission as the next atomic follow-up if needed.
+- Expose and wire prompt choice submission for awaiting prompts, starting with Ultra Ball's `discard_two_from_hand` cost prompt and `search_deck_for_pokemon` effect prompt so the browser can complete the generic play-card flow end-to-end.

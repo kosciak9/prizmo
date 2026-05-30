@@ -13,6 +13,7 @@ import {
   runListSupportedTcgDecks,
   runOpenTcgEngineActionWindow,
   runPlaceTcgEnginePrizes,
+  runPlayTcgEngineCard,
   runSkipTcgEngineDrawForTurn,
   runStartNextTcgEngineTurn,
   runStartTcgEngineSetup,
@@ -198,6 +199,17 @@ type ActionAffordance = {
   note: string | null
 }
 
+type PlayCardInput = {
+  gameId: string
+  playerId: PlayerId
+  cardInstanceId: string
+}
+
+type PlayCardCommand = {
+  playerId: string
+  cardInstanceId: string
+}
+
 type GameState = {
   gameId: string
   viewerPlayerId: string
@@ -345,6 +357,13 @@ export function HomeRoute() {
 
   const openActionWindowMutation = useMutation({
     mutationFn: (gameId: string) => openActionWindow(gameId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['tcg-engine', 'game-state'] })
+    }
+  })
+
+  const playCardMutation = useMutation({
+    mutationFn: (input: PlayCardInput) => playCard(input),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['tcg-engine', 'game-state'] })
     }
@@ -883,6 +902,12 @@ export function HomeRoute() {
                     {errorMessage(openActionWindowMutation.error)}
                   </InlineNotice>
                 ) : null}
+
+                {playCardMutation.error ? (
+                  <InlineNotice tone="error" title="Play card command failed">
+                    {errorMessage(playCardMutation.error)}
+                  </InlineNotice>
+                ) : null}
               </div>
             </Panel>
 
@@ -923,7 +948,20 @@ export function HomeRoute() {
                 {errorMessage(gameStateQuery.error)}
               </InlineNotice>
             ) : gameState ? (
-              <GameStateWorkbench gameState={gameState} deckNamesByKey={deckNamesByKey} />
+              <GameStateWorkbench
+                deckNamesByKey={deckNamesByKey}
+                gameState={gameState}
+                onPlayCard={({ playerId, cardInstanceId }) => {
+                  if (isPlayerId(playerId)) {
+                    playCardMutation.mutate({
+                      gameId: normalisedGameId,
+                      playerId,
+                      cardInstanceId
+                    })
+                  }
+                }}
+                playCardPendingCardId={playCardMutation.isPending ? playCardMutation.variables?.cardInstanceId ?? null : null}
+              />
             ) : null}
           </section>
         </section>
@@ -1130,13 +1168,33 @@ async function openActionWindow(gameId: string): Promise<CreatedGame> {
   return result.data as CreatedGame
 }
 
+async function playCard(input: PlayCardInput): Promise<CreatedGame> {
+  const result = await runPlayTcgEngineCard({
+    input: { ...input, choices: {} },
+    fields: GAME_RESOURCE_FIELDS,
+    headers: buildAshRpcHeaders()
+  })
+
+  if (!result.success) {
+    throw new Error(rpcErrorMessage(result.errors))
+  }
+
+  return result.data as CreatedGame
+}
+
 function GameStateWorkbench({
   gameState,
-  deckNamesByKey
+  deckNamesByKey,
+  onPlayCard,
+  playCardPendingCardId
 }: {
   gameState: GameState
   deckNamesByKey: Map<string, string>
+  onPlayCard: (input: PlayCardCommand) => void
+  playCardPendingCardId: string | null
 }) {
+  const cardsById = useMemo(() => visibleCardsById(gameState), [gameState])
+
   return (
     <div className="space-y-5">
       <Panel
@@ -1165,7 +1223,12 @@ function GameStateWorkbench({
         </div>
       </Panel>
 
-      <ActionAffordancesPanel actions={gameState.actionAffordances} />
+      <ActionAffordancesPanel
+        actions={gameState.actionAffordances}
+        cardsById={cardsById}
+        onPlayCard={onPlayCard}
+        playCardPendingCardId={playCardPendingCardId}
+      />
 
       <div className="grid gap-5 xl:grid-cols-2">
         {gameState.players.map(player => (
@@ -1226,7 +1289,17 @@ function GameStateWorkbench({
   )
 }
 
-function ActionAffordancesPanel({ actions }: { actions: ActionAffordance[] }) {
+function ActionAffordancesPanel({
+  actions,
+  cardsById,
+  onPlayCard,
+  playCardPendingCardId
+}: {
+  actions: ActionAffordance[]
+  cardsById: Map<string, CardSummary>
+  onPlayCard: (input: PlayCardCommand) => void
+  playCardPendingCardId: string | null
+}) {
   return (
     <Panel
       title="Viewer legal actions"
@@ -1259,6 +1332,27 @@ function ActionAffordancesPanel({ actions }: { actions: ActionAffordance[] }) {
                 <ActionCount count={action.promptIds.length} label="prompt" />
                 <ActionCount count={action.choiceKeys.length} label="choice key" />
               </div>
+
+              {action.key === 'play_card' && action.sourceCardInstanceIds.length > 0 ? (
+                <div className="mt-3 space-y-2">
+                  {action.sourceCardInstanceIds.map(cardInstanceId => {
+                    const card = cardsById.get(cardInstanceId)
+                    const isPending = playCardPendingCardId === cardInstanceId
+
+                    return (
+                      <button
+                        className="w-full rounded-xl border border-emerald-700 px-3 py-2 text-left text-sm font-semibold text-emerald-800 transition hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:border-stone-300 disabled:text-stone-400 disabled:hover:bg-transparent"
+                        disabled={Boolean(playCardPendingCardId) || !isPlayerId(action.playerId)}
+                        key={cardInstanceId}
+                        onClick={() => onPlayCard({ playerId: action.playerId, cardInstanceId })}
+                        type="button"
+                      >
+                        {isPending ? `Playing ${card?.name ?? 'card'}...` : `Play ${card?.name ?? formatCardInstanceId(cardInstanceId)}`}
+                      </button>
+                    )
+                  })}
+                </div>
+              ) : null}
             </li>
           ))}
         </ul>
@@ -1590,6 +1684,30 @@ function actionKey(action: ActionAffordance) {
     ...action.promptIds,
     ...action.choiceKeys
   ].join(':')
+}
+
+function visibleCardsById(gameState: GameState) {
+  const cards = new Map<string, CardSummary>()
+
+  for (const player of gameState.players) {
+    if (player.active) {
+      cards.set(player.active.id, player.active)
+    }
+
+    for (const card of [...player.bench, ...player.hand, ...player.discard]) {
+      cards.set(card.id, card)
+    }
+  }
+
+  if (gameState.stadium) {
+    cards.set(gameState.stadium.id, gameState.stadium)
+  }
+
+  return cards
+}
+
+function formatCardInstanceId(cardInstanceId: string) {
+  return `card ${cardInstanceId.slice(0, 8)}`
 }
 
 function rpcErrorMessage(errors: RpcError[] = []) {

@@ -4,6 +4,7 @@ defmodule Prizmo.TcgEngine.Game do
   use Ash.Resource,
     otp_app: :prizmo,
     domain: Prizmo.TcgEngine,
+    fragments: [Prizmo.TcgEngine.Game.ActionCommands],
     data_layer: AshPostgres.DataLayer,
     authorizers: [Ash.Policy.Authorizer],
     extensions: [AshStateMachine, AshTypescript.Resource]
@@ -63,6 +64,7 @@ defmodule Prizmo.TcgEngine.Game do
     define :draw_for_turn_command, args: [:game_id, :player_id]
     define :skip_draw_for_turn_command, args: [:game_id, :player_id]
     define :open_action_window_command, args: [:game_id]
+    define :play_card_command, args: [:game_id, :player_id, :card_instance_id]
     define :start_setup
     define :complete_setup
     define :finish
