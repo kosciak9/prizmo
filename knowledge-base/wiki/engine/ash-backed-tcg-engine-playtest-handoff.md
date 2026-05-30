@@ -126,17 +126,22 @@ Updated: 2026-05-30
 - Iteration 41 added `Prizmo.TcgEngine.AttackEffects` as the explicit support list for persisted attack effect execution.
 - `Prizmo.TcgEngine.CardCatalog.fetch_attack/2` now rejects authored attacks whose effect type is not supported by the persisted attack resolver, returning `{:unsupported_attack_effect, card_id, attack_id, effect_type}` instead of allowing declaration and silently no-oping the effect.
 - `Prizmo.TcgEngine.AttackDamage.damage_for/3` now defensively errors on unknown non-nil effects; the currently supported effectful attack remains `PFL-014` Moltres `Fighting Wings` with `:bonus_damage_if_defender_pokemon_ex`, and no-effect damage attacks like `TWM-128` Dreepy `Petty Grudge` remain executable.
+- Iteration 42 implemented persisted support for authored `:switch_self_with_bench` attack effects.
+- `Prizmo.TcgEngine.AttackEffects` now resolves after-damage effects and can switch the attacking Active Pokémon with a requested Benched Pokémon, using the same active/bench movement semantics as manual switch/retreat without marking the player as retreated.
+- `Prizmo.TcgEngine.AttackDamage.damage_for/3` treats `:switch_self_with_bench` as a non-damage modifier, while `Prizmo.TcgEngine.CardCatalog.fetch_attack/2` now accepts `PFL-083` `Run Around` and `JTG-120` `Trading Places` as executable attacks.
+- `Prizmo.TcgEngine.Mechanics.resolve_declared_attack/3` accepts an optional `:switch_bench_card_instance_id`; if omitted, no-Bench attacks no-op and exactly-one-Bench attacks switch implicitly, while multiple Benched Pokémon return `:switch_self_with_bench_requires_target` instead of choosing silently.
+- The Ash/RPC `resolveTcgEngineDeclaredAttack` input now includes optional `switchBenchCardInstanceId`, generated in `lib/prizmo_web/spa/lib/ash/generated/ash_rpc.ts`; the React shell does not yet render a dedicated attack-effect target chooser.
 
 ## Last commit
 
-- Baseline entering iteration 41: `b0fc9c3 fix(tcg-engine): reject unsupported attack declarations`.
-- This handoff was written before committing iteration 41; expected commit message is `fix(tcg-engine): reject unsupported attack effects`.
+- Baseline entering iteration 42: `63808c6 fix(tcg-engine): reject unsupported attack effects`.
+- This handoff was written before committing iteration 42; expected commit message is `feat(tcg-engine): resolve switch-self attack effects`.
 
 ## Remaining tasks
 
 - Decide whether old `Prizmo.Tcg.Sim` tests are kept as historical reference, quarantined, or ported scenario-by-scenario.
 - Build the minimal playable React SPA loop beyond prompt resolution, Bench commands, Attach Energy, attached-card board visibility, Retreat, paid attack declaration, static/executable attack resolution and finish controls, End Turn, next-turn progression, deterministic playtest fixture order, hardened tab-scoped viewer identity, and reduced prompt/action debug noise: rerun the full two-browser/manual-tester playtest milestone only after the validation harness can guarantee separate browser contexts, then address any remaining command-loop gaps it exposes.
-- Expand persisted Ash engine mechanics: implement explicit support for one rejected authored attack effect at a time beyond Moltres's Pokémon ex bonus, damage/KO/prizes/replacement Active, switch effects, evolution UI/RPC wiring, turn transitions, and snapshot-backed undo/debug support.
+- Expand persisted Ash engine mechanics: implement explicit support for one rejected authored attack effect at a time beyond Moltres's Pokémon ex bonus and switch-self effects, damage/KO/prizes/replacement Active, evolution UI/RPC wiring, turn transitions, and snapshot-backed undo/debug support.
 - Continue migrating executable card behavior into engine-owned definitions with explicit unsupported-behavior tracking.
 - Spike Electric Streams only after the command/read loop has enough event shape to publish safely.
 
@@ -144,8 +149,9 @@ Updated: 2026-05-30
 
 - No known code blocker after the iteration 33 viewer hardening, isolated-context playtest pass, iteration 34 action/prompt clarity pass, iteration 35 retreat command pass, iteration 36 attached-card visibility pass, iteration 37 paid attack declaration pass, iteration 38 static/executable attack resolution/finish pass, iteration 39 Moltres `Fighting Wings` behavior pass, iteration 40 unsupported attack declaration guard, and iteration 41 unsupported authored-effect guard.
 - Raw printed attacks with missing authored behavior and authored attacks with unsupported effect types are hidden/rejected before declaration; new attack-effect slices should opt into `Prizmo.TcgEngine.AttackEffects` only when persisted resolution semantics are implemented.
+- Switch-self attacks are executable, but when the attacking player has multiple Benched Pokémon, attack resolution requires an explicit `switch_bench_card_instance_id`; the current React attack-resolution panel does not yet expose that target choice.
 - Validation blocker: the available manual-tester subagents still appear to share/contend over one browser/session, so their reported viewer flips are not reliable proof of independent-browser behavior. The documented manual-tester milestone needs a harness that guarantees separate browser contexts before it can be marked formally complete.
 
 ## Recommended next atomic task
 
-- Implement one explicit persisted attack effect from the now-rejected authored set, preferably `:switch_self_with_bench` for `PFL-083`/`JTG-120` because it exercises the existing switch/retreat-style board movement path without introducing damage math.
+- Add a minimal React attack-resolution target chooser for attacks that need `switchBenchCardInstanceId`, reusing visible Active/Bench cards so `Run Around` / `Trading Places` can resolve from the browser when multiple Bench targets are available.

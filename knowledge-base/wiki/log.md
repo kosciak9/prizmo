@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-30] iteration 42 | Switch-self attack effect
+- Task attempted: implemented the persisted `:switch_self_with_bench` attack effect so authored Buneary `Run Around` and Dunsparce `Trading Places` attacks are executable instead of catalog-rejected, with optional RPC target input for callers that need to choose among multiple Benched Pokémon.
+- Files changed: updated `lib/prizmo/tcg_engine/attack_effects.ex`, `lib/prizmo/tcg_engine/attack_damage.ex`, `lib/prizmo/tcg_engine/mechanics.ex`, `lib/prizmo/tcg_engine/game/action_commands.ex`, generated `lib/prizmo_web/spa/lib/ash/generated/ash_rpc.ts`, this log, and the TCG engine playtest handoff.
+- Validation: initial Tidewave rollback smoke exposed a staging mistake that attached a non-provider Special Energy; rerun smoke passed with provider Energy, verifying `PFL-083` `run_around` and `JTG-120` `trading_places` fetch as executable, `Run Around` resolves to `attack_resolving`, and the attacking Active swaps with the requested Bench target; `mix test test/prizmo/tcg_engine/mechanics_test.exs` passed (4 tests); `mix ash_typescript.codegen --check` passed; `mix assets.build` passed; `git diff --check` passed; `mix check --no-test` passed.
+- Remaining/blocking notes: no code blocker for the switch-self effect; if callers omit a switch target with multiple Benched Pokémon, resolution now fails explicitly with `:switch_self_with_bench_requires_target`, so a future UI slice should expose target choice during attack resolution before broad playtesting of multi-Bench switch attacks.
+
 ## [2026-05-30] iteration 41 | Unsupported authored attack effects
 - Task attempted: tightened executable attack behavior so authored attack effects are only considered playable when the persisted attack resolver explicitly supports their effect type, preventing unsupported authored effects from entering `attack_declared` as silent no-ops.
 - Files changed: added `lib/prizmo/tcg_engine/attack_effects.ex`; updated `lib/prizmo/tcg_engine/card_catalog.ex`, `lib/prizmo/tcg_engine/attack_damage.ex`, this log, and the TCG engine playtest handoff.

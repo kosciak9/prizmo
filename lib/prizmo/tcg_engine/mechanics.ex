@@ -69,6 +69,7 @@ defmodule Prizmo.TcgEngine.Mechanics do
   import Prizmo.TcgEngine.TurnStore, only: [current_turn: 1]
 
   alias Prizmo.TcgEngine.AttackDamage
+  alias Prizmo.TcgEngine.AttackEffects
   alias Prizmo.TcgEngine.CardCatalog
   alias Prizmo.TcgEngine.CardPlay
   alias Prizmo.TcgEngine.Cards.Registry, as: EngineCardRegistry
@@ -954,7 +955,12 @@ defmodule Prizmo.TcgEngine.Mechanics do
 
   @spec resolve_declared_attack(Game.t() | String.t(), String.t()) ::
           {:ok, Game.t()} | {:error, term()}
-  def resolve_declared_attack(game_or_id, player_id) when is_binary(player_id) do
+  @spec resolve_declared_attack(Game.t() | String.t(), String.t(), map()) ::
+          {:ok, Game.t()} | {:error, term()}
+  def resolve_declared_attack(game_or_id, player_id, opts \\ %{})
+
+  def resolve_declared_attack(game_or_id, player_id, opts)
+      when is_binary(player_id) and is_map(opts) do
     transaction(fn ->
       with {:ok, game} <- get_game(game_or_id),
            :ok <- require_game_status(game, :in_progress),
@@ -971,15 +977,25 @@ defmodule Prizmo.TcgEngine.Mechanics do
              apply_attack_damage(game.id, player_id, defender_card, damage),
            {:ok, game} <-
              maybe_finish_for_empty_board(game, player_id, defender_card.owner_player_id),
+           {:ok, effect_payload} <-
+             AttackEffects.resolve_after_damage(game.id, player_id, attacker_card, attack, opts),
            {:ok, event} <-
-             write_event(game, :resolve_declared_attack, player_id, %{
-               turn_id: turn.id,
-               attack_id: Atom.to_string(turn.pending_attack_id),
-               defender_card_instance_id: defender_card.id,
-               damage: damage_result.damage,
-               resulting_damage: damage_result.resulting_damage,
-               knocked_out?: damage_result.knocked_out?
-             }),
+             write_event(
+               game,
+               :resolve_declared_attack,
+               player_id,
+               Map.merge(
+                 %{
+                   turn_id: turn.id,
+                   attack_id: Atom.to_string(turn.pending_attack_id),
+                   defender_card_instance_id: defender_card.id,
+                   damage: damage_result.damage,
+                   resulting_damage: damage_result.resulting_damage,
+                   knocked_out?: damage_result.knocked_out?
+                 },
+                 effect_payload
+               )
+             ),
            {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do
         get_game(game.id)
       end

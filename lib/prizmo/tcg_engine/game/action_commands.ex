@@ -185,8 +185,14 @@ defmodule Prizmo.TcgEngine.Game.ActionCommands do
         allow_nil? false
       end
 
+      argument :switch_bench_card_instance_id, :uuid do
+        allow_nil? true
+      end
+
       run fn input, _context ->
-        Mechanics.resolve_declared_attack(input.arguments.game_id, input.arguments.player_id)
+        Mechanics.resolve_declared_attack(input.arguments.game_id, input.arguments.player_id, %{
+          switch_bench_card_instance_id: input.arguments.switch_bench_card_instance_id
+        })
       end
     end
 

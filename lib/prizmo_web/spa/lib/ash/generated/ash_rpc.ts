@@ -975,6 +975,7 @@ export async function playTcgEngineCard<Fields extends PlayTcgEngineCardFields |
 export type ResolveTcgEngineDeclaredAttackInput = {
   gameId: UUID;
   playerId: string;
+  switchBenchCardInstanceId?: UUID | null;
 };
 
 export type ResolveTcgEngineDeclaredAttackFields = UnifiedFieldSelection<TcgEngineGameResourceSchema>[];
