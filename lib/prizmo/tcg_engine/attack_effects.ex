@@ -31,6 +31,7 @@ defmodule Prizmo.TcgEngine.AttackEffects do
     :bonus_damage_per_energy_attached_to_both_active,
     :bonus_damage_per_energy_attached_to_defender,
     :attacker_cannot_attack_next_turn,
+    :confuse_defender_active,
     :damage_unaffected_by_effects_on_opponent_active,
     :damage_only_if_stadium_in_play,
     :discard_hand_then_draw,
@@ -55,9 +56,23 @@ defmodule Prizmo.TcgEngine.AttackEffects do
   def type(%{type: effect_type}), do: effect_type
   def type(effect), do: effect
 
-  @spec resolve_after_damage(String.t(), String.t(), CardInstance.t(), map(), map()) ::
+  @spec resolve_after_damage(
+          String.t(),
+          String.t(),
+          CardInstance.t(),
+          CardInstance.t(),
+          map(),
+          map()
+        ) ::
           {:ok, map()} | {:error, term()}
-  def resolve_after_damage(game_id, player_id, %CardInstance{} = attacker_card, attack, opts)
+  def resolve_after_damage(
+        game_id,
+        player_id,
+        %CardInstance{} = attacker_card,
+        %CardInstance{} = defender_card,
+        attack,
+        opts
+      )
       when is_binary(game_id) and is_binary(player_id) and is_map(attack) and is_map(opts) do
     case Map.get(attack, :effect) do
       %{type: :switch_self_with_bench} ->
@@ -83,6 +98,9 @@ defmodule Prizmo.TcgEngine.AttackEffects do
 
       %{type: :attacker_cannot_attack_next_turn} ->
         attacker_cannot_attack_next_turn(game_id, attacker_card)
+
+      %{type: :confuse_defender_active} ->
+        set_defender_status(game_id, defender_card, :confused)
 
       %{type: :damage_per_own_benched_pokemon} ->
         {:ok, %{}}
@@ -159,6 +177,33 @@ defmodule Prizmo.TcgEngine.AttackEffects do
          cannot_attack_card_instance_id: attacker_card.id,
          blocked_turn_number: turn.turn_number + 2
        }}
+    end
+  end
+
+  defp set_defender_status(game_id, %CardInstance{} = defender_card, status) do
+    with {:ok, current_defender_card} <- get_card(game_id, defender_card.id) do
+      case current_defender_card.zone do
+        :active ->
+          with {:ok, _defender_card} <-
+                 update(current_defender_card, :set_status, %{status: status}) do
+            {:ok,
+             %{
+               effect_type: "confuse_defender_active",
+               defender_status: Atom.to_string(status),
+               defender_status_applied?: true,
+               defender_status_card_instance_id: current_defender_card.id
+             }}
+          end
+
+        _other_zone ->
+          {:ok,
+           %{
+             effect_type: "confuse_defender_active",
+             defender_status: Atom.to_string(status),
+             defender_status_applied?: false,
+             defender_status_card_instance_id: defender_card.id
+           }}
+      end
     end
   end
 

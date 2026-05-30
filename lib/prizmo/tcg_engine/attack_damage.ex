@@ -155,6 +155,9 @@ defmodule Prizmo.TcgEngine.AttackDamage do
          type: :attacker_cannot_attack_next_turn
        }), do: {:ok, damage}
 
+  defp apply_effect(damage, _attacker_card, _defender_card, %{type: :confuse_defender_active}),
+    do: {:ok, damage}
+
   defp apply_effect(damage, _attacker_card, _defender_card, %{type: :self_damage}),
     do: {:ok, damage}
 

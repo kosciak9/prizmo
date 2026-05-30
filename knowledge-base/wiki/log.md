@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-30] iteration 64 | Munkidori confuse attack effect
+- Task attempted: continued the rejected authored attack-effect inventory and implemented the narrow persisted `:confuse_defender_active` slice for Munkidori `TWM-095` `Mind Bend`, preserving its 60 defender damage while setting the surviving defender Active Pokémon's status to Confused.
+- Files changed: updated `lib/prizmo/tcg/cards/behaviors/twm.ex`, `lib/prizmo/tcg_engine/attack_effects.ex`, `lib/prizmo/tcg_engine/attack_damage.ex`, `lib/prizmo/tcg_engine/mechanics.ex`, this log, and the TCG engine playtest handoff.
+- Validation: `mix format && mix compile --warnings-as-errors` passed; `mix test test/prizmo/tcg_engine/mechanics_test.exs` passed (4 tests); Tidewave rollback smoke passed for `TWM-095` `Mind Bend` fetching as executable, surfacing a browser `declare_attack` affordance, resolving for 60 damage against Fezandipiti ex, persisting defender status `:confused`, recording `effect_type: "confuse_defender_active"`, and showing `"confused"` in the game view; `mix prizmo.cards.coverage` passed; `mix check --no-test` passed.
+- Remaining/blocking notes: no code blocker for Munkidori's confuse-defender path; additional rejected authored attack effects remain and should continue to be enabled one deterministic persisted effect at a time.
+
 ## [2026-05-30] iteration 63 | Next-turn attack lock effect
 - Task attempted: continued the rejected authored attack-effect inventory and implemented the deterministic persisted `:attacker_cannot_attack_next_turn` slice for Latias ex `SSP-076` `Eon Blade` and Iron Leaves ex `TEF-025` `Prism Edge`, storing an expiring card marker and enforcing it at both attack declaration and viewer affordance generation.
 - Files changed: added `lib/prizmo/tcg_engine/attack_locks.ex`; updated `lib/prizmo/tcg_engine/attack_effects.ex`, `lib/prizmo/tcg_engine/attack_damage.ex`, `lib/prizmo/tcg_engine/card_instance.ex`, `lib/prizmo/tcg_engine/requirements.ex`, `lib/prizmo/tcg_engine/mechanics.ex`, `lib/prizmo/tcg_engine/game_view/action_affordances.ex`, this log, and the TCG engine playtest handoff.

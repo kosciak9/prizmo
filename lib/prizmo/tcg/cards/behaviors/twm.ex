@@ -74,6 +74,10 @@ defmodule Prizmo.Tcg.Cards.Behaviors.TWM do
     attack(:beam, effect: nil)
   end
 
+  card "TWM-095" do
+    attack(:mind_bend, effect: %{type: :confuse_defender_active})
+  end
+
   card "TWM-126" do
     attack(:find_a_friend,
       damage: 0,

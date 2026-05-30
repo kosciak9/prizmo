@@ -1103,7 +1103,14 @@ defmodule Prizmo.TcgEngine.Mechanics do
            {:ok, damage_result} <-
              apply_attack_damage(game.id, player_id, defender_card, damage),
            {:ok, effect_payload} <-
-             AttackEffects.resolve_after_damage(game.id, player_id, attacker_card, attack, opts),
+             AttackEffects.resolve_after_damage(
+               game.id,
+               player_id,
+               attacker_card,
+               defender_card,
+               attack,
+               opts
+             ),
            {:ok, event} <-
              write_event(
                game,
