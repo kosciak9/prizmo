@@ -248,6 +248,48 @@ type ActionAffordance = {
   note: string | null
 }
 
+type CommandErrorNotice = {
+  title: string
+  message: string
+}
+
+type ActionGroupId = 'required' | 'hand' | 'battle' | 'turn' | 'other'
+
+type ActionGroup = {
+  id: ActionGroupId
+  title: string
+  description: string
+  actions: ActionAffordance[]
+}
+
+const ACTION_GROUPS: Array<Omit<ActionGroup, 'actions'>> = [
+  {
+    id: 'required',
+    title: 'Required choices',
+    description: 'Resolve forced choices before the game can advance.'
+  },
+  {
+    id: 'hand',
+    title: 'Hand and board',
+    description: 'Play cards from hand, evolve Pokémon, and attach Energy.'
+  },
+  {
+    id: 'battle',
+    title: 'Battle decisions',
+    description: 'Retreat or declare a paid attack with the Active Pokémon.'
+  },
+  {
+    id: 'turn',
+    title: 'Turn flow',
+    description: 'Pass priority back to the engine when this turn is done.'
+  },
+  {
+    id: 'other',
+    title: 'Other engine actions',
+    description: 'Additional engine commands exposed by the current state.'
+  }
+]
+
 type AttackCopyChoice = {
   attackId: string
   attackName: string
@@ -727,6 +769,19 @@ export function HomeRoute() {
     !drawForTurnMutation.isPending &&
     !skipDrawForTurnMutation.isPending &&
     !openActionWindowMutation.isPending
+  const promptCommandError = commandErrorNotice(choosePromptMutation.error, 'Prompt choice failed')
+  const attackCommandError =
+    commandErrorNotice(resolveDeclaredAttackMutation.error, 'Attack resolution failed') ??
+    commandErrorNotice(finishAttackMutation.error, 'Finish attack failed')
+  const actionCommandError =
+    commandErrorNotice(playCardMutation.error, 'Play card failed') ??
+    commandErrorNotice(playBasicToBenchMutation.error, 'Bench Basic failed') ??
+    commandErrorNotice(evolveFromHandMutation.error, 'Evolution failed') ??
+    commandErrorNotice(attachEnergyMutation.error, 'Attach Energy failed') ??
+    commandErrorNotice(retreatMutation.error, 'Retreat failed') ??
+    commandErrorNotice(declareAttackMutation.error, 'Attack declaration failed') ??
+    commandErrorNotice(chooseReplacementActiveMutation.error, 'Replacement Active failed') ??
+    commandErrorNotice(endTurnMutation.error, 'End turn failed')
 
   function updateSession(updater: (currentSession: PlaytestSession) => PlaytestSession) {
     setSession(currentSession => updater(currentSession))
@@ -1189,72 +1244,6 @@ export function HomeRoute() {
                     {errorMessage(openActionWindowMutation.error)}
                   </InlineNotice>
                 ) : null}
-
-                {playCardMutation.error ? (
-                  <InlineNotice tone="error" title="Play card command failed">
-                    {errorMessage(playCardMutation.error)}
-                  </InlineNotice>
-                ) : null}
-
-                {playBasicToBenchMutation.error ? (
-                  <InlineNotice tone="error" title="Bench Basic command failed">
-                    {errorMessage(playBasicToBenchMutation.error)}
-                  </InlineNotice>
-                ) : null}
-
-                {evolveFromHandMutation.error ? (
-                  <InlineNotice tone="error" title="Evolution command failed">
-                    {errorMessage(evolveFromHandMutation.error)}
-                  </InlineNotice>
-                ) : null}
-
-                {attachEnergyMutation.error ? (
-                  <InlineNotice tone="error" title="Attach Energy command failed">
-                    {errorMessage(attachEnergyMutation.error)}
-                  </InlineNotice>
-                ) : null}
-
-                {endTurnMutation.error ? (
-                  <InlineNotice tone="error" title="End turn command failed">
-                    {errorMessage(endTurnMutation.error)}
-                  </InlineNotice>
-                ) : null}
-
-                {retreatMutation.error ? (
-                  <InlineNotice tone="error" title="Retreat command failed">
-                    {errorMessage(retreatMutation.error)}
-                  </InlineNotice>
-                ) : null}
-
-                {declareAttackMutation.error ? (
-                  <InlineNotice tone="error" title="Attack declaration command failed">
-                    {errorMessage(declareAttackMutation.error)}
-                  </InlineNotice>
-                ) : null}
-
-                {resolveDeclaredAttackMutation.error ? (
-                  <InlineNotice tone="error" title="Attack resolution command failed">
-                    {errorMessage(resolveDeclaredAttackMutation.error)}
-                  </InlineNotice>
-                ) : null}
-
-                {finishAttackMutation.error ? (
-                  <InlineNotice tone="error" title="Finish attack command failed">
-                    {errorMessage(finishAttackMutation.error)}
-                  </InlineNotice>
-                ) : null}
-
-                {chooseReplacementActiveMutation.error ? (
-                  <InlineNotice tone="error" title="Replacement Active command failed">
-                    {errorMessage(chooseReplacementActiveMutation.error)}
-                  </InlineNotice>
-                ) : null}
-
-                {choosePromptMutation.error ? (
-                  <InlineNotice tone="error" title="Prompt choice command failed">
-                    {errorMessage(choosePromptMutation.error)}
-                  </InlineNotice>
-                ) : null}
               </div>
             </Panel>
 
@@ -1301,8 +1290,11 @@ export function HomeRoute() {
               </InlineNotice>
             ) : gameState ? (
               <GameStateWorkbench
+                actionCommandError={actionCommandError}
+                attackCommandError={attackCommandError}
                 deckNamesByKey={deckNamesByKey}
                 gameState={gameState}
+                promptCommandError={promptCommandError}
                 viewerPlayerId={session.viewerPlayerId}
                 onChooseReplacementActive={({ playerId, benchCardInstanceId }) => {
                   if (isPlayerId(playerId)) {
@@ -1369,7 +1361,8 @@ export function HomeRoute() {
                   benchDamageTargetCardInstanceId,
                   benchDamageCounterAllocations,
                   coinResult,
-                  headsCount
+                  headsCount,
+                  copiedAttackId
                 }) => {
                   if (isPlayerId(playerId)) {
                     resolveDeclaredAttackMutation.mutate({
@@ -1382,7 +1375,8 @@ export function HomeRoute() {
                       benchDamageTargetCardInstanceId,
                       benchDamageCounterAllocations,
                       coinResult,
-                      headsCount
+                      headsCount,
+                      copiedAttackId
                     })
                   }
                 }}
@@ -1832,9 +1826,12 @@ async function choosePrompt(input: ChoosePromptInput): Promise<CreatedGame> {
 }
 
 function GameStateWorkbench({
+  actionCommandError,
+  attackCommandError,
   gameState,
   viewerPlayerId,
   deckNamesByKey,
+  promptCommandError,
   onChoosePrompt,
   onChooseReplacementActive,
   onAttachEnergy,
@@ -1858,9 +1855,12 @@ function GameStateWorkbench({
   resolveDeclaredAttackPendingPlayerId,
   retreatPendingKey
 }: {
+  actionCommandError: CommandErrorNotice | null
+  attackCommandError: CommandErrorNotice | null
   gameState: GameState
   viewerPlayerId: PlayerId
   deckNamesByKey: Map<string, string>
+  promptCommandError: CommandErrorNotice | null
   onChoosePrompt: (input: ChoosePromptCommand) => void
   onChooseReplacementActive: (input: ChooseReplacementActiveCommand) => void
   onAttachEnergy: (input: AttachEnergyCommand) => void
@@ -1927,6 +1927,7 @@ function GameStateWorkbench({
         <aside className="space-y-5 xl:sticky xl:top-6" aria-label="Player command rail">
           <ViewerPromptsPanel
             cardsById={cardsById}
+            commandError={promptCommandError}
             onChoosePrompt={onChoosePrompt}
             promptPendingId={promptPendingId}
             prompts={gameState.prompts}
@@ -1934,6 +1935,7 @@ function GameStateWorkbench({
 
           <AttackProgressPanel
             cardsById={cardsById}
+            commandError={attackCommandError}
             finishAttackPendingPlayerId={finishAttackPendingPlayerId}
             gameState={gameState}
             onFinishAttack={onFinishAttack}
@@ -1945,6 +1947,7 @@ function GameStateWorkbench({
           <ActionAffordancesPanel
             actions={gameState.actionAffordances}
             cardsById={cardsById}
+            commandError={actionCommandError}
             chooseReplacementActivePendingCardId={chooseReplacementActivePendingCardId}
             onAttachEnergy={onAttachEnergy}
             onChooseReplacementActive={onChooseReplacementActive}
@@ -1996,35 +1999,41 @@ function GameStateWorkbench({
 
 function ViewerPromptsPanel({
   cardsById,
+  commandError,
   onChoosePrompt,
   promptPendingId,
   prompts
 }: {
   cardsById: Map<string, CardSummary>
+  commandError: CommandErrorNotice | null
   onChoosePrompt: (input: ChoosePromptCommand) => void
   promptPendingId: string | null
   prompts: GameState['prompts']
 }) {
   return (
     <Panel title="Viewer prompts">
-      {prompts.length > 0 ? (
-        <div className="space-y-3">
-          {prompts.map(prompt => (
-            <PromptChoiceCard
-              cardsById={cardsById}
-              isPending={promptPendingId === prompt.id}
-              key={prompt.id}
-              onChoosePrompt={onChoosePrompt}
-              prompt={prompt}
-              promptPendingId={promptPendingId}
-            />
-          ))}
-        </div>
-      ) : (
-        <EmptyState title="No prompt is awaiting this viewer">
-          Pending card effects will appear here with selectable legal choices.
-        </EmptyState>
-      )}
+      <div className="space-y-3">
+        {commandError ? <InlineNotice tone="error" title={commandError.title}>{commandError.message}</InlineNotice> : null}
+
+        {prompts.length > 0 ? (
+          <div className="space-y-3">
+            {prompts.map(prompt => (
+              <PromptChoiceCard
+                cardsById={cardsById}
+                isPending={promptPendingId === prompt.id}
+                key={prompt.id}
+                onChoosePrompt={onChoosePrompt}
+                prompt={prompt}
+                promptPendingId={promptPendingId}
+              />
+            ))}
+          </div>
+        ) : (
+          <EmptyState title="No prompt is awaiting this viewer">
+            Cost, search, and Prize prompts appear here only for the player who must choose.
+          </EmptyState>
+        )}
+      </div>
     </Panel>
   )
 }
@@ -2157,6 +2166,7 @@ function PromptChoiceCard({
 
 function AttackProgressPanel({
   cardsById,
+  commandError,
   finishAttackPendingPlayerId,
   gameState,
   onFinishAttack,
@@ -2165,6 +2175,7 @@ function AttackProgressPanel({
   viewerPlayerId
 }: {
   cardsById: Map<string, CardSummary>
+  commandError: CommandErrorNotice | null
   finishAttackPendingPlayerId: string | null
   gameState: GameState
   onFinishAttack: (input: FinishAttackCommand) => void
@@ -2565,6 +2576,8 @@ function AttackProgressPanel({
           Resolve applies the declared attack's currently executable damage/effect behavior. Finish closes the
           attack and ends the turn after resolution.
         </p>
+
+        {commandError ? <InlineNotice tone="error" title={commandError.title}>{commandError.message}</InlineNotice> : null}
 
         {turn.pendingAttackRequiresCopiedAttack ? (
           <div className="rounded-xl border border-cyan-200 bg-cyan-50/70 p-3">
@@ -3082,6 +3095,7 @@ function AttackProgressPanel({
 function ActionAffordancesPanel({
   actions,
   cardsById,
+  commandError,
   chooseReplacementActivePendingCardId,
   onAttachEnergy,
   onChooseReplacementActive,
@@ -3101,6 +3115,7 @@ function ActionAffordancesPanel({
 }: {
   actions: ActionAffordance[]
   cardsById: Map<string, CardSummary>
+  commandError: CommandErrorNotice | null
   chooseReplacementActivePendingCardId: string | null
   onAttachEnergy: (input: AttachEnergyCommand) => void
   onChooseReplacementActive: (input: ChooseReplacementActiveCommand) => void
@@ -3128,15 +3143,31 @@ function ActionAffordancesPanel({
       evolveFromHandPendingKey ||
       retreatPendingKey
   )
+  const actionGroups = useMemo(() => groupActionAffordances(actions), [actions])
 
   return (
     <Panel
-      title="Viewer legal actions"
+      title="Available actions"
       trailing={<StatusBadge tone={actions.length > 0 ? 'active' : 'neutral'}>{actions.length}</StatusBadge>}
     >
-      {actions.length > 0 ? (
-        <ul className="space-y-2">
-          {actions.map(action => (
+      <div className="space-y-4">
+        {commandError ? <InlineNotice tone="error" title={commandError.title}>{commandError.message}</InlineNotice> : null}
+
+        {actionGroups.length > 0 ? (
+          actionGroups.map(group => (
+            <section className="space-y-2" key={group.id}>
+              <div className="flex items-start justify-between gap-3 px-1">
+                <div>
+                  <h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">
+                    {group.title}
+                  </h3>
+                  <p className="mt-1 text-xs leading-5 text-stone-500">{group.description}</p>
+                </div>
+                <StatusBadge tone={group.id === 'required' ? 'warning' : 'neutral'}>{group.actions.length}</StatusBadge>
+              </div>
+
+              <ul className="space-y-2">
+                {group.actions.map(action => (
             <li
               className="rounded-xl border border-stone-200 bg-stone-50 px-3 py-3 text-sm"
               key={actionKey(action)}
@@ -3379,14 +3410,17 @@ function ActionAffordancesPanel({
                 </button>
               ) : null}
             </li>
-          ))}
-        </ul>
-      ) : (
-        <EmptyState title="No viewer action available">
-          Action window commands appear for the active viewer. Prompt choices and replacement Active choices
-          appear when pending effects or knockouts ask this player to choose.
-        </EmptyState>
-      )}
+                ))}
+              </ul>
+            </section>
+          ))
+        ) : (
+          <EmptyState title="No viewer action available">
+            Turn commands appear here for the active viewer. Prompts and forced replacement choices appear when the
+            engine asks this player to choose.
+          </EmptyState>
+        )}
+      </div>
     </Panel>
   )
 }
@@ -3412,6 +3446,43 @@ function actionHasMetadata(action: ActionAffordance) {
     action.promptIds.length > 0 ||
     action.choiceKeys.length > 0
   )
+}
+
+function groupActionAffordances(actions: ActionAffordance[]): ActionGroup[] {
+  const groupedActions = new Map<ActionGroupId, ActionAffordance[]>()
+
+  for (const action of actions) {
+    const groupId = actionGroupId(action)
+    const groupActions = groupedActions.get(groupId) ?? []
+
+    groupActions.push(action)
+    groupedActions.set(groupId, groupActions)
+  }
+
+  return ACTION_GROUPS.map(group => ({
+    ...group,
+    actions: groupedActions.get(group.id) ?? []
+  })).filter(group => group.actions.length > 0)
+}
+
+function actionGroupId(action: ActionAffordance): ActionGroupId {
+  switch (action.key) {
+    case 'choose_prompt':
+    case 'choose_replacement_active':
+      return 'required'
+    case 'play_card':
+    case 'play_basic_to_bench':
+    case 'evolve_from_hand':
+    case 'attach_energy':
+      return 'hand'
+    case 'retreat':
+    case 'declare_attack':
+      return 'battle'
+    case 'end_turn':
+      return 'turn'
+    default:
+      return 'other'
+  }
 }
 
 function BattlefieldPanel({
@@ -4181,6 +4252,14 @@ function errorMessage(error: unknown) {
   }
 
   return String(error)
+}
+
+function commandErrorNotice(error: unknown, title: string): CommandErrorNotice | null {
+  if (!error) {
+    return null
+  }
+
+  return { title, message: errorMessage(error) }
 }
 
 function formatPlayerId(playerId: string) {

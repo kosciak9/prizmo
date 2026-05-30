@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-31] iteration 87 | Command rail action grouping
+- Task attempted: continued the Web UI polish pass by grouping legal actions inside the player command rail by intent, moving prompt/attack/action command errors next to their rail controls, tightening prompt/action empty copy, and preserving the copied-attack selection when resolving Gemstone Mimicry-style attacks from the browser.
+- Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.
+- Validation: `mix format && mix assets.build` passed; browser smoke on `http://localhost:4003` switched an existing local game to Player 2, opened the action window, and confirmed grouped `Hand and board` plus `Turn flow` command sections with collapsed action metadata and no browser warnings or errors; `mix check --no-test` passed.
+- Remaining/blocking notes: no code blocker for this command-surface clarity slice. Further Web UI polish should refine action row density, card/action affordance surfaces, setup/turn command integration with the main rail, and product-quality error/empty states before rerunning the formal two-browser playtest milestone.
+
 ## [2026-05-31] iteration 86 | Command rail layout polish
 - Task attempted: continued the Web UI polish pass by moving normal-path prompts, attack resolution, and legal actions into a responsive command rail beside the Battlefield panel on wide screens, with the Battlefield shown before command controls and the event log moved below the play area.
 - Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.
