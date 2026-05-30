@@ -1,6 +1,7 @@
 defmodule Prizmo.TcgEngine.AttackDamage do
   @moduledoc false
 
+  alias Prizmo.TcgEngine.AttackEffects
   alias Prizmo.TcgEngine.CardCatalog
   alias Prizmo.TcgEngine.CardInstance
 
@@ -32,7 +33,11 @@ defmodule Prizmo.TcgEngine.AttackDamage do
     end
   end
 
-  defp apply_effect(damage, _attacker_card, _defender_card, _effect), do: {:ok, damage}
+  defp apply_effect(damage, _attacker_card, _defender_card, nil), do: {:ok, damage}
+
+  defp apply_effect(_damage, _attacker_card, _defender_card, effect) do
+    {:error, {:unsupported_attack_effect, AttackEffects.type(effect)}}
+  end
 
   defp pokemon_ex?(%{supertype: :pokemon, suffix: "ex"}), do: true
 

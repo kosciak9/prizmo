@@ -2,6 +2,7 @@ defmodule Prizmo.TcgEngine.CardCatalog do
   @moduledoc false
 
   alias Prizmo.Tcg.Cards.Metadata
+  alias Prizmo.TcgEngine.AttackEffects
 
   @energy_name_types %{
     "Colorless" => :colorless,
@@ -255,7 +256,13 @@ defmodule Prizmo.TcgEngine.CardCatalog do
     end
   end
 
-  defp require_executable_attack(_card_id, _attack_id, %{effect: %{type: _type}}), do: :ok
+  defp require_executable_attack(card_id, attack_id, %{effect: effect}) when is_map(effect) do
+    if AttackEffects.supported?(effect) do
+      :ok
+    else
+      {:error, {:unsupported_attack_effect, card_id, attack_id, AttackEffects.type(effect)}}
+    end
+  end
 
   defp require_executable_attack(card_id, attack_id, %{raw_effect: raw_effect})
        when raw_effect not in [nil, ""] do

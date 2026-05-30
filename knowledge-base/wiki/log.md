@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-30] iteration 41 | Unsupported authored attack effects
+- Task attempted: tightened executable attack behavior so authored attack effects are only considered playable when the persisted attack resolver explicitly supports their effect type, preventing unsupported authored effects from entering `attack_declared` as silent no-ops.
+- Files changed: added `lib/prizmo/tcg_engine/attack_effects.ex`; updated `lib/prizmo/tcg_engine/card_catalog.ex`, `lib/prizmo/tcg_engine/attack_damage.ex`, this log, and the TCG engine playtest handoff.
+- Validation: Tidewave smoke verified `PFL-083` `run_around` now returns `{:unsupported_attack_effect, "PFL-083", :run_around, :switch_self_with_bench}` while supported `PFL-014` `fighting_wings` and no-effect `TWM-128` `petty_grudge` still fetch as executable; `mix test test/prizmo/tcg_engine/mechanics_test.exs` passed (4 tests); `git diff --check` passed; `mix check --no-test` passed.
+- Remaining/blocking notes: no code blocker; unsupported effectful authored attacks are now hidden/rejected before declaration, so the next mechanics slice can safely add one explicit persisted effect implementation such as `:switch_self_with_bench` or another supported-deck attack effect.
+
 ## [2026-05-30] iteration 40 | Unsupported attack declaration guard
 - Task attempted: made unsupported persisted attack declarations fail before entering `attack_declared` by routing declaration and viewer affordances through executable `CardCatalog.fetch_attack/2` lookup, while preserving binary attack IDs from the SPA/RPC boundary.
 - Files changed: updated `lib/prizmo/tcg_engine/card_catalog.ex`, `lib/prizmo/tcg_engine/mechanics.ex`, `lib/prizmo/tcg_engine/game_view/action_affordances.ex`, this log, and the TCG engine playtest handoff.
