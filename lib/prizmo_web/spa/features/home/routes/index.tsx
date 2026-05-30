@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react'
 import {
   buildAshRpcHeaders,
   runChooseTcgEngineActiveFromHand,
+  runChooseTcgEngineSetupBenchFromHand,
   runCreateTcgEngineGame,
   runDrawTcgEngineOpeningHand,
   runGetTcgEngineGameState,
@@ -267,9 +268,18 @@ export function HomeRoute() {
     }
   })
 
+  const chooseSetupBenchMutation = useMutation({
+    mutationFn: (input: { gameId: string; playerId: PlayerId; cardInstanceId: string }) =>
+      chooseSetupBenchFromHand(input),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['tcg-engine', 'game-state'] })
+    }
+  })
+
   const gameState = gameStateQuery.data
   const viewerPlayer = gameState?.players.find(player => player.playerId === gameState.viewerPlayerId)
   const setupActiveCandidates = viewerPlayer?.hand.filter(isSetupActiveCandidate) ?? []
+  const setupBenchCandidates = viewerPlayer?.hand.filter(isSetupBenchCandidate) ?? []
   const deckNamesByKey = useMemo(
     () => new Map(decks.map(deck => [deck.deckKey, deck.name])),
     [decks]
@@ -288,6 +298,15 @@ export function HomeRoute() {
         !viewerPlayer.active &&
         setupActiveCandidates.length > 0
     ) && !chooseActiveMutation.isPending
+  const canChooseSetupBench =
+    Boolean(
+      normalisedGameId &&
+        gameState?.setup?.status === 'hands_drawn' &&
+        viewerPlayer &&
+        viewerPlayer.active &&
+        viewerPlayer.bench.length < 5 &&
+        setupBenchCandidates.length > 0
+    ) && !chooseSetupBenchMutation.isPending
 
   function updateSession(nextSession: PlaytestSession) {
     setStoredSession(nextSession)
@@ -504,6 +523,56 @@ export function HomeRoute() {
                         </p>
                       )}
                     </div>
+
+                    <div className="rounded-xl border border-stone-200 bg-stone-50 p-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-medium text-stone-950">Choose setup Bench</p>
+                          <p className="mt-1 text-xs leading-5 text-stone-500">
+                            Optionally bench Basic Pokémon from {formatPlayerId(session.viewerPlayerId)}'s hand.
+                          </p>
+                        </div>
+                        <StatusBadge tone={viewerPlayer?.bench.length ? 'active' : 'neutral'}>
+                          {viewerPlayer?.bench.length ?? 0}/5
+                        </StatusBadge>
+                      </div>
+
+                      {gameState?.setup?.status === 'hands_drawn' && viewerPlayer && viewerPlayer.active ? (
+                        viewerPlayer.bench.length >= 5 ? (
+                          <p className="mt-3 rounded-lg border border-dashed border-stone-300 px-3 py-3 text-sm text-stone-500">
+                            This viewer's Bench is full.
+                          </p>
+                        ) : setupBenchCandidates.length > 0 ? (
+                          <div className="mt-3 space-y-2">
+                            {setupBenchCandidates.map(card => (
+                              <button
+                                className="w-full rounded-xl border border-emerald-700 px-3 py-2 text-left text-sm font-semibold text-emerald-800 transition hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:border-stone-300 disabled:text-stone-400 disabled:hover:bg-transparent"
+                                disabled={!canChooseSetupBench}
+                                key={card.id}
+                                onClick={() =>
+                                  chooseSetupBenchMutation.mutate({
+                                    gameId: normalisedGameId,
+                                    playerId: session.viewerPlayerId,
+                                    cardInstanceId: card.id
+                                  })
+                                }
+                                type="button"
+                              >
+                                {chooseSetupBenchMutation.isPending ? 'Benching Pokémon...' : `Bench ${card.name}`}
+                              </button>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="mt-3 rounded-lg border border-dashed border-stone-300 px-3 py-3 text-sm text-stone-500">
+                            No additional Basic Pokémon are visible in this viewer's hand.
+                          </p>
+                        )
+                      ) : (
+                        <p className="mt-3 rounded-lg border border-dashed border-stone-300 px-3 py-3 text-sm text-stone-500">
+                          Draw opening hands and choose this viewer's Active Pokémon before benching setup Pokémon.
+                        </p>
+                      )}
+                    </div>
                   </div>
                 </div>
 
@@ -522,6 +591,12 @@ export function HomeRoute() {
                 {chooseActiveMutation.error ? (
                   <InlineNotice tone="error" title="Active choice command failed">
                     {errorMessage(chooseActiveMutation.error)}
+                  </InlineNotice>
+                ) : null}
+
+                {chooseSetupBenchMutation.error ? (
+                  <InlineNotice tone="error" title="Bench choice command failed">
+                    {errorMessage(chooseSetupBenchMutation.error)}
                   </InlineNotice>
                 ) : null}
               </div>
@@ -657,6 +732,24 @@ async function chooseActiveFromHand(input: {
   cardInstanceId: string
 }): Promise<CreatedGame> {
   const result = await runChooseTcgEngineActiveFromHand({
+    input,
+    fields: GAME_RESOURCE_FIELDS,
+    headers: buildAshRpcHeaders()
+  })
+
+  if (!result.success) {
+    throw new Error(rpcErrorMessage(result.errors))
+  }
+
+  return result.data as CreatedGame
+}
+
+async function chooseSetupBenchFromHand(input: {
+  gameId: string
+  playerId: PlayerId
+  cardInstanceId: string
+}): Promise<CreatedGame> {
+  const result = await runChooseTcgEngineSetupBenchFromHand({
     input,
     fields: GAME_RESOURCE_FIELDS,
     headers: buildAshRpcHeaders()
@@ -1054,6 +1147,10 @@ function isPlayerId(value: unknown): value is PlayerId {
 
 function isSetupActiveCandidate(card: CardSummary) {
   return card.category === 'pokemon' && card.stage === 'basic'
+}
+
+function isSetupBenchCandidate(card: CardSummary) {
+  return isSetupActiveCandidate(card)
 }
 
 function rpcErrorMessage(errors: RpcError[] = []) {
