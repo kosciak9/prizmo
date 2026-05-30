@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-30] iteration 54 | Lopunny bench-to-Active bonus damage
+- Task attempted: continued the rejected authored attack-effect inventory and implemented the narrow persisted `:bonus_damage_if_moved_from_bench_to_active_this_turn` slice for Mega Lopunny ex `PFL-084` `Gale Thrust`, applying the authored bonus only when the attacker moved from Bench to Active during the current persisted turn.
+- Files changed: updated `lib/prizmo/tcg_engine/attack_effects.ex`, `lib/prizmo/tcg_engine/attack_damage.ex`, this log, and the TCG engine playtest handoff.
+- Validation: `mix format && mix compile --warnings-as-errors` passed; Tidewave rollback smoke passed for `PFL-084` `Gale Thrust` surfacing a browser declare-attack affordance, resolving for 60 damage without same-turn Bench-to-Active movement, and resolving for 230 damage after a persisted `switch_active_with_bench` event; `mix test test/prizmo/tcg_engine/mechanics_test.exs` passed (4 tests); `mix prizmo.cards.coverage` passed; `mix check --no-test` passed.
+- Remaining/blocking notes: no code blocker for Lopunny's same-turn Bench-to-Active bonus damage path; additional rejected authored attack effects remain and should continue to be enabled one deterministic persisted effect at a time.
+
 ## [2026-05-30] iteration 53 | Dipplin own-Bench attack damage
 - Task attempted: continued the rejected authored attack-effect inventory and implemented the narrow persisted `:damage_per_own_benched_pokemon` slice for Dipplin `TWM-018` `Do the Wave`, counting only the attacker's own Benched Pokémon for authored attack damage.
 - Files changed: updated `lib/prizmo/tcg_engine/attack_effects.ex`, `lib/prizmo/tcg_engine/attack_damage.ex`, this log, and the TCG engine playtest handoff.

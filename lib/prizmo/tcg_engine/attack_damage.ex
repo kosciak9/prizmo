@@ -5,6 +5,10 @@ defmodule Prizmo.TcgEngine.AttackDamage do
   alias Prizmo.TcgEngine.CardCatalog
   alias Prizmo.TcgEngine.CardInstance
   alias Prizmo.TcgEngine.CardStore
+  alias Prizmo.TcgEngine.GameEvent
+  alias Prizmo.TcgEngine.TurnStore
+
+  require Ash.Query
 
   @spec damage_for(CardInstance.t(), CardInstance.t(), map()) ::
           {:ok, non_neg_integer()} | {:error, term()}
@@ -27,6 +31,20 @@ defmodule Prizmo.TcgEngine.AttackDamage do
        when is_integer(bonus_damage) and bonus_damage >= 0 do
     with {:ok, defender_metadata} <- CardCatalog.fetch(defender_card.card_id) do
       if pokemon_ex?(defender_metadata) do
+        {:ok, damage + bonus_damage}
+      else
+        {:ok, damage}
+      end
+    end
+  end
+
+  defp apply_effect(damage, %CardInstance{} = attacker_card, _defender_card, %{
+         type: :bonus_damage_if_moved_from_bench_to_active_this_turn,
+         bonus_damage: bonus_damage
+       })
+       when is_integer(bonus_damage) and bonus_damage >= 0 do
+    with {:ok, moved?} <- moved_from_bench_to_active_this_turn?(attacker_card) do
+      if moved? do
         {:ok, damage + bonus_damage}
       else
         {:ok, damage}
@@ -139,4 +157,43 @@ defmodule Prizmo.TcgEngine.AttackDamage do
       {:ok, length(cards)}
     end
   end
+
+  defp moved_from_bench_to_active_this_turn?(%CardInstance{
+         game_id: game_id,
+         id: card_instance_id,
+         owner_player_id: player_id
+       }) do
+    with {:ok, turn} <- TurnStore.current_turn(game_id),
+         {:ok, events} <- turn_player_events(game_id, turn.id, player_id) do
+      {:ok, Enum.any?(events, &bench_to_active_event?(&1, card_instance_id))}
+    end
+  end
+
+  defp turn_player_events(game_id, turn_id, player_id) do
+    case GameEvent
+         |> Ash.Query.filter(game_id == ^game_id and player_id == ^player_id)
+         |> Ash.Query.sort(index: :asc)
+         |> Ash.read() do
+      {:ok, events} ->
+        {:ok, Enum.filter(events, &(Map.get(&1.payload, "turn_id") == turn_id))}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  defp bench_to_active_event?(%GameEvent{type: type, payload: payload}, card_instance_id)
+       when type in ["retreat", "switch_active_with_bench"] do
+    Map.get(payload, "bench_card_instance_id") == card_instance_id
+  end
+
+  defp bench_to_active_event?(
+         %GameEvent{type: "resolve_declared_attack", payload: payload},
+         card_instance_id
+       ) do
+    Map.get(payload, "effect_type") == "switch_self_with_bench" and
+      Map.get(payload, "switched_bench_card_instance_id") == card_instance_id
+  end
+
+  defp bench_to_active_event?(%GameEvent{}, _card_instance_id), do: false
 end
