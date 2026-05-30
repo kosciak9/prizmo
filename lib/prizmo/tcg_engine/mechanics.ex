@@ -74,6 +74,7 @@ defmodule Prizmo.TcgEngine.Mechanics do
 
   alias Prizmo.TcgEngine.AttackDamage
   alias Prizmo.TcgEngine.AttackEffects
+  alias Prizmo.TcgEngine.AttackRequirements
   alias Prizmo.TcgEngine.CardCatalog
   alias Prizmo.TcgEngine.CardPlay
   alias Prizmo.TcgEngine.Cards.Registry, as: EngineCardRegistry
@@ -1083,6 +1084,7 @@ defmodule Prizmo.TcgEngine.Mechanics do
            {:ok, turn} <- require_action_window_for_player(game, player_id),
            {:ok, attacker_card} <- active_card(game.id, player_id),
            :ok <- require_can_attack(attacker_card, turn),
+           :ok <- AttackRequirements.require_card_attack_restrictions(game.id, attacker_card),
            {:ok, defender_player_id} <- opponent_player_id(game.id, player_id),
            {:ok, defender_card} <- active_card(game.id, defender_player_id),
            {:ok, attack} <- CardCatalog.fetch_attack(attacker_card.card_id, attack_id),

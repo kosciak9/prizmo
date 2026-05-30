@@ -38,6 +38,8 @@ const PLAYER_IDS = [PLAYER_ONE_ID, PLAYER_TWO_ID] as const
 const LEGACY_SESSION_STORAGE_KEY = 'prizmo:tcg-playtest-session'
 const GAME_ID_STORAGE_KEY = 'prizmo:tcg-playtest-game-id'
 const VIEWER_STORAGE_KEY = 'prizmo:tcg-playtest-viewer'
+const DISCARD_OWN_BASIC_ENERGY_FOR_DAMAGE_EFFECT = 'damage_per_discarded_own_basic_energy'
+const DISCARD_OWN_BENCH_ENERGY_FOR_BONUS_DAMAGE_EFFECT = 'discard_energy_from_own_bench_for_bonus_damage'
 
 const SUPPORTED_DECK_FIELDS: ListSupportedTcgDecksFields = [
   'deckKey',
@@ -2113,14 +2115,21 @@ function AttackProgressPanel({
       return []
     }
 
-    return [activePlayer.active, ...activePlayer.bench]
+    const sourceCards =
+      turn.pendingAttackEffectType === DISCARD_OWN_BENCH_ENERGY_FOR_BONUS_DAMAGE_EFFECT
+        ? activePlayer.bench
+        : turn.pendingAttackEffectType === DISCARD_OWN_BASIC_ENERGY_FOR_DAMAGE_EFFECT
+          ? [activePlayer.active, ...activePlayer.bench]
+          : []
+
+    return sourceCards
       .filter((card): card is CardSummary => Boolean(card))
       .flatMap(card =>
         (card.attachedCards ?? [])
           .filter(isEnergyCard)
           .map(energyCard => ({ attachedTo: card, energyCard }))
       )
-  }, [activePlayer, turn?.pendingAttackRequiresDiscardedEnergy])
+  }, [activePlayer, turn?.pendingAttackEffectType, turn?.pendingAttackRequiresDiscardedEnergy])
   const discardedEnergyOptionIds = useMemo(
     () => new Set(discardedEnergyOptions.map(option => option.energyCard.id)),
     [discardedEnergyOptions]
@@ -2157,6 +2166,14 @@ function AttackProgressPanel({
   const viewerCanAdvanceAttack = viewerPlayerId === turn.activePlayerId && isPlayerId(turn.activePlayerId)
   const commandPending = Boolean(resolveDeclaredAttackPendingPlayerId || finishAttackPendingPlayerId)
   const switchTargetRequired = turn.pendingAttackRequiresSwitchTarget && switchTargetOptions.length > 1
+  const discardedEnergyMaxSelection =
+    turn.pendingAttackEffectType === DISCARD_OWN_BENCH_ENERGY_FOR_BONUS_DAMAGE_EFFECT ? 2 : null
+  const discardedEnergyDescription =
+    turn.pendingAttackEffectType === DISCARD_OWN_BENCH_ENERGY_FOR_BONUS_DAMAGE_EFFECT
+      ? 'This attack does 60 more damage for each selected Energy attached to Benched Pokémon, then discards those Energy cards during resolution. Select up to 2, or select none for no bonus damage.'
+      : turn.pendingAttackEffectType === DISCARD_OWN_BASIC_ENERGY_FOR_DAMAGE_EFFECT
+        ? 'This attack does damage for each selected own Basic Energy attached to Pokémon in play, then discards those Energy cards during resolution. Selecting none resolves it for zero bonus damage.'
+        : 'This attack resolves with the selected discarded Energy cards.'
   const missingActivePlayers = gameState.players.filter(player => !player.active)
   const viewerPromptBlocksFinish = viewerCanAdvanceAttack && gameState.prompts.length > 0
   const attackCannotFinish = missingActivePlayers.length > 0 || viewerPromptBlocksFinish
@@ -2168,11 +2185,17 @@ function AttackProgressPanel({
       ? `Choose a switch target for ${attackLabel}`
       : `Resolve ${attackLabel}`
   const toggleDiscardedEnergyCard = (energyCardInstanceId: string) => {
-    setSelectedDiscardedEnergyCardInstanceIds(previousSelectedIds =>
-      previousSelectedIds.includes(energyCardInstanceId)
-        ? previousSelectedIds.filter(id => id !== energyCardInstanceId)
-        : [...previousSelectedIds, energyCardInstanceId]
-    )
+    setSelectedDiscardedEnergyCardInstanceIds(previousSelectedIds => {
+      if (previousSelectedIds.includes(energyCardInstanceId)) {
+        return previousSelectedIds.filter(id => id !== energyCardInstanceId)
+      }
+
+      if (discardedEnergyMaxSelection && previousSelectedIds.length >= discardedEnergyMaxSelection) {
+        return previousSelectedIds
+      }
+
+      return [...previousSelectedIds, energyCardInstanceId]
+    })
   }
 
   return (
@@ -2247,8 +2270,7 @@ function AttackProgressPanel({
             <div className="space-y-1">
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-orange-900">Discarded Energy</p>
               <p className="text-xs leading-5 text-orange-900/80">
-                This attack does damage for each selected own Basic Energy attached to Pokémon in play, then discards
-                those Energy cards during resolution. Selecting none resolves it for zero bonus damage.
+                {discardedEnergyDescription}
               </p>
             </div>
 
@@ -2256,6 +2278,10 @@ function AttackProgressPanel({
               <div className="mt-3 grid gap-2 sm:grid-cols-2">
                 {discardedEnergyOptions.map(({ attachedTo, energyCard }) => {
                   const selected = selectedDiscardedEnergyCardInstanceIds.includes(energyCard.id)
+                  const maxSelectionReached = Boolean(
+                    discardedEnergyMaxSelection &&
+                      selectedDiscardedEnergyCardInstanceIds.length >= discardedEnergyMaxSelection
+                  )
 
                   return (
                     <label
@@ -2269,7 +2295,7 @@ function AttackProgressPanel({
                       <input
                         checked={selected}
                         className="mt-0.5"
-                        disabled={!viewerCanAdvanceAttack || commandPending}
+                        disabled={!viewerCanAdvanceAttack || commandPending || (!selected && maxSelectionReached)}
                         onChange={() => toggleDiscardedEnergyCard(energyCard.id)}
                         type="checkbox"
                       />

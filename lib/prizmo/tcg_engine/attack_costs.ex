@@ -41,25 +41,26 @@ defmodule Prizmo.TcgEngine.AttackCosts do
   end
 
   defp attached_energy_providers(attached_cards) do
-    attached_cards
-    |> Enum.map(&energy_provider/1)
-    |> Enum.reject(&is_nil/1)
+    Enum.flat_map(attached_cards, &energy_providers/1)
   end
 
-  defp energy_provider(%CardInstance{} = card) do
+  defp energy_providers(%CardInstance{} = card) do
     case CardCatalog.fetch(card.card_id) do
+      {:ok, %{supertype: :energy, name: "Team Rocket's Energy"}} ->
+        List.duplicate(%{card_instance_id: card.id, provides: [:psychic, :darkness]}, 2)
+
       {:ok, %{supertype: :energy, provides: provides}}
       when is_list(provides) and provides != [] ->
-        %{card_instance_id: card.id, provides: provides}
+        [%{card_instance_id: card.id, provides: provides}]
 
       {:ok, %{supertype: :energy}} ->
-        nil
+        []
 
       {:ok, _metadata} ->
-        nil
+        []
 
       {:error, _reason} ->
-        nil
+        []
     end
   end
 

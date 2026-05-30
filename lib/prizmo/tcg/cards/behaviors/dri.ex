@@ -43,6 +43,7 @@ defmodule Prizmo.Tcg.Cards.Behaviors.DRI do
     )
 
     attack(:erasure_ball,
+      damage: 160,
       effect: %{
         type: :discard_energy_from_own_bench_for_bonus_damage,
         max_discards: 2,

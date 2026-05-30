@@ -3,6 +3,7 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
 
   alias Prizmo.TcgEngine.AttackCosts
   alias Prizmo.TcgEngine.AttackLocks
+  alias Prizmo.TcgEngine.AttackRequirements
   alias Prizmo.TcgEngine.CardCatalog
   alias Prizmo.TcgEngine.CardInstance
   alias Prizmo.TcgEngine.Cards.Registry, as: EngineCardRegistry
@@ -221,6 +222,8 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
     with %CardInstance{} = active_card <- active_pokemon_card(cards),
          false <- blocked_attack_status?(active_card),
          false <- AttackLocks.blocked_this_turn?(active_card, current_turn),
+         true <-
+           AttackRequirements.attack_restrictions_met?(active_card, in_play_pokemon_cards(cards)),
          %CardInstance{} = defender_card <-
            opponent_active_pokemon_card(all_cards, player.player_id),
          {:ok, %{attacks: attacks}} <- CardCatalog.fetch(active_card.card_id) do

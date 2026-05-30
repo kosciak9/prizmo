@@ -44,6 +44,25 @@ defmodule Prizmo.TcgEngine.AttackDamage do
     end
   end
 
+  defp apply_effect(
+         damage,
+         _attacker_card,
+         _defender_card,
+         %{
+           type: :discard_energy_from_own_bench_for_bonus_damage,
+           bonus_damage: bonus_damage,
+           max_discards: max_discards
+         },
+         opts
+       )
+       when is_integer(bonus_damage) and bonus_damage >= 0 and is_integer(max_discards) and
+              max_discards >= 0 do
+    with {:ok, energy_card_instance_ids} <- discarded_energy_card_instance_ids(opts),
+         :ok <- require_max_discarded_energy_count(energy_card_instance_ids, max_discards) do
+      {:ok, damage + length(energy_card_instance_ids) * bonus_damage}
+    end
+  end
+
   defp apply_effect(damage, attacker_card, defender_card, effect, _opts) do
     apply_effect(damage, attacker_card, defender_card, effect)
   end
@@ -342,6 +361,14 @@ defmodule Prizmo.TcgEngine.AttackDamage do
       nil -> {:ok, []}
       ids when is_list(ids) -> {:ok, ids}
       _invalid -> {:error, :invalid_discarded_energy_card_instance_ids}
+    end
+  end
+
+  defp require_max_discarded_energy_count(energy_card_instance_ids, max_discards) do
+    if length(energy_card_instance_ids) <= max_discards do
+      :ok
+    else
+      {:error, {:too_many_discarded_energy_cards, max_discards}}
     end
   end
 
