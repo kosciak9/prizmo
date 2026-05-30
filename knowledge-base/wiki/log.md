@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-30] iteration 34 | Playtest action and prompt clarity
+- Task attempted: reduced debug noise in the minimal React playtest loop after manual playtesting noted noisy prompt JSON and duplicated action metadata.
+- Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.
+- Validation: `mix assets.build` passed.
+- Remaining/blocking notes: no code blocker; prompt payload JSON and action counts remain available through collapsed debug/details disclosures, while the formal two-browser manual-tester milestone is still blocked on a validation harness with guaranteed separate browser contexts.
+
 ## [2026-05-30] iteration 33 | Playtest viewer stale-read hardening
 - Task attempted: reran the documented two-browser playtest validation after the viewer-storage fix, then hardened the SPA against stale viewer/session updates when the manual-tester agents still reported viewer flips during Refresh/live-update flows.
 - Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.

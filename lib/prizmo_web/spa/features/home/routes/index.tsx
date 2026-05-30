@@ -1615,8 +1615,8 @@ function PromptChoiceCard({
         <div>
           <p className="text-sm font-medium text-emerald-950">{formatEventType(prompt.promptType)}</p>
           <p className="mt-1 text-xs text-emerald-800">
-            {formatEventType(promptChoiceKey(prompt.payload))} · choose {min === max ? min : `${min}-${max}`} card
-            {max === 1 ? '' : 's'}
+            {formatEventType(promptChoiceKey(prompt.payload))} · {promptChoiceInstruction(min, max)} ·{' '}
+            {legalChoiceIds.length} legal {legalChoiceIds.length === 1 ? 'choice' : 'choices'}
           </p>
         </div>
         <StatusBadge tone="warning">{prompt.status}</StatusBadge>
@@ -1669,9 +1669,12 @@ function PromptChoiceCard({
         </p>
       )}
 
-      <pre className="mt-3 max-h-32 overflow-auto rounded-lg bg-stone-950 p-3 text-xs text-stone-100">
-        {JSON.stringify(prompt.payload, null, 2)}
-      </pre>
+      <details className="mt-3 rounded-lg border border-emerald-200 bg-stone-50 px-3 py-2 text-xs text-stone-600">
+        <summary className="cursor-pointer font-medium text-emerald-900">Debug prompt payload</summary>
+        <pre className="mt-2 max-h-32 overflow-auto rounded-lg bg-stone-950 p-3 text-xs text-stone-100">
+          {JSON.stringify(prompt.payload, null, 2)}
+        </pre>
+      </details>
     </div>
   )
 }
@@ -1719,22 +1722,27 @@ function ActionAffordancesPanel({
                 <div>
                   <p className="font-medium text-stone-950">{action.label}</p>
                   <p className="mt-1 text-xs text-stone-500">
-                    {formatEventType(action.kind)} for {formatPlayerId(action.playerId)}
+                    Available for {formatPlayerId(action.playerId)}
                   </p>
                 </div>
                 <StatusBadge tone={action.kind === 'prompt' ? 'warning' : 'active'}>
-                  {formatEventType(action.key)}
+                  {formatEventType(action.kind)}
                 </StatusBadge>
               </div>
 
               {action.note ? <p className="mt-2 text-xs leading-5 text-stone-600">{action.note}</p> : null}
 
-              <div className="mt-3 flex flex-wrap gap-2">
-                <ActionCount count={action.sourceCardInstanceIds.length} label="source" />
-                <ActionCount count={action.targetCardInstanceIds.length} label="target" />
-                <ActionCount count={action.promptIds.length} label="prompt" />
-                <ActionCount count={action.choiceKeys.length} label="choice key" />
-              </div>
+              {actionHasMetadata(action) ? (
+                <details className="mt-3 rounded-lg border border-stone-200 bg-stone-100 px-3 py-2 text-xs text-stone-600">
+                  <summary className="cursor-pointer font-medium text-stone-700">Action metadata</summary>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <ActionCount count={action.sourceCardInstanceIds.length} label="source" />
+                    <ActionCount count={action.targetCardInstanceIds.length} label="target" />
+                    <ActionCount count={action.promptIds.length} label="prompt" />
+                    <ActionCount count={action.choiceKeys.length} label="choice key" />
+                  </div>
+                </details>
+              ) : null}
 
               {action.key === 'play_card' && action.sourceCardInstanceIds.length > 0 ? (
                 <div className="mt-3 space-y-2">
@@ -1852,6 +1860,15 @@ function ActionCount({ count, label }: { count: number; label: string }) {
       {count} {label}
       {count === 1 ? '' : 's'}
     </span>
+  )
+}
+
+function actionHasMetadata(action: ActionAffordance) {
+  return (
+    action.sourceCardInstanceIds.length > 0 ||
+    action.targetCardInstanceIds.length > 0 ||
+    action.promptIds.length > 0 ||
+    action.choiceKeys.length > 0
   )
 }
 
@@ -2220,6 +2237,14 @@ function promptChoiceCount(payload: Record<string, unknown>, key: 'min' | 'max',
   const value = payload[key]
 
   return typeof value === 'number' && Number.isFinite(value) ? value : fallback
+}
+
+function promptChoiceInstruction(min: number, max: number) {
+  if (min === max) {
+    return `choose ${min} ${min === 1 ? 'card' : 'cards'}`
+  }
+
+  return `choose ${min}-${max} cards`
 }
 
 function promptChoiceKey(payload: Record<string, unknown>) {
