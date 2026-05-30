@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-30] iteration 32 | Two-browser playtest fixture and viewer isolation
+- Task attempted: ran the documented two-browser playtest validation, made the default Dragapult fixture order deterministic for the narrow prompt/Bench/Attach/End Turn loop, and fixed the SPA session storage so viewer identity is tab-scoped instead of shared through localStorage.
+- Files changed: updated `lib/prizmo/tcg/decks/dragapult27431.ex`, `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.
+- Validation: `mix run --no-start -e ...` verified the Dragapult opening order starts with Moltres, Ultra Ball, and Fire Energy; `mix assets.build` passed; single-browser Playwright smoke completed setup, turn start/draw/open, Attach Energy, Ultra Ball prompt resolution, Bench, End Turn, and Start next turn; two manual-tester Playwright agents initially exposed a viewer-refresh leak where Player 2 could be reset to Player 1; after the fix, focused same-origin two-tab Playwright validation passed for Refresh/reload preserving Player 2 while another tab stayed Player 1; `mix test test/prizmo/tcg_engine/mechanics_test.exs` passed (4 tests); `mix check --no-test` passed.
+- Remaining/blocking notes: no code blocker remains from the viewer leak; rerun the full two-manual-tester playtest milestone after this commit to confirm the complete scenario now passes end-to-end with independent player sessions.
+
 ## [2026-05-30] iteration 31 | SPA next-turn progression after End Turn
 - Task attempted: updated the React SPA turn controls so a persisted game can call `runStartNextTcgEngineTurn` after the current turn reaches `ended`, enabling the browser loop to progress beyond the first turn after `End Turn`.
 - Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.

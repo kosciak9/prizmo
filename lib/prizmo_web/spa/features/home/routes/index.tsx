@@ -29,7 +29,9 @@ import {
 const PLAYER_ONE_ID = 'player_1'
 const PLAYER_TWO_ID = 'player_2'
 const PLAYER_IDS = [PLAYER_ONE_ID, PLAYER_TWO_ID] as const
-const SESSION_STORAGE_KEY = 'prizmo:tcg-playtest-session'
+const LEGACY_SESSION_STORAGE_KEY = 'prizmo:tcg-playtest-session'
+const GAME_ID_STORAGE_KEY = 'prizmo:tcg-playtest-game-id'
+const VIEWER_STORAGE_KEY = 'prizmo:tcg-playtest-viewer'
 
 const SUPPORTED_DECK_FIELDS: ListSupportedTcgDecksFields = [
   'deckKey',
@@ -2082,22 +2084,9 @@ function readStoredSession(): PlaytestSession {
     return defaultSession()
   }
 
-  try {
-    const item = window.localStorage.getItem(SESSION_STORAGE_KEY)
-
-    if (!item) {
-      return defaultSession()
-    }
-
-    const parsed = JSON.parse(item) as Partial<PlaytestSession>
-    const viewerPlayerId = isPlayerId(parsed.viewerPlayerId) ? parsed.viewerPlayerId : PLAYER_ONE_ID
-
-    return {
-      gameId: typeof parsed.gameId === 'string' ? parsed.gameId : '',
-      viewerPlayerId
-    }
-  } catch {
-    return defaultSession()
+  return {
+    gameId: readStoredGameId(),
+    viewerPlayerId: readStoredViewerPlayerId()
   }
 }
 
@@ -2106,7 +2095,54 @@ function setStoredSession(session: PlaytestSession) {
     return
   }
 
-  window.localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session))
+  if (session.gameId) {
+    window.localStorage.setItem(GAME_ID_STORAGE_KEY, session.gameId)
+  } else {
+    window.localStorage.removeItem(GAME_ID_STORAGE_KEY)
+  }
+
+  window.localStorage.removeItem(LEGACY_SESSION_STORAGE_KEY)
+  window.sessionStorage.setItem(VIEWER_STORAGE_KEY, session.viewerPlayerId)
+}
+
+function readStoredGameId() {
+  try {
+    const storedGameId = window.localStorage.getItem(GAME_ID_STORAGE_KEY)
+
+    if (storedGameId !== null) {
+      return storedGameId
+    }
+
+    return readLegacyStoredGameId()
+  } catch {
+    return ''
+  }
+}
+
+function readLegacyStoredGameId() {
+  try {
+    const item = window.localStorage.getItem(LEGACY_SESSION_STORAGE_KEY)
+
+    if (!item) {
+      return ''
+    }
+
+    const parsed = JSON.parse(item) as Partial<PlaytestSession>
+
+    return typeof parsed.gameId === 'string' ? parsed.gameId : ''
+  } catch {
+    return ''
+  }
+}
+
+function readStoredViewerPlayerId() {
+  try {
+    const viewerPlayerId = window.sessionStorage.getItem(VIEWER_STORAGE_KEY)
+
+    return isPlayerId(viewerPlayerId) ? viewerPlayerId : PLAYER_ONE_ID
+  } catch {
+    return PLAYER_ONE_ID
+  }
 }
 
 function defaultSession(): PlaytestSession {

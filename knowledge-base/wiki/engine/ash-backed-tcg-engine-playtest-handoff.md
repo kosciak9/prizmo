@@ -91,24 +91,28 @@ Updated: 2026-05-30
 - The Viewer legal actions panel now renders an `End ... turn` button for the existing `end_turn` affordance, calls the new command, and invalidates the viewer-scoped game-state query. The persisted mechanics layer enforces active-player/action-window state, transitions the current turn to `:ended`, writes the `end_turn` event, and snapshots it.
 - Iteration 31 updated the SPA turn controls so `runStartNextTcgEngineTurn` is enabled when the persisted current turn has status `ended`, not only before the first turn exists.
 - The Turn commands panel copy now describes starting the first or next persisted turn, and the Start Turn button labels ended turns as `Start next turn` while still preventing duplicate starts during in-progress turn statuses.
+- Iteration 32 ran the documented two-browser Playwright playtest validation and found a real viewer-isolation blocker: Refresh/reload could reset a Player 2 browser session to Player 1 because the SPA persisted both game ID and viewer in a shared localStorage session object.
+- The SPA now stores the shared game ID in localStorage but stores the selected viewer in tab-scoped sessionStorage, removes the legacy combined localStorage session on writes, and preserves Player 2 across Refresh/reload even while a same-origin Player 1 tab refreshes the same game.
+- The Dragapult fixture order now starts new games with Moltres, Ultra Ball, and Fire Energy so the narrow browser playtest can cover setup Active, Attach Energy, Ultra Ball cost/effect prompts, searched Basic-to-Bench, End Turn, and Start next turn without many draw/end-turn cycles. The fixture card counts are unchanged.
+- Manual-tester results before the viewer fix: Player 1 completed the functional flow but reported viewer switching; Player 2 selected Abra and verified hidden hand behavior until Refresh reset the viewer and exposed Player 1 state. Focused same-origin two-tab validation passed after the fix, but the full two-manual-tester milestone should be rerun.
 
 ## Last commit
 
-- Baseline entering iteration 31: `8cd9e96 feat(spa): wire end turn command`.
-- This handoff was written before committing iteration 31; expected commit message is `feat(spa): allow next turn after end turn`.
+- Baseline entering iteration 32: `e866732 feat(spa): allow next turn after end turn`.
+- This handoff was written before committing iteration 32; expected commit message is `fix(spa): isolate playtest viewer sessions`.
 
 ## Remaining tasks
 
 - Decide whether old `Prizmo.Tcg.Sim` tests are kept as historical reference, quarantined, or ported scenario-by-scenario.
-- Build the minimal playable React SPA loop beyond prompt resolution, Bench commands, Attach Energy, End Turn, and next-turn progression: run two-browser refresh/reconnect validation and address any command-loop gaps it exposes.
+- Build the minimal playable React SPA loop beyond prompt resolution, Bench commands, Attach Energy, End Turn, next-turn progression, deterministic playtest fixture order, and tab-scoped viewer identity: rerun the full two-browser/manual-tester playtest milestone and address any remaining command-loop gaps it exposes.
 - Expand persisted Ash engine mechanics: evolution timing, retreat/switch, attacks/damage/KO/prizes/replacement Active, turn transitions, and snapshot-backed undo/debug support.
 - Continue migrating executable card behavior into engine-owned definitions with explicit unsupported-behavior tracking.
 - Spike Electric Streams only after the command/read loop has enough event shape to publish safely.
 
 ## Blockers
 
-- None known from this iteration.
+- None known in code after the viewer-isolation fix. The full two-manual-tester milestone has not yet been rerun after the fix.
 
 ## Recommended next atomic task
 
-- Run the documented two-browser Playwright playtest validation for the current narrow scenario: create/reconnect to a fixture game, complete setup, start/open a turn, play and resolve an Ultra Ball-style prompt flow, bench/attach/end turn, start the next turn, and verify refresh/reconnect state recovery for both viewers.
+- Rerun the documented two-browser Playwright playtest validation on a fresh game after iteration 32: create/reconnect to a Dragapult-vs-Alakazam fixture game, complete setup with Player 1 Moltres and Player 2 Abra, start/open turn 1, attach Fire Energy, play and resolve Ultra Ball, Bench the searched Basic, End Turn, Start next turn for Player 2, and verify refresh/reconnect state recovery plus hidden-hand isolation for both viewers.
