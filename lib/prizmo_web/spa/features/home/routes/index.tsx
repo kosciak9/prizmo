@@ -495,7 +495,7 @@ export function HomeRoute() {
       normalisedGameId &&
         gameState?.status === 'in_progress' &&
         gameState.setup?.status === 'completed' &&
-        !gameState.currentTurn
+        (!gameState.currentTurn || gameState.currentTurn.status === 'ended')
     ) && !startNextTurnMutation.isPending
   const canDrawForTurn =
     Boolean(
@@ -869,7 +869,7 @@ export function HomeRoute() {
                     <div>
                       <p className="text-sm font-medium text-stone-950">Turn commands</p>
                       <p className="mt-1 text-xs leading-5 text-stone-500">
-                        Start the first persisted turn, then draw, skip draw, or open the action window.
+                        Start the first or next persisted turn, then draw, skip draw, or open the action window.
                       </p>
                     </div>
                     <StatusBadge tone={gameState?.currentTurn ? 'active' : 'neutral'}>
@@ -887,8 +887,10 @@ export function HomeRoute() {
                   >
                     {startNextTurnMutation.isPending
                       ? 'Starting turn...'
-                      : gameState?.currentTurn
-                        ? `Turn ${gameState.currentTurn.turnNumber} started`
+                      : gameState?.currentTurn?.status === 'ended'
+                        ? 'Start next turn'
+                        : gameState?.currentTurn
+                          ? `Turn ${gameState.currentTurn.turnNumber} in progress`
                         : gameState?.setup?.status === 'completed'
                           ? 'Start first turn'
                           : 'Complete setup first'}

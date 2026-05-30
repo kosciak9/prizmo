@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-30] iteration 31 | SPA next-turn progression after End Turn
+- Task attempted: updated the React SPA turn controls so a persisted game can call `runStartNextTcgEngineTurn` after the current turn reaches `ended`, enabling the browser loop to progress beyond the first turn after `End Turn`.
+- Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.
+- Validation: `mix assets.build` passed; `mix check --no-test` passed.
+- Remaining/blocking notes: no blocker; the SPA can now start the first turn and later start the next persisted turn after an ended current turn, while two-browser Playwright playtest validation for the narrow browser scenario remains pending.
+
 ## [2026-05-30] iteration 30 | SPA End Turn action command
 - Task attempted: exposed the persisted engine's `end_turn` mechanic as an Ash/RPC command and wired the React SPA Viewer legal actions panel to end the active viewer's current action-window turn from the browser.
 - Files changed: updated `lib/prizmo/tcg_engine/game/action_commands.ex`, `lib/prizmo/tcg_engine.ex`, `lib/prizmo_web/spa/features/home/routes/index.tsx`, `lib/prizmo_web/spa/lib/ash/client.ts`, generated `lib/prizmo_web/spa/lib/ash/generated/ash_rpc.ts`, this log, and the TCG engine playtest handoff.

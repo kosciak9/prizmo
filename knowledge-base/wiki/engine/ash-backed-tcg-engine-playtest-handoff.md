@@ -89,16 +89,18 @@ Updated: 2026-05-30
 - Iteration 30 added `Prizmo.TcgEngine.Game.ActionCommands.end_turn_command`, exposed through the domain as `Prizmo.TcgEngine.end_turn_for_game/2` and through AshTypescript RPC as `endTcgEngineTurn`.
 - The SPA Ash client re-exports the generated End Turn command as `runEndTcgEngineTurn`, with `EndTcgEngineTurnInput` and `EndTcgEngineTurnResult` types.
 - The Viewer legal actions panel now renders an `End ... turn` button for the existing `end_turn` affordance, calls the new command, and invalidates the viewer-scoped game-state query. The persisted mechanics layer enforces active-player/action-window state, transitions the current turn to `:ended`, writes the `end_turn` event, and snapshots it.
+- Iteration 31 updated the SPA turn controls so `runStartNextTcgEngineTurn` is enabled when the persisted current turn has status `ended`, not only before the first turn exists.
+- The Turn commands panel copy now describes starting the first or next persisted turn, and the Start Turn button labels ended turns as `Start next turn` while still preventing duplicate starts during in-progress turn statuses.
 
 ## Last commit
 
-- Baseline entering iteration 30: `c880763 feat(spa): wire attach energy command`.
-- This handoff was written before committing iteration 30; expected commit message is `feat(spa): wire end turn command`.
+- Baseline entering iteration 31: `8cd9e96 feat(spa): wire end turn command`.
+- This handoff was written before committing iteration 31; expected commit message is `feat(spa): allow next turn after end turn`.
 
 ## Remaining tasks
 
 - Decide whether old `Prizmo.Tcg.Sim` tests are kept as historical reference, quarantined, or ported scenario-by-scenario.
-- Build the minimal playable React SPA loop beyond prompt resolution, Bench commands, Attach Energy, and End Turn: support smooth multi-turn progression and run two-browser refresh/reconnect validation.
+- Build the minimal playable React SPA loop beyond prompt resolution, Bench commands, Attach Energy, End Turn, and next-turn progression: run two-browser refresh/reconnect validation and address any command-loop gaps it exposes.
 - Expand persisted Ash engine mechanics: evolution timing, retreat/switch, attacks/damage/KO/prizes/replacement Active, turn transitions, and snapshot-backed undo/debug support.
 - Continue migrating executable card behavior into engine-owned definitions with explicit unsupported-behavior tracking.
 - Spike Electric Streams only after the command/read loop has enough event shape to publish safely.
@@ -109,4 +111,4 @@ Updated: 2026-05-30
 
 ## Recommended next atomic task
 
-- Update the existing SPA Start Turn control so it can call `runStartNextTcgEngineTurn` after the current persisted turn reaches `ended`, not only before the first turn exists.
+- Run the documented two-browser Playwright playtest validation for the current narrow scenario: create/reconnect to a fixture game, complete setup, start/open a turn, play and resolve an Ultra Ball-style prompt flow, bench/attach/end turn, start the next turn, and verify refresh/reconnect state recovery for both viewers.
