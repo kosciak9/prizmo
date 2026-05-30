@@ -1091,6 +1091,7 @@ defmodule Prizmo.TcgEngine.Mechanics do
            {:ok, defender_player_id} <- opponent_player_id(game.id, player_id),
            {:ok, defender_card} <- active_card(game.id, defender_player_id),
            {:ok, attack} <- CardCatalog.fetch_attack(attacker_card.card_id, attack_id),
+           :ok <- AttackEffects.require_declarable_attack(attack, defender_card),
            :ok <- require_attack_cost_paid(game.id, attacker_card, attack),
            {:ok, turn} <-
              update(turn, :declare_attack, %{
@@ -1130,7 +1131,10 @@ defmodule Prizmo.TcgEngine.Mechanics do
            {:ok, defender_card} <- get_card(game.id, turn.pending_defender_card_instance_id),
            {:ok, attack} <-
              CardCatalog.fetch_attack(attacker_card.card_id, turn.pending_attack_id),
-           {:ok, damage} <- AttackDamage.damage_for(attacker_card, defender_card, attack, opts),
+           {:ok, {effective_attack, copied_attack_payload}} <-
+             AttackEffects.effective_attack_for_resolution(defender_card, attack, opts),
+           {:ok, damage} <-
+             AttackDamage.damage_for(attacker_card, defender_card, effective_attack, opts),
            {:ok, turn} <- update(turn, :resolve_attack, %{}),
            {:ok, damage_result} <-
              apply_attack_damage(game.id, player_id, defender_card, damage),
@@ -1140,7 +1144,7 @@ defmodule Prizmo.TcgEngine.Mechanics do
                player_id,
                attacker_card,
                defender_card,
-               attack,
+               effective_attack,
                opts
              ),
            {:ok, event} <-
@@ -1154,7 +1158,9 @@ defmodule Prizmo.TcgEngine.Mechanics do
                  defender_card_instance_id: defender_card.id
                }
                |> Map.merge(attack_damage_payload(damage_result))
-               |> Map.merge(effect_payload)
+               |> Map.merge(
+                 AttackEffects.merge_copied_attack_payload(copied_attack_payload, effect_payload)
+               )
              ),
            {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do
         with {:ok, game} <-

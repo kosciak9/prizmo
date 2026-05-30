@@ -2,6 +2,7 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
   @moduledoc false
 
   alias Prizmo.TcgEngine.AttackCosts
+  alias Prizmo.TcgEngine.AttackEffects
   alias Prizmo.TcgEngine.AttackLocks
   alias Prizmo.TcgEngine.AttackRequirements
   alias Prizmo.TcgEngine.CardCatalog
@@ -390,7 +391,8 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
          attack
        ) do
     with true <- attack |> AttackCosts.attack_cost() |> AttackCosts.paid?(attached_cards),
-         {:ok, executable_attack} <- CardCatalog.fetch_attack(active_card.card_id, attack_id) do
+         {:ok, executable_attack} <- CardCatalog.fetch_attack(active_card.card_id, attack_id),
+         :ok <- AttackEffects.require_declarable_attack(executable_attack, defender_card) do
       [attack_affordance(player, active_card, defender_card, attack_id, executable_attack)]
     else
       _other -> []

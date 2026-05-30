@@ -35,6 +35,13 @@ defmodule Prizmo.TcgEngine.GameView.Fields do
     status: [type: :string, allow_nil?: false]
   ]
 
+  @attack_copy_choice_fields [
+    attack_id: [type: :string, allow_nil?: false],
+    attack_name: [type: :string, allow_nil?: false],
+    attack_damage: [type: :string],
+    attack_effect_type: [type: :string]
+  ]
+
   @turn_view_fields [
     id: [type: :uuid, allow_nil?: false],
     turn_number: [type: :integer, allow_nil?: false],
@@ -51,6 +58,12 @@ defmodule Prizmo.TcgEngine.GameView.Fields do
     pending_attack_requires_bench_damage_counters: [type: :boolean, allow_nil?: false],
     pending_attack_requires_coin_result: [type: :boolean, allow_nil?: false],
     pending_attack_requires_heads_count: [type: :boolean, allow_nil?: false],
+    pending_attack_requires_copied_attack: [type: :boolean, allow_nil?: false],
+    pending_attack_copy_choices: [
+      type: {:array, :map},
+      allow_nil?: false,
+      constraints: [items: [fields: @attack_copy_choice_fields]]
+    ],
     pending_attacker_card_instance_id: [type: :uuid],
     pending_defender_card_instance_id: [type: :uuid]
   ]

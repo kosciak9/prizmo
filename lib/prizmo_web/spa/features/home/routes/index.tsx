@@ -43,6 +43,7 @@ const DISCARD_OWN_BENCH_ENERGY_FOR_BONUS_DAMAGE_EFFECT = 'discard_energy_from_ow
 const DISCARD_DEFENDING_ENERGY_ON_COIN_HEADS_EFFECT = 'discard_defending_energy_on_coin_heads'
 const SHUFFLE_ATTACHED_ENERGY_INTO_DECK_THEN_DAMAGE_OPPONENT_BENCH_EFFECT =
   'shuffle_attached_energy_into_deck_then_damage_opponent_bench'
+const COPY_OPPONENT_ACTIVE_TERA_POKEMON_ATTACK_EFFECT = 'copy_opponent_active_tera_pokemon_attack'
 
 const SUPPORTED_DECK_FIELDS: ListSupportedTcgDecksFields = [
   'deckKey',
@@ -131,6 +132,8 @@ const GAME_STATE_FIELDS = [
       'pendingAttackRequiresBenchDamageCounters',
       'pendingAttackRequiresCoinResult',
       'pendingAttackRequiresHeadsCount',
+      'pendingAttackRequiresCopiedAttack',
+      { pendingAttackCopyChoices: ['attackId', 'attackName', 'attackDamage', 'attackEffectType'] },
       'pendingAttackerCardInstanceId',
       'pendingDefenderCardInstanceId'
     ]
@@ -244,6 +247,13 @@ type ActionAffordance = {
   note: string | null
 }
 
+type AttackCopyChoice = {
+  attackId: string
+  attackName: string
+  attackDamage: string | null
+  attackEffectType: string | null
+}
+
 type PlayCardInput = {
   gameId: string
   playerId: PlayerId
@@ -336,6 +346,7 @@ type ResolveDeclaredAttackInput = {
   benchDamageCounterAllocations?: Record<string, number>
   coinResult?: CoinResult | null
   headsCount?: number | null
+  copiedAttackId?: string | null
 }
 
 type ResolveDeclaredAttackCommand = {
@@ -348,6 +359,7 @@ type ResolveDeclaredAttackCommand = {
   benchDamageCounterAllocations?: Record<string, number>
   coinResult?: CoinResult | null
   headsCount?: number | null
+  copiedAttackId?: string | null
 }
 
 type FinishAttackInput = {
@@ -409,6 +421,8 @@ type GameState = {
     pendingAttackRequiresBenchDamageCounters: boolean
     pendingAttackRequiresCoinResult: boolean
     pendingAttackRequiresHeadsCount: boolean
+    pendingAttackRequiresCopiedAttack: boolean
+    pendingAttackCopyChoices: AttackCopyChoice[]
     pendingAttackerCardInstanceId: string | null
     pendingDefenderCardInstanceId: string | null
   } | null
@@ -2154,24 +2168,64 @@ function AttackProgressPanel({
   >({})
   const [selectedCoinResult, setSelectedCoinResult] = useState<CoinResult | ''>('')
   const [selectedHeadsCount, setSelectedHeadsCount] = useState('')
+  const [selectedCopiedAttackId, setSelectedCopiedAttackId] = useState('')
   const turn = gameState.currentTurn
   const activePlayer = turn ? gameState.players.find(player => player.playerId === turn.activePlayerId) : undefined
   const opponentPlayer = turn ? gameState.players.find(player => player.playerId !== turn.activePlayerId) : undefined
-  const switchTargetOptions = turn?.pendingAttackRequiresSwitchTarget ? (activePlayer?.bench ?? []) : []
+  const copiedAttackOptions = turn?.pendingAttackRequiresCopiedAttack ? turn.pendingAttackCopyChoices : []
+  const selectedCopiedAttackChoice = copiedAttackOptions.find(choice => choice.attackId === selectedCopiedAttackId)
+  const copiedAttackChoiceForResolve = selectedCopiedAttackChoice ?? (copiedAttackOptions.length === 1 ? copiedAttackOptions[0] : null)
+  const copiedAttackIdForResolve = turn?.pendingAttackRequiresCopiedAttack
+    ? (copiedAttackChoiceForResolve?.attackId ?? null)
+    : null
+  const resolutionEffectType = copiedAttackChoiceForResolve?.attackEffectType ?? turn?.pendingAttackEffectType ?? null
+  const pendingAttackRequiresSwitchTarget = Boolean(
+    turn?.pendingAttackRequiresSwitchTarget || resolutionEffectType === 'switch_self_with_bench'
+  )
+  const pendingAttackRequiresDiscardedEnergy = Boolean(
+    turn?.pendingAttackRequiresDiscardedEnergy ||
+      resolutionEffectType === DISCARD_OWN_BASIC_ENERGY_FOR_DAMAGE_EFFECT ||
+      resolutionEffectType === DISCARD_OWN_BENCH_ENERGY_FOR_BONUS_DAMAGE_EFFECT ||
+      resolutionEffectType === DISCARD_DEFENDING_ENERGY_ON_COIN_HEADS_EFFECT
+  )
+  const pendingAttackRequiresReturnedEnergy = Boolean(
+    turn?.pendingAttackRequiresReturnedEnergy || resolutionEffectType === 'return_attached_energy_to_hand'
+  )
+  const pendingAttackRequiresShuffledEnergy = Boolean(
+    turn?.pendingAttackRequiresShuffledEnergy ||
+      resolutionEffectType === SHUFFLE_ATTACHED_ENERGY_INTO_DECK_THEN_DAMAGE_OPPONENT_BENCH_EFFECT
+  )
+  const pendingAttackRequiresBenchDamageTarget = Boolean(
+    turn?.pendingAttackRequiresBenchDamageTarget ||
+      resolutionEffectType === SHUFFLE_ATTACHED_ENERGY_INTO_DECK_THEN_DAMAGE_OPPONENT_BENCH_EFFECT
+  )
+  const pendingAttackRequiresBenchDamageCounters = Boolean(
+    turn?.pendingAttackRequiresBenchDamageCounters || resolutionEffectType === 'opponent_bench_damage_counters'
+  )
+  const pendingAttackRequiresCoinResult = Boolean(
+    turn?.pendingAttackRequiresCoinResult ||
+      resolutionEffectType === 'bonus_damage_on_coin_heads' ||
+      resolutionEffectType === DISCARD_DEFENDING_ENERGY_ON_COIN_HEADS_EFFECT ||
+      resolutionEffectType === 'prevent_damage_and_effects_from_attacks_next_turn_on_coin_heads'
+  )
+  const pendingAttackRequiresHeadsCount = Boolean(
+    turn?.pendingAttackRequiresHeadsCount || resolutionEffectType === 'bonus_damage_per_coin_heads_count'
+  )
+  const switchTargetOptions = pendingAttackRequiresSwitchTarget ? (activePlayer?.bench ?? []) : []
   const selectedSwitchTargetIsValid = switchTargetOptions.some(card => card.id === selectedSwitchBenchCardInstanceId)
   const discardedEnergyOptions = useMemo(() => {
-    if (!turn?.pendingAttackRequiresDiscardedEnergy || !activePlayer) {
+    if (!pendingAttackRequiresDiscardedEnergy || !activePlayer) {
       return []
     }
 
     const sourceCards =
-      turn.pendingAttackEffectType === DISCARD_OWN_BENCH_ENERGY_FOR_BONUS_DAMAGE_EFFECT
+      resolutionEffectType === DISCARD_OWN_BENCH_ENERGY_FOR_BONUS_DAMAGE_EFFECT
         ? activePlayer.bench
-        : turn.pendingAttackEffectType === DISCARD_DEFENDING_ENERGY_ON_COIN_HEADS_EFFECT
+        : resolutionEffectType === DISCARD_DEFENDING_ENERGY_ON_COIN_HEADS_EFFECT
           ? opponentPlayer?.active
             ? [opponentPlayer.active]
             : []
-        : turn.pendingAttackEffectType === DISCARD_OWN_BASIC_ENERGY_FOR_DAMAGE_EFFECT
+        : resolutionEffectType === DISCARD_OWN_BASIC_ENERGY_FOR_DAMAGE_EFFECT
           ? [activePlayer.active, ...activePlayer.bench]
           : []
 
@@ -2182,27 +2236,27 @@ function AttackProgressPanel({
           .filter(isEnergyCard)
           .map(energyCard => ({ attachedTo: card, energyCard }))
       )
-  }, [activePlayer, opponentPlayer?.active, turn?.pendingAttackEffectType, turn?.pendingAttackRequiresDiscardedEnergy])
+  }, [activePlayer, opponentPlayer?.active, pendingAttackRequiresDiscardedEnergy, resolutionEffectType])
   const discardedEnergyOptionIds = useMemo(
     () => new Set(discardedEnergyOptions.map(option => option.energyCard.id)),
     [discardedEnergyOptions]
   )
-  const selectedDiscardedEnergyIdsForResolve = turn?.pendingAttackRequiresDiscardedEnergy
+  const selectedDiscardedEnergyIdsForResolve = pendingAttackRequiresDiscardedEnergy
     ? selectedDiscardedEnergyCardInstanceIds.filter(id => discardedEnergyOptionIds.has(id))
     : []
   const returnedEnergyOptions = useMemo(() => {
-    if (!turn?.pendingAttackRequiresReturnedEnergy || !activePlayer?.active) {
+    if (!pendingAttackRequiresReturnedEnergy || !activePlayer?.active) {
       return []
     }
 
     return (activePlayer.active.attachedCards ?? []).filter(isEnergyCard)
-  }, [activePlayer?.active, turn?.pendingAttackRequiresReturnedEnergy])
+  }, [activePlayer?.active, pendingAttackRequiresReturnedEnergy])
   const returnedEnergyOptionIds = useMemo(
     () => new Set(returnedEnergyOptions.map(energyCard => energyCard.id)),
     [returnedEnergyOptions]
   )
   const selectedReturnedEnergyIsValid = returnedEnergyOptionIds.has(selectedReturnedEnergyCardInstanceId)
-  const returnedEnergyIdForResolve = turn?.pendingAttackRequiresReturnedEnergy
+  const returnedEnergyIdForResolve = pendingAttackRequiresReturnedEnergy
     ? selectedReturnedEnergyIsValid
       ? selectedReturnedEnergyCardInstanceId
       : returnedEnergyOptions.length === 1
@@ -2210,20 +2264,20 @@ function AttackProgressPanel({
         : null
     : null
   const shuffledEnergyOptions = useMemo(() => {
-    if (!turn?.pendingAttackRequiresShuffledEnergy || !activePlayer?.active) {
+    if (!pendingAttackRequiresShuffledEnergy || !activePlayer?.active) {
       return []
     }
 
     return (activePlayer.active.attachedCards ?? []).filter(isEnergyCard)
-  }, [activePlayer?.active, turn?.pendingAttackRequiresShuffledEnergy])
+  }, [activePlayer?.active, pendingAttackRequiresShuffledEnergy])
   const shuffledEnergyOptionIds = useMemo(
     () => new Set(shuffledEnergyOptions.map(energyCard => energyCard.id)),
     [shuffledEnergyOptions]
   )
-  const selectedShuffledEnergyIdsForResolve = turn?.pendingAttackRequiresShuffledEnergy
+  const selectedShuffledEnergyIdsForResolve = pendingAttackRequiresShuffledEnergy
     ? selectedShuffledEnergyCardInstanceIds.filter(id => shuffledEnergyOptionIds.has(id))
     : []
-  const benchDamageTargetOptions = turn?.pendingAttackRequiresBenchDamageTarget ? (opponentPlayer?.bench ?? []) : []
+  const benchDamageTargetOptions = pendingAttackRequiresBenchDamageTarget ? (opponentPlayer?.bench ?? []) : []
   const selectedBenchDamageTargetIsValid = benchDamageTargetOptions.some(
     card => card.id === selectedBenchDamageTargetCardInstanceId
   )
@@ -2232,7 +2286,7 @@ function AttackProgressPanel({
     : benchDamageTargetOptions.length === 1
       ? (benchDamageTargetOptions[0]?.id ?? null)
       : null
-  const benchDamageCounterOptions = turn?.pendingAttackRequiresBenchDamageCounters ? (opponentPlayer?.bench ?? []) : []
+  const benchDamageCounterOptions = pendingAttackRequiresBenchDamageCounters ? (opponentPlayer?.bench ?? []) : []
   const benchDamageCounterOptionIds = useMemo(
     () => new Set(benchDamageCounterOptions.map(card => card.id)),
     [benchDamageCounterOptions]
@@ -2250,11 +2304,11 @@ function AttackProgressPanel({
     (total, counters) => total + counters,
     0
   )
-  const coinResultForResolve = turn?.pendingAttackRequiresCoinResult && selectedCoinResult ? selectedCoinResult : null
+  const coinResultForResolve = pendingAttackRequiresCoinResult && selectedCoinResult ? selectedCoinResult : null
   const selectedHeadsCountValue = selectedHeadsCount.trim()
   const parsedHeadsCount = Number(selectedHeadsCountValue)
   const headsCountForResolve =
-    turn?.pendingAttackRequiresHeadsCount &&
+    pendingAttackRequiresHeadsCount &&
     selectedHeadsCountValue !== '' &&
     Number.isInteger(parsedHeadsCount) &&
     parsedHeadsCount >= 0
@@ -2275,7 +2329,14 @@ function AttackProgressPanel({
     setSelectedBenchDamageCounterAllocations({})
     setSelectedCoinResult('')
     setSelectedHeadsCount('')
+    setSelectedCopiedAttackId('')
   }, [turn?.id, turn?.pendingAttackId])
+
+  useEffect(() => {
+    if (selectedCopiedAttackId && !selectedCopiedAttackChoice) {
+      setSelectedCopiedAttackId('')
+    }
+  }, [selectedCopiedAttackChoice, selectedCopiedAttackId])
 
   useEffect(() => {
     setSelectedDiscardedEnergyCardInstanceIds(previousSelectedIds => {
@@ -2326,59 +2387,63 @@ function AttackProgressPanel({
   const attackLabel = turn.pendingAttackId ? formatEventType(turn.pendingAttackId) : 'declared attack'
   const viewerCanAdvanceAttack = viewerPlayerId === turn.activePlayerId && isPlayerId(turn.activePlayerId)
   const commandPending = Boolean(resolveDeclaredAttackPendingPlayerId || finishAttackPendingPlayerId)
-  const switchTargetRequired = turn.pendingAttackRequiresSwitchTarget && switchTargetOptions.length > 1
+  const copiedAttackUnavailable = turn.pendingAttackRequiresCopiedAttack && copiedAttackOptions.length === 0
+  const copiedAttackRequiresChoice = turn.pendingAttackRequiresCopiedAttack && copiedAttackOptions.length > 1 && !selectedCopiedAttackChoice
+  const switchTargetRequired = pendingAttackRequiresSwitchTarget && switchTargetOptions.length > 1
   const discardedEnergyMaxSelection =
-    turn.pendingAttackEffectType === DISCARD_OWN_BENCH_ENERGY_FOR_BONUS_DAMAGE_EFFECT
+    resolutionEffectType === DISCARD_OWN_BENCH_ENERGY_FOR_BONUS_DAMAGE_EFFECT
       ? 2
-      : turn.pendingAttackEffectType === DISCARD_DEFENDING_ENERGY_ON_COIN_HEADS_EFFECT
+      : resolutionEffectType === DISCARD_DEFENDING_ENERGY_ON_COIN_HEADS_EFFECT
         ? 1
         : null
   const discardedEnergyDescription =
-    turn.pendingAttackEffectType === DISCARD_OWN_BENCH_ENERGY_FOR_BONUS_DAMAGE_EFFECT
+    resolutionEffectType === DISCARD_OWN_BENCH_ENERGY_FOR_BONUS_DAMAGE_EFFECT
       ? 'This attack does 60 more damage for each selected Energy attached to Benched Pokémon, then discards those Energy cards during resolution. Select up to 2, or select none for no bonus damage.'
-      : turn.pendingAttackEffectType === DISCARD_DEFENDING_ENERGY_ON_COIN_HEADS_EFFECT
+      : resolutionEffectType === DISCARD_DEFENDING_ENERGY_ON_COIN_HEADS_EFFECT
         ? "On Heads, this attack discards one Energy attached to the opponent's Active Pokémon after damage. If exactly one Energy is attached, resolution will discard it automatically. Tails discards none."
-      : turn.pendingAttackEffectType === DISCARD_OWN_BASIC_ENERGY_FOR_DAMAGE_EFFECT
+      : resolutionEffectType === DISCARD_OWN_BASIC_ENERGY_FOR_DAMAGE_EFFECT
         ? 'This attack does damage for each selected own Basic Energy attached to Pokémon in play, then discards those Energy cards during resolution. Selecting none resolves it for zero bonus damage.'
         : 'This attack resolves with the selected discarded Energy cards.'
   const discardedEnergyEmptyDescription =
-    turn.pendingAttackEffectType === DISCARD_DEFENDING_ENERGY_ON_COIN_HEADS_EFFECT
+    resolutionEffectType === DISCARD_DEFENDING_ENERGY_ON_COIN_HEADS_EFFECT
       ? `No Energy cards are visible on the opponent's Active Pokémon, so Heads will discard none.`
       : `No attached Energy cards are visible for ${formatPlayerId(turn.activePlayerId)}, so resolution will deal zero damage from this effect.`
-  const returnedEnergyRequiresChoice = turn.pendingAttackRequiresReturnedEnergy && returnedEnergyOptions.length > 1
-  const returnedEnergyUnavailable = turn.pendingAttackRequiresReturnedEnergy && returnedEnergyOptions.length === 0
+  const returnedEnergyRequiresChoice = pendingAttackRequiresReturnedEnergy && returnedEnergyOptions.length > 1
+  const returnedEnergyUnavailable = pendingAttackRequiresReturnedEnergy && returnedEnergyOptions.length === 0
   const shuffledEnergyRequiredCount = 3
   const shuffledEnergySelectedCount = selectedShuffledEnergyIdsForResolve.length
   const shuffledEnergyPartialSelection =
-    turn.pendingAttackRequiresShuffledEnergy &&
+    pendingAttackRequiresShuffledEnergy &&
     shuffledEnergySelectedCount > 0 &&
     shuffledEnergySelectedCount !== shuffledEnergyRequiredCount
   const benchDamageTargetRequired =
-    turn.pendingAttackRequiresBenchDamageTarget &&
+    pendingAttackRequiresBenchDamageTarget &&
     shuffledEnergySelectedCount === shuffledEnergyRequiredCount &&
     benchDamageTargetOptions.length > 1
   const benchDamageTargetUnavailable =
-    turn.pendingAttackRequiresBenchDamageTarget &&
+    pendingAttackRequiresBenchDamageTarget &&
     shuffledEnergySelectedCount === shuffledEnergyRequiredCount &&
     benchDamageTargetOptions.length === 0
   const benchDamageCounterRequiredCount = 6
   const benchDamageCounterAllocationRequired =
-    turn.pendingAttackRequiresBenchDamageCounters && benchDamageCounterOptions.length > 0
+    pendingAttackRequiresBenchDamageCounters && benchDamageCounterOptions.length > 0
   const benchDamageCounterAllocationIncomplete =
     benchDamageCounterAllocationRequired && selectedBenchDamageCounterTotal !== benchDamageCounterRequiredCount
-  const coinResultRequired = turn.pendingAttackRequiresCoinResult && !coinResultForResolve
+  const coinResultRequired = pendingAttackRequiresCoinResult && !coinResultForResolve
   const defendingEnergyDiscardRequiresChoice =
-    turn.pendingAttackEffectType === DISCARD_DEFENDING_ENERGY_ON_COIN_HEADS_EFFECT &&
+    resolutionEffectType === DISCARD_DEFENDING_ENERGY_ON_COIN_HEADS_EFFECT &&
     coinResultForResolve === 'heads' &&
     discardedEnergyOptions.length > 1 &&
     selectedDiscardedEnergyIdsForResolve.length !== 1
-  const headsCountRequired = turn.pendingAttackRequiresHeadsCount && headsCountForResolve === null
+  const headsCountRequired = pendingAttackRequiresHeadsCount && headsCountForResolve === null
   const missingActivePlayers = gameState.players.filter(player => !player.active)
   const viewerPromptBlocksFinish = viewerCanAdvanceAttack && gameState.prompts.length > 0
   const attackCannotFinish = missingActivePlayers.length > 0 || viewerPromptBlocksFinish
   const resolveDisabled =
     !viewerCanAdvanceAttack ||
     commandPending ||
+    copiedAttackUnavailable ||
+    copiedAttackRequiresChoice ||
     (switchTargetRequired && !selectedSwitchTargetIsValid) ||
     returnedEnergyUnavailable ||
     (returnedEnergyRequiresChoice && !selectedReturnedEnergyIsValid) ||
@@ -2391,27 +2456,31 @@ function AttackProgressPanel({
     headsCountRequired
   const resolveButtonLabel = resolveDeclaredAttackPendingPlayerId === turn.activePlayerId
     ? `Resolving ${attackLabel}...`
-    : switchTargetRequired && !selectedSwitchTargetIsValid
-      ? `Choose a switch target for ${attackLabel}`
-      : returnedEnergyUnavailable
-        ? `No Energy available to return for ${attackLabel}`
-        : returnedEnergyRequiresChoice && !selectedReturnedEnergyIsValid
-          ? `Choose returned Energy for ${attackLabel}`
-          : shuffledEnergyPartialSelection
-            ? `Select exactly ${shuffledEnergyRequiredCount} Energy or none for ${attackLabel}`
-            : benchDamageTargetUnavailable
-              ? `No opponent Bench target for ${attackLabel}`
-              : benchDamageTargetRequired && !selectedBenchDamageTargetIsValid
-                ? `Choose a Bench damage target for ${attackLabel}`
-                : benchDamageCounterAllocationIncomplete
-                  ? `Allocate exactly ${benchDamageCounterRequiredCount} Bench damage counters for ${attackLabel}`
-                  : coinResultRequired
-                    ? `Choose a coin result for ${attackLabel}`
-                    : defendingEnergyDiscardRequiresChoice
-                      ? `Choose an Energy to discard for ${attackLabel}`
-                      : headsCountRequired
-                        ? `Enter a heads count for ${attackLabel}`
-                        : `Resolve ${attackLabel}`
+    : copiedAttackUnavailable
+      ? `No copyable Tera attacks for ${attackLabel}`
+      : copiedAttackRequiresChoice
+        ? `Choose a copied attack for ${attackLabel}`
+        : switchTargetRequired && !selectedSwitchTargetIsValid
+          ? `Choose a switch target for ${attackLabel}`
+          : returnedEnergyUnavailable
+            ? `No Energy available to return for ${attackLabel}`
+            : returnedEnergyRequiresChoice && !selectedReturnedEnergyIsValid
+              ? `Choose returned Energy for ${attackLabel}`
+              : shuffledEnergyPartialSelection
+                ? `Select exactly ${shuffledEnergyRequiredCount} Energy or none for ${attackLabel}`
+                : benchDamageTargetUnavailable
+                  ? `No opponent Bench target for ${attackLabel}`
+                  : benchDamageTargetRequired && !selectedBenchDamageTargetIsValid
+                    ? `Choose a Bench damage target for ${attackLabel}`
+                    : benchDamageCounterAllocationIncomplete
+                      ? `Allocate exactly ${benchDamageCounterRequiredCount} Bench damage counters for ${attackLabel}`
+                      : coinResultRequired
+                        ? `Choose a coin result for ${attackLabel}`
+                        : defendingEnergyDiscardRequiresChoice
+                          ? `Choose an Energy to discard for ${attackLabel}`
+                          : headsCountRequired
+                            ? `Enter a heads count for ${attackLabel}`
+                            : `Resolve ${attackLabel}`
   const toggleDiscardedEnergyCard = (energyCardInstanceId: string) => {
     setSelectedDiscardedEnergyCardInstanceIds(previousSelectedIds => {
       if (previousSelectedIds.includes(energyCardInstanceId)) {
@@ -2472,7 +2541,62 @@ function AttackProgressPanel({
           attack and ends the turn after resolution.
         </p>
 
-        {turn.pendingAttackRequiresCoinResult ? (
+        {turn.pendingAttackRequiresCopiedAttack ? (
+          <div className="rounded-xl border border-cyan-200 bg-cyan-50/70 p-3">
+            <div className="space-y-1">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-cyan-900">Copied attack</p>
+              <p className="text-xs leading-5 text-cyan-900/80">
+                Gemstone Mimicry uses one executable attack from the opponent's Active Tera Pokémon as this attack.
+              </p>
+            </div>
+
+            {copiedAttackOptions.length > 1 ? (
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                {copiedAttackOptions.map(choice => {
+                  const selected = choice.attackId === selectedCopiedAttackId
+
+                  return (
+                    <label
+                      className={`flex cursor-pointer items-start gap-2 rounded-lg border px-3 py-2 text-xs transition ${
+                        selected
+                          ? 'border-cyan-700 bg-cyan-100 text-cyan-950'
+                          : 'border-cyan-200 bg-stone-50 text-stone-700 hover:border-cyan-400'
+                      }`}
+                      key={choice.attackId}
+                    >
+                      <input
+                        checked={selected}
+                        className="mt-0.5"
+                        disabled={!viewerCanAdvanceAttack || commandPending}
+                        name="copied-attack-id"
+                        onChange={() => setSelectedCopiedAttackId(choice.attackId)}
+                        type="radio"
+                      />
+                      <span className="min-w-0">
+                        <span className="block font-medium">{choice.attackName}</span>
+                        <span className="mt-0.5 block font-mono text-[0.68rem] opacity-70">
+                          {choice.attackId}
+                          {choice.attackDamage ? ` · ${choice.attackDamage} damage` : ''}
+                          {choice.attackEffectType ? ` · ${formatEventType(choice.attackEffectType)}` : ''}
+                        </span>
+                      </span>
+                    </label>
+                  )
+                })}
+              </div>
+            ) : copiedAttackOptions.length === 1 ? (
+              <p className="mt-3 rounded-lg border border-cyan-200 bg-stone-50 px-3 py-2 text-xs text-cyan-900">
+                Only {copiedAttackOptions[0]?.attackName} is executable, so resolution will copy it automatically.
+              </p>
+            ) : (
+              <p className="mt-3 rounded-lg border border-cyan-200 bg-stone-50 px-3 py-2 text-xs text-cyan-900">
+                The opponent's Active Pokémon has no engine-executable Tera attacks available to copy.
+              </p>
+            )}
+          </div>
+        ) : null}
+
+        {pendingAttackRequiresCoinResult ? (
           <div className="rounded-xl border border-yellow-200 bg-yellow-50/70 p-3">
             <div className="space-y-1">
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-yellow-900">Coin result</p>
@@ -2516,7 +2640,7 @@ function AttackProgressPanel({
           </div>
         ) : null}
 
-        {turn.pendingAttackRequiresHeadsCount ? (
+        {pendingAttackRequiresHeadsCount ? (
           <div className="rounded-xl border border-yellow-200 bg-yellow-50/70 p-3">
             <div className="space-y-1">
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-yellow-900">Heads count</p>
@@ -2545,7 +2669,7 @@ function AttackProgressPanel({
           </div>
         ) : null}
 
-        {turn.pendingAttackRequiresSwitchTarget ? (
+        {pendingAttackRequiresSwitchTarget ? (
           <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-3">
             <div className="space-y-1">
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-900">Switch target</p>
@@ -2597,7 +2721,7 @@ function AttackProgressPanel({
           </div>
         ) : null}
 
-        {turn.pendingAttackRequiresDiscardedEnergy ? (
+        {pendingAttackRequiresDiscardedEnergy ? (
           <div className="rounded-xl border border-orange-200 bg-orange-50/70 p-3">
             <div className="space-y-1">
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-orange-900">Discarded Energy</p>
@@ -2649,7 +2773,7 @@ function AttackProgressPanel({
           </div>
         ) : null}
 
-        {turn.pendingAttackRequiresReturnedEnergy ? (
+        {pendingAttackRequiresReturnedEnergy ? (
           <div className="rounded-xl border border-sky-200 bg-sky-50/70 p-3">
             <div className="space-y-1">
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-sky-900">Returned Energy</p>
@@ -2704,7 +2828,7 @@ function AttackProgressPanel({
           </div>
         ) : null}
 
-        {turn.pendingAttackRequiresShuffledEnergy ? (
+        {pendingAttackRequiresShuffledEnergy ? (
           <div className="rounded-xl border border-violet-200 bg-violet-50/70 p-3">
             <div className="space-y-1">
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-violet-900">
@@ -2809,7 +2933,7 @@ function AttackProgressPanel({
           </div>
         ) : null}
 
-        {turn.pendingAttackRequiresBenchDamageCounters ? (
+        {pendingAttackRequiresBenchDamageCounters ? (
           <div className="rounded-xl border border-fuchsia-200 bg-fuchsia-50/70 p-3">
             <div className="space-y-1">
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-fuchsia-900">
@@ -2895,7 +3019,8 @@ function AttackProgressPanel({
                 benchDamageTargetCardInstanceId: benchDamageTargetIdForResolve,
                 benchDamageCounterAllocations: selectedBenchDamageCounterAllocationsForResolve,
                 coinResult: coinResultForResolve,
-                headsCount: headsCountForResolve
+                headsCount: headsCountForResolve,
+                copiedAttackId: copiedAttackIdForResolve
               })
             }
             type="button"

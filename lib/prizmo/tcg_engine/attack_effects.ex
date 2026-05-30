@@ -9,6 +9,7 @@ defmodule Prizmo.TcgEngine.AttackEffects do
       require_basic_energy: 1,
       require_energy: 1,
       require_pokemon_card: 1,
+      require_tera_pokemon_card: 1,
       require_trainer_type: 2
     ]
 
@@ -44,6 +45,7 @@ defmodule Prizmo.TcgEngine.AttackEffects do
   alias Prizmo.TcgEngine.AttackLocks
   alias Prizmo.TcgEngine.AttackPrevention
   alias Prizmo.TcgEngine.BattleActions
+  alias Prizmo.TcgEngine.CardCatalog
   alias Prizmo.TcgEngine.CardInstance
   alias Prizmo.TcgEngine.EventPayloads
   alias Prizmo.TcgEngine.Game
@@ -53,6 +55,8 @@ defmodule Prizmo.TcgEngine.AttackEffects do
   alias Prizmo.TcgEngine.Prompt
   alias Prizmo.TcgEngine.RetreatLocks
   alias Prizmo.TcgEngine.TurnStore
+
+  @copy_opponent_active_tera_pokemon_attack :copy_opponent_active_tera_pokemon_attack
 
   @supported_effect_types [
     :bonus_damage_per_benched_pokemon,
@@ -65,6 +69,7 @@ defmodule Prizmo.TcgEngine.AttackEffects do
     :bonus_damage_per_energy_attached_to_defender,
     :attacker_cannot_attack_next_turn,
     :confuse_defender_active,
+    @copy_opponent_active_tera_pokemon_attack,
     :damage_unaffected_by_effects_on_opponent_active,
     :damage_only_if_stadium_in_play,
     :damage_per_discarded_own_basic_energy,
@@ -122,6 +127,57 @@ defmodule Prizmo.TcgEngine.AttackEffects do
     end
   end
 
+  @spec effective_attack_for_resolution(CardInstance.t(), map(), map()) ::
+          {:ok, {map(), map()}} | {:error, term()}
+  def effective_attack_for_resolution(%CardInstance{} = defender_card, attack, opts)
+      when is_map(attack) and is_map(opts) do
+    case Map.get(attack, :effect) do
+      %{type: @copy_opponent_active_tera_pokemon_attack} ->
+        copied_attack_for_resolution(defender_card, opts)
+
+      _other_effect ->
+        {:ok, {attack, %{}}}
+    end
+  end
+
+  @spec merge_copied_attack_payload(map(), map()) :: map()
+  def merge_copied_attack_payload(copy_payload, effect_payload)
+      when is_map(copy_payload) and is_map(effect_payload) do
+    payload = Map.merge(copy_payload, effect_payload)
+
+    cond do
+      map_size(copy_payload) == 0 ->
+        payload
+
+      Map.has_key?(payload, :effect_type) ->
+        payload
+
+      true ->
+        Map.put(payload, :effect_type, Map.fetch!(copy_payload, :copied_by_effect_type))
+    end
+  end
+
+  @spec require_declarable_attack(map(), CardInstance.t()) :: :ok | {:error, term()}
+  def require_declarable_attack(
+        %{effect: %{type: @copy_opponent_active_tera_pokemon_attack}},
+        %CardInstance{} = defender_card
+      ) do
+    case copyable_attacks(defender_card) do
+      {:ok, [_first | _rest]} -> :ok
+      {:ok, []} -> {:error, :no_copyable_tera_attacks}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  def require_declarable_attack(_attack, %CardInstance{}), do: :ok
+
+  @spec copyable_attack_choices(CardInstance.t()) :: {:ok, [map()]} | {:error, term()}
+  def copyable_attack_choices(%CardInstance{} = defender_card) do
+    with {:ok, attacks} <- copyable_attacks(defender_card) do
+      {:ok, Enum.map(attacks, &copyable_attack_choice/1)}
+    end
+  end
+
   @spec resolve_after_damage(
           String.t(),
           String.t(),
@@ -141,6 +197,21 @@ defmodule Prizmo.TcgEngine.AttackEffects do
       )
       when is_binary(game_id) and is_binary(player_id) and is_map(attack) and is_map(opts) do
     case Map.get(attack, :effect) do
+      %{type: @copy_opponent_active_tera_pokemon_attack} ->
+        with {:ok, {copied_attack, copy_payload}} <-
+               effective_attack_for_resolution(defender_card, attack, opts),
+             {:ok, effect_payload} <-
+               resolve_after_damage(
+                 game_id,
+                 player_id,
+                 attacker_card,
+                 defender_card,
+                 copied_attack,
+                 opts
+               ) do
+          {:ok, merge_copied_attack_payload(copy_payload, effect_payload)}
+        end
+
       %{type: :switch_self_with_bench} ->
         switch_self_with_bench(game_id, player_id, attacker_card, opts)
 
@@ -575,6 +646,83 @@ defmodule Prizmo.TcgEngine.AttackEffects do
       card_instance_id: pending_effect.source_card_instance_id
     }
   end
+
+  defp copied_attack_for_resolution(%CardInstance{} = defender_card, opts) do
+    with {:ok, copied_attack} <- copied_attack(defender_card, opts) do
+      {:ok, {copied_attack, copied_attack_payload(defender_card, copied_attack)}}
+    end
+  end
+
+  defp copied_attack(%CardInstance{} = defender_card, opts) do
+    with {:ok, attacks} <- copyable_attacks(defender_card) do
+      case copied_attack_id(opts) do
+        nil ->
+          implicit_copied_attack(attacks)
+
+        copied_attack_id when is_binary(copied_attack_id) ->
+          explicit_copied_attack(attacks, copied_attack_id)
+
+        _invalid ->
+          {:error, :invalid_copied_attack_id}
+      end
+    end
+  end
+
+  defp copyable_attacks(%CardInstance{card_id: card_id}) do
+    with :ok <- require_tera_pokemon_card(card_id),
+         {:ok, attacks} <- CardCatalog.fetch_executable_attacks(card_id) do
+      {:ok, Enum.reject(attacks, &copy_attack?/1)}
+    end
+  end
+
+  defp copied_attack_id(opts) do
+    Map.get(opts, :copied_attack_id) || Map.get(opts, "copied_attack_id")
+  end
+
+  defp implicit_copied_attack([]), do: {:error, :no_copyable_tera_attacks}
+  defp implicit_copied_attack([attack]), do: {:ok, attack}
+  defp implicit_copied_attack([_first | _rest]), do: {:error, :copied_attack_requires_target}
+
+  defp explicit_copied_attack(attacks, copied_attack_id) do
+    case Enum.find(attacks, &(Atom.to_string(&1.id) == copied_attack_id)) do
+      nil -> {:error, :invalid_copied_attack_choice}
+      attack -> {:ok, attack}
+    end
+  end
+
+  defp copied_attack_payload(%CardInstance{} = defender_card, copied_attack) do
+    %{
+      copied_by_effect_type: Atom.to_string(@copy_opponent_active_tera_pokemon_attack),
+      copied_from_card_id: defender_card.card_id,
+      copied_from_card_instance_id: defender_card.id,
+      copied_attack_id: Atom.to_string(copied_attack.id),
+      copied_attack_name: copied_attack.name,
+      copied_attack_damage: attack_damage(copied_attack),
+      copied_attack_effect_type: copied_attack_effect_type(copied_attack)
+    }
+  end
+
+  defp copyable_attack_choice(attack) do
+    %{
+      attack_id: Atom.to_string(attack.id),
+      attack_name: attack.name,
+      attack_damage: attack_damage(attack),
+      attack_effect_type: copied_attack_effect_type(attack)
+    }
+  end
+
+  defp copy_attack?(%{effect: %{type: @copy_opponent_active_tera_pokemon_attack}}), do: true
+  defp copy_attack?(_attack), do: false
+
+  defp attack_damage(%{damage: damage}) when is_integer(damage), do: Integer.to_string(damage)
+  defp attack_damage(%{damage: damage}) when is_binary(damage), do: damage
+  defp attack_damage(_attack), do: nil
+
+  defp copied_attack_effect_type(%{effect: effect}) when is_map(effect) do
+    effect |> type() |> Atom.to_string()
+  end
+
+  defp copied_attack_effect_type(_attack), do: nil
 
   defp switch_self_with_bench(game_id, player_id, %CardInstance{} = attacker_card, opts) do
     with {:ok, bench_card} <- switch_target(game_id, player_id, opts) do

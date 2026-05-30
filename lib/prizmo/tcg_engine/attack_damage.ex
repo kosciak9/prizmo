@@ -32,6 +32,25 @@ defmodule Prizmo.TcgEngine.AttackDamage do
   defp base_damage(%{damage: damage}), do: {:error, {:unsupported_attack_damage, damage}}
 
   defp apply_effect(
+         _damage,
+         %CardInstance{} = attacker_card,
+         %CardInstance{} = defender_card,
+         %{type: :copy_opponent_active_tera_pokemon_attack},
+         opts
+       ) do
+    with {:ok, {copied_attack, _copy_payload}} <-
+           AttackEffects.effective_attack_for_resolution(
+             defender_card,
+             %{
+               effect: %{type: :copy_opponent_active_tera_pokemon_attack}
+             },
+             opts
+           ) do
+      damage_for(attacker_card, defender_card, copied_attack, opts)
+    end
+  end
+
+  defp apply_effect(
          damage,
          _attacker_card,
          _defender_card,

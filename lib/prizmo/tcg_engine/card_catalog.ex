@@ -35,6 +35,16 @@ defmodule Prizmo.TcgEngine.CardCatalog do
     Prizmo.Tcg.Cards.Behaviors.WHT
   ]
 
+  # TCGdex's cached card payloads do not currently expose Tera status as a
+  # structured field, so keep this engine-owned predicate deliberately narrow
+  # and limited to supported fixture cards whose Tera status is needed by rules.
+  @tera_pokemon_card_ids MapSet.new([
+                           "TEF-025",
+                           "TWM-025",
+                           "TWM-064",
+                           "TWM-130"
+                         ])
+
   @behaviors @behavior_modules
              |> Enum.flat_map(& &1.behavior_manifest())
              |> Map.new()
@@ -69,6 +79,22 @@ defmodule Prizmo.TcgEngine.CardCatalog do
     end
   end
 
+  def fetch_executable_attacks(card_id) do
+    with {:ok, %{attacks: attacks}} <- fetch(card_id) do
+      attacks
+      |> Map.keys()
+      |> Enum.sort_by(&Atom.to_string/1)
+      |> Enum.map(&fetch_attack(card_id, &1))
+      |> collect_results()
+    end
+  end
+
+  def tera_pokemon?(card_id) when is_binary(card_id) do
+    MapSet.member?(@tera_pokemon_card_ids, card_id)
+  end
+
+  def tera_pokemon?(_card_id), do: false
+
   def supported_card_ids do
     @behaviors
     |> Map.keys()
@@ -101,6 +127,7 @@ defmodule Prizmo.TcgEngine.CardCatalog do
       stage: metadata.stage,
       suffix: metadata.suffix,
       supertype: metadata.category,
+      tera?: tera_pokemon?(metadata.id),
       tcgdex_energy_type: metadata.energy_type,
       tcgdex_id: metadata.tcgdex_id,
       trainer_type: metadata.trainer_type,
@@ -223,6 +250,18 @@ defmodule Prizmo.TcgEngine.CardCatalog do
     |> case do
       nil -> :error
       attack_id -> {:ok, attack_id}
+    end
+  end
+
+  defp collect_results(results) do
+    results
+    |> Enum.reduce_while({:ok, []}, fn
+      {:ok, value}, {:ok, acc} -> {:cont, {:ok, [value | acc]}}
+      {:error, reason}, _acc -> {:halt, {:error, reason}}
+    end)
+    |> case do
+      {:ok, values} -> {:ok, Enum.reverse(values)}
+      {:error, reason} -> {:error, reason}
     end
   end
 

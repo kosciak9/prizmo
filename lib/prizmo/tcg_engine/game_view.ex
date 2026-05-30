@@ -107,6 +107,9 @@ defmodule Prizmo.TcgEngine.GameView do
   defp turn_view(%Turn{} = turn, cards) do
     pending_attack_effect_type = pending_attack_effect_type(turn, cards)
 
+    pending_attack_copy_choices =
+      pending_attack_copy_choices(turn, cards, pending_attack_effect_type)
+
     %{
       id: turn.id,
       turn_number: turn.turn_number,
@@ -141,6 +144,9 @@ defmodule Prizmo.TcgEngine.GameView do
         ],
       pending_attack_requires_heads_count:
         pending_attack_effect_type == :bonus_damage_per_coin_heads_count,
+      pending_attack_requires_copied_attack:
+        pending_attack_effect_type == :copy_opponent_active_tera_pokemon_attack,
+      pending_attack_copy_choices: pending_attack_copy_choices,
       pending_attacker_card_instance_id: turn.pending_attacker_card_instance_id,
       pending_defender_card_instance_id: turn.pending_defender_card_instance_id
     }
@@ -161,6 +167,22 @@ defmodule Prizmo.TcgEngine.GameView do
   end
 
   defp pending_attack_effect_type(%Turn{}, _cards), do: nil
+
+  defp pending_attack_copy_choices(
+         %Turn{pending_defender_card_instance_id: defender_id},
+         cards,
+         :copy_opponent_active_tera_pokemon_attack
+       )
+       when not is_nil(defender_id) do
+    with %CardInstance{} = defender_card <- Enum.find(cards, &(&1.id == defender_id)),
+         {:ok, choices} <- AttackEffects.copyable_attack_choices(defender_card) do
+      choices
+    else
+      _other -> []
+    end
+  end
+
+  defp pending_attack_copy_choices(%Turn{}, _cards, _pending_attack_effect_type), do: []
 
   defp stadium_view(cards, attached_cards_by_target) do
     cards
