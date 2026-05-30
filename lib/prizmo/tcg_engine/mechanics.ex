@@ -68,6 +68,7 @@ defmodule Prizmo.TcgEngine.Mechanics do
 
   import Prizmo.TcgEngine.TurnStore, only: [current_turn: 1]
 
+  alias Prizmo.TcgEngine.AttackDamage
   alias Prizmo.TcgEngine.CardCatalog
   alias Prizmo.TcgEngine.CardPlay
   alias Prizmo.TcgEngine.Cards.Registry, as: EngineCardRegistry
@@ -965,9 +966,10 @@ defmodule Prizmo.TcgEngine.Mechanics do
            {:ok, defender_card} <- get_card(game.id, turn.pending_defender_card_instance_id),
            {:ok, attack} <-
              CardCatalog.fetch_attack(attacker_card.card_id, turn.pending_attack_id),
+           {:ok, damage} <- AttackDamage.damage_for(attacker_card, defender_card, attack),
            {:ok, turn} <- update(turn, :resolve_attack, %{}),
            {:ok, damage_result} <-
-             apply_attack_damage(game.id, player_id, defender_card, Map.get(attack, :damage, 0)),
+             apply_attack_damage(game.id, player_id, defender_card, damage),
            {:ok, game} <-
              maybe_finish_for_empty_board(game, player_id, defender_card.owner_player_id),
            {:ok, event} <-

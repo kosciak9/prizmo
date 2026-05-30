@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-30] iteration 39 | Moltres Fighting Wings engine behavior
+- Task attempted: migrated the deterministic playtest fixture's `PFL-014` Moltres `Fighting Wings` attack into authored engine behavior and taught persisted attack resolution to apply its Pokémon ex bonus damage.
+- Files changed: added `lib/prizmo/tcg_engine/attack_damage.ex`; updated `lib/prizmo/tcg/cards/behaviors/pfl.ex`, `lib/prizmo/tcg_engine/mechanics.ex`, `test/prizmo/tcg/sim/scenario_test.exs`, this log, and the TCG engine playtest handoff.
+- Validation: `mix test test/prizmo/tcg_engine/mechanics_test.exs` passed (4 tests); Tidewave rollback smoke passed for Moltres declaring/resolving/finishing `Fighting Wings` for 110 damage into `ASC-142` Fezandipiti ex and 20 damage into `MEG-054` Abra; `mix prizmo.cards.coverage` passed with all 101 known deck cards implemented; `mix check --no-test` passed; initial full `mix check` exposed two legacy simulator scenarios that still assumed Drakloak was naturally drawn, then focused rerun of those scenarios passed after explicit Drakloak staging; final full `mix check` passed.
+- Remaining/blocking notes: no code blocker for the Moltres playtest path; attack declaration can still expose paid attacks whose executable behavior is missing, so unsupported declaration should be made explicit before broad attack playtesting.
+
 ## [2026-05-30] iteration 38 | Attack resolution and finish commands
 - Task attempted: exposed the persisted engine's existing `resolve_declared_attack` and `finish_attack` mechanics through Ash/RPC and added React SPA controls for turns in `attack_declared` or `attack_resolving` status.
 - Files changed: updated `lib/prizmo/tcg_engine/game/action_commands.ex`, `lib/prizmo/tcg_engine.ex`, `lib/prizmo_web/spa/features/home/routes/index.tsx`, `lib/prizmo_web/spa/lib/ash/client.ts`, generated `lib/prizmo_web/spa/lib/ash/generated/ash_rpc.ts`, this log, and the TCG engine playtest handoff.

@@ -116,26 +116,30 @@ Updated: 2026-05-30
 - The SPA Ash client re-exports the new generated RPC calls as `runResolveTcgEngineDeclaredAttack` and `runFinishTcgEngineAttack`.
 - The React playtest workbench now renders an Attack resolution panel while the current turn is `attack_declared` or `attack_resolving`; the active viewer can resolve the declared attack and then finish it to end the turn.
 - A Tidewave rollback smoke staged Dreepy `Petty Grudge` and verified the full persisted state path: `declare_attack` → `attack_declared`, `resolve_declared_attack` → `attack_resolving` with 10 damage applied, then `finish_attack` → `ended` with persisted events.
+- Iteration 39 added an authored PFL behavior overlay for `PFL-014` Moltres `Fighting Wings`, with executable base damage 20 and `bonus_damage_if_defender_pokemon_ex` bonus damage 90.
+- `Prizmo.TcgEngine.AttackDamage` now calculates persisted declared-attack damage and applies the Pokémon ex bonus by inspecting the defender's catalog metadata before `BattleActions.apply_attack_damage/4` persists damage.
+- A Tidewave rollback smoke verified the browser-visible path behind the SPA controls: Moltres can declare, resolve, and finish `Fighting Wings`, dealing 110 damage to `ASC-142` Fezandipiti ex and 20 damage to `MEG-054` Abra.
+- Full `mix check` initially exposed two legacy simulator scenarios that still assumed Drakloak was naturally drawn after the deterministic fixture ordering changes; those scenarios now explicitly stage Drakloak with the existing `search_to_hand_by_card_id/3` helper before evolving, and final full `mix check` passes.
 
 ## Last commit
 
-- Baseline entering iteration 38: `24db2d7 feat(tcg-engine): declare paid attacks`.
-- This handoff was written before committing iteration 38; expected commit message is `feat(tcg-engine): resolve declared attacks`.
+- Baseline entering iteration 39: `b8696f7 feat(tcg-engine): resolve declared attacks`.
+- This handoff was written before committing iteration 39; expected commit message is `feat(tcg-engine): add Moltres Fighting Wings behavior`.
 
 ## Remaining tasks
 
 - Decide whether old `Prizmo.Tcg.Sim` tests are kept as historical reference, quarantined, or ported scenario-by-scenario.
 - Build the minimal playable React SPA loop beyond prompt resolution, Bench commands, Attach Energy, attached-card board visibility, Retreat, paid attack declaration, static/executable attack resolution and finish controls, End Turn, next-turn progression, deterministic playtest fixture order, hardened tab-scoped viewer identity, and reduced prompt/action debug noise: rerun the full two-browser/manual-tester playtest milestone only after the validation harness can guarantee separate browser contexts, then address any remaining command-loop gaps it exposes.
-- Expand persisted Ash engine mechanics: broader attack effects, damage/KO/prizes/replacement Active, switch effects, evolution UI/RPC wiring, turn transitions, and snapshot-backed undo/debug support.
+- Expand persisted Ash engine mechanics: broader attack effects beyond Moltres's Pokémon ex bonus, damage/KO/prizes/replacement Active, switch effects, evolution UI/RPC wiring, turn transitions, and snapshot-backed undo/debug support.
 - Continue migrating executable card behavior into engine-owned definitions with explicit unsupported-behavior tracking.
 - Spike Electric Streams only after the command/read loop has enough event shape to publish safely.
 
 ## Blockers
 
-- No known code blocker after the iteration 33 viewer hardening, isolated-context playtest pass, iteration 34 action/prompt clarity pass, iteration 35 retreat command pass, iteration 36 attached-card visibility pass, iteration 37 paid attack declaration pass, and iteration 38 static/executable attack resolution/finish pass.
+- No known code blocker after the iteration 33 viewer hardening, isolated-context playtest pass, iteration 34 action/prompt clarity pass, iteration 35 retreat command pass, iteration 36 attached-card visibility pass, iteration 37 paid attack declaration pass, iteration 38 static/executable attack resolution/finish pass, and iteration 39 Moltres `Fighting Wings` behavior pass.
 - Attack resolution currently depends on `Prizmo.TcgEngine.CardCatalog.fetch_attack/2`; paid attacks with raw text but missing executable behavior can still be declared and will fail at resolution until their behavior is migrated or unsupported declaration is made explicit.
 - Validation blocker: the available manual-tester subagents still appear to share/contend over one browser/session, so their reported viewer flips are not reliable proof of independent-browser behavior. The documented manual-tester milestone needs a harness that guarantees separate browser contexts before it can be marked formally complete.
 
 ## Recommended next atomic task
 
-- Migrate the deterministic playtest fixture's `PFL-014` Moltres `Fighting Wings` attack into engine-owned executable behavior, then validate the browser-visible paid attack path can declare, resolve, finish, and start the next turn without hitting an unsupported-attack resolution error.
+- Make unsupported attack declaration explicit by hiding/rejecting paid attack affordances unless `CardCatalog.fetch_attack/2` confirms executable behavior, so unsupported attacks fail before `attack_declared` instead of during resolution.

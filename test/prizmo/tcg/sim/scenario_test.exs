@@ -899,7 +899,7 @@ defmodule Prizmo.Tcg.Sim.ScenarioTest do
     assert {:ok, state} = pass_turn(state, :alakazam)
     assert {:ok, state} = open_turn(state, :dragapult)
 
-    drakloak = card_in_hand(state, :dragapult, "TWM-129")
+    assert {:ok, state, drakloak} = search_to_hand_by_card_id(state, :dragapult, "TWM-129")
     dreepy = state.players.dragapult.active
 
     assert {:ok, state} =
@@ -1615,7 +1615,7 @@ defmodule Prizmo.Tcg.Sim.ScenarioTest do
                }
              })
 
-    drakloak = card_in_hand(state, :dragapult, "TWM-129")
+    assert {:ok, state, drakloak} = search_to_hand_by_card_id(state, :dragapult, "TWM-129")
 
     assert {:ok, state} =
              Engine.apply_action(state, %Action{

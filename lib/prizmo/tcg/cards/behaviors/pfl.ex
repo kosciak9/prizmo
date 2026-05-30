@@ -3,6 +3,13 @@ defmodule Prizmo.Tcg.Cards.Behaviors.PFL do
 
   use Prizmo.Tcg.Cards.DSL
 
+  card "PFL-014" do
+    attack(:fighting_wings,
+      damage: 20,
+      effect: %{type: :bonus_damage_if_defender_pokemon_ex, bonus_damage: 90}
+    )
+  end
+
   card "PFL-083" do
     attack(:run_around, effect: %{type: :switch_self_with_bench})
     attack(:kick, effect: nil)
