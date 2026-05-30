@@ -56,6 +56,7 @@ defmodule Prizmo.TcgEngine.AttackEffects do
   @supported_effect_types [
     :bonus_damage_per_benched_pokemon,
     :bonus_damage_on_coin_heads,
+    :bonus_damage_per_coin_heads_count,
     :bonus_damage_if_defender_pokemon_ex,
     :bonus_damage_if_attacker_has_team_rocket_energy,
     :bonus_damage_if_moved_from_bench_to_active_this_turn,
@@ -109,6 +110,15 @@ defmodule Prizmo.TcgEngine.AttackEffects do
     end
   end
 
+  @spec heads_count(map()) :: {:ok, non_neg_integer()} | {:error, term()}
+  def heads_count(opts) when is_map(opts) do
+    case Map.get(opts, :heads_count) || Map.get(opts, "heads_count") do
+      count when is_integer(count) and count >= 0 -> {:ok, count}
+      nil -> {:error, :missing_heads_count}
+      count -> {:error, {:invalid_heads_count, count}}
+    end
+  end
+
   @spec resolve_after_damage(
           String.t(),
           String.t(),
@@ -137,6 +147,10 @@ defmodule Prizmo.TcgEngine.AttackEffects do
       %{type: :bonus_damage_on_coin_heads, bonus_damage: bonus_damage}
       when is_integer(bonus_damage) and bonus_damage >= 0 ->
         coin_bonus_damage_payload(opts, bonus_damage)
+
+      %{type: :bonus_damage_per_coin_heads_count, bonus_damage: bonus_damage}
+      when is_integer(bonus_damage) and bonus_damage >= 0 ->
+        coin_heads_count_bonus_damage_payload(opts, bonus_damage)
 
       %{type: :bonus_damage_if_attacker_has_team_rocket_energy} ->
         {:ok, %{}}
@@ -594,6 +608,21 @@ defmodule Prizmo.TcgEngine.AttackEffects do
          coin_result: Atom.to_string(result),
          bonus_damage: if(result == :heads, do: bonus_damage, else: 0),
          bonus_damage_applied?: result == :heads
+       }}
+    end
+  end
+
+  defp coin_heads_count_bonus_damage_payload(opts, bonus_damage) do
+    with {:ok, count} <- heads_count(opts) do
+      total_bonus_damage = count * bonus_damage
+
+      {:ok,
+       %{
+         effect_type: "bonus_damage_per_coin_heads_count",
+         heads_count: count,
+         bonus_damage_per_heads: bonus_damage,
+         bonus_damage: total_bonus_damage,
+         bonus_damage_applied?: total_bonus_damage > 0
        }}
     end
   end

@@ -52,6 +52,19 @@ defmodule Prizmo.TcgEngine.AttackDamage do
          damage,
          _attacker_card,
          _defender_card,
+         %{type: :bonus_damage_per_coin_heads_count, bonus_damage: bonus_damage},
+         opts
+       )
+       when is_integer(bonus_damage) and bonus_damage >= 0 do
+    with {:ok, heads_count} <- AttackEffects.heads_count(opts) do
+      {:ok, damage + heads_count * bonus_damage}
+    end
+  end
+
+  defp apply_effect(
+         damage,
+         _attacker_card,
+         _defender_card,
          %{type: :damage_per_discarded_own_basic_energy, damage_per_energy: damage_per_energy},
          opts
        )

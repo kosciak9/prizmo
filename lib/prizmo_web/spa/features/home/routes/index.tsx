@@ -129,6 +129,7 @@ const GAME_STATE_FIELDS = [
       'pendingAttackRequiresBenchDamageTarget',
       'pendingAttackRequiresBenchDamageCounters',
       'pendingAttackRequiresCoinResult',
+      'pendingAttackRequiresHeadsCount',
       'pendingAttackerCardInstanceId',
       'pendingDefenderCardInstanceId'
     ]
@@ -333,6 +334,7 @@ type ResolveDeclaredAttackInput = {
   benchDamageTargetCardInstanceId?: string | null
   benchDamageCounterAllocations?: Record<string, number>
   coinResult?: CoinResult | null
+  headsCount?: number | null
 }
 
 type ResolveDeclaredAttackCommand = {
@@ -344,6 +346,7 @@ type ResolveDeclaredAttackCommand = {
   benchDamageTargetCardInstanceId?: string | null
   benchDamageCounterAllocations?: Record<string, number>
   coinResult?: CoinResult | null
+  headsCount?: number | null
 }
 
 type FinishAttackInput = {
@@ -404,6 +407,7 @@ type GameState = {
     pendingAttackRequiresBenchDamageTarget: boolean
     pendingAttackRequiresBenchDamageCounters: boolean
     pendingAttackRequiresCoinResult: boolean
+    pendingAttackRequiresHeadsCount: boolean
     pendingAttackerCardInstanceId: string | null
     pendingDefenderCardInstanceId: string | null
   } | null
@@ -1347,7 +1351,8 @@ export function HomeRoute() {
                   shuffledEnergyCardInstanceIds,
                   benchDamageTargetCardInstanceId,
                   benchDamageCounterAllocations,
-                  coinResult
+                  coinResult,
+                  headsCount
                 }) => {
                   if (isPlayerId(playerId)) {
                     resolveDeclaredAttackMutation.mutate({
@@ -1359,7 +1364,8 @@ export function HomeRoute() {
                       shuffledEnergyCardInstanceIds,
                       benchDamageTargetCardInstanceId,
                       benchDamageCounterAllocations,
-                      coinResult
+                      coinResult,
+                      headsCount
                     })
                   }
                 }}
@@ -2146,6 +2152,7 @@ function AttackProgressPanel({
     Record<string, number>
   >({})
   const [selectedCoinResult, setSelectedCoinResult] = useState<CoinResult | ''>('')
+  const [selectedHeadsCount, setSelectedHeadsCount] = useState('')
   const turn = gameState.currentTurn
   const activePlayer = turn ? gameState.players.find(player => player.playerId === turn.activePlayerId) : undefined
   const opponentPlayer = turn ? gameState.players.find(player => player.playerId !== turn.activePlayerId) : undefined
@@ -2239,6 +2246,15 @@ function AttackProgressPanel({
     0
   )
   const coinResultForResolve = turn?.pendingAttackRequiresCoinResult && selectedCoinResult ? selectedCoinResult : null
+  const selectedHeadsCountValue = selectedHeadsCount.trim()
+  const parsedHeadsCount = Number(selectedHeadsCountValue)
+  const headsCountForResolve =
+    turn?.pendingAttackRequiresHeadsCount &&
+    selectedHeadsCountValue !== '' &&
+    Number.isInteger(parsedHeadsCount) &&
+    parsedHeadsCount >= 0
+      ? parsedHeadsCount
+      : null
 
   useEffect(() => {
     if (selectedSwitchBenchCardInstanceId && !selectedSwitchTargetIsValid) {
@@ -2253,6 +2269,7 @@ function AttackProgressPanel({
     setSelectedBenchDamageTargetCardInstanceId('')
     setSelectedBenchDamageCounterAllocations({})
     setSelectedCoinResult('')
+    setSelectedHeadsCount('')
   }, [turn?.id, turn?.pendingAttackId])
 
   useEffect(() => {
@@ -2335,6 +2352,7 @@ function AttackProgressPanel({
   const benchDamageCounterAllocationIncomplete =
     benchDamageCounterAllocationRequired && selectedBenchDamageCounterTotal !== benchDamageCounterRequiredCount
   const coinResultRequired = turn.pendingAttackRequiresCoinResult && !coinResultForResolve
+  const headsCountRequired = turn.pendingAttackRequiresHeadsCount && headsCountForResolve === null
   const missingActivePlayers = gameState.players.filter(player => !player.active)
   const viewerPromptBlocksFinish = viewerCanAdvanceAttack && gameState.prompts.length > 0
   const attackCannotFinish = missingActivePlayers.length > 0 || viewerPromptBlocksFinish
@@ -2348,7 +2366,8 @@ function AttackProgressPanel({
     benchDamageTargetUnavailable ||
     (benchDamageTargetRequired && !selectedBenchDamageTargetIsValid) ||
     benchDamageCounterAllocationIncomplete ||
-    coinResultRequired
+    coinResultRequired ||
+    headsCountRequired
   const resolveButtonLabel = resolveDeclaredAttackPendingPlayerId === turn.activePlayerId
     ? `Resolving ${attackLabel}...`
     : switchTargetRequired && !selectedSwitchTargetIsValid
@@ -2367,7 +2386,9 @@ function AttackProgressPanel({
                   ? `Allocate exactly ${benchDamageCounterRequiredCount} Bench damage counters for ${attackLabel}`
                   : coinResultRequired
                     ? `Choose a coin result for ${attackLabel}`
-      : `Resolve ${attackLabel}`
+                    : headsCountRequired
+                      ? `Enter a heads count for ${attackLabel}`
+                      : `Resolve ${attackLabel}`
   const toggleDiscardedEnergyCard = (energyCardInstanceId: string) => {
     setSelectedDiscardedEnergyCardInstanceIds(previousSelectedIds => {
       if (previousSelectedIds.includes(energyCardInstanceId)) {
@@ -2468,6 +2489,35 @@ function AttackProgressPanel({
                 )
               })}
             </div>
+          </div>
+        ) : null}
+
+        {turn.pendingAttackRequiresHeadsCount ? (
+          <div className="rounded-xl border border-yellow-200 bg-yellow-50/70 p-3">
+            <div className="space-y-1">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-yellow-900">Heads count</p>
+              <p className="text-xs leading-5 text-yellow-900/80">
+                This attack needs a deterministic non-negative heads count before the persisted engine can resolve its
+                coin-flip bonus damage.
+              </p>
+            </div>
+
+            <label className="mt-3 block space-y-2 text-xs text-yellow-950">
+              <span className="font-medium">Number of heads</span>
+              <input
+                className="w-full rounded-lg border border-yellow-200 bg-stone-50 px-3 py-2 font-mono text-sm text-yellow-950 outline-none transition placeholder:text-yellow-900/40 focus:border-yellow-600 focus:ring-2 focus:ring-yellow-100 disabled:cursor-not-allowed disabled:bg-stone-100 disabled:text-stone-400"
+                disabled={!viewerCanAdvanceAttack || commandPending}
+                min={0}
+                onChange={event => setSelectedHeadsCount(event.currentTarget.value)}
+                placeholder="0"
+                step={1}
+                type="number"
+                value={selectedHeadsCount}
+              />
+              <span className="block text-[0.68rem] leading-4 text-yellow-900/70">
+                Each heads adds the authored bonus damage. Enter 0 when the first flip is tails.
+              </span>
+            </label>
           </div>
         ) : null}
 
@@ -2821,7 +2871,8 @@ function AttackProgressPanel({
                 shuffledEnergyCardInstanceIds: selectedShuffledEnergyIdsForResolve,
                 benchDamageTargetCardInstanceId: benchDamageTargetIdForResolve,
                 benchDamageCounterAllocations: selectedBenchDamageCounterAllocationsForResolve,
-                coinResult: coinResultForResolve
+                coinResult: coinResultForResolve,
+                headsCount: headsCountForResolve
               })
             }
             type="button"

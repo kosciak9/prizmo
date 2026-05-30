@@ -247,6 +247,10 @@ defmodule Prizmo.TcgEngine.Game.ActionCommands do
         allow_nil? true
       end
 
+      argument :heads_count, :integer do
+        allow_nil? true
+      end
+
       run fn input, _context ->
         Mechanics.resolve_declared_attack(input.arguments.game_id, input.arguments.player_id, %{
           switch_bench_card_instance_id: Map.get(input.arguments, :switch_bench_card_instance_id),
@@ -257,7 +261,8 @@ defmodule Prizmo.TcgEngine.Game.ActionCommands do
           bench_damage_target_card_instance_id:
             Map.get(input.arguments, :bench_damage_target_card_instance_id),
           bench_damage_counter_allocations: input.arguments.bench_damage_counter_allocations,
-          coin_result: Map.get(input.arguments, :coin_result)
+          coin_result: Map.get(input.arguments, :coin_result),
+          heads_count: Map.get(input.arguments, :heads_count)
         })
       end
     end
