@@ -7,6 +7,7 @@ defmodule Prizmo.TcgEngine.GameView do
   alias Prizmo.TcgEngine.Game
   alias Prizmo.TcgEngine.GameEvent
   alias Prizmo.TcgEngine.GameStore
+  alias Prizmo.TcgEngine.GameView.ActionAffordances
   alias Prizmo.TcgEngine.PlayerStore
   alias Prizmo.TcgEngine.Prompt
   alias Prizmo.TcgEngine.Setup
@@ -38,6 +39,15 @@ defmodule Prizmo.TcgEngine.GameView do
          latest_event_index: game.latest_event_index,
          setup: setup_view(setup),
          current_turn: turn_view(current_turn),
+         action_affordances:
+           ActionAffordances.for_viewer(
+             game,
+             current_turn,
+             players,
+             cards,
+             prompts,
+             viewer_player_id
+           ),
          stadium: stadium_view(cards),
          players: player_views(players, cards, viewer_player_id),
          events: Enum.map(events, &event_view/1),

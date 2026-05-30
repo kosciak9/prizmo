@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-30] iteration 25 | Viewer legal action affordances
+- Task attempted: added a viewer-scoped legal action affordance shape to the persisted TCG game-state read model and rendered it in the React SPA shell. Awaiting prompts take precedence; otherwise the active viewer in the action window can see informational affordances for engine-defined card play, benching Basic Pokémon, attaching Energy, and ending the turn.
+- Files changed: added `lib/prizmo/tcg_engine/game_view/action_affordances.ex`; updated `lib/prizmo/tcg_engine/game_view.ex`, `lib/prizmo/tcg_engine/game_view/fields.ex`, `lib/prizmo_web/spa/features/home/routes/index.tsx`, generated `lib/prizmo_web/spa/lib/ash/generated/ash_rpc.ts`, this log, and the TCG engine playtest handoff.
+- Validation: `MIX_ENV=test mix run -e ...` action-window read-model smoke passed with `player_1` seeing `play_card`/`end_turn` and `player_2` seeing no action-window affordances; `mix assets.build` passed; `mix test test/prizmo/tcg_engine/mechanics_test.exs` passed; `mix check --no-test` passed.
+- Remaining/blocking notes: no blocker; the affordances are informational only, so command execution controls for these actions and prompt resolution UI remain pending.
+
 ## [2026-05-30] iteration 24 | SPA open-action-window command
 - Task attempted: added the next turn-progress command to the React SPA playtest shell so a selected persisted game can open the action window through `runOpenTcgEngineActionWindow` after the active player has drawn for turn, then invalidate the viewer-scoped game-state query and show refreshed `action_window` turn status.
 - Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`; updated this log and the TCG engine playtest handoff.

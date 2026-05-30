@@ -80,6 +80,18 @@ defmodule Prizmo.TcgEngine.GameView.Fields do
     payload: [type: :map, allow_nil?: false]
   ]
 
+  @action_affordance_fields [
+    key: [type: :string, allow_nil?: false],
+    label: [type: :string, allow_nil?: false],
+    kind: [type: :string, allow_nil?: false],
+    player_id: [type: :string, allow_nil?: false],
+    source_card_instance_ids: [type: {:array, :uuid}, allow_nil?: false],
+    target_card_instance_ids: [type: {:array, :uuid}, allow_nil?: false],
+    prompt_ids: [type: {:array, :uuid}, allow_nil?: false],
+    choice_keys: [type: {:array, :string}, allow_nil?: false],
+    note: [type: :string]
+  ]
+
   @game_state_fields [
     game_id: [type: :uuid, allow_nil?: false],
     viewer_player_id: [type: :string, allow_nil?: false],
@@ -91,6 +103,11 @@ defmodule Prizmo.TcgEngine.GameView.Fields do
     latest_event_index: [type: :integer, allow_nil?: false],
     setup: [type: :map, constraints: [fields: @setup_view_fields]],
     current_turn: [type: :map, constraints: [fields: @turn_view_fields]],
+    action_affordances: [
+      type: {:array, :map},
+      allow_nil?: false,
+      constraints: [items: [fields: @action_affordance_fields]]
+    ],
     stadium: [type: :map, constraints: [fields: @card_summary_fields]],
     players: [
       type: {:array, :map},

@@ -62,6 +62,18 @@ const CARD_SUMMARY_FIELDS = [
   'turnEnteredPlay'
 ] as const
 
+const ACTION_AFFORDANCE_FIELDS = [
+  'key',
+  'label',
+  'kind',
+  'playerId',
+  'sourceCardInstanceIds',
+  'targetCardInstanceIds',
+  'promptIds',
+  'choiceKeys',
+  'note'
+] as const
+
 const GAME_STATE_FIELDS = [
   'gameId',
   'viewerPlayerId',
@@ -84,6 +96,7 @@ const GAME_STATE_FIELDS = [
       'pendingDefenderCardInstanceId'
     ]
   },
+  { actionAffordances: [...ACTION_AFFORDANCE_FIELDS] },
   { stadium: [...CARD_SUMMARY_FIELDS] },
   {
     players: [
@@ -173,6 +186,18 @@ type PlayerView = {
   discard: CardSummary[]
 }
 
+type ActionAffordance = {
+  key: string
+  label: string
+  kind: string
+  playerId: string
+  sourceCardInstanceIds: string[]
+  targetCardInstanceIds: string[]
+  promptIds: string[]
+  choiceKeys: string[]
+  note: string | null
+}
+
 type GameState = {
   gameId: string
   viewerPlayerId: string
@@ -193,6 +218,7 @@ type GameState = {
     pendingAttackerCardInstanceId: string | null
     pendingDefenderCardInstanceId: string | null
   } | null
+  actionAffordances: ActionAffordance[]
   stadium: CardSummary | null
   players: PlayerView[]
   events: Array<{
@@ -1139,6 +1165,8 @@ function GameStateWorkbench({
         </div>
       </Panel>
 
+      <ActionAffordancesPanel actions={gameState.actionAffordances} />
+
       <div className="grid gap-5 xl:grid-cols-2">
         {gameState.players.map(player => (
           <PlayerPanel
@@ -1195,6 +1223,65 @@ function GameStateWorkbench({
         </Panel>
       </div>
     </div>
+  )
+}
+
+function ActionAffordancesPanel({ actions }: { actions: ActionAffordance[] }) {
+  return (
+    <Panel
+      title="Viewer legal actions"
+      trailing={<StatusBadge tone={actions.length > 0 ? 'active' : 'neutral'}>{actions.length}</StatusBadge>}
+    >
+      {actions.length > 0 ? (
+        <ul className="space-y-2">
+          {actions.map(action => (
+            <li
+              className="rounded-xl border border-stone-200 bg-stone-50 px-3 py-3 text-sm"
+              key={actionKey(action)}
+            >
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="font-medium text-stone-950">{action.label}</p>
+                  <p className="mt-1 text-xs text-stone-500">
+                    {formatEventType(action.kind)} for {formatPlayerId(action.playerId)}
+                  </p>
+                </div>
+                <StatusBadge tone={action.kind === 'prompt' ? 'warning' : 'active'}>
+                  {formatEventType(action.key)}
+                </StatusBadge>
+              </div>
+
+              {action.note ? <p className="mt-2 text-xs leading-5 text-stone-600">{action.note}</p> : null}
+
+              <div className="mt-3 flex flex-wrap gap-2">
+                <ActionCount count={action.sourceCardInstanceIds.length} label="source" />
+                <ActionCount count={action.targetCardInstanceIds.length} label="target" />
+                <ActionCount count={action.promptIds.length} label="prompt" />
+                <ActionCount count={action.choiceKeys.length} label="choice key" />
+              </div>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <EmptyState title="No viewer action available">
+          Action window commands appear for the active viewer. Prompt choices appear when pending effects ask
+          this player to choose.
+        </EmptyState>
+      )}
+    </Panel>
+  )
+}
+
+function ActionCount({ count, label }: { count: number; label: string }) {
+  if (count === 0) {
+    return null
+  }
+
+  return (
+    <span className="rounded-full bg-stone-200 px-2 py-0.5 text-xs font-medium text-stone-600">
+      {count} {label}
+      {count === 1 ? '' : 's'}
+    </span>
   )
 }
 
@@ -1493,6 +1580,16 @@ function isSetupActiveCandidate(card: CardSummary) {
 
 function isSetupBenchCandidate(card: CardSummary) {
   return isSetupActiveCandidate(card)
+}
+
+function actionKey(action: ActionAffordance) {
+  return [
+    action.key,
+    ...action.sourceCardInstanceIds,
+    ...action.targetCardInstanceIds,
+    ...action.promptIds,
+    ...action.choiceKeys
+  ].join(':')
 }
 
 function rpcErrorMessage(errors: RpcError[] = []) {
