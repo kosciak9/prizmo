@@ -2,7 +2,10 @@ defmodule Prizmo.TcgEngine.AttackEffects do
   @moduledoc false
 
   import Prizmo.TcgEngine.BoardState, only: [active_card: 2]
-  import Prizmo.TcgEngine.CardStore, only: [cards_in_zone: 3, get_card: 2]
+
+  import Prizmo.TcgEngine.CardStore,
+    only: [cards_in_zone: 3, deck_cards_for_player: 2, get_card: 2, next_hand_position_result: 2]
+
   import Prizmo.TcgEngine.Operation, only: [update: 3]
 
   import Prizmo.TcgEngine.Requirements,
@@ -10,6 +13,7 @@ defmodule Prizmo.TcgEngine.AttackEffects do
 
   alias Prizmo.TcgEngine.BattleActions
   alias Prizmo.TcgEngine.CardInstance
+  alias Prizmo.TcgEngine.PlayerStore
 
   @supported_effect_types [
     :bonus_damage_per_benched_pokemon,
@@ -20,6 +24,7 @@ defmodule Prizmo.TcgEngine.AttackEffects do
     :bonus_damage_per_energy_attached_to_defender,
     :damage_unaffected_by_effects_on_opponent_active,
     :damage_only_if_stadium_in_play,
+    :draw_after_attack,
     :damage_per_own_basic_pokemon_in_play,
     :damage_per_own_benched_pokemon,
     :damage_per_own_team_rocket_pokemon_in_play,
@@ -81,6 +86,9 @@ defmodule Prizmo.TcgEngine.AttackEffects do
       %{type: :damage_unaffected_by_effects_on_opponent_active} ->
         {:ok, %{}}
 
+      %{type: :draw_after_attack, count: count} when is_integer(count) and count >= 0 ->
+        draw_after_attack(game_id, player_id, count)
+
       %{type: :self_damage, damage: damage} when is_integer(damage) and damage >= 0 ->
         self_damage(game_id, player_id, attacker_card, damage)
 
@@ -109,6 +117,32 @@ defmodule Prizmo.TcgEngine.AttackEffects do
          self_resulting_damage: damage_result.resulting_damage,
          self_knocked_out?: damage_result.knocked_out?
        }}
+    end
+  end
+
+  defp draw_after_attack(game_id, player_id, count) do
+    with {:ok, player} <- PlayerStore.get_player(game_id, player_id),
+         {:ok, deck_cards} <- deck_cards_for_player(player.id, count),
+         {:ok, drawn_cards} <- draw_cards_to_hand(game_id, player_id, deck_cards) do
+      {:ok,
+       %{
+         effect_type: "draw_after_attack",
+         requested_draw_count: count,
+         drawn_count: length(drawn_cards)
+       }}
+    end
+  end
+
+  defp draw_cards_to_hand(_game_id, _player_id, []), do: {:ok, []}
+
+  defp draw_cards_to_hand(game_id, player_id, deck_cards) do
+    with {:ok, first_hand_position} <- next_hand_position_result(game_id, player_id) do
+      deck_cards
+      |> Enum.with_index(first_hand_position)
+      |> Enum.map(fn {card, position} ->
+        update(card, :draw_to_hand, %{position: position})
+      end)
+      |> collect_results()
     end
   end
 
@@ -179,4 +213,16 @@ defmodule Prizmo.TcgEngine.AttackEffects do
 
   defp require_same_card(%CardInstance{}, %CardInstance{}),
     do: {:error, :attacker_is_no_longer_active}
+
+  defp collect_results(results) do
+    results
+    |> Enum.reduce_while({:ok, []}, fn
+      {:ok, value}, {:ok, acc} -> {:cont, {:ok, [value | acc]}}
+      {:error, reason}, _acc -> {:halt, {:error, reason}}
+    end)
+    |> case do
+      {:ok, values} -> {:ok, Enum.reverse(values)}
+      {:error, reason} -> {:error, reason}
+    end
+  end
 end

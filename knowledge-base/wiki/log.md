@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-30] iteration 61 | Rapid Draw attack effect
+- Task attempted: continued the rejected authored attack-effect inventory and implemented the narrow persisted `:draw_after_attack` slice for Seaking `PRE-021` `Rapid Draw`, preserving its authored 60 defender damage while drawing up to the authored two cards for the attacker after damage.
+- Files changed: updated `lib/prizmo/tcg_engine/attack_effects.ex`, `lib/prizmo/tcg_engine/attack_damage.ex`, this log, and the TCG engine playtest handoff.
+- Validation: `mix format && mix compile --warnings-as-errors` passed; Tidewave rollback smoke passed for `PRE-021` `Rapid Draw` fetching as executable, surfacing a browser declare-attack affordance, resolving for 60 damage against Fezandipiti ex, drawing two cards into Player 1's hand, reducing Player 1's deck by two, and recording `effect_type: "draw_after_attack"` with requested/drawn counts in the attack event; `mix test test/prizmo/tcg_engine/mechanics_test.exs` passed (4 tests); `mix prizmo.cards.coverage` passed; `mix check --no-test` passed.
+- Remaining/blocking notes: no code blocker for Seaking's draw-after-attack path; additional rejected authored attack effects remain and should continue to be enabled one deterministic persisted effect at a time.
+
 ## [2026-05-30] iteration 60 | Tarountula self-damage attack effect
 - Task attempted: continued the rejected authored attack-effect inventory and implemented the narrow persisted `:self_damage` slice for Team Rocket's Tarountula `DRI-019` `Take Down`, preserving its 30 defender damage while applying the authored 10 damage to the attacking Pokémon and recording self-damage details in the attack event.
 - Files changed: updated `lib/prizmo/tcg_engine/attack_effects.ex`, `lib/prizmo/tcg_engine/attack_damage.ex`, `lib/prizmo/tcg_engine/mechanics.ex`, this log, and the TCG engine playtest handoff.
