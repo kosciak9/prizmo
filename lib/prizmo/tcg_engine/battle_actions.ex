@@ -9,6 +9,7 @@ defmodule Prizmo.TcgEngine.BattleActions do
   alias Prizmo.TcgEngine.CardCatalog
   alias Prizmo.TcgEngine.CardInstance
   alias Prizmo.TcgEngine.CardStore
+  alias Prizmo.TcgEngine.TeraBenchProtection
   alias Prizmo.TcgEngine.TurnStore
 
   def attached_energy_cards_for_retreat(game_id, active_card_id, energy_card_instance_ids) do
@@ -88,6 +89,14 @@ defmodule Prizmo.TcgEngine.BattleActions do
   end
 
   defp prevented_attack_damage_result(game_id, attacking_player_id, target_card, damage) do
+    if TeraBenchProtection.prevents_attack_damage?(target_card) do
+      {:ok, TeraBenchProtection.prevented_attack_damage_result(target_card, damage)}
+    else
+      prevented_attack_damage_by_marker_result(game_id, attacking_player_id, target_card, damage)
+    end
+  end
+
+  defp prevented_attack_damage_by_marker_result(game_id, attacking_player_id, target_card, damage) do
     with {:ok, turn} <- TurnStore.current_turn(game_id),
          true <-
            AttackPrevention.damage_and_effects_prevented_this_turn?(

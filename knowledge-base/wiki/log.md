@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-30] iteration 79 | Tera Bench damage prevention
+- Task attempted: continued Tera hardening by modeling the authored Tera rule that Benched Tera Pokémon prevent attack damage, while preserving damage-counter placement semantics as attack effects rather than damage.
+- Files changed: added `lib/prizmo/tcg_engine/tera_bench_protection.ex`; updated `lib/prizmo/tcg_engine/battle_actions.ex`, `lib/prizmo/tcg_engine/attack_effects.ex`, this log, and the TCG engine playtest handoff.
+- Validation: `mix format && mix compile --warnings-as-errors` passed after removing an unused optional-argument default; `mix test test/prizmo/tcg_engine/mechanics_test.exs` passed; Tidewave rollback smoke verified direct `BattleActions.apply_attack_damage/4` and persisted `TWM-064` `Torrential Pump` prevent 120 Bench damage to Benched Tera `TWM-025` while preserving 100 Active damage and recording Tera-prevention payload; Tidewave rollback regression verified `TWM-130` `Phantom Dive` damage-counter allocation still places 60 damage on a Benched Tera Pokémon; `mix prizmo.cards.coverage && mix check --no-test` passed.
+- Remaining/blocking notes: no code blocker for Tera Bench damage prevention. Bench damage/damage-counter KOs are still intentionally blocked until multi-KO/prize prompt sequencing is implemented.
+
 ## [2026-05-30] iteration 78 | Authored Tera card tags
 - Task attempted: hardened the Gemstone Mimicry copy/Tera boundary by moving supported-fixture Tera status out of `Prizmo.TcgEngine.CardCatalog`'s hard-coded list and into authored card behavior tags.
 - Files changed: updated `lib/prizmo/tcg/cards/dsl.ex`, `lib/prizmo/tcg/cards/behaviors/tef.ex`, `lib/prizmo/tcg/cards/behaviors/twm.ex`, `lib/prizmo/tcg_engine/card_catalog.ex`, `lib/prizmo/tcg_engine/card_metadata_requirements.ex`, this log, and the TCG engine playtest handoff.

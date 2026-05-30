@@ -54,6 +54,7 @@ defmodule Prizmo.TcgEngine.AttackEffects do
   alias Prizmo.TcgEngine.PlayerStore
   alias Prizmo.TcgEngine.Prompt
   alias Prizmo.TcgEngine.RetreatLocks
+  alias Prizmo.TcgEngine.TeraBenchProtection
   alias Prizmo.TcgEngine.TurnStore
 
   @copy_opponent_active_tera_pokemon_attack :copy_opponent_active_tera_pokemon_attack
@@ -1228,7 +1229,8 @@ defmodule Prizmo.TcgEngine.AttackEffects do
              game_id,
              player_id,
              bench_target,
-             bench_damage
+             bench_damage,
+             :damage
            ),
          {:ok, shuffled_energy_cards} <-
            shuffle_attached_cards_into_deck(game_id, player_id, energy_cards) do
@@ -1239,9 +1241,12 @@ defmodule Prizmo.TcgEngine.AttackEffects do
          shuffled_energy_count: length(shuffled_energy_cards),
          bench_damage_target_card_instance_id: bench_target.id,
          bench_damage: damage_result.damage,
+         bench_prevented_damage: Map.get(damage_result, :prevented_damage, 0),
          bench_resulting_damage: damage_result.resulting_damage,
          bench_knocked_out?: damage_result.knocked_out?,
-         bench_damage_applied?: true
+         bench_damage_applied?: damage_result.damage > 0,
+         bench_damage_prevented?: Map.get(damage_result, :damage_prevented?, false),
+         bench_damage_prevention: Map.get(damage_result, :damage_prevention)
        }}
     end
   end
@@ -1371,12 +1376,19 @@ defmodule Prizmo.TcgEngine.AttackEffects do
       damage = counters * 10
 
       with {:ok, damage_result} <-
-             apply_bench_attack_damage_without_knockout(game_id, player_id, bench_card, damage) do
+             apply_bench_attack_damage_without_knockout(
+               game_id,
+               player_id,
+               bench_card,
+               damage,
+               :damage_counters
+             ) do
         {:ok,
          %{
            card_instance_id: bench_card.id,
            counters: counters,
            damage: damage_result.damage,
+           prevented_damage: Map.get(damage_result, :prevented_damage, 0),
            resulting_damage: damage_result.resulting_damage,
            knocked_out?: damage_result.knocked_out?,
            damage_prevented?: Map.get(damage_result, :damage_prevented?, false)
@@ -1506,9 +1518,16 @@ defmodule Prizmo.TcgEngine.AttackEffects do
          game_id,
          attacking_player_id,
          %CardInstance{} = bench_target,
-         damage
+         damage,
+         kind
        ) do
-    case prevented_bench_attack_damage_result(game_id, attacking_player_id, bench_target, damage) do
+    case prevented_bench_attack_damage_result(
+           game_id,
+           attacking_player_id,
+           bench_target,
+           damage,
+           kind
+         ) do
       {:ok, damage_result} ->
         {:ok, damage_result}
 
@@ -1527,7 +1546,46 @@ defmodule Prizmo.TcgEngine.AttackEffects do
     end
   end
 
-  defp prevented_bench_attack_damage_result(game_id, attacking_player_id, bench_target, damage) do
+  defp prevented_bench_attack_damage_result(
+         game_id,
+         attacking_player_id,
+         bench_target,
+         damage,
+         :damage
+       ) do
+    if TeraBenchProtection.prevents_attack_damage?(bench_target) do
+      {:ok, TeraBenchProtection.prevented_attack_damage_result(bench_target, damage)}
+    else
+      prevented_bench_attack_damage_by_marker_result(
+        game_id,
+        attacking_player_id,
+        bench_target,
+        damage
+      )
+    end
+  end
+
+  defp prevented_bench_attack_damage_result(
+         game_id,
+         attacking_player_id,
+         bench_target,
+         damage,
+         _kind
+       ) do
+    prevented_bench_attack_damage_by_marker_result(
+      game_id,
+      attacking_player_id,
+      bench_target,
+      damage
+    )
+  end
+
+  defp prevented_bench_attack_damage_by_marker_result(
+         game_id,
+         attacking_player_id,
+         bench_target,
+         damage
+       ) do
     with {:ok, turn} <- TurnStore.current_turn(game_id),
          true <-
            AttackPrevention.damage_and_effects_prevented_this_turn?(

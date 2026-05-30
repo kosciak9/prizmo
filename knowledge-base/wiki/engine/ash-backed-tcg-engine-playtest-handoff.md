@@ -281,11 +281,14 @@ Updated: 2026-05-30
 - `Prizmo.Tcg.Cards.DSL` now accepts `tag(:tera)` card-level entries, stores unique tags in each behavior manifest, and validates tags against the currently supported authored tag set.
 - `Prizmo.TcgEngine.CardCatalog` now exposes `tags` and derives `tera?` from behavior tags after applying overlays; `Prizmo.TcgEngine.CardMetadataRequirements.require_tera_pokemon_card/1` uses the fetched card's authored `tera?` field.
 - `TEF-025`, `TWM-025`, `TWM-064`, and `TWM-130` now declare `tag(:tera)` in their behavior modules. A Tidewave project eval verified those four cards expose `tags: [:tera]`/`tera?: true`, while `DRI-087` remains untagged.
+- Iteration 79 added `Prizmo.TcgEngine.TeraBenchProtection` and wired it into direct attack damage plus persisted Bench-damage attack effects so authored Tera Pokémon on the Bench prevent attack damage.
+- `Prizmo.TcgEngine.AttackEffects` now distinguishes actual Bench attack damage from damage-counter placement: `Torrential Pump`-style Bench damage uses Tera prevention, while `Phantom Dive`-style damage-counter allocation still places counters unless a separate damage-and-effects prevention marker applies.
+- Resolve-event payloads for prevented Bench damage now record `bench_damage: 0`, `bench_prevented_damage`, `bench_damage_prevented?: true`, and `bench_damage_prevention: "tera_bench_protection"`.
 
 ## Last commit
 
-- Baseline entering iteration 78: `53aa401 feat(tcg-engine): resolve gemstone mimicry copy attack`.
-- This handoff was written before committing iteration 78; expected commit message is `feat(tcg-engine): author tera card tags`.
+- Baseline entering iteration 79: `d6bca56 docs(wiki): require ptcgl-adjacent web ui`.
+- This handoff was written before committing iteration 79; expected commit message is `feat(tcg-engine): prevent bench damage to tera pokemon`.
 
 ## Remaining tasks
 
@@ -304,6 +307,7 @@ Updated: 2026-05-30
 - Multi-Bench KO replacement now exposes `choose_replacement_active/3` through Ash/RPC and the React SPA, and attack finish remains blocked until every player has an Active Pokémon.
 - Knockout Prize taking now uses an explicit face-down Prize prompt for the attacking player and blocks attack finish until resolved; broader KO work still needs multi-KO/prize handling and more browser playtest coverage.
 - Evolution from hand is now callable from the browser for valid turn-2+ evolution pairs; pre-existing attached cards are reparented to the evolved Pokémon, damage counters move to the new top, and special conditions are cleared so attack/retreat cost checks still work for evolved attackers. Broader evolution work should still verify multi-stage stack presentation, marker handling, and longer KO/replacement/prize browser flows.
+- Authored Tera Pokémon now prevent attack damage while Benched through `Prizmo.TcgEngine.TeraBenchProtection`; damage-counter effects are intentionally not treated as damage for this rule.
 - Rabsca `TEF-024` `Psychic` is now executable in the persisted engine and deals 10 plus 30 more damage per Energy card attached to the opponent's Active Pokémon.
 - Lillie's Clefairy ex `JTG-056` `Full Moon Rondo` is now executable in the persisted engine and deals 20 plus 20 more damage for each Benched Pokémon controlled by either player.
 - Teal Mask Ogerpon ex `TWM-025` `Myriad Leaf Shower` is now executable in the persisted engine and deals 30 plus 30 more damage for each Energy card attached to either Active Pokémon.
@@ -334,9 +338,9 @@ Updated: 2026-05-30
 - Goldeen `TWM-044` `Whirlpool` is now executable in the persisted engine and deals its printed 10 damage before applying a command-provided, engine-validated coin result. Heads discards one selected or implicitly sole Energy attached to the opponent's Active Pokémon; tails records no discard. The browser attack-resolution panel now prompts for Heads/Tails and visible opponent-Active Energy selection when needed.
 - Team Rocket's Mimikyu `DRI-087` `Gemstone Mimicry` is now executable in the persisted engine when the opponent's Active Pokémon is an engine-known Tera Pokémon with executable attacks. It copies a selected or implicitly sole copied attack through the attack-resolution command, reuses that copied attack's existing persisted damage/effect semantics, and exposes copied attack choices plus copied effect controls in the browser.
 - Damage-dealing attack effects that truly require a new pending prompt still need a sequencing design before implementation because the engine currently enforces one awaiting pending effect per game and KO Prize prompts also use that continuation slot. `SSP-056` `Icicle Loop` avoided that blocker by using a resolve-command input rather than a pending prompt.
-- Tera status is now modeled as authored `tag(:tera)` behavior metadata for supported fixtures instead of a hard-coded `CardCatalog` list; broader Tera hardening still needs card-level rules such as Bench damage prevention before relying on this beyond known playtest fixtures.
+- Tera status is now modeled as authored `tag(:tera)` behavior metadata for supported fixtures instead of a hard-coded `CardCatalog` list, and Benched Tera Pokémon now prevent attack damage. Broader Tera hardening should continue only for any remaining card-level rules found in supported playtest scenarios.
 - Validation blocker: the available manual-tester subagents still appear to share/contend over one browser/session, so their reported viewer flips are not reliable proof of independent-browser behavior. The documented manual-tester milestone needs a harness that guarantees separate browser contexts before it can be marked formally complete.
 
 ## Recommended next atomic task
 
-- Pick the next small mechanics blocker for Bench-damage multi-KO/prize sequencing, or continue Tera hardening by modeling the Tera Bench damage-prevention rule now that supported fixtures can declare authored Tera tags.
+- Pick the next small mechanics blocker for Bench-damage multi-KO/prize sequencing, starting with a non-KO-safe design for resolving one Bench KO into explicit Prize/replacement continuations without bypassing the existing prompt guard.
