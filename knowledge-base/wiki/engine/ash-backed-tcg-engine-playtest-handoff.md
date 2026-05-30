@@ -57,17 +57,19 @@ Updated: 2026-05-30
 - The shell now calls `runChooseTcgEngineActiveFromHand` for a selected Basic Pokémon in the current viewer's visible hand when setup is in `hands_drawn` and that viewer has no Active Pokémon, invalidates the viewer-scoped game-state query, and surfaces pending/error state plus the refreshed Active Spot.
 - Iteration 18 added the optional setup Bench choice write command to the SPA shell.
 - The shell now calls `runChooseTcgEngineSetupBenchFromHand` for a selected Basic Pokémon in the current viewer's visible hand after that viewer has chosen an Active Pokémon, invalidates the viewer-scoped game-state query, and surfaces pending/error state plus the refreshed Bench count/list.
-- Setup start, opening-hand draw, setup Active choice, and setup Bench choice are no longer read-only in the browser shell; prize placement, setup completion, turn commands, legal action affordances, and prompt resolution controls still need UI wiring.
+- Iteration 19 added the setup Prize placement write command to the SPA shell.
+- The shell now calls `runPlaceTcgEnginePrizes` once both players have chosen Active Pokémon and no Prizes are placed, invalidates the viewer-scoped game-state query, and surfaces pending/error state plus refreshed Prize counts and `prizes_placed` setup status.
+- Setup start, opening-hand draw, setup Active choice, setup Bench choice, and setup Prize placement are no longer read-only in the browser shell; setup completion, turn commands, legal action affordances, and prompt resolution controls still need UI wiring.
 
 ## Last commit
 
-- Baseline entering iteration 18: `c8f8f97 feat(spa): wire setup active choice`.
-- This handoff was written before committing iteration 18; expected commit message is `feat(spa): wire setup bench choice`.
+- Baseline entering iteration 19: `274c77b feat(spa): wire setup bench choice`.
+- This handoff was written before committing iteration 19; expected commit message is `feat(spa): wire setup prize placement`.
 
 ## Remaining tasks
 
 - Decide whether old `Prizmo.Tcg.Sim` tests are kept as historical reference, quarantined, or ported scenario-by-scenario.
-- Build the minimal playable React SPA loop beyond setup start, opening-hand draw, setup Active choice, and setup Bench choice: wire prize placement, setup completion, turn start, draw for turn, skip draw, and open action window to UI buttons; expose legal action affordances, prompt resolution controls, and two-browser refresh/reconnect validation.
+- Build the minimal playable React SPA loop beyond setup start, opening-hand draw, setup Active choice, setup Bench choice, and setup Prize placement: wire setup completion, turn start, draw for turn, skip draw, and open action window to UI buttons; expose legal action affordances, prompt resolution controls, and two-browser refresh/reconnect validation.
 - Expand persisted Ash engine mechanics: bench Basic Pokémon, one Energy attachment per turn, evolution timing, retreat/switch, attacks/damage/KO/prizes/replacement Active, turn transitions, and snapshot-backed undo/debug support.
 - Continue migrating executable card behavior into engine-owned definitions with explicit unsupported-behavior tracking.
 - Spike Electric Streams only after the command/read loop has enough event shape to publish safely.
@@ -78,4 +80,4 @@ Updated: 2026-05-30
 
 ## Recommended next atomic task
 
-- Add the setup Prize placement control to the SPA shell by calling `runPlaceTcgEnginePrizes` once both players have chosen Active Pokémon, invalidating the game-state query, and showing Prize count/setup status updates. Keep setup completion for a later iteration.
+- Add the setup completion control to the SPA shell by calling `runCompleteTcgEngineSetup` once setup status is `prizes_placed`, invalidating the game-state query, and showing game/setup status updates. Keep turn-start commands for a later iteration.

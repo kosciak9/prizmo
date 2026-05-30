@@ -9,6 +9,7 @@ import {
   runDrawTcgEngineOpeningHand,
   runGetTcgEngineGameState,
   runListSupportedTcgDecks,
+  runPlaceTcgEnginePrizes,
   runStartTcgEngineSetup,
   type CreateTcgEngineGameFields,
   type GetTcgEngineGameStateFields,
@@ -276,10 +277,19 @@ export function HomeRoute() {
     }
   })
 
+  const placePrizesMutation = useMutation({
+    mutationFn: (gameId: string) => placePrizes(gameId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['tcg-engine', 'game-state'] })
+    }
+  })
+
   const gameState = gameStateQuery.data
   const viewerPlayer = gameState?.players.find(player => player.playerId === gameState.viewerPlayerId)
   const setupActiveCandidates = viewerPlayer?.hand.filter(isSetupActiveCandidate) ?? []
   const setupBenchCandidates = viewerPlayer?.hand.filter(isSetupBenchCandidate) ?? []
+  const allPlayersHaveSetupActive = gameState?.players.every(player => player.active) ?? false
+  const setupPrizesAreUnplaced = gameState?.players.every(player => player.prizeCount === 0) ?? false
   const deckNamesByKey = useMemo(
     () => new Map(decks.map(deck => [deck.deckKey, deck.name])),
     [decks]
@@ -307,6 +317,13 @@ export function HomeRoute() {
         viewerPlayer.bench.length < 5 &&
         setupBenchCandidates.length > 0
     ) && !chooseSetupBenchMutation.isPending
+  const canPlacePrizes =
+    Boolean(
+      normalisedGameId &&
+        gameState?.setup?.status === 'hands_drawn' &&
+        allPlayersHaveSetupActive &&
+        setupPrizesAreUnplaced
+    ) && !placePrizesMutation.isPending
 
   function updateSession(nextSession: PlaytestSession) {
     setStoredSession(nextSession)
@@ -573,6 +590,23 @@ export function HomeRoute() {
                         </p>
                       )}
                     </div>
+
+                    <button
+                      className="w-full rounded-xl border border-emerald-700 px-3 py-2 text-sm font-semibold text-emerald-800 transition hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:border-stone-300 disabled:text-stone-400 disabled:hover:bg-transparent"
+                      disabled={!canPlacePrizes}
+                      onClick={() => placePrizesMutation.mutate(normalisedGameId)}
+                      type="button"
+                    >
+                      {placePrizesMutation.isPending
+                        ? 'Placing prizes...'
+                        : gameState?.setup?.status === 'prizes_placed'
+                          ? 'Prizes placed'
+                          : gameState?.setup?.status === 'hands_drawn'
+                            ? allPlayersHaveSetupActive
+                              ? 'Place setup prizes'
+                              : 'Choose both Active Pokémon first'
+                            : 'Choose Active Pokémon first'}
+                    </button>
                   </div>
                 </div>
 
@@ -597,6 +631,12 @@ export function HomeRoute() {
                 {chooseSetupBenchMutation.error ? (
                   <InlineNotice tone="error" title="Bench choice command failed">
                     {errorMessage(chooseSetupBenchMutation.error)}
+                  </InlineNotice>
+                ) : null}
+
+                {placePrizesMutation.error ? (
+                  <InlineNotice tone="error" title="Prize placement command failed">
+                    {errorMessage(placePrizesMutation.error)}
                   </InlineNotice>
                 ) : null}
               </div>
@@ -751,6 +791,20 @@ async function chooseSetupBenchFromHand(input: {
 }): Promise<CreatedGame> {
   const result = await runChooseTcgEngineSetupBenchFromHand({
     input,
+    fields: GAME_RESOURCE_FIELDS,
+    headers: buildAshRpcHeaders()
+  })
+
+  if (!result.success) {
+    throw new Error(rpcErrorMessage(result.errors))
+  }
+
+  return result.data as CreatedGame
+}
+
+async function placePrizes(gameId: string): Promise<CreatedGame> {
+  const result = await runPlaceTcgEnginePrizes({
+    input: { gameId },
     fields: GAME_RESOURCE_FIELDS,
     headers: buildAshRpcHeaders()
   })
