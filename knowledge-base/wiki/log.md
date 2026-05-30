@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-30] iteration 14 | Minimal TCG SPA playtest shell
+- Task attempted: wired the React SPA home route to the AshTypescript TCG engine RPC boundary so a browser can list supported deck fixtures, create a persisted fixture game, reconnect by game ID, switch viewer between player 1 and player 2, and render the viewer-scoped game-state read model.
+- Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx` and `lib/prizmo_web/spa/lib/ash/client.ts`; updated this log and the TCG engine playtest handoff.
+- Validation: `mix assets.build` passed; `mix check --no-test` passed; full `mix check` passed, including tests.
+- Remaining/blocking notes: no blocker; the shell is read-only after game creation, so setup command buttons, legal action affordances, prompt resolution controls, and two-browser Playwright playtest validation remain pending.
+
 ## [2026-05-30] iteration 13 | Viewer-scoped game-state RPC
 - Task attempted: exposed a minimal viewer-scoped Ash/RPC read model for persisted TCG engine games so the SPA can read board state without direct database access or hidden-zone leaks.
 - Files changed: added `lib/prizmo/tcg_engine/game_view.ex` and `lib/prizmo/tcg_engine/game_view/fields.ex`; updated `lib/prizmo/tcg_engine/game.ex`, `lib/prizmo/tcg_engine.ex`, `lib/prizmo_web/spa/lib/ash/client.ts`, and regenerated `lib/prizmo_web/spa/lib/ash/generated/ash_rpc.ts`; updated this log and the TCG engine playtest handoff.
