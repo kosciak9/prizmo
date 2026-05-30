@@ -1125,7 +1125,7 @@ defmodule Prizmo.TcgEngine.Mechanics do
            {:ok, defender_card} <- get_card(game.id, turn.pending_defender_card_instance_id),
            {:ok, attack} <-
              CardCatalog.fetch_attack(attacker_card.card_id, turn.pending_attack_id),
-           {:ok, damage} <- AttackDamage.damage_for(attacker_card, defender_card, attack),
+           {:ok, damage} <- AttackDamage.damage_for(attacker_card, defender_card, attack, opts),
            {:ok, turn} <- update(turn, :resolve_attack, %{}),
            {:ok, damage_result} <-
              apply_attack_damage(game.id, player_id, defender_card, damage),

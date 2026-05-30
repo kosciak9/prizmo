@@ -119,6 +119,7 @@ const GAME_STATE_FIELDS = [
       'pendingAttackId',
       'pendingAttackEffectType',
       'pendingAttackRequiresSwitchTarget',
+      'pendingAttackRequiresDiscardedEnergy',
       'pendingAttackerCardInstanceId',
       'pendingDefenderCardInstanceId'
     ]
@@ -316,11 +317,13 @@ type ResolveDeclaredAttackInput = {
   gameId: string
   playerId: PlayerId
   switchBenchCardInstanceId?: string | null
+  discardedEnergyCardInstanceIds?: string[]
 }
 
 type ResolveDeclaredAttackCommand = {
   playerId: string
   switchBenchCardInstanceId?: string | null
+  discardedEnergyCardInstanceIds?: string[]
 }
 
 type FinishAttackInput = {
@@ -375,6 +378,7 @@ type GameState = {
     pendingAttackId: string | null
     pendingAttackEffectType: string | null
     pendingAttackRequiresSwitchTarget: boolean
+    pendingAttackRequiresDiscardedEnergy: boolean
     pendingAttackerCardInstanceId: string | null
     pendingDefenderCardInstanceId: string | null
   } | null
@@ -1310,12 +1314,17 @@ export function HomeRoute() {
                     })
                   }
                 }}
-                onResolveDeclaredAttack={({ playerId, switchBenchCardInstanceId }) => {
+                onResolveDeclaredAttack={({
+                  playerId,
+                  switchBenchCardInstanceId,
+                  discardedEnergyCardInstanceIds
+                }) => {
                   if (isPlayerId(playerId)) {
                     resolveDeclaredAttackMutation.mutate({
                       gameId: normalisedGameId,
                       playerId,
-                      switchBenchCardInstanceId
+                      switchBenchCardInstanceId,
+                      discardedEnergyCardInstanceIds
                     })
                   }
                 }}
@@ -2094,16 +2103,49 @@ function AttackProgressPanel({
   viewerPlayerId: PlayerId
 }) {
   const [selectedSwitchBenchCardInstanceId, setSelectedSwitchBenchCardInstanceId] = useState('')
+  const [selectedDiscardedEnergyCardInstanceIds, setSelectedDiscardedEnergyCardInstanceIds] = useState<string[]>([])
   const turn = gameState.currentTurn
   const activePlayer = turn ? gameState.players.find(player => player.playerId === turn.activePlayerId) : undefined
   const switchTargetOptions = turn?.pendingAttackRequiresSwitchTarget ? (activePlayer?.bench ?? []) : []
   const selectedSwitchTargetIsValid = switchTargetOptions.some(card => card.id === selectedSwitchBenchCardInstanceId)
+  const discardedEnergyOptions = useMemo(() => {
+    if (!turn?.pendingAttackRequiresDiscardedEnergy || !activePlayer) {
+      return []
+    }
+
+    return [activePlayer.active, ...activePlayer.bench]
+      .filter((card): card is CardSummary => Boolean(card))
+      .flatMap(card =>
+        (card.attachedCards ?? [])
+          .filter(isEnergyCard)
+          .map(energyCard => ({ attachedTo: card, energyCard }))
+      )
+  }, [activePlayer, turn?.pendingAttackRequiresDiscardedEnergy])
+  const discardedEnergyOptionIds = useMemo(
+    () => new Set(discardedEnergyOptions.map(option => option.energyCard.id)),
+    [discardedEnergyOptions]
+  )
+  const selectedDiscardedEnergyIdsForResolve = turn?.pendingAttackRequiresDiscardedEnergy
+    ? selectedDiscardedEnergyCardInstanceIds.filter(id => discardedEnergyOptionIds.has(id))
+    : []
 
   useEffect(() => {
     if (selectedSwitchBenchCardInstanceId && !selectedSwitchTargetIsValid) {
       setSelectedSwitchBenchCardInstanceId('')
     }
   }, [selectedSwitchBenchCardInstanceId, selectedSwitchTargetIsValid])
+
+  useEffect(() => {
+    setSelectedDiscardedEnergyCardInstanceIds([])
+  }, [turn?.id, turn?.pendingAttackId])
+
+  useEffect(() => {
+    setSelectedDiscardedEnergyCardInstanceIds(previousSelectedIds => {
+      const filteredSelectedIds = previousSelectedIds.filter(id => discardedEnergyOptionIds.has(id))
+
+      return filteredSelectedIds.length === previousSelectedIds.length ? previousSelectedIds : filteredSelectedIds
+    })
+  }, [discardedEnergyOptionIds])
 
   if (!turn || (turn.status !== 'attack_declared' && turn.status !== 'attack_resolving')) {
     return null
@@ -2125,6 +2167,13 @@ function AttackProgressPanel({
     : switchTargetRequired && !selectedSwitchTargetIsValid
       ? `Choose a switch target for ${attackLabel}`
       : `Resolve ${attackLabel}`
+  const toggleDiscardedEnergyCard = (energyCardInstanceId: string) => {
+    setSelectedDiscardedEnergyCardInstanceIds(previousSelectedIds =>
+      previousSelectedIds.includes(energyCardInstanceId)
+        ? previousSelectedIds.filter(id => id !== energyCardInstanceId)
+        : [...previousSelectedIds, energyCardInstanceId]
+    )
+  }
 
   return (
     <Panel title="Attack resolution" trailing={<StatusBadge tone="warning">{turn.status}</StatusBadge>}>
@@ -2193,6 +2242,56 @@ function AttackProgressPanel({
           </div>
         ) : null}
 
+        {turn.pendingAttackRequiresDiscardedEnergy ? (
+          <div className="rounded-xl border border-orange-200 bg-orange-50/70 p-3">
+            <div className="space-y-1">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-orange-900">Discarded Energy</p>
+              <p className="text-xs leading-5 text-orange-900/80">
+                This attack does damage for each selected own Basic Energy attached to Pokémon in play, then discards
+                those Energy cards during resolution. Selecting none resolves it for zero bonus damage.
+              </p>
+            </div>
+
+            {discardedEnergyOptions.length > 0 ? (
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                {discardedEnergyOptions.map(({ attachedTo, energyCard }) => {
+                  const selected = selectedDiscardedEnergyCardInstanceIds.includes(energyCard.id)
+
+                  return (
+                    <label
+                      className={`flex cursor-pointer items-start gap-2 rounded-lg border px-3 py-2 text-xs transition ${
+                        selected
+                          ? 'border-orange-700 bg-orange-100 text-orange-950'
+                          : 'border-orange-200 bg-stone-50 text-stone-700 hover:border-orange-400'
+                      }`}
+                      key={energyCard.id}
+                    >
+                      <input
+                        checked={selected}
+                        className="mt-0.5"
+                        disabled={!viewerCanAdvanceAttack || commandPending}
+                        onChange={() => toggleDiscardedEnergyCard(energyCard.id)}
+                        type="checkbox"
+                      />
+                      <span className="min-w-0">
+                        <span className="block font-medium">{energyCard.name}</span>
+                        <span className="mt-0.5 block font-mono text-[0.68rem] opacity-70">
+                          attached to {attachedTo.name}
+                        </span>
+                      </span>
+                    </label>
+                  )
+                })}
+              </div>
+            ) : (
+              <p className="mt-3 rounded-lg border border-orange-200 bg-stone-50 px-3 py-2 text-xs text-orange-900">
+                No attached Energy cards are visible for {formatPlayerId(turn.activePlayerId)}, so resolution will deal
+                zero damage from this effect.
+              </p>
+            )}
+          </div>
+        ) : null}
+
         {!viewerCanAdvanceAttack ? (
           <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
             Switch this tab to {formatPlayerId(turn.activePlayerId)} to advance the attack.
@@ -2214,7 +2313,8 @@ function AttackProgressPanel({
             onClick={() =>
               onResolveDeclaredAttack({
                 playerId: turn.activePlayerId,
-                switchBenchCardInstanceId: selectedSwitchTargetIsValid ? selectedSwitchBenchCardInstanceId : null
+                switchBenchCardInstanceId: selectedSwitchTargetIsValid ? selectedSwitchBenchCardInstanceId : null,
+                discardedEnergyCardInstanceIds: selectedDiscardedEnergyIdsForResolve
               })
             }
             type="button"
@@ -2921,6 +3021,10 @@ function isSetupActiveCandidate(card: CardSummary) {
 
 function isSetupBenchCandidate(card: CardSummary) {
   return isSetupActiveCandidate(card)
+}
+
+function isEnergyCard(card: CardSummary) {
+  return card.category === 'energy'
 }
 
 function promptLegalChoiceIds(payload: Record<string, unknown>) {

@@ -10,12 +10,19 @@ defmodule Prizmo.TcgEngine.AttackDamage do
 
   require Ash.Query
 
+  @spec damage_for(CardInstance.t(), CardInstance.t(), map(), map()) ::
+          {:ok, non_neg_integer()} | {:error, term()}
   @spec damage_for(CardInstance.t(), CardInstance.t(), map()) ::
           {:ok, non_neg_integer()} | {:error, term()}
-  def damage_for(%CardInstance{} = attacker_card, %CardInstance{} = defender_card, attack)
-      when is_map(attack) do
+  def damage_for(
+        %CardInstance{} = attacker_card,
+        %CardInstance{} = defender_card,
+        attack,
+        opts \\ %{}
+      )
+      when is_map(attack) and is_map(opts) do
     with {:ok, damage} <- base_damage(attack) do
-      apply_effect(damage, attacker_card, defender_card, Map.get(attack, :effect))
+      apply_effect(damage, attacker_card, defender_card, Map.get(attack, :effect), opts)
     end
   end
 
@@ -23,6 +30,23 @@ defmodule Prizmo.TcgEngine.AttackDamage do
   defp base_damage(%{damage: nil}), do: {:ok, 0}
   defp base_damage(attack) when not is_map_key(attack, :damage), do: {:ok, 0}
   defp base_damage(%{damage: damage}), do: {:error, {:unsupported_attack_damage, damage}}
+
+  defp apply_effect(
+         damage,
+         _attacker_card,
+         _defender_card,
+         %{type: :damage_per_discarded_own_basic_energy, damage_per_energy: damage_per_energy},
+         opts
+       )
+       when is_integer(damage_per_energy) and damage_per_energy >= 0 do
+    with {:ok, energy_card_instance_ids} <- discarded_energy_card_instance_ids(opts) do
+      {:ok, damage + length(energy_card_instance_ids) * damage_per_energy}
+    end
+  end
+
+  defp apply_effect(damage, attacker_card, defender_card, effect, _opts) do
+    apply_effect(damage, attacker_card, defender_card, effect)
+  end
 
   defp apply_effect(damage, _attacker_card, %CardInstance{} = defender_card, %{
          type: :bonus_damage_if_defender_pokemon_ex,
@@ -310,6 +334,15 @@ defmodule Prizmo.TcgEngine.AttackDamage do
       {:ok, false}, {:ok, count} -> {:cont, {:ok, count}}
       {:error, reason}, _acc -> {:halt, {:error, reason}}
     end)
+  end
+
+  defp discarded_energy_card_instance_ids(opts) do
+    case Map.get(opts, :discarded_energy_card_instance_ids) ||
+           Map.get(opts, "discarded_energy_card_instance_ids") do
+      nil -> {:ok, []}
+      ids when is_list(ids) -> {:ok, ids}
+      _invalid -> {:error, :invalid_discarded_energy_card_instance_ids}
+    end
   end
 
   defp moved_from_bench_to_active_this_turn?(%CardInstance{

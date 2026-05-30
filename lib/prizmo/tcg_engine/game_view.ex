@@ -117,6 +117,8 @@ defmodule Prizmo.TcgEngine.GameView do
       pending_attack_effect_type: stringify(pending_attack_effect_type),
       pending_attack_requires_switch_target:
         pending_attack_effect_type == :switch_self_with_bench,
+      pending_attack_requires_discarded_energy:
+        pending_attack_effect_type == :damage_per_discarded_own_basic_energy,
       pending_attacker_card_instance_id: turn.pending_attacker_card_instance_id,
       pending_defender_card_instance_id: turn.pending_defender_card_instance_id
     }

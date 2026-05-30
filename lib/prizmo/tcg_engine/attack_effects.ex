@@ -4,7 +4,7 @@ defmodule Prizmo.TcgEngine.AttackEffects do
   import Prizmo.TcgEngine.BoardState, only: [active_card: 2]
 
   import Prizmo.TcgEngine.CardMetadataRequirements,
-    only: [require_pokemon_card: 1, require_trainer_type: 2]
+    only: [require_basic_energy: 1, require_pokemon_card: 1, require_trainer_type: 2]
 
   import Prizmo.TcgEngine.CardStore,
     only: [
@@ -27,6 +27,7 @@ defmodule Prizmo.TcgEngine.AttackEffects do
       require_card_owned_by_player: 2,
       require_card_zone: 2,
       require_exact_count: 3,
+      require_in_play_pokemon_zone: 1,
       require_unique_ids: 1
     ]
 
@@ -53,6 +54,7 @@ defmodule Prizmo.TcgEngine.AttackEffects do
     :confuse_defender_active,
     :damage_unaffected_by_effects_on_opponent_active,
     :damage_only_if_stadium_in_play,
+    :damage_per_discarded_own_basic_energy,
     :defending_pokemon_cannot_retreat_next_turn,
     :discard_hand_then_draw,
     :draw_after_attack,
@@ -140,6 +142,9 @@ defmodule Prizmo.TcgEngine.AttackEffects do
 
       %{type: :damage_per_own_team_rocket_pokemon_in_play} ->
         {:ok, %{}}
+
+      %{type: :damage_per_discarded_own_basic_energy} ->
+        discard_attached_basic_energy_for_damage(game_id, player_id, opts)
 
       %{type: :damage_unaffected_by_effects_on_opponent_active} ->
         {:ok, %{}}
@@ -607,6 +612,64 @@ defmodule Prizmo.TcgEngine.AttackEffects do
          requested_draw_count: count,
          drawn_count: length(drawn_cards)
        }}
+    end
+  end
+
+  defp discard_attached_basic_energy_for_damage(game_id, player_id, opts) do
+    with {:ok, energy_card_instance_ids} <- discarded_energy_card_instance_ids(opts),
+         {:ok, energy_cards} <-
+           discardable_basic_energy_cards(game_id, player_id, energy_card_instance_ids),
+         {:ok, discarded_cards} <-
+           BattleActions.discard_retreat_energy(game_id, player_id, energy_cards) do
+      {:ok,
+       %{
+         effect_type: "damage_per_discarded_own_basic_energy",
+         discarded_energy_card_instance_ids: Enum.map(discarded_cards, & &1.id),
+         discarded_energy_count: length(discarded_cards)
+       }}
+    end
+  end
+
+  defp discarded_energy_card_instance_ids(opts) do
+    case Map.get(opts, :discarded_energy_card_instance_ids) ||
+           Map.get(opts, "discarded_energy_card_instance_ids") do
+      nil -> {:ok, []}
+      ids when is_list(ids) -> {:ok, ids}
+      _invalid -> {:error, :invalid_discarded_energy_card_instance_ids}
+    end
+  end
+
+  defp discardable_basic_energy_cards(_game_id, _player_id, []), do: {:ok, []}
+
+  defp discardable_basic_energy_cards(game_id, player_id, energy_card_instance_ids) do
+    with :ok <- require_unique_ids(energy_card_instance_ids),
+         {:ok, energy_cards} <- get_cards(game_id, energy_card_instance_ids) do
+      energy_cards
+      |> Enum.map(&discardable_basic_energy_card(game_id, player_id, &1))
+      |> collect_results()
+    end
+  end
+
+  defp discardable_basic_energy_card(game_id, player_id, %CardInstance{} = energy_card) do
+    with :ok <- require_card_owned_by_player(energy_card, player_id),
+         :ok <- require_card_zone(energy_card, :attached),
+         :ok <- require_basic_energy(energy_card.card_id),
+         {:ok, _target_card} <- attached_to_own_in_play_pokemon(game_id, player_id, energy_card) do
+      {:ok, energy_card}
+    end
+  end
+
+  defp attached_to_own_in_play_pokemon(_game_id, _player_id, %CardInstance{
+         attached_to_card_instance_id: nil
+       }) do
+    {:error, :energy_not_attached_to_pokemon}
+  end
+
+  defp attached_to_own_in_play_pokemon(game_id, player_id, %CardInstance{} = energy_card) do
+    with {:ok, target_card} <- get_card(game_id, energy_card.attached_to_card_instance_id),
+         :ok <- require_card_owned_by_player(target_card, player_id),
+         :ok <- require_in_play_pokemon_zone(target_card) do
+      {:ok, target_card}
     end
   end
 
