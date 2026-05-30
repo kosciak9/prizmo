@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-30] iteration 59 | Lopunny unaffected attack damage
+- Task attempted: continued the rejected authored attack-effect inventory and implemented the narrow persisted `:damage_unaffected_by_effects_on_opponent_active` slice for Mega Lopunny ex `PFL-084` `Spiky Hopper`, preserving its authored damage while the persisted engine has no modeled opponent Active damage-prevention modifiers to bypass.
+- Files changed: updated `lib/prizmo/tcg_engine/attack_effects.ex`, `lib/prizmo/tcg_engine/attack_damage.ex`, this log, and the TCG engine playtest handoff.
+- Validation: `mix format && mix compile --warnings-as-errors` passed; Tidewave rollback smoke passed for `PFL-084` `Spiky Hopper` fetching as executable, surfacing a browser declare-attack affordance, and resolving for 160 damage against Fezandipiti ex with no KO; `mix test test/prizmo/tcg_engine/mechanics_test.exs` passed (4 tests); `mix prizmo.cards.coverage` passed; `mix check --no-test` passed.
+- Remaining/blocking notes: no code blocker for Spiky Hopper's current persisted semantics; future damage-prevention/defensive effects should explicitly integrate with this bypass effect when those effects are modeled.
+
 ## [2026-05-30] iteration 58 | Team Rocket Energy attack damage
 - Task attempted: continued the rejected authored attack-effect inventory and implemented the narrow persisted `:bonus_damage_if_attacker_has_team_rocket_energy` slice for Team Rocket's Articuno `DRI-051` `Dark Frost`, adding the authored bonus when the attacker has Team Rocket's Energy attached.
 - Files changed: updated `lib/prizmo/tcg_engine/attack_effects.ex`, `lib/prizmo/tcg_engine/attack_damage.ex`, `lib/prizmo/tcg_engine/game/action_commands.ex`, this log, and the TCG engine playtest handoff.
