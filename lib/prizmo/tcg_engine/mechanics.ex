@@ -7,6 +7,8 @@ defmodule Prizmo.TcgEngine.Mechanics do
   roll back before an event or snapshot is written.
   """
 
+  import Prizmo.TcgEngine.AttackCosts, only: [require_attack_cost_paid: 3]
+
   import Prizmo.TcgEngine.BattleActions,
     only: [
       apply_attack_damage: 4,
@@ -916,10 +918,10 @@ defmodule Prizmo.TcgEngine.Mechanics do
     end)
   end
 
-  @spec declare_attack(Game.t() | String.t(), String.t(), atom()) ::
+  @spec declare_attack(Game.t() | String.t(), String.t(), atom() | String.t()) ::
           {:ok, Game.t()} | {:error, term()}
   def declare_attack(game_or_id, player_id, attack_id)
-      when is_binary(player_id) and is_atom(attack_id) do
+      when is_binary(player_id) and (is_atom(attack_id) or is_binary(attack_id)) do
     transaction(fn ->
       with {:ok, game} <- get_game(game_or_id),
            {:ok, turn} <- require_action_window_for_player(game, player_id),
@@ -927,10 +929,12 @@ defmodule Prizmo.TcgEngine.Mechanics do
            :ok <- require_can_attack(attacker_card),
            {:ok, defender_player_id} <- opponent_player_id(game.id, player_id),
            {:ok, defender_card} <- active_card(game.id, defender_player_id),
-           {:ok, _attack} <- CardCatalog.fetch_attack(attacker_card.card_id, attack_id),
+           {:ok, attack} <-
+             CardCatalog.fetch_attack_for_declaration(attacker_card.card_id, attack_id),
+           :ok <- require_attack_cost_paid(game.id, attacker_card, attack),
            {:ok, turn} <-
              update(turn, :declare_attack, %{
-               pending_attack_id: attack_id,
+               pending_attack_id: attack.id,
                pending_attacker_card_instance_id: attacker_card.id,
                pending_defender_card_instance_id: defender_card.id
              }),
@@ -939,7 +943,8 @@ defmodule Prizmo.TcgEngine.Mechanics do
                turn_id: turn.id,
                attacker_card_instance_id: attacker_card.id,
                defender_card_instance_id: defender_card.id,
-               attack_id: Atom.to_string(attack_id)
+               attack_id: Atom.to_string(attack.id),
+               attack_cost: Prizmo.TcgEngine.AttackCosts.stringify_cost(attack.cost)
              }),
            {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do
         get_game(game.id)

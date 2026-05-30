@@ -146,6 +146,32 @@ defmodule Prizmo.TcgEngine.Game.ActionCommands do
       end
     end
 
+    action :declare_attack_command, :struct do
+      description "Declare an attack after validating the active Pokémon's attached Energy cost."
+
+      constraints instance_of: Game
+
+      argument :game_id, :uuid do
+        allow_nil? false
+      end
+
+      argument :player_id, :string do
+        allow_nil? false
+      end
+
+      argument :attack_id, :string do
+        allow_nil? false
+      end
+
+      run fn input, _context ->
+        Mechanics.declare_attack(
+          input.arguments.game_id,
+          input.arguments.player_id,
+          input.arguments.attack_id
+        )
+      end
+    end
+
     action :choose_prompt_command, :struct do
       description "Resolve a select-cards prompt through the generic mechanics layer."
 

@@ -107,25 +107,31 @@ Updated: 2026-05-30
 - Iteration 36 added public one-level `attached_cards`/`attachedCards` to top-level game-state card summaries, including Active, Bench, Stadium, viewer hand, discard, and prompt legal-choice card views.
 - The SPA now requests nested `attachedCards`, renders attached cards under each visible `CardPill`, and indexes those nested cards in `visibleCardsById`, so retreat payment buttons can show attached Energy names instead of fallback card instance IDs.
 - A rollback smoke verified Moltres with attached Fire Energy appears in `player_1.active.attached_cards` and that the retreat affordance's source ID matches the visible attached Energy.
+- Iteration 37 added `Prizmo.TcgEngine.AttackCosts` to validate attack Energy costs from attached Energy providers and updated `Mechanics.declare_attack/3` to accept string attack IDs, fetch attack metadata for declaration, validate attached Energy, and persist `declare_attack` with pending attack state.
+- `Prizmo.TcgEngine.CardCatalog.fetch_attack_for_declaration/2` now returns printed attack metadata without requiring executable damage/effect behavior, so declaration can be separated from later attack resolution.
+- `Prizmo.TcgEngine.Game.ActionCommands.declare_attack_command` is exposed through the domain as `Prizmo.TcgEngine.declare_attack_for_game/3` and through AshTypescript RPC as `declareTcgEngineAttack`; the SPA client re-exports it as `runDeclareTcgEngineAttack`.
+- Viewer action affordances now include one `declare_attack` entry per paid attack on the active viewer's Active Pokémon, with `attack_id`, `attack_name`, `attack_cost`, `attack_damage`, source Active ID, and opponent Active target ID.
+- The SPA legal-actions panel now renders attack declaration buttons and calls the new RPC command. This moves the turn to `attack_declared`; damage/effects/KO/prize resolution and attack finish controls are intentionally still follow-up work.
 
 ## Last commit
 
-- Baseline entering iteration 36: `9718404 feat(tcg-engine): wire retreat command`.
-- This handoff was written before committing iteration 36; expected commit message is `feat(tcg-engine): show attached cards in playtest view`.
+- Baseline entering iteration 37: `8216d91 feat(tcg-engine): show attached cards in playtest view`.
+- This handoff was written before committing iteration 37; expected commit message is `feat(tcg-engine): declare paid attacks`.
 
 ## Remaining tasks
 
 - Decide whether old `Prizmo.Tcg.Sim` tests are kept as historical reference, quarantined, or ported scenario-by-scenario.
-- Build the minimal playable React SPA loop beyond prompt resolution, Bench commands, Attach Energy, attached-card board visibility, Retreat, End Turn, next-turn progression, deterministic playtest fixture order, hardened tab-scoped viewer identity, and reduced prompt/action debug noise: rerun the full two-browser/manual-tester playtest milestone only after the validation harness can guarantee separate browser contexts, then address any remaining command-loop gaps it exposes.
-- Expand persisted Ash engine mechanics: switch effects, attack declaration/cost validation/damage/KO/prizes/replacement Active, evolution UI/RPC wiring, turn transitions, and snapshot-backed undo/debug support.
+- Build the minimal playable React SPA loop beyond prompt resolution, Bench commands, Attach Energy, attached-card board visibility, Retreat, paid attack declaration, End Turn, next-turn progression, deterministic playtest fixture order, hardened tab-scoped viewer identity, and reduced prompt/action debug noise: rerun the full two-browser/manual-tester playtest milestone only after the validation harness can guarantee separate browser contexts, then address any remaining command-loop gaps it exposes.
+- Expand persisted Ash engine mechanics: attack resolution/finish controls, damage/KO/prizes/replacement Active, switch effects, evolution UI/RPC wiring, turn transitions, and snapshot-backed undo/debug support.
 - Continue migrating executable card behavior into engine-owned definitions with explicit unsupported-behavior tracking.
 - Spike Electric Streams only after the command/read loop has enough event shape to publish safely.
 
 ## Blockers
 
-- No known code blocker after the iteration 33 viewer hardening, isolated-context playtest pass, iteration 34 action/prompt clarity pass, iteration 35 retreat command pass, and iteration 36 attached-card visibility pass.
+- No known code blocker after the iteration 33 viewer hardening, isolated-context playtest pass, iteration 34 action/prompt clarity pass, iteration 35 retreat command pass, iteration 36 attached-card visibility pass, and iteration 37 paid attack declaration pass.
+- Attack declaration currently stops the turn at `attack_declared`; a browser playtest that clicks an attack needs the next attack-resolution/finish slice before that turn can continue through the UI.
 - Validation blocker: the available manual-tester subagents still appear to share/contend over one browser/session, so their reported viewer flips are not reliable proof of independent-browser behavior. The documented manual-tester milestone needs a harness that guarantees separate browser contexts before it can be marked formally complete.
 
 ## Recommended next atomic task
 
-- Start the persisted attack-declaration slice with explicit attack/cost affordances for the active viewer's Active Pokémon, then expose a narrow command that validates attached Energy cost before any broader damage/KO/prize resolution. Keep damage resolution as a follow-up if the command boundary becomes too broad.
+- Add the next narrow attack slice: expose existing `resolve_declared_attack` and `finish_attack` mechanics through Ash/RPC and the SPA for static/executable attacks, then validate that a declared attack can advance from `attack_declared` → `attack_resolving` → `ended` without adding broader KO/prize UI yet.

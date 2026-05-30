@@ -1,6 +1,7 @@
 defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
   @moduledoc false
 
+  alias Prizmo.TcgEngine.AttackCosts
   alias Prizmo.TcgEngine.CardCatalog
   alias Prizmo.TcgEngine.CardInstance
   alias Prizmo.TcgEngine.Cards.Registry, as: EngineCardRegistry
@@ -35,7 +36,7 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
       viewer_cards = Enum.filter(cards, &(&1.owner_player_id == viewer_player_id))
 
       player
-      |> available_action_window_affordances(viewer_cards)
+      |> available_action_window_affordances(viewer_cards, cards)
       |> Enum.reject(&is_nil/1)
     else
       []
@@ -51,16 +52,19 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
 
   defp action_window_for_viewer?(_game, _current_turn, _viewer_player_id), do: false
 
-  defp available_action_window_affordances(nil, _cards), do: []
+  defp available_action_window_affordances(nil, _cards, _all_cards), do: []
 
-  defp available_action_window_affordances(%GamePlayer{} = player, cards) do
+  defp available_action_window_affordances(%GamePlayer{} = player, cards, all_cards) do
     [
       play_card_affordance(player, cards),
       play_basic_to_bench_affordance(player, cards),
       attach_energy_affordance(player, cards),
-      retreat_affordance(player, cards),
-      end_turn_affordance(player)
-    ]
+      retreat_affordance(player, cards)
+    ] ++
+      declare_attack_affordances(player, cards, all_cards) ++
+      [
+        end_turn_affordance(player)
+      ]
   end
 
   defp play_card_affordance(%GamePlayer{} = player, cards) do
@@ -140,6 +144,27 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
     end
   end
 
+  defp declare_attack_affordances(%GamePlayer{} = player, cards, all_cards) do
+    with %CardInstance{} = active_card <- active_pokemon_card(cards),
+         false <- blocked_attack_status?(active_card),
+         %CardInstance{} = defender_card <-
+           opponent_active_pokemon_card(all_cards, player.player_id),
+         {:ok, %{attacks: attacks}} <- CardCatalog.fetch(active_card.card_id) do
+      attached_cards = attached_cards_for(cards, active_card.id)
+
+      attacks
+      |> Enum.sort_by(fn {attack_id, _attack} -> Atom.to_string(attack_id) end)
+      |> Enum.filter(fn {_attack_id, attack} ->
+        attack |> AttackCosts.attack_cost() |> AttackCosts.paid?(attached_cards)
+      end)
+      |> Enum.map(fn {attack_id, attack} ->
+        attack_affordance(player, active_card, defender_card, attack_id, attack)
+      end)
+    else
+      _other -> []
+    end
+  end
+
   defp end_turn_affordance(%GamePlayer{} = player) do
     affordance(:end_turn, "End turn", :command, player.player_id,
       note: "Pass the action to the next player after resolving optional actions."
@@ -155,6 +180,10 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
       source_card_instance_ids: Keyword.get(opts, :source_card_instance_ids, []),
       target_card_instance_ids: Keyword.get(opts, :target_card_instance_ids, []),
       required_source_count: Keyword.get(opts, :required_source_count, 0),
+      attack_id: Keyword.get(opts, :attack_id),
+      attack_name: Keyword.get(opts, :attack_name),
+      attack_cost: Keyword.get(opts, :attack_cost, []),
+      attack_damage: Keyword.get(opts, :attack_damage),
       prompt_ids: Keyword.get(opts, :prompt_ids, []),
       choice_keys: Keyword.get(opts, :choice_keys, []),
       note: Keyword.get(opts, :note)
@@ -174,6 +203,10 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
     Enum.find(cards, &(&1.zone == :active))
   end
 
+  defp opponent_active_pokemon_card(cards, player_id) do
+    Enum.find(cards, &(&1.zone == :active and &1.owner_player_id != player_id))
+  end
+
   defp in_play_pokemon_cards(cards) do
     cards
     |> Enum.filter(&(&1.zone in [:active, :bench]))
@@ -190,6 +223,14 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
     cards
     |> Enum.filter(&(&1.zone == :attached and &1.attached_to_card_instance_id == active_card_id))
     |> Enum.filter(&energy_card?/1)
+    |> Enum.sort_by(&{&1.position, &1.instance_id})
+  end
+
+  defp attached_cards_for(cards, card_instance_id) do
+    cards
+    |> Enum.filter(
+      &(&1.zone == :attached and &1.attached_to_card_instance_id == card_instance_id)
+    )
     |> Enum.sort_by(&{&1.position, &1.instance_id})
   end
 
@@ -216,6 +257,35 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
   end
 
   defp blocked_retreat_status?(%CardInstance{status: status}), do: status in [:asleep, :paralyzed]
+
+  defp blocked_attack_status?(%CardInstance{status: status}), do: status in [:asleep, :paralyzed]
+
+  defp attack_affordance(player, active_card, defender_card, attack_id, attack) do
+    cost = AttackCosts.stringify_cost(AttackCosts.attack_cost(attack))
+    attack_name = Map.get(attack, :name) || Atom.to_string(attack_id)
+
+    affordance(:declare_attack, "Declare #{attack_name}", :command, player.player_id,
+      source_card_instance_ids: [active_card.id],
+      target_card_instance_ids: [defender_card.id],
+      attack_id: Atom.to_string(attack_id),
+      attack_name: attack_name,
+      attack_cost: cost,
+      attack_damage: attack_damage(attack),
+      note: attack_note(cost)
+    )
+  end
+
+  defp attack_damage(%{damage: damage}) when is_integer(damage), do: Integer.to_string(damage)
+  defp attack_damage(%{damage: damage}) when is_binary(damage), do: damage
+  defp attack_damage(_attack), do: nil
+
+  defp attack_note([]) do
+    "Declaration validates this free attack. Damage and effects resolve in follow-up attack commands."
+  end
+
+  defp attack_note(cost) do
+    "Declaration validates attached Energy cost #{Enum.join(cost, ", ")}. Damage and effects resolve in follow-up attack commands."
+  end
 
   defp retreat_note(0),
     do: "Switch the Active Pokémon with a Benched Pokémon without discarding Energy."

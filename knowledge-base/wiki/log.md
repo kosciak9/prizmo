@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-30] iteration 37 | Attack declaration affordance and command
+- Task attempted: started the persisted attack-declaration slice by adding Energy-cost validation for declared attacks, exposing `declare_attack` through the Ash/RPC boundary, and rendering paid attack buttons in the React playtest legal-actions panel.
+- Files changed: added `lib/prizmo/tcg_engine/attack_costs.ex`; updated `lib/prizmo/tcg_engine/card_catalog.ex`, `lib/prizmo/tcg_engine/mechanics.ex`, `lib/prizmo/tcg_engine/game/action_commands.ex`, `lib/prizmo/tcg_engine/game_view/action_affordances.ex`, `lib/prizmo/tcg_engine/game_view/fields.ex`, `lib/prizmo/tcg_engine.ex`, `lib/prizmo_web/spa/features/home/routes/index.tsx`, `lib/prizmo_web/spa/lib/ash/client.ts`, generated `lib/prizmo_web/spa/lib/ash/generated/ash_rpc.ts`, this log, and the TCG engine playtest handoff.
+- Validation: initial Tidewave rollback smoke exposed an invalid direct `created` → `in_progress` staging shortcut; corrected rollback smoke passed by attaching Fire Energy to Moltres, verifying a `declare_attack` affordance for `fighting_wings`, and confirming `Prizmo.TcgEngine.declare_attack_for_game/3` moved the current turn to `:attack_declared`; `mix ash_typescript.codegen --check` passed; `mix assets.build` passed; `mix test test/prizmo/tcg_engine/mechanics_test.exs` passed (4 tests); `mix check --no-test` passed.
+- Remaining/blocking notes: no code blocker; declaration intentionally validates attached Energy and records pending attack state only, while damage/effects/KO/prize handling and attack finish controls remain follow-up work.
+
 ## [2026-05-30] iteration 36 | Attached-card read-model visibility
 - Task attempted: added public attached-card visibility to the persisted TCG engine game-state read model and React playtest board so Energy/Tool attachments render under visible Pokémon and retreat payment buttons can resolve attached Energy names.
 - Files changed: updated `lib/prizmo/tcg_engine/game_view.ex`, `lib/prizmo/tcg_engine/game_view/fields.ex`, `lib/prizmo_web/spa/features/home/routes/index.tsx`, generated `lib/prizmo_web/spa/lib/ash/generated/ash_rpc.ts`, this log, and the TCG engine playtest handoff.

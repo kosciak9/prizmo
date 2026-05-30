@@ -31,6 +31,7 @@ defmodule Prizmo.TcgEngine do
       rpc_action :attach_tcg_engine_energy, :attach_energy_command
       rpc_action :end_tcg_engine_turn, :end_turn_command
       rpc_action :retreat_tcg_engine_active, :retreat_command
+      rpc_action :declare_tcg_engine_attack, :declare_attack_command
       rpc_action :choose_tcg_engine_prompt, :choose_prompt_command
     end
   end
@@ -84,6 +85,10 @@ defmodule Prizmo.TcgEngine do
       define :retreat_active_for_game,
         action: :retreat_command,
         args: [:game_id, :player_id, :bench_card_instance_id, :energy_card_instance_ids]
+
+      define :declare_attack_for_game,
+        action: :declare_attack_command,
+        args: [:game_id, :player_id, :attack_id]
 
       define :choose_prompt_for_game,
         action: :choose_prompt_command,

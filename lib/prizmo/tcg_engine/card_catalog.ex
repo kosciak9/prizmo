@@ -67,6 +67,17 @@ defmodule Prizmo.TcgEngine.CardCatalog do
     end
   end
 
+  def fetch_attack_for_declaration(card_id, attack_id) do
+    with {:ok, %{attacks: attacks}} <- fetch(card_id),
+         {:ok, attack_id} <- find_attack_id(attacks, attack_id),
+         {:ok, attack} <- Map.fetch(attacks, attack_id) do
+      {:ok, Map.put(attack, :id, attack_id)}
+    else
+      :error -> {:error, {:unsupported_attack, card_id, attack_id}}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
   def supported_card_ids do
     @behaviors
     |> Map.keys()
@@ -205,6 +216,24 @@ defmodule Prizmo.TcgEngine.CardCatalog do
 
   defp primary_type(%Metadata{types: [type | _types]}), do: type
   defp primary_type(%Metadata{}), do: nil
+
+  defp find_attack_id(attacks, attack_id) when is_atom(attack_id) do
+    if Map.has_key?(attacks, attack_id) do
+      {:ok, attack_id}
+    else
+      :error
+    end
+  end
+
+  defp find_attack_id(attacks, attack_id) when is_binary(attack_id) do
+    attacks
+    |> Map.keys()
+    |> Enum.find(&(Atom.to_string(&1) == attack_id))
+    |> case do
+      nil -> :error
+      attack_id -> {:ok, attack_id}
+    end
+  end
 
   defp first_weakness([%{type: type, value: value} | _weaknesses]) do
     %{type: type, multiplier: multiplier_value(value)}

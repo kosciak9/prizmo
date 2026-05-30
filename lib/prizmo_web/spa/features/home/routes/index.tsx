@@ -9,6 +9,7 @@ import {
   runChooseTcgEngineSetupBenchFromHand,
   runCompleteTcgEngineSetup,
   runCreateTcgEngineGame,
+  runDeclareTcgEngineAttack,
   runDrawTcgEngineCardForTurn,
   runDrawTcgEngineOpeningHand,
   runEndTcgEngineTurn,
@@ -85,6 +86,10 @@ const ACTION_AFFORDANCE_FIELDS = [
   'sourceCardInstanceIds',
   'targetCardInstanceIds',
   'requiredSourceCount',
+  'attackId',
+  'attackName',
+  'attackCost',
+  'attackDamage',
   'promptIds',
   'choiceKeys',
   'note'
@@ -211,6 +216,10 @@ type ActionAffordance = {
   sourceCardInstanceIds: string[]
   targetCardInstanceIds: string[]
   requiredSourceCount: number
+  attackId: string | null
+  attackName: string | null
+  attackCost: string[]
+  attackDamage: string | null
   promptIds: string[]
   choiceKeys: string[]
   note: string | null
@@ -271,6 +280,17 @@ type RetreatCommand = {
   playerId: string
   benchCardInstanceId: string
   energyCardInstanceIds: string[]
+}
+
+type DeclareAttackInput = {
+  gameId: string
+  playerId: PlayerId
+  attackId: string
+}
+
+type DeclareAttackCommand = {
+  playerId: string
+  attackId: string
 }
 
 type ChoosePromptInput = {
@@ -473,6 +493,13 @@ export function HomeRoute() {
 
   const retreatMutation = useMutation({
     mutationFn: (input: RetreatInput) => retreat(input),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['tcg-engine', 'game-state'] })
+    }
+  })
+
+  const declareAttackMutation = useMutation({
+    mutationFn: (input: DeclareAttackInput) => declareAttack(input),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['tcg-engine', 'game-state'] })
     }
@@ -1063,6 +1090,12 @@ export function HomeRoute() {
                   </InlineNotice>
                 ) : null}
 
+                {declareAttackMutation.error ? (
+                  <InlineNotice tone="error" title="Attack declaration command failed">
+                    {errorMessage(declareAttackMutation.error)}
+                  </InlineNotice>
+                ) : null}
+
                 {choosePromptMutation.error ? (
                   <InlineNotice tone="error" title="Prompt choice command failed">
                     {errorMessage(choosePromptMutation.error)}
@@ -1155,6 +1188,15 @@ export function HomeRoute() {
                     })
                   }
                 }}
+                onDeclareAttack={({ playerId, attackId }) => {
+                  if (isPlayerId(playerId)) {
+                    declareAttackMutation.mutate({
+                      gameId: normalisedGameId,
+                      playerId,
+                      attackId
+                    })
+                  }
+                }}
                 onPlayCard={({ playerId, cardInstanceId }) => {
                   if (isPlayerId(playerId)) {
                     playCardMutation.mutate({
@@ -1193,6 +1235,11 @@ export function HomeRoute() {
                         retreatMutation.variables.benchCardInstanceId,
                         retreatMutation.variables.energyCardInstanceIds
                       )
+                    : null
+                }
+                declareAttackPendingKey={
+                  declareAttackMutation.isPending && declareAttackMutation.variables
+                    ? attackKey(declareAttackMutation.variables.playerId, declareAttackMutation.variables.attackId)
                     : null
                 }
               />
@@ -1472,6 +1519,20 @@ async function retreat(input: RetreatInput): Promise<CreatedGame> {
   return result.data as CreatedGame
 }
 
+async function declareAttack(input: DeclareAttackInput): Promise<CreatedGame> {
+  const result = await runDeclareTcgEngineAttack({
+    input,
+    fields: GAME_RESOURCE_FIELDS,
+    headers: buildAshRpcHeaders()
+  })
+
+  if (!result.success) {
+    throw new Error(rpcErrorMessage(result.errors))
+  }
+
+  return result.data as CreatedGame
+}
+
 async function choosePrompt(input: ChoosePromptInput): Promise<CreatedGame> {
   const result = await runChooseTcgEnginePrompt({
     input,
@@ -1492,11 +1553,13 @@ function GameStateWorkbench({
   deckNamesByKey,
   onChoosePrompt,
   onAttachEnergy,
+  onDeclareAttack,
   onEndTurn,
   onPlayBasicToBench,
   onPlayCard,
   onRetreat,
   attachEnergyPendingKey,
+  declareAttackPendingKey,
   endTurnPendingPlayerId,
   playBasicToBenchPendingCardId,
   promptPendingId,
@@ -1508,11 +1571,13 @@ function GameStateWorkbench({
   deckNamesByKey: Map<string, string>
   onChoosePrompt: (input: ChoosePromptCommand) => void
   onAttachEnergy: (input: AttachEnergyCommand) => void
+  onDeclareAttack: (input: DeclareAttackCommand) => void
   onEndTurn: (input: EndTurnCommand) => void
   onPlayBasicToBench: (input: PlayBasicToBenchCommand) => void
   onPlayCard: (input: PlayCardCommand) => void
   onRetreat: (input: RetreatCommand) => void
   attachEnergyPendingKey: string | null
+  declareAttackPendingKey: string | null
   endTurnPendingPlayerId: string | null
   playBasicToBenchPendingCardId: string | null
   promptPendingId: string | null
@@ -1553,11 +1618,13 @@ function GameStateWorkbench({
         actions={gameState.actionAffordances}
         cardsById={cardsById}
         onAttachEnergy={onAttachEnergy}
+        onDeclareAttack={onDeclareAttack}
         onEndTurn={onEndTurn}
         onPlayBasicToBench={onPlayBasicToBench}
         onPlayCard={onPlayCard}
         onRetreat={onRetreat}
         attachEnergyPendingKey={attachEnergyPendingKey}
+        declareAttackPendingKey={declareAttackPendingKey}
         endTurnPendingPlayerId={endTurnPendingPlayerId}
         playBasicToBenchPendingCardId={playBasicToBenchPendingCardId}
         playCardPendingCardId={playCardPendingCardId}
@@ -1758,11 +1825,13 @@ function ActionAffordancesPanel({
   actions,
   cardsById,
   onAttachEnergy,
+  onDeclareAttack,
   onEndTurn,
   onPlayBasicToBench,
   onPlayCard,
   onRetreat,
   attachEnergyPendingKey,
+  declareAttackPendingKey,
   endTurnPendingPlayerId,
   playBasicToBenchPendingCardId,
   playCardPendingCardId,
@@ -1771,11 +1840,13 @@ function ActionAffordancesPanel({
   actions: ActionAffordance[]
   cardsById: Map<string, CardSummary>
   onAttachEnergy: (input: AttachEnergyCommand) => void
+  onDeclareAttack: (input: DeclareAttackCommand) => void
   onEndTurn: (input: EndTurnCommand) => void
   onPlayBasicToBench: (input: PlayBasicToBenchCommand) => void
   onPlayCard: (input: PlayCardCommand) => void
   onRetreat: (input: RetreatCommand) => void
   attachEnergyPendingKey: string | null
+  declareAttackPendingKey: string | null
   endTurnPendingPlayerId: string | null
   playBasicToBenchPendingCardId: string | null
   playCardPendingCardId: string | null
@@ -1785,6 +1856,7 @@ function ActionAffordancesPanel({
     playCardPendingCardId ||
       playBasicToBenchPendingCardId ||
       attachEnergyPendingKey ||
+      declareAttackPendingKey ||
       endTurnPendingPlayerId ||
       retreatPendingKey
   )
@@ -1944,6 +2016,21 @@ function ActionAffordancesPanel({
                     )
                   )}
                 </div>
+              ) : null}
+
+              {action.key === 'declare_attack' && action.attackId ? (
+                <button
+                  className="mt-3 w-full rounded-xl border border-emerald-700 px-3 py-2 text-left text-sm font-semibold text-emerald-800 transition hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:border-stone-300 disabled:text-stone-400 disabled:hover:bg-transparent"
+                  disabled={actionCommandPending || !isPlayerId(action.playerId)}
+                  onClick={() => onDeclareAttack({ playerId: action.playerId, attackId: action.attackId! })}
+                  type="button"
+                >
+                  {declareAttackPendingKey === attackKey(action.playerId, action.attackId)
+                    ? `Declaring ${action.attackName ?? 'attack'}...`
+                    : `Declare ${action.attackName ?? formatEventType(action.attackId)}${attackCostLabel(
+                        action.attackCost
+                      )}${attackDamageLabel(action.attackDamage)}`}
+                </button>
               ) : null}
 
               {action.key === 'end_turn' ? (
@@ -2407,6 +2494,7 @@ function promptChoiceCardDetail(card: CardSummary | undefined, cardInstanceId: s
 function actionKey(action: ActionAffordance) {
   return [
     action.key,
+    action.attackId ?? '',
     ...action.sourceCardInstanceIds,
     ...action.targetCardInstanceIds,
     ...action.promptIds,
@@ -2420,6 +2508,22 @@ function attachEnergyPairKey(energyCardInstanceId: string, targetCardInstanceId:
 
 function retreatKey(benchCardInstanceId: string, energyCardInstanceIds: string[]) {
   return `${benchCardInstanceId}:${energyCardInstanceIds.join(',')}`
+}
+
+function attackKey(playerId: string, attackId: string) {
+  return `${playerId}:${attackId}`
+}
+
+function attackCostLabel(cost: string[]) {
+  if (cost.length === 0) {
+    return ' for free'
+  }
+
+  return ` for ${cost.map(formatEventType).join(' + ')}`
+}
+
+function attackDamageLabel(damage: string | null) {
+  return damage ? ` (${damage} damage)` : ''
 }
 
 function retreatPaymentOptions(sourceCardInstanceIds: string[], requiredSourceCount: number) {

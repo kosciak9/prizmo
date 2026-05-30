@@ -99,6 +99,10 @@ defmodule Prizmo.TcgEngine.GameView.Fields do
     source_card_instance_ids: [type: {:array, :uuid}, allow_nil?: false],
     target_card_instance_ids: [type: {:array, :uuid}, allow_nil?: false],
     required_source_count: [type: :integer, allow_nil?: false],
+    attack_id: [type: :string],
+    attack_name: [type: :string],
+    attack_cost: [type: {:array, :string}, allow_nil?: false],
+    attack_damage: [type: :string],
     prompt_ids: [type: {:array, :uuid}, allow_nil?: false],
     choice_keys: [type: {:array, :string}, allow_nil?: false],
     note: [type: :string]
