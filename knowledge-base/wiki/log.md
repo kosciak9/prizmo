@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-31] iteration 81 | Aggregated multi-KO Prize prompt
+- Task attempted: removed the remaining active+Bench and multiple-Bench KO rejection in the persisted attack resolver by aggregating same-attacker knockout prize records into one `choose_knockout_prizes` pending effect/prompt with plural knockout metadata while preserving replacement-Active follow-up for Active KOs.
+- Files changed: updated `lib/prizmo/tcg_engine/mechanics.ex`, this log, and the TCG engine playtest handoff.
+- Validation: `mix format && mix compile --warnings-as-errors` passed; `mix test test/prizmo/tcg_engine/mechanics_test.exs` passed; Tidewave rollback smokes passed for `TWM-130` `Phantom Dive` creating and resolving one two-Prize prompt for simultaneous Active Abra + Benched Abra KOs and for two simultaneous Bench Abra KOs while the Active Fezandipiti ex survived; `mix check --no-test` passed.
+- Remaining/blocking notes: no code blocker for same-attacker active+Bench or multiple-Bench KO Prize aggregation. Cross-player simultaneous KOs, such as an attack that KOs the defender and also self-KOs the attacker, still need a queued prompt design because different players may need separate Prize prompts.
+
 ## [2026-05-30] iteration 80 | Single Bench KO Prize prompt
 - Task attempted: implemented the first Bench-damage KO continuation slice so exactly one Bench KO from supported attack-effect Bench damage/counter resolution discards the KO stack and routes into the existing face-down knockout Prize prompt, while active+Bench and multiple Bench KOs still reject instead of creating competing prompts.
 - Files changed: updated `lib/prizmo/tcg_engine/attack_effects.ex`, `lib/prizmo/tcg_engine/battle_actions.ex`, `lib/prizmo/tcg_engine/mechanics.ex`, this log, and the TCG engine playtest handoff.

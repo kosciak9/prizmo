@@ -1,6 +1,6 @@
 # Ash-backed TCG Engine Playtest Handoff
 
-Updated: 2026-05-30
+Updated: 2026-05-31
 
 ## Current state
 
@@ -289,18 +289,22 @@ Updated: 2026-05-30
 - `Prizmo.TcgEngine.BattleActions.discard_knocked_out_stack/2` is now a shared helper used by Active and Bench KO paths.
 - `Prizmo.TcgEngine.Mechanics.resolve_declared_attack/3` extracts Bench KOs from effect payloads and routes exactly one Bench KO into the existing `choose_knockout_prizes` pending-effect/prompt flow, with `finish_attack/2` still blocked by the existing awaiting-prompt guard until the Prize prompt resolves.
 - Simultaneous active+Bench KOs still reject with `:multi_knockout_not_supported`, and multiple Bench KOs still reject with `{:multiple_bench_knockouts_not_supported, ids}` until a queued or multi-KO Prize sequencing design exists.
+- Iteration 81 replaced that same-attacker active+Bench/multiple-Bench KO rejection with an explicit aggregate Prize prompt.
+- `Prizmo.TcgEngine.Mechanics.resolve_declared_attack/3` now gathers the Active KO, if any, plus all Bench KOs reported by supported attack-effect payloads, sums their Prize counts, and creates one `choose_knockout_prizes` pending effect/prompt for the attacking player instead of trying to create competing awaiting pending effects.
+- Knockout prompt/pending-effect/event payloads now preserve both legacy singular fields and plural `knockouts`, `knocked_out_card_instance_ids`, and `knocked_out_player_ids` metadata, so existing single-KO consumers keep working while multi-KO domain facts identify every KO'd Pokémon.
+- Replacement-Active follow-up still runs for Active KOs after the aggregate Prize prompt is created; multiple-Bench-only KOs can resolve their aggregate Prize prompt and finish the attack without a replacement choice when the defender Active survives.
 
 ## Last commit
 
-- Baseline entering iteration 80: `6eed297 feat(tcg-engine): prevent bench damage to tera pokemon`.
-- This handoff was written before committing iteration 80; expected commit message is `feat(tcg-engine): resolve single bench knockout prizes`.
+- Baseline entering iteration 81: `d546208 feat(tcg-engine): resolve single bench knockout prizes`.
+- This handoff was written before committing iteration 81; expected commit message is `feat(tcg-engine): aggregate multi knockout prizes`.
 
 ## Remaining tasks
 
 - Decide whether old `Prizmo.Tcg.Sim` tests are kept as historical reference, quarantined, or ported scenario-by-scenario.
 - Build the minimal playable React SPA loop beyond prompt resolution, Bench commands, Attach Energy, attached-card board visibility, Retreat, paid attack declaration, static/executable attack resolution/finish controls, switch-self target choice, one-Bench KO follow-up, multi-Bench replacement Active choice, explicit KO Prize prompt choice, evolution from hand, End Turn, next-turn progression, deterministic playtest fixture order, hardened tab-scoped viewer identity, and reduced prompt/action debug noise: rerun the full two-browser/manual-tester playtest milestone only after the validation harness can guarantee separate browser contexts.
 - Complete a substantial Web UI polish pass before handoff: the browser surface should feel much closer to Pokémon TCG Live (PTCGL) than an internal test bench, with spatial board zones, card-like battlefield objects, readable hand/action areas, guided prompt resolution, product-quality errors/empty states, and raw payloads or debug-only affordances removed from or isolated outside the normal play path.
-- Expand persisted Ash engine mechanics: continue multi-KO/prize handling beyond the new single Bench KO path, richer status/marker lifecycle semantics, turn transitions, remaining card-level effect semantics, and snapshot-backed undo/debug support now that the first executable copy-attack path and authored Tera tag boundary are in place.
+- Expand persisted Ash engine mechanics: continue KO/prize handling beyond same-attacker active+Bench and multiple-Bench aggregation, especially cross-player simultaneous KOs, richer status/marker lifecycle semantics, turn transitions, remaining card-level effect semantics, and snapshot-backed undo/debug support now that the first executable copy-attack path and authored Tera tag boundary are in place.
 - Continue migrating executable card behavior into engine-owned definitions with explicit unsupported-behavior tracking.
 - Spike Electric Streams only after the command/read loop has enough event shape to publish safely.
 
@@ -310,7 +314,7 @@ Updated: 2026-05-30
 - Raw printed attacks with missing authored behavior and authored attacks with unsupported effect types are hidden/rejected before declaration; new attack-effect slices should opt into `Prizmo.TcgEngine.AttackEffects` only when persisted resolution semantics are implemented.
 - Switch-self attacks are executable from the browser, including the multiple-Bench case where the active viewer must choose a visible Bench target before resolving.
 - Multi-Bench KO replacement now exposes `choose_replacement_active/3` through Ash/RPC and the React SPA, and attack finish remains blocked until every player has an Active Pokémon.
-- Knockout Prize taking now uses an explicit face-down Prize prompt for the attacking player and blocks attack finish until resolved; exactly one Bench KO from supported Bench damage/counter effects can now use that same prompt flow, while broader KO work still needs simultaneous active+Bench/multi-Bench KO sequencing and more browser playtest coverage.
+- Knockout Prize taking now uses an explicit face-down Prize prompt and blocks attack finish until resolved; same-attacker active+Bench KOs and multiple-Bench KOs from supported Bench damage/counter effects now aggregate into one Prize prompt, while cross-player simultaneous KO work still needs queued prompt sequencing and more browser playtest coverage.
 - Evolution from hand is now callable from the browser for valid turn-2+ evolution pairs; pre-existing attached cards are reparented to the evolved Pokémon, damage counters move to the new top, and special conditions are cleared so attack/retreat cost checks still work for evolved attackers. Broader evolution work should still verify multi-stage stack presentation, marker handling, and longer KO/replacement/prize browser flows.
 - Authored Tera Pokémon now prevent attack damage while Benched through `Prizmo.TcgEngine.TeraBenchProtection`; damage-counter effects are intentionally not treated as damage for this rule.
 - Rabsca `TEF-024` `Psychic` is now executable in the persisted engine and deals 10 plus 30 more damage per Energy card attached to the opponent's Active Pokémon.
@@ -335,8 +339,8 @@ Updated: 2026-05-30
 - Raging Bolt ex `TEF-123` `Bellowing Thunder` is now executable in the persisted engine and deals 70 damage for each selected own Basic Energy attached to the attacker's Pokémon in play, then discards those selected Energy cards through the attack-resolution command.
 - Team Rocket's Mewtwo ex `DRI-081` `Erasure Ball` is now executable in the persisted engine and deals 160 plus 60 more damage for each selected own Energy attached to Benched Pokémon, up to two selected Energy cards, then discards those selected Energy cards through the attack-resolution command. Its `Power Saver` attack restriction is enforced by declaration and affordance generation.
 - Chien-Pao `SSP-056` `Icicle Loop` is now executable in the persisted engine and deals its printed 120 damage before returning one selected Energy attached to the attacking Active Pokémon to hand through the attack-resolution command. Multiple attached Energy cards are selected in the browser via visible attached-card radio buttons; exactly one attached Energy is returned implicitly.
-- Wellspring Mask Ogerpon ex `TWM-064` `Torrential Pump` is now executable in the persisted engine and deals its printed 100 Active damage. The optional extra effect shuffles exactly three selected Energy attached to the attacking Active Pokémon into deck through the attack-resolution command, then deals 120 damage to a selected opponent Benched Pokémon. Exactly one Bench KO now creates the existing knockout Prize prompt; active+Bench and multiple Bench KOs remain blocked until multi-KO/prize prompt sequencing is implemented.
-- Dragapult ex `TWM-130` `Phantom Dive` is now executable in the persisted engine and deals its printed 200 Active damage. Its Bench effect allocates exactly six damage counters across opponent Benched Pokémon through the attack-resolution command, with browser numeric allocation inputs. Exactly one Bench-counter KO now creates the existing knockout Prize prompt; active+Bench and multiple Bench KOs remain blocked until multi-KO/prize prompt sequencing is implemented.
+- Wellspring Mask Ogerpon ex `TWM-064` `Torrential Pump` is now executable in the persisted engine and deals its printed 100 Active damage. The optional extra effect shuffles exactly three selected Energy attached to the attacking Active Pokémon into deck through the attack-resolution command, then deals 120 damage to a selected opponent Benched Pokémon. Same-attacker Active+Bench and multiple-Bench KOs now aggregate into one face-down knockout Prize prompt.
+- Dragapult ex `TWM-130` `Phantom Dive` is now executable in the persisted engine and deals its printed 200 Active damage. Its Bench effect allocates exactly six damage counters across opponent Benched Pokémon through the attack-resolution command, with browser numeric allocation inputs. Same-attacker Active+Bench and multiple-Bench KOs now aggregate into one face-down knockout Prize prompt.
 - Applin `TWM-017` `Tumbling Attack` is now executable in the persisted engine and deals 10 base damage plus 20 more damage on a command-provided, engine-validated heads result. Tails resolves for 10 damage. The browser attack-resolution panel now prompts for Heads/Tails when the read model marks `pending_attack_requires_coin_result`.
 - Mega Kangaskhan ex `MEG-104` `Rapid-Fire Combo` is now executable in the persisted engine and deals 200 base damage plus 50 more damage for each command-provided, engine-validated heads count. The browser attack-resolution panel now prompts for a non-negative heads count when the read model marks `pending_attack_requires_heads_count`.
 - Dunsparce `TEF-128` `Dig` is now executable in the persisted engine and deals its printed 30 damage before applying a command-provided, engine-validated coin result. Heads marks the attacker so opponent attack damage/effects to that Pokémon are prevented during the opponent's next turn; tails records no protection. The browser attack-resolution panel now prompts for Heads/Tails when the read model marks `pending_attack_requires_coin_result` for coin-gated damage or effects.
@@ -348,4 +352,4 @@ Updated: 2026-05-30
 
 ## Recommended next atomic task
 
-- Pick the next small mechanics blocker for simultaneous KO sequencing: design and implement a queue or explicit multi-KO prompt path for active+Bench or multiple Bench KOs without creating competing awaiting pending effects.
+- Pick the next small mechanics blocker for simultaneous KO sequencing: design and implement queued Prize prompts for cross-player simultaneous KOs, such as an attack that KOs the defender and also self-KOs the attacker, where different players may need separate Prize prompts without competing awaiting pending effects.

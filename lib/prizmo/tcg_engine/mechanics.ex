@@ -462,7 +462,10 @@ defmodule Prizmo.TcgEngine.Mechanics do
              taken_prize_card_instance_ids: Enum.map(taken_prize_cards, & &1.id),
              knocked_out_card_instance_id:
                Map.get(pending_effect.state || %{}, "knocked_out_card_instance_id"),
+             knocked_out_card_instance_ids: pending_knockout_card_instance_ids(pending_effect),
              knocked_out_player_id: Map.get(pending_effect.state || %{}, "knocked_out_player_id"),
+             knocked_out_player_ids: pending_knockout_player_ids(pending_effect),
+             knockouts: Map.get(pending_effect.state || %{}, "knockouts", []),
              winner_player_id: game.winner_player_id
            }),
          {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do
@@ -1147,7 +1150,6 @@ defmodule Prizmo.TcgEngine.Mechanics do
                effective_attack,
                opts
              ),
-           :ok <- require_supported_attack_knockout_shape(damage_result, effect_payload),
            {:ok, event} <-
              write_event(
                game,
@@ -1165,15 +1167,21 @@ defmodule Prizmo.TcgEngine.Mechanics do
              ),
            {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do
         with {:ok, game} <-
-               resolve_knockout_after_attack_damage(
+               resolve_attack_knockout_prize_selection(
                  game.id,
                  player_id,
                  defender_card.owner_player_id,
                  defender_card,
-                 damage_result
+                 damage_result,
+                 effect_payload
                ),
              {:ok, game} <-
-               resolve_bench_knockouts_after_attack_effect(game, player_id, effect_payload) do
+               resolve_active_replacement_after_attack_damage(
+                 game,
+                 player_id,
+                 defender_card.owner_player_id,
+                 damage_result
+               ) do
           resolve_self_knockout_after_attack_effect(
             game,
             player_id,
@@ -1202,6 +1210,46 @@ defmodule Prizmo.TcgEngine.Mechanics do
         get_game(game.id)
       end
     end)
+  end
+
+  defp resolve_attack_knockout_prize_selection(
+         game_id,
+         attacking_player_id,
+         knocked_out_player_id,
+         target_card,
+         damage_result,
+         effect_payload
+       ) do
+    with {:ok, prize_records} <-
+           attack_knockout_prize_records(
+             game_id,
+             knocked_out_player_id,
+             target_card,
+             damage_result,
+             effect_payload
+           ) do
+      create_knockout_prize_selection(game_id, attacking_player_id, prize_records)
+    end
+  end
+
+  defp resolve_active_replacement_after_attack_damage(
+         %Game{} = game,
+         attacking_player_id,
+         knocked_out_player_id,
+         %{
+           knocked_out?: true
+         }
+       ) do
+    resolve_replacement_after_knockout(game, attacking_player_id, knocked_out_player_id)
+  end
+
+  defp resolve_active_replacement_after_attack_damage(
+         %Game{} = game,
+         _attacking_player_id,
+         _knocked_out_player_id,
+         _damage_result
+       ) do
+    {:ok, game}
   end
 
   defp resolve_knockout_after_attack_damage(
@@ -1236,45 +1284,65 @@ defmodule Prizmo.TcgEngine.Mechanics do
     get_game(game_id)
   end
 
-  defp require_supported_attack_knockout_shape(%{knocked_out?: true}, effect_payload) do
-    case bench_knockout_card_instance_ids(effect_payload) do
-      [] -> :ok
-      [_first | _rest] -> {:error, :multi_knockout_not_supported}
-    end
-  end
-
-  defp require_supported_attack_knockout_shape(_damage_result, effect_payload) do
-    case bench_knockout_card_instance_ids(effect_payload) do
-      [] -> :ok
-      [_single] -> :ok
-      ids -> {:error, {:multiple_bench_knockouts_not_supported, ids}}
-    end
-  end
-
-  defp resolve_bench_knockouts_after_attack_effect(
-         %Game{} = game,
-         attacking_player_id,
+  defp attack_knockout_prize_records(
+         game_id,
+         knocked_out_player_id,
+         target_card,
+         damage_result,
          effect_payload
        ) do
-    case bench_knockout_card_instance_ids(effect_payload) do
-      [] ->
-        {:ok, game}
+    with {:ok, active_records} <-
+           active_knockout_prize_records(
+             game_id,
+             knocked_out_player_id,
+             target_card,
+             damage_result
+           ),
+         {:ok, bench_records} <- bench_knockout_prize_records(game_id, effect_payload) do
+      {:ok, active_records ++ bench_records}
+    end
+  end
 
-      [bench_card_instance_id] ->
-        with {:ok, target_card} <- get_card(game.id, bench_card_instance_id),
-             :ok <- require_card_zone(target_card, :discard),
-             {:ok, prize_count} <- knockout_prize_count(target_card) do
-          create_knockout_prize_selection(
-            game.id,
-            attacking_player_id,
-            target_card.owner_player_id,
-            target_card,
-            prize_count
-          )
-        end
+  defp active_knockout_prize_records(game_id, knocked_out_player_id, target_card, %{
+         knocked_out?: true
+       }) do
+    with {:ok, current_target_card} <- get_card(game_id, target_card.id),
+         :ok <- require_card_zone(current_target_card, :discard),
+         {:ok, prize_record} <- knockout_prize_record(knocked_out_player_id, current_target_card) do
+      {:ok, [prize_record]}
+    end
+  end
 
-      ids ->
-        {:error, {:multiple_bench_knockouts_not_supported, ids}}
+  defp active_knockout_prize_records(
+         _game_id,
+         _knocked_out_player_id,
+         _target_card,
+         _damage_result
+       ) do
+    {:ok, []}
+  end
+
+  defp bench_knockout_prize_records(game_id, effect_payload) do
+    effect_payload
+    |> bench_knockout_card_instance_ids()
+    |> Enum.map(fn bench_card_instance_id ->
+      with {:ok, target_card} <- get_card(game_id, bench_card_instance_id),
+           :ok <- require_card_zone(target_card, :discard) do
+        knockout_prize_record(target_card.owner_player_id, target_card)
+      end
+    end)
+    |> collect_results()
+  end
+
+  defp knockout_prize_record(knocked_out_player_id, target_card) do
+    with {:ok, prize_count} <- knockout_prize_count(target_card) do
+      {:ok,
+       %{
+         knocked_out_card_id: target_card.card_id,
+         knocked_out_card_instance_id: target_card.id,
+         knocked_out_player_id: knocked_out_player_id,
+         prize_count: prize_count
+       }}
     end
   end
 
@@ -1339,6 +1407,28 @@ defmodule Prizmo.TcgEngine.Mechanics do
          target_card,
          prize_count
        ) do
+    prize_record = %{
+      knocked_out_card_id: target_card.card_id,
+      knocked_out_card_instance_id: target_card.id,
+      knocked_out_player_id: knocked_out_player_id,
+      prize_count: prize_count
+    }
+
+    create_knockout_prize_selection(game_id, attacking_player_id, [prize_record])
+  end
+
+  defp create_knockout_prize_selection(game_id, _attacking_player_id, []) do
+    get_game(game_id)
+  end
+
+  defp create_knockout_prize_selection(game_id, attacking_player_id, prize_records)
+       when is_list(prize_records) do
+    prize_count = total_knockout_prize_count(prize_records)
+    first_record = List.first(prize_records)
+    knocked_out_card_instance_ids = knockout_card_instance_ids(prize_records)
+    knocked_out_player_ids = knockout_player_ids(prize_records)
+    knockout_payloads = knockout_prize_payloads(prize_records)
+
     with {:ok, game} <- get_game(game_id),
          :ok <- CardPlay.require_no_awaiting_pending_effect(game.id),
          {:ok, prize_cards} <- cards_in_zone(game.id, attacking_player_id, :prize),
@@ -1355,8 +1445,11 @@ defmodule Prizmo.TcgEngine.Mechanics do
                "version" => 1,
                "kind" => "knockout_prize",
                "player_id" => attacking_player_id,
-               "knocked_out_card_instance_id" => target_card.id,
-               "knocked_out_player_id" => knocked_out_player_id,
+               "knockouts" => knockout_payloads,
+               "knocked_out_card_instance_id" => first_record.knocked_out_card_instance_id,
+               "knocked_out_card_instance_ids" => knocked_out_card_instance_ids,
+               "knocked_out_player_id" => first_record.knocked_out_player_id,
+               "knocked_out_player_ids" => knocked_out_player_ids,
                "prize_count" => prize_count,
                "required_prize_count" => required_prize_count
              }
@@ -1381,8 +1474,11 @@ defmodule Prizmo.TcgEngine.Mechanics do
                "legal_choice_labels" => prize_choice_labels(prize_cards),
                "min" => required_prize_count,
                "max" => required_prize_count,
-               "knocked_out_card_instance_id" => target_card.id,
-               "knocked_out_player_id" => knocked_out_player_id,
+               "knockouts" => knockout_payloads,
+               "knocked_out_card_instance_id" => first_record.knocked_out_card_instance_id,
+               "knocked_out_card_instance_ids" => knocked_out_card_instance_ids,
+               "knocked_out_player_id" => first_record.knocked_out_player_id,
+               "knocked_out_player_ids" => knocked_out_player_ids,
                "prize_count" => prize_count
              }
            }),
@@ -1392,12 +1488,40 @@ defmodule Prizmo.TcgEngine.Mechanics do
              pending_effect_id: pending_effect.id,
              prize_count: prize_count,
              required_prize_count: required_prize_count,
-             knocked_out_card_instance_id: target_card.id,
-             knocked_out_player_id: knocked_out_player_id
+             knockouts: knockout_payloads,
+             knocked_out_card_instance_id: first_record.knocked_out_card_instance_id,
+             knocked_out_card_instance_ids: knocked_out_card_instance_ids,
+             knocked_out_player_id: first_record.knocked_out_player_id,
+             knocked_out_player_ids: knocked_out_player_ids
            }),
          {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do
       get_game(game.id)
     end
+  end
+
+  defp total_knockout_prize_count(prize_records) do
+    Enum.reduce(prize_records, 0, &(&1.prize_count + &2))
+  end
+
+  defp knockout_card_instance_ids(prize_records) do
+    Enum.map(prize_records, & &1.knocked_out_card_instance_id)
+  end
+
+  defp knockout_player_ids(prize_records) do
+    prize_records
+    |> Enum.map(& &1.knocked_out_player_id)
+    |> Enum.uniq()
+  end
+
+  defp knockout_prize_payloads(prize_records) do
+    Enum.map(prize_records, fn prize_record ->
+      %{
+        "knocked_out_card_id" => prize_record.knocked_out_card_id,
+        "knocked_out_card_instance_id" => prize_record.knocked_out_card_instance_id,
+        "knocked_out_player_id" => prize_record.knocked_out_player_id,
+        "prize_count" => prize_record.prize_count
+      }
+    end)
   end
 
   defp current_turn_id(game_id) do
@@ -1415,6 +1539,33 @@ defmodule Prizmo.TcgEngine.Mechanics do
         "detail" => "Face-down Prize card"
       }
     end)
+  end
+
+  defp pending_knockout_card_instance_ids(%PendingEffect{state: state}) do
+    state = state || %{}
+
+    case Map.get(state, "knocked_out_card_instance_ids") do
+      ids when is_list(ids) ->
+        Enum.filter(ids, &is_binary/1)
+
+      _other ->
+        state
+        |> Map.get("knocked_out_card_instance_id")
+        |> List.wrap()
+        |> Enum.filter(&is_binary/1)
+    end
+  end
+
+  defp pending_knockout_player_ids(%PendingEffect{state: state}) do
+    state = state || %{}
+
+    case Map.get(state, "knocked_out_player_ids") do
+      ids when is_list(ids) ->
+        Enum.filter(ids, &is_binary/1)
+
+      _other ->
+        state |> Map.get("knocked_out_player_id") |> List.wrap() |> Enum.filter(&is_binary/1)
+    end
   end
 
   defp resolve_replacement_after_knockout(
