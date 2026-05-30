@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-30] iteration 16 | SPA draw opening hand command
+- Task attempted: added the next setup write command to the React SPA playtest shell so a selected persisted game can draw both opening hands through `runDrawTcgEngineOpeningHand`, then invalidate the viewer-scoped game-state query and show updated hand/deck counts plus the `draw_opening_hand` event transition.
+- Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`; updated this log and the TCG engine playtest handoff.
+- Validation: `mix assets.build` passed; `mix check --no-test` passed.
+- Remaining/blocking notes: no blocker; setup start and opening-hand draw are now clickable from the shell, while active/bench setup choices, prize placement, setup completion, turn commands, legal action affordances, and prompt resolution controls remain pending.
+
 ## [2026-05-30] iteration 15 | SPA start setup command
 - Task attempted: added the first write command to the React SPA playtest shell so a selected persisted game can start setup through `runStartTcgEngineSetup`, then invalidate the viewer-scoped game-state query and show the resulting setup status/event transition.
 - Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`; updated this log and the TCG engine playtest handoff.

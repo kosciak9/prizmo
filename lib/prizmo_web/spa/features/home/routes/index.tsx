@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react'
 import {
   buildAshRpcHeaders,
   runCreateTcgEngineGame,
+  runDrawTcgEngineOpeningHand,
   runGetTcgEngineGameState,
   runListSupportedTcgDecks,
   runStartTcgEngineSetup,
@@ -251,6 +252,13 @@ export function HomeRoute() {
     }
   })
 
+  const drawOpeningHandMutation = useMutation({
+    mutationFn: (gameId: string) => drawOpeningHand(gameId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['tcg-engine', 'game-state'] })
+    }
+  })
+
   const gameState = gameStateQuery.data
   const deckNamesByKey = useMemo(
     () => new Map(decks.map(deck => [deck.deckKey, deck.name])),
@@ -260,6 +268,8 @@ export function HomeRoute() {
     Boolean(selectedPlayerOneDeckKey && selectedPlayerTwoDeckKey) && !createGameMutation.isPending
   const canStartSetup =
     Boolean(normalisedGameId && gameState && !gameState.setup) && !startSetupMutation.isPending
+  const canDrawOpeningHand =
+    Boolean(normalisedGameId && gameState?.setup?.status === 'waiting_to_draw') && !drawOpeningHandMutation.isPending
 
   function updateSession(nextSession: PlaytestSession) {
     setStoredSession(nextSession)
@@ -394,9 +404,9 @@ export function HomeRoute() {
                 <div className="rounded-2xl border border-stone-200 bg-stone-50 p-3">
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <p className="text-sm font-medium text-stone-950">Setup command</p>
+                      <p className="text-sm font-medium text-stone-950">Setup commands</p>
                       <p className="mt-1 text-xs leading-5 text-stone-500">
-                        Writes setup state and a start setup event through Ash RPC.
+                        Advance setup through Ash RPC, then refresh the viewer-scoped state.
                       </p>
                     </div>
                     <StatusBadge tone={gameState?.setup ? 'active' : 'neutral'}>
@@ -404,23 +414,45 @@ export function HomeRoute() {
                     </StatusBadge>
                   </div>
 
-                  <button
-                    className="mt-3 w-full rounded-xl border border-emerald-700 px-3 py-2 text-sm font-semibold text-emerald-800 transition hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:border-stone-300 disabled:text-stone-400 disabled:hover:bg-transparent"
-                    disabled={!canStartSetup}
-                    onClick={() => startSetupMutation.mutate(normalisedGameId)}
-                    type="button"
-                  >
-                    {startSetupMutation.isPending
-                      ? 'Starting setup...'
-                      : gameState?.setup
-                        ? 'Setup already started'
-                        : 'Start setup'}
-                  </button>
+                  <div className="mt-3 space-y-2">
+                    <button
+                      className="w-full rounded-xl border border-emerald-700 px-3 py-2 text-sm font-semibold text-emerald-800 transition hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:border-stone-300 disabled:text-stone-400 disabled:hover:bg-transparent"
+                      disabled={!canStartSetup}
+                      onClick={() => startSetupMutation.mutate(normalisedGameId)}
+                      type="button"
+                    >
+                      {startSetupMutation.isPending
+                        ? 'Starting setup...'
+                        : gameState?.setup
+                          ? 'Setup already started'
+                          : 'Start setup'}
+                    </button>
+                    <button
+                      className="w-full rounded-xl border border-emerald-700 px-3 py-2 text-sm font-semibold text-emerald-800 transition hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:border-stone-300 disabled:text-stone-400 disabled:hover:bg-transparent"
+                      disabled={!canDrawOpeningHand}
+                      onClick={() => drawOpeningHandMutation.mutate(normalisedGameId)}
+                      type="button"
+                    >
+                      {drawOpeningHandMutation.isPending
+                        ? 'Drawing hands...'
+                        : gameState?.setup?.status === 'waiting_to_draw'
+                          ? 'Draw opening hands'
+                          : gameState?.setup
+                            ? 'Opening hands resolved'
+                            : 'Start setup first'}
+                    </button>
+                  </div>
                 </div>
 
                 {startSetupMutation.error ? (
                   <InlineNotice tone="error" title="Setup command failed">
                     {errorMessage(startSetupMutation.error)}
+                  </InlineNotice>
+                ) : null}
+
+                {drawOpeningHandMutation.error ? (
+                  <InlineNotice tone="error" title="Opening hand command failed">
+                    {errorMessage(drawOpeningHandMutation.error)}
                   </InlineNotice>
                 ) : null}
               </div>
@@ -524,6 +556,20 @@ async function getGameState(gameId: string, viewerPlayerId: PlayerId): Promise<G
 
 async function startSetup(gameId: string): Promise<CreatedGame> {
   const result = await runStartTcgEngineSetup({
+    input: { gameId },
+    fields: GAME_RESOURCE_FIELDS,
+    headers: buildAshRpcHeaders()
+  })
+
+  if (!result.success) {
+    throw new Error(rpcErrorMessage(result.errors))
+  }
+
+  return result.data as CreatedGame
+}
+
+async function drawOpeningHand(gameId: string): Promise<CreatedGame> {
+  const result = await runDrawTcgEngineOpeningHand({
     input: { gameId },
     fields: GAME_RESOURCE_FIELDS,
     headers: buildAshRpcHeaders()
