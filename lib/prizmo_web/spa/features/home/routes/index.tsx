@@ -40,6 +40,8 @@ const GAME_ID_STORAGE_KEY = 'prizmo:tcg-playtest-game-id'
 const VIEWER_STORAGE_KEY = 'prizmo:tcg-playtest-viewer'
 const DISCARD_OWN_BASIC_ENERGY_FOR_DAMAGE_EFFECT = 'damage_per_discarded_own_basic_energy'
 const DISCARD_OWN_BENCH_ENERGY_FOR_BONUS_DAMAGE_EFFECT = 'discard_energy_from_own_bench_for_bonus_damage'
+const SHUFFLE_ATTACHED_ENERGY_INTO_DECK_THEN_DAMAGE_OPPONENT_BENCH_EFFECT =
+  'shuffle_attached_energy_into_deck_then_damage_opponent_bench'
 
 const SUPPORTED_DECK_FIELDS: ListSupportedTcgDecksFields = [
   'deckKey',
@@ -123,6 +125,8 @@ const GAME_STATE_FIELDS = [
       'pendingAttackRequiresSwitchTarget',
       'pendingAttackRequiresDiscardedEnergy',
       'pendingAttackRequiresReturnedEnergy',
+      'pendingAttackRequiresShuffledEnergy',
+      'pendingAttackRequiresBenchDamageTarget',
       'pendingAttackerCardInstanceId',
       'pendingDefenderCardInstanceId'
     ]
@@ -322,6 +326,8 @@ type ResolveDeclaredAttackInput = {
   switchBenchCardInstanceId?: string | null
   discardedEnergyCardInstanceIds?: string[]
   returnedEnergyCardInstanceId?: string | null
+  shuffledEnergyCardInstanceIds?: string[]
+  benchDamageTargetCardInstanceId?: string | null
 }
 
 type ResolveDeclaredAttackCommand = {
@@ -329,6 +335,8 @@ type ResolveDeclaredAttackCommand = {
   switchBenchCardInstanceId?: string | null
   discardedEnergyCardInstanceIds?: string[]
   returnedEnergyCardInstanceId?: string | null
+  shuffledEnergyCardInstanceIds?: string[]
+  benchDamageTargetCardInstanceId?: string | null
 }
 
 type FinishAttackInput = {
@@ -385,6 +393,8 @@ type GameState = {
     pendingAttackRequiresSwitchTarget: boolean
     pendingAttackRequiresDiscardedEnergy: boolean
     pendingAttackRequiresReturnedEnergy: boolean
+    pendingAttackRequiresShuffledEnergy: boolean
+    pendingAttackRequiresBenchDamageTarget: boolean
     pendingAttackerCardInstanceId: string | null
     pendingDefenderCardInstanceId: string | null
   } | null
@@ -1324,7 +1334,9 @@ export function HomeRoute() {
                   playerId,
                   switchBenchCardInstanceId,
                   discardedEnergyCardInstanceIds,
-                  returnedEnergyCardInstanceId
+                  returnedEnergyCardInstanceId,
+                  shuffledEnergyCardInstanceIds,
+                  benchDamageTargetCardInstanceId
                 }) => {
                   if (isPlayerId(playerId)) {
                     resolveDeclaredAttackMutation.mutate({
@@ -1332,7 +1344,9 @@ export function HomeRoute() {
                       playerId,
                       switchBenchCardInstanceId,
                       discardedEnergyCardInstanceIds,
-                      returnedEnergyCardInstanceId
+                      returnedEnergyCardInstanceId,
+                      shuffledEnergyCardInstanceIds,
+                      benchDamageTargetCardInstanceId
                     })
                   }
                 }}
@@ -2113,8 +2127,11 @@ function AttackProgressPanel({
   const [selectedSwitchBenchCardInstanceId, setSelectedSwitchBenchCardInstanceId] = useState('')
   const [selectedDiscardedEnergyCardInstanceIds, setSelectedDiscardedEnergyCardInstanceIds] = useState<string[]>([])
   const [selectedReturnedEnergyCardInstanceId, setSelectedReturnedEnergyCardInstanceId] = useState('')
+  const [selectedShuffledEnergyCardInstanceIds, setSelectedShuffledEnergyCardInstanceIds] = useState<string[]>([])
+  const [selectedBenchDamageTargetCardInstanceId, setSelectedBenchDamageTargetCardInstanceId] = useState('')
   const turn = gameState.currentTurn
   const activePlayer = turn ? gameState.players.find(player => player.playerId === turn.activePlayerId) : undefined
+  const opponentPlayer = turn ? gameState.players.find(player => player.playerId !== turn.activePlayerId) : undefined
   const switchTargetOptions = turn?.pendingAttackRequiresSwitchTarget ? (activePlayer?.bench ?? []) : []
   const selectedSwitchTargetIsValid = switchTargetOptions.some(card => card.id === selectedSwitchBenchCardInstanceId)
   const discardedEnergyOptions = useMemo(() => {
@@ -2163,6 +2180,29 @@ function AttackProgressPanel({
         ? (returnedEnergyOptions[0]?.id ?? null)
         : null
     : null
+  const shuffledEnergyOptions = useMemo(() => {
+    if (!turn?.pendingAttackRequiresShuffledEnergy || !activePlayer?.active) {
+      return []
+    }
+
+    return (activePlayer.active.attachedCards ?? []).filter(isEnergyCard)
+  }, [activePlayer?.active, turn?.pendingAttackRequiresShuffledEnergy])
+  const shuffledEnergyOptionIds = useMemo(
+    () => new Set(shuffledEnergyOptions.map(energyCard => energyCard.id)),
+    [shuffledEnergyOptions]
+  )
+  const selectedShuffledEnergyIdsForResolve = turn?.pendingAttackRequiresShuffledEnergy
+    ? selectedShuffledEnergyCardInstanceIds.filter(id => shuffledEnergyOptionIds.has(id))
+    : []
+  const benchDamageTargetOptions = turn?.pendingAttackRequiresBenchDamageTarget ? (opponentPlayer?.bench ?? []) : []
+  const selectedBenchDamageTargetIsValid = benchDamageTargetOptions.some(
+    card => card.id === selectedBenchDamageTargetCardInstanceId
+  )
+  const benchDamageTargetIdForResolve = selectedBenchDamageTargetIsValid
+    ? selectedBenchDamageTargetCardInstanceId
+    : benchDamageTargetOptions.length === 1
+      ? (benchDamageTargetOptions[0]?.id ?? null)
+      : null
 
   useEffect(() => {
     if (selectedSwitchBenchCardInstanceId && !selectedSwitchTargetIsValid) {
@@ -2173,6 +2213,8 @@ function AttackProgressPanel({
   useEffect(() => {
     setSelectedDiscardedEnergyCardInstanceIds([])
     setSelectedReturnedEnergyCardInstanceId('')
+    setSelectedShuffledEnergyCardInstanceIds([])
+    setSelectedBenchDamageTargetCardInstanceId('')
   }, [turn?.id, turn?.pendingAttackId])
 
   useEffect(() => {
@@ -2188,6 +2230,20 @@ function AttackProgressPanel({
       setSelectedReturnedEnergyCardInstanceId('')
     }
   }, [selectedReturnedEnergyCardInstanceId, selectedReturnedEnergyIsValid])
+
+  useEffect(() => {
+    setSelectedShuffledEnergyCardInstanceIds(previousSelectedIds => {
+      const filteredSelectedIds = previousSelectedIds.filter(id => shuffledEnergyOptionIds.has(id))
+
+      return filteredSelectedIds.length === previousSelectedIds.length ? previousSelectedIds : filteredSelectedIds
+    })
+  }, [shuffledEnergyOptionIds])
+
+  useEffect(() => {
+    if (selectedBenchDamageTargetCardInstanceId && !selectedBenchDamageTargetIsValid) {
+      setSelectedBenchDamageTargetCardInstanceId('')
+    }
+  }, [selectedBenchDamageTargetCardInstanceId, selectedBenchDamageTargetIsValid])
 
   if (!turn || (turn.status !== 'attack_declared' && turn.status !== 'attack_resolving')) {
     return null
@@ -2209,6 +2265,20 @@ function AttackProgressPanel({
         : 'This attack resolves with the selected discarded Energy cards.'
   const returnedEnergyRequiresChoice = turn.pendingAttackRequiresReturnedEnergy && returnedEnergyOptions.length > 1
   const returnedEnergyUnavailable = turn.pendingAttackRequiresReturnedEnergy && returnedEnergyOptions.length === 0
+  const shuffledEnergyRequiredCount = 3
+  const shuffledEnergySelectedCount = selectedShuffledEnergyIdsForResolve.length
+  const shuffledEnergyPartialSelection =
+    turn.pendingAttackRequiresShuffledEnergy &&
+    shuffledEnergySelectedCount > 0 &&
+    shuffledEnergySelectedCount !== shuffledEnergyRequiredCount
+  const benchDamageTargetRequired =
+    turn.pendingAttackRequiresBenchDamageTarget &&
+    shuffledEnergySelectedCount === shuffledEnergyRequiredCount &&
+    benchDamageTargetOptions.length > 1
+  const benchDamageTargetUnavailable =
+    turn.pendingAttackRequiresBenchDamageTarget &&
+    shuffledEnergySelectedCount === shuffledEnergyRequiredCount &&
+    benchDamageTargetOptions.length === 0
   const missingActivePlayers = gameState.players.filter(player => !player.active)
   const viewerPromptBlocksFinish = viewerCanAdvanceAttack && gameState.prompts.length > 0
   const attackCannotFinish = missingActivePlayers.length > 0 || viewerPromptBlocksFinish
@@ -2217,7 +2287,10 @@ function AttackProgressPanel({
     commandPending ||
     (switchTargetRequired && !selectedSwitchTargetIsValid) ||
     returnedEnergyUnavailable ||
-    (returnedEnergyRequiresChoice && !selectedReturnedEnergyIsValid)
+    (returnedEnergyRequiresChoice && !selectedReturnedEnergyIsValid) ||
+    shuffledEnergyPartialSelection ||
+    benchDamageTargetUnavailable ||
+    (benchDamageTargetRequired && !selectedBenchDamageTargetIsValid)
   const resolveButtonLabel = resolveDeclaredAttackPendingPlayerId === turn.activePlayerId
     ? `Resolving ${attackLabel}...`
     : switchTargetRequired && !selectedSwitchTargetIsValid
@@ -2226,6 +2299,12 @@ function AttackProgressPanel({
         ? `No Energy available to return for ${attackLabel}`
         : returnedEnergyRequiresChoice && !selectedReturnedEnergyIsValid
           ? `Choose returned Energy for ${attackLabel}`
+          : shuffledEnergyPartialSelection
+            ? `Select exactly ${shuffledEnergyRequiredCount} Energy or none for ${attackLabel}`
+            : benchDamageTargetUnavailable
+              ? `No opponent Bench target for ${attackLabel}`
+              : benchDamageTargetRequired && !selectedBenchDamageTargetIsValid
+                ? `Choose a Bench damage target for ${attackLabel}`
       : `Resolve ${attackLabel}`
   const toggleDiscardedEnergyCard = (energyCardInstanceId: string) => {
     setSelectedDiscardedEnergyCardInstanceIds(previousSelectedIds => {
@@ -2234,6 +2313,20 @@ function AttackProgressPanel({
       }
 
       if (discardedEnergyMaxSelection && previousSelectedIds.length >= discardedEnergyMaxSelection) {
+        return previousSelectedIds
+      }
+
+      return [...previousSelectedIds, energyCardInstanceId]
+    })
+  }
+
+  const toggleShuffledEnergyCard = (energyCardInstanceId: string) => {
+    setSelectedShuffledEnergyCardInstanceIds(previousSelectedIds => {
+      if (previousSelectedIds.includes(energyCardInstanceId)) {
+        return previousSelectedIds.filter(id => id !== energyCardInstanceId)
+      }
+
+      if (previousSelectedIds.length >= shuffledEnergyRequiredCount) {
         return previousSelectedIds
       }
 
@@ -2416,6 +2509,111 @@ function AttackProgressPanel({
           </div>
         ) : null}
 
+        {turn.pendingAttackRequiresShuffledEnergy ? (
+          <div className="rounded-xl border border-violet-200 bg-violet-50/70 p-3">
+            <div className="space-y-1">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-violet-900">
+                Shuffled Energy + Bench damage
+              </p>
+              <p className="text-xs leading-5 text-violet-900/80">
+                This attack may shuffle exactly {shuffledEnergyRequiredCount} Energy attached to the attacking Active
+                Pokémon into the deck. If you choose that option, select one opponent Benched Pokémon to receive 120
+                damage. Select no Energy to skip the optional Bench damage.
+              </p>
+            </div>
+
+            {shuffledEnergyOptions.length > 0 ? (
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                {shuffledEnergyOptions.map(energyCard => {
+                  const selected = selectedShuffledEnergyCardInstanceIds.includes(energyCard.id)
+                  const maxSelectionReached = selectedShuffledEnergyCardInstanceIds.length >= shuffledEnergyRequiredCount
+
+                  return (
+                    <label
+                      className={`flex cursor-pointer items-start gap-2 rounded-lg border px-3 py-2 text-xs transition ${
+                        selected
+                          ? 'border-violet-700 bg-violet-100 text-violet-950'
+                          : 'border-violet-200 bg-stone-50 text-stone-700 hover:border-violet-400'
+                      }`}
+                      key={energyCard.id}
+                    >
+                      <input
+                        checked={selected}
+                        className="mt-0.5"
+                        disabled={!viewerCanAdvanceAttack || commandPending || (!selected && maxSelectionReached)}
+                        onChange={() => toggleShuffledEnergyCard(energyCard.id)}
+                        type="checkbox"
+                      />
+                      <span className="min-w-0">
+                        <span className="block font-medium">{energyCard.name}</span>
+                        <span className="mt-0.5 block font-mono text-[0.68rem] opacity-70">
+                          attached to {attacker?.name ?? formatPlayerId(turn.activePlayerId)}
+                        </span>
+                      </span>
+                    </label>
+                  )
+                })}
+              </div>
+            ) : (
+              <p className="mt-3 rounded-lg border border-violet-200 bg-stone-50 px-3 py-2 text-xs text-violet-900">
+                No Energy is attached to the attacking Active Pokémon, so resolution will skip this optional effect.
+              </p>
+            )}
+
+            {shuffledEnergySelectedCount > 0 ? (
+              <div className="mt-3 rounded-xl border border-violet-200 bg-stone-50 p-3">
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-violet-900">
+                  Opponent Bench target
+                </p>
+
+                {benchDamageTargetOptions.length > 1 ? (
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    {benchDamageTargetOptions.map(card => {
+                      const selected = card.id === selectedBenchDamageTargetCardInstanceId
+
+                      return (
+                        <label
+                          className={`flex cursor-pointer items-start gap-2 rounded-lg border px-3 py-2 text-xs transition ${
+                            selected
+                              ? 'border-violet-700 bg-violet-100 text-violet-950'
+                              : 'border-violet-200 bg-stone-50 text-stone-700 hover:border-violet-400'
+                          }`}
+                          key={card.id}
+                        >
+                          <input
+                            checked={selected}
+                            className="mt-0.5"
+                            disabled={!viewerCanAdvanceAttack || commandPending}
+                            name="bench-damage-target-card-instance-id"
+                            onChange={() => setSelectedBenchDamageTargetCardInstanceId(card.id)}
+                            type="radio"
+                          />
+                          <span className="min-w-0">
+                            <span className="block font-medium">{card.name}</span>
+                            <span className="mt-0.5 block font-mono text-[0.68rem] opacity-70">
+                              {card.damage} damage · {card.cardId}
+                            </span>
+                          </span>
+                        </label>
+                      )
+                    })}
+                  </div>
+                ) : benchDamageTargetOptions.length === 1 ? (
+                  <p className="mt-3 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-xs text-violet-900">
+                    Only {benchDamageTargetOptions[0]?.name} is on the opponent Bench, so resolution will target it
+                    automatically.
+                  </p>
+                ) : (
+                  <p className="mt-3 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-xs text-violet-900">
+                    No opponent Benched Pokémon are available. Clear the selected Energy cards to skip this optional
+                    effect.
+                  </p>
+                )}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+
         {!viewerCanAdvanceAttack ? (
           <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
             Switch this tab to {formatPlayerId(turn.activePlayerId)} to advance the attack.
@@ -2439,7 +2637,9 @@ function AttackProgressPanel({
                 playerId: turn.activePlayerId,
                 switchBenchCardInstanceId: selectedSwitchTargetIsValid ? selectedSwitchBenchCardInstanceId : null,
                 discardedEnergyCardInstanceIds: selectedDiscardedEnergyIdsForResolve,
-                returnedEnergyCardInstanceId: returnedEnergyIdForResolve
+                returnedEnergyCardInstanceId: returnedEnergyIdForResolve,
+                shuffledEnergyCardInstanceIds: selectedShuffledEnergyIdsForResolve,
+                benchDamageTargetCardInstanceId: benchDamageTargetIdForResolve
               })
             }
             type="button"

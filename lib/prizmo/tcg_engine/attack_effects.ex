@@ -5,6 +5,7 @@ defmodule Prizmo.TcgEngine.AttackEffects do
 
   import Prizmo.TcgEngine.CardMetadataRequirements,
     only: [
+      pokemon_hp: 1,
       require_basic_energy: 1,
       require_energy: 1,
       require_pokemon_card: 1,
@@ -22,7 +23,8 @@ defmodule Prizmo.TcgEngine.AttackEffects do
       move_attached_card_to_hand: 3,
       move_deck_card_to_hand: 3,
       move_discard_card_to_hand: 3,
-      next_hand_position_result: 2
+      next_hand_position_result: 2,
+      shuffle_attached_cards_into_deck: 3
     ]
 
   import Prizmo.TcgEngine.EventLog, only: [write_event_and_snapshot: 4]
@@ -74,6 +76,7 @@ defmodule Prizmo.TcgEngine.AttackEffects do
     :return_attached_energy_to_hand,
     :search_pokemon_to_hand,
     :self_damage,
+    :shuffle_attached_energy_into_deck_then_damage_opponent_bench,
     :switch_self_with_bench
   ]
 
@@ -180,6 +183,22 @@ defmodule Prizmo.TcgEngine.AttackEffects do
 
       %{type: :return_attached_energy_to_hand} ->
         return_attached_energy_to_hand(game_id, player_id, attacker_card, opts)
+
+      %{
+        type: :shuffle_attached_energy_into_deck_then_damage_opponent_bench,
+        energy_count: energy_count,
+        bench_damage: bench_damage
+      }
+      when is_integer(energy_count) and energy_count > 0 and is_integer(bench_damage) and
+             bench_damage >= 0 ->
+        shuffle_attached_energy_then_damage_bench(
+          game_id,
+          player_id,
+          attacker_card,
+          opts,
+          energy_count,
+          bench_damage
+        )
 
       nil ->
         {:ok, %{}}
@@ -681,6 +700,81 @@ defmodule Prizmo.TcgEngine.AttackEffects do
     end
   end
 
+  defp shuffle_attached_energy_then_damage_bench(
+         game_id,
+         player_id,
+         %CardInstance{} = attacker_card,
+         opts,
+         energy_count,
+         bench_damage
+       ) do
+    with {:ok, energy_card_instance_ids} <- shuffled_energy_card_instance_ids(opts) do
+      case energy_card_instance_ids do
+        [] ->
+          {:ok,
+           %{
+             effect_type: "shuffle_attached_energy_into_deck_then_damage_opponent_bench",
+             shuffled_energy_card_instance_ids: [],
+             shuffled_energy_count: 0,
+             bench_damage_applied?: false
+           }}
+
+        [_first | _rest] ->
+          shuffle_selected_attached_energy_then_damage_bench(
+            game_id,
+            player_id,
+            attacker_card,
+            opts,
+            energy_card_instance_ids,
+            energy_count,
+            bench_damage
+          )
+      end
+    end
+  end
+
+  defp shuffle_selected_attached_energy_then_damage_bench(
+         game_id,
+         player_id,
+         %CardInstance{} = attacker_card,
+         opts,
+         energy_card_instance_ids,
+         energy_count,
+         bench_damage
+       ) do
+    with :ok <-
+           require_exact_count(
+             energy_card_instance_ids,
+             energy_count,
+             :wrong_shuffled_energy_count
+           ),
+         :ok <- require_unique_ids(energy_card_instance_ids),
+         {:ok, energy_cards} <-
+           shufflable_attached_energy_cards(
+             game_id,
+             player_id,
+             attacker_card,
+             energy_card_instance_ids
+           ),
+         {:ok, bench_target} <- bench_damage_target_card(game_id, player_id, opts),
+         {:ok, damage_result} <-
+           apply_bench_attack_damage_without_knockout(bench_target, bench_damage),
+         {:ok, shuffled_energy_cards} <-
+           shuffle_attached_cards_into_deck(game_id, player_id, energy_cards) do
+      {:ok,
+       %{
+         effect_type: "shuffle_attached_energy_into_deck_then_damage_opponent_bench",
+         shuffled_energy_card_instance_ids: Enum.map(shuffled_energy_cards, & &1.id),
+         shuffled_energy_count: length(shuffled_energy_cards),
+         bench_damage_target_card_instance_id: bench_target.id,
+         bench_damage: damage_result.damage,
+         bench_resulting_damage: damage_result.resulting_damage,
+         bench_knocked_out?: damage_result.knocked_out?,
+         bench_damage_applied?: true
+       }}
+    end
+  end
+
   defp discarded_energy_card_instance_ids(opts) do
     case Map.get(opts, :discarded_energy_card_instance_ids) ||
            Map.get(opts, "discarded_energy_card_instance_ids") do
@@ -688,6 +782,20 @@ defmodule Prizmo.TcgEngine.AttackEffects do
       ids when is_list(ids) -> {:ok, ids}
       _invalid -> {:error, :invalid_discarded_energy_card_instance_ids}
     end
+  end
+
+  defp shuffled_energy_card_instance_ids(opts) do
+    case Map.get(opts, :shuffled_energy_card_instance_ids) ||
+           Map.get(opts, "shuffled_energy_card_instance_ids") do
+      nil -> {:ok, []}
+      ids when is_list(ids) -> {:ok, ids}
+      _invalid -> {:error, :invalid_shuffled_energy_card_instance_ids}
+    end
+  end
+
+  defp bench_damage_target_card_instance_id(opts) do
+    Map.get(opts, :bench_damage_target_card_instance_id) ||
+      Map.get(opts, "bench_damage_target_card_instance_id")
   end
 
   defp returned_attached_energy_card(game_id, player_id, %CardInstance{} = attacker_card, opts) do
@@ -743,6 +851,92 @@ defmodule Prizmo.TcgEngine.AttackEffects do
       |> case do
         {:ok, energy_cards} -> {:ok, Enum.reverse(energy_cards)}
         {:error, reason} -> {:error, reason}
+      end
+    end
+  end
+
+  defp shufflable_attached_energy_cards(
+         game_id,
+         player_id,
+         %CardInstance{} = attacker_card,
+         energy_card_instance_ids
+       ) do
+    with {:ok, energy_cards} <-
+           returnable_attached_energy_cards(game_id, player_id, attacker_card) do
+      energy_cards_by_id = Map.new(energy_cards, &{&1.id, &1})
+
+      energy_card_instance_ids
+      |> Enum.map(fn card_instance_id ->
+        case Map.fetch(energy_cards_by_id, card_instance_id) do
+          {:ok, energy_card} -> {:ok, energy_card}
+          :error -> {:error, :invalid_shuffled_energy_choice}
+        end
+      end)
+      |> collect_results()
+    end
+  end
+
+  defp bench_damage_target_card(game_id, player_id, opts) do
+    with {:ok, opponent_player_id} <- opponent_player_id(game_id, player_id) do
+      case bench_damage_target_card_instance_id(opts) do
+        nil ->
+          implicit_bench_damage_target(game_id, opponent_player_id)
+
+        card_instance_id when is_binary(card_instance_id) ->
+          explicit_bench_damage_target(game_id, opponent_player_id, card_instance_id)
+
+        _invalid ->
+          {:error, :invalid_bench_damage_target_card_instance_id}
+      end
+    end
+  end
+
+  defp implicit_bench_damage_target(game_id, opponent_player_id) do
+    with {:ok, bench_cards} <- cards_in_zone(game_id, opponent_player_id, :bench) do
+      case bench_cards do
+        [bench_card] -> {:ok, bench_card}
+        [] -> {:error, :bench_damage_target_required}
+        [_first | _rest] -> {:error, :bench_damage_requires_target}
+      end
+    end
+  end
+
+  defp explicit_bench_damage_target(game_id, opponent_player_id, card_instance_id) do
+    with {:ok, bench_card} <- get_card(game_id, card_instance_id),
+         :ok <- require_card_owned_by_player(bench_card, opponent_player_id),
+         :ok <- require_card_zone(bench_card, :bench) do
+      {:ok, bench_card}
+    end
+  end
+
+  defp apply_bench_attack_damage_without_knockout(%CardInstance{} = bench_target, damage) do
+    with {:ok, target_hp} <- pokemon_hp(bench_target.card_id),
+         new_damage = bench_target.damage + damage,
+         :ok <- require_bench_damage_does_not_knock_out(new_damage, target_hp),
+         {:ok, _bench_target} <- update(bench_target, :set_damage, %{damage: new_damage}) do
+      {:ok,
+       %{
+         damage: damage,
+         resulting_damage: new_damage,
+         knocked_out?: false
+       }}
+    end
+  end
+
+  defp require_bench_damage_does_not_knock_out(new_damage, target_hp) when new_damage < target_hp,
+    do: :ok
+
+  defp require_bench_damage_does_not_knock_out(_new_damage, _target_hp),
+    do: {:error, :bench_damage_knockout_not_supported}
+
+  defp opponent_player_id(game_id, player_id) do
+    with {:ok, players} <- PlayerStore.list_players(game_id) do
+      players
+      |> Enum.reject(&(&1.player_id == player_id))
+      |> case do
+        [opponent] -> {:ok, opponent.player_id}
+        [] -> {:error, :opponent_player_not_found}
+        _players -> {:error, :ambiguous_opponent_player}
       end
     end
   end

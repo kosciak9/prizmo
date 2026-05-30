@@ -229,12 +229,24 @@ defmodule Prizmo.TcgEngine.Game.ActionCommands do
         allow_nil? true
       end
 
+      argument :shuffled_energy_card_instance_ids, {:array, :uuid} do
+        allow_nil? false
+        default []
+      end
+
+      argument :bench_damage_target_card_instance_id, :uuid do
+        allow_nil? true
+      end
+
       run fn input, _context ->
         Mechanics.resolve_declared_attack(input.arguments.game_id, input.arguments.player_id, %{
           switch_bench_card_instance_id: Map.get(input.arguments, :switch_bench_card_instance_id),
           discarded_energy_card_instance_ids: input.arguments.discarded_energy_card_instance_ids,
           returned_energy_card_instance_id:
-            Map.get(input.arguments, :returned_energy_card_instance_id)
+            Map.get(input.arguments, :returned_energy_card_instance_id),
+          shuffled_energy_card_instance_ids: input.arguments.shuffled_energy_card_instance_ids,
+          bench_damage_target_card_instance_id:
+            Map.get(input.arguments, :bench_damage_target_card_instance_id)
         })
       end
     end

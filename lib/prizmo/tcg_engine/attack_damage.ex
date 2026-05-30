@@ -207,6 +207,11 @@ defmodule Prizmo.TcgEngine.AttackDamage do
        }), do: {:ok, damage}
 
   defp apply_effect(damage, _attacker_card, _defender_card, %{
+         type: :shuffle_attached_energy_into_deck_then_damage_opponent_bench
+       }),
+       do: {:ok, damage}
+
+  defp apply_effect(damage, _attacker_card, _defender_card, %{
          type: :attacker_cannot_attack_next_turn
        }), do: {:ok, damage}
 

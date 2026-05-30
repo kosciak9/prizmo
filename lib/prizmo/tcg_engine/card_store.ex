@@ -63,6 +63,12 @@ defmodule Prizmo.TcgEngine.CardStore do
     |> Ash.read()
   end
 
+  def deck_count(game_id, player_id) do
+    with {:ok, deck_cards} <- cards_in_zone(game_id, player_id, :deck) do
+      {:ok, length(deck_cards)}
+    end
+  end
+
   def non_deck_cards(game_id) do
     CardInstance
     |> Ash.Query.filter(game_id == ^game_id and zone != :deck)
@@ -155,6 +161,20 @@ defmodule Prizmo.TcgEngine.CardStore do
   def move_attached_card_to_hand(game_id, player_id, %CardInstance{} = card) do
     with {:ok, position} <- next_hand_position_result(game_id, player_id) do
       update(card, :return_to_hand, %{position: position, attached_to_card_instance_id: nil})
+    end
+  end
+
+  def shuffle_attached_cards_into_deck(game_id, player_id, cards) do
+    with {:ok, deck_count} <- deck_count(game_id, player_id) do
+      cards
+      |> Enum.with_index(deck_count + 1)
+      |> Enum.map(fn {card, position} ->
+        update(card, :shuffle_into_deck, %{
+          position: position,
+          attached_to_card_instance_id: nil
+        })
+      end)
+      |> collect_results()
     end
   end
 

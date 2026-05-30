@@ -46,6 +46,8 @@ defmodule Prizmo.TcgEngine.GameView.Fields do
     pending_attack_requires_switch_target: [type: :boolean, allow_nil?: false],
     pending_attack_requires_discarded_energy: [type: :boolean, allow_nil?: false],
     pending_attack_requires_returned_energy: [type: :boolean, allow_nil?: false],
+    pending_attack_requires_shuffled_energy: [type: :boolean, allow_nil?: false],
+    pending_attack_requires_bench_damage_target: [type: :boolean, allow_nil?: false],
     pending_attacker_card_instance_id: [type: :uuid],
     pending_defender_card_instance_id: [type: :uuid]
   ]
