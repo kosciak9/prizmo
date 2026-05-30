@@ -177,17 +177,20 @@ Updated: 2026-05-30
 - Iteration 54 continued the rejected authored attack-effect inventory and picked Mega Lopunny ex `PFL-084` `Gale Thrust` as another narrow deterministic persisted effect.
 - `Prizmo.TcgEngine.AttackEffects` and `Prizmo.TcgEngine.AttackDamage` now support `:bonus_damage_if_moved_from_bench_to_active_this_turn`, checking same-turn persisted movement events for the attacking player before applying the authored bonus damage.
 - A Tidewave rollback smoke verified `Gale Thrust` fetches as executable, appears as a browser declare-attack affordance, resolves for 60 damage without same-turn Bench-to-Active movement, and resolves for 230 damage after a persisted `switch_active_with_bench` event.
+- Iteration 55 continued the rejected authored attack-effect inventory and picked Passimian `SSP-111` `Coordinated Throwing` as another narrow deterministic persisted effect.
+- `Prizmo.TcgEngine.AttackEffects` and `Prizmo.TcgEngine.AttackDamage` now support `:damage_per_own_basic_pokemon_in_play`, using the authored per-Pokémon damage value for each Basic Pokémon in the attacker's own Active Spot and Bench.
+- A Tidewave rollback smoke verified `Coordinated Throwing` fetches as executable, appears as a browser declare-attack affordance, and resolves for 80 damage against Fezandipiti ex with Passimian Active plus three own Benched Basic Pokémon.
 
 ## Last commit
 
-- Baseline entering iteration 54: `8c13f1f feat(tcg-engine): resolve own-bench attack damage`.
-- This handoff was written before committing iteration 54; expected commit message is `feat(tcg-engine): resolve bench-to-active attack damage`.
+- Baseline entering iteration 55: `7b9ca91 feat(tcg-engine): resolve bench-to-active attack damage`.
+- This handoff was written before committing iteration 55; expected commit message is `feat(tcg-engine): resolve own-basic attack damage`.
 
 ## Remaining tasks
 
 - Decide whether old `Prizmo.Tcg.Sim` tests are kept as historical reference, quarantined, or ported scenario-by-scenario.
 - Build the minimal playable React SPA loop beyond prompt resolution, Bench commands, Attach Energy, attached-card board visibility, Retreat, paid attack declaration, static/executable attack resolution/finish controls, switch-self target choice, one-Bench KO follow-up, multi-Bench replacement Active choice, explicit KO Prize prompt choice, evolution from hand, End Turn, next-turn progression, deterministic playtest fixture order, hardened tab-scoped viewer identity, and reduced prompt/action debug noise: rerun the full two-browser/manual-tester playtest milestone only after the validation harness can guarantee separate browser contexts.
-- Expand persisted Ash engine mechanics: implement explicit support for one rejected authored attack effect at a time beyond Moltres's Pokémon ex bonus, switch-self effects, Rabsca's defender-Energy bonus damage, Clefairy's bench-count bonus damage, Ogerpon's both-Active Energy bonus damage, Dipplin's own-Bench damage, and Lopunny's same-turn Bench-to-Active bonus damage; continue multi-KO/prize handling, richer status/marker lifecycle semantics, turn transitions, and snapshot-backed undo/debug support.
+- Expand persisted Ash engine mechanics: implement explicit support for one rejected authored attack effect at a time beyond Moltres's Pokémon ex bonus, switch-self effects, Rabsca's defender-Energy bonus damage, Clefairy's bench-count bonus damage, Ogerpon's both-Active Energy bonus damage, Dipplin's own-Bench damage, Lopunny's same-turn Bench-to-Active bonus damage, and Passimian's own-Basic-in-play damage; continue multi-KO/prize handling, richer status/marker lifecycle semantics, turn transitions, and snapshot-backed undo/debug support.
 - Continue migrating executable card behavior into engine-owned definitions with explicit unsupported-behavior tracking.
 - Spike Electric Streams only after the command/read loop has enough event shape to publish safely.
 
@@ -204,6 +207,7 @@ Updated: 2026-05-30
 - Teal Mask Ogerpon ex `TWM-025` `Myriad Leaf Shower` is now executable in the persisted engine and deals 30 plus 30 more damage for each Energy card attached to either Active Pokémon.
 - Dipplin `TWM-018` `Do the Wave` is now executable in the persisted engine and deals 20 damage for each Pokémon on the attacker's own Bench.
 - Mega Lopunny ex `PFL-084` `Gale Thrust` is now executable in the persisted engine and deals 60 plus 170 more damage if same-turn persisted movement events show it moved from its controller's Bench to the Active Spot.
+- Passimian `SSP-111` `Coordinated Throwing` is now executable in the persisted engine and deals 20 damage for each Basic Pokémon in the attacker's own Active Spot and Bench.
 - Validation blocker: the available manual-tester subagents still appear to share/contend over one browser/session, so their reported viewer flips are not reliable proof of independent-browser behavior. The documented manual-tester milestone needs a harness that guarantees separate browser contexts before it can be marked formally complete.
 
 ## Recommended next atomic task

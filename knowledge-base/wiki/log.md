@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-30] iteration 55 | Passimian own-Basic attack damage
+- Task attempted: continued the rejected authored attack-effect inventory and implemented the narrow persisted `:damage_per_own_basic_pokemon_in_play` slice for Passimian `SSP-111` `Coordinated Throwing`, counting the attacker's own Active plus Benched Basic Pokémon for authored attack damage.
+- Files changed: updated `lib/prizmo/tcg_engine/attack_effects.ex`, `lib/prizmo/tcg_engine/attack_damage.ex`, this log, and the TCG engine playtest handoff.
+- Validation: `mix format && mix compile --warnings-as-errors` passed; Tidewave rollback smoke passed for `SSP-111` `Coordinated Throwing` fetching as executable, surfacing a browser declare-attack affordance, and resolving for 80 damage against Fezandipiti ex with Passimian Active plus three own Basic Pokémon on the Bench; `mix test test/prizmo/tcg_engine/mechanics_test.exs` passed (4 tests); `mix prizmo.cards.coverage` passed; `mix check --no-test` passed.
+- Remaining/blocking notes: no code blocker for Passimian's own-Basic-in-play damage path; additional rejected authored attack effects remain and should continue to be enabled one deterministic persisted effect at a time.
+
 ## [2026-05-30] iteration 54 | Lopunny bench-to-Active bonus damage
 - Task attempted: continued the rejected authored attack-effect inventory and implemented the narrow persisted `:bonus_damage_if_moved_from_bench_to_active_this_turn` slice for Mega Lopunny ex `PFL-084` `Gale Thrust`, applying the authored bonus only when the attacker moved from Bench to Active during the current persisted turn.
 - Files changed: updated `lib/prizmo/tcg_engine/attack_effects.ex`, `lib/prizmo/tcg_engine/attack_damage.ex`, this log, and the TCG engine playtest handoff.

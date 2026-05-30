@@ -72,6 +72,16 @@ defmodule Prizmo.TcgEngine.AttackDamage do
     end
   end
 
+  defp apply_effect(damage, %CardInstance{} = attacker_card, _defender_card, %{
+         type: :damage_per_own_basic_pokemon_in_play,
+         damage_per_pokemon: damage_per_pokemon
+       })
+       when is_integer(damage_per_pokemon) and damage_per_pokemon >= 0 do
+    with {:ok, basic_pokemon_count} <- own_basic_pokemon_in_play_count(attacker_card) do
+      {:ok, damage + damage_per_pokemon * basic_pokemon_count}
+    end
+  end
+
   defp apply_effect(damage, %CardInstance{} = attacker_card, %CardInstance{} = defender_card, %{
          type: :bonus_damage_per_energy_attached_to_both_active,
          bonus_damage: bonus_damage
@@ -156,6 +166,35 @@ defmodule Prizmo.TcgEngine.AttackDamage do
     with {:ok, cards} <- CardStore.cards_in_zone(game_id, player_id, :bench) do
       {:ok, length(cards)}
     end
+  end
+
+  defp own_basic_pokemon_in_play_count(%CardInstance{
+         game_id: game_id,
+         owner_player_id: player_id
+       }) do
+    with {:ok, active_cards} <- CardStore.cards_in_zone(game_id, player_id, :active),
+         {:ok, bench_cards} <- CardStore.cards_in_zone(game_id, player_id, :bench) do
+      [active_cards, bench_cards]
+      |> List.flatten()
+      |> Enum.map(&basic_pokemon_card?/1)
+      |> collect_basic_pokemon_count()
+    end
+  end
+
+  defp basic_pokemon_card?(%CardInstance{card_id: card_id}) do
+    case CardCatalog.fetch(card_id) do
+      {:ok, %{supertype: :pokemon, stage: :basic}} -> {:ok, true}
+      {:ok, _card} -> {:ok, false}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp collect_basic_pokemon_count(results) do
+    Enum.reduce_while(results, {:ok, 0}, fn
+      {:ok, true}, {:ok, count} -> {:cont, {:ok, count + 1}}
+      {:ok, false}, {:ok, count} -> {:cont, {:ok, count}}
+      {:error, reason}, _acc -> {:halt, {:error, reason}}
+    end)
   end
 
   defp moved_from_bench_to_active_this_turn?(%CardInstance{
