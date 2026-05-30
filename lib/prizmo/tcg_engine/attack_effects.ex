@@ -16,6 +16,7 @@ defmodule Prizmo.TcgEngine.AttackEffects do
     :bonus_damage_if_moved_from_bench_to_active_this_turn,
     :bonus_damage_per_energy_attached_to_both_active,
     :bonus_damage_per_energy_attached_to_defender,
+    :damage_only_if_stadium_in_play,
     :damage_per_own_basic_pokemon_in_play,
     :damage_per_own_benched_pokemon,
     :switch_self_with_bench
@@ -61,6 +62,9 @@ defmodule Prizmo.TcgEngine.AttackEffects do
         {:ok, %{}}
 
       %{type: :damage_per_own_basic_pokemon_in_play} ->
+        {:ok, %{}}
+
+      %{type: :damage_only_if_stadium_in_play} ->
         {:ok, %{}}
 
       nil ->

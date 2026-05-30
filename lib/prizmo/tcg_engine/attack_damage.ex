@@ -82,6 +82,14 @@ defmodule Prizmo.TcgEngine.AttackDamage do
     end
   end
 
+  defp apply_effect(damage, %CardInstance{game_id: game_id}, _defender_card, %{
+         type: :damage_only_if_stadium_in_play
+       }) do
+    with {:ok, stadiums} <- CardStore.cards_in_zone(game_id, :stadium) do
+      if Enum.empty?(stadiums), do: {:ok, 0}, else: {:ok, damage}
+    end
+  end
+
   defp apply_effect(damage, %CardInstance{} = attacker_card, %CardInstance{} = defender_card, %{
          type: :bonus_damage_per_energy_attached_to_both_active,
          bonus_damage: bonus_damage

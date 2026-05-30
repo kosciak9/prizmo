@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-30] iteration 56 | Fan Rotom Stadium-gated attack damage
+- Task attempted: continued the rejected authored attack-effect inventory and implemented the narrow persisted `:damage_only_if_stadium_in_play` slice for Fan Rotom `SCR-118` `Assault Landing`, keeping its authored damage only while a Stadium card is persisted in the Stadium zone.
+- Files changed: updated `lib/prizmo/tcg_engine/attack_effects.ex`, `lib/prizmo/tcg_engine/attack_damage.ex`, this log, and the TCG engine playtest handoff.
+- Validation: `mix format && mix compile --warnings-as-errors` passed; Tidewave rollback smoke passed for `SCR-118` `Assault Landing` fetching as executable, surfacing a browser declare-attack affordance, resolving for 0 damage with no Stadium in play, and resolving for 70 damage with `MEG-127` in the Stadium zone; `mix test test/prizmo/tcg_engine/mechanics_test.exs` passed (4 tests); `mix prizmo.cards.coverage` passed; `mix check --no-test` passed.
+- Remaining/blocking notes: no code blocker for Fan Rotom's Stadium-gated damage path; additional rejected authored attack effects remain and should continue to be enabled one deterministic persisted effect at a time.
+
 ## [2026-05-30] iteration 55 | Passimian own-Basic attack damage
 - Task attempted: continued the rejected authored attack-effect inventory and implemented the narrow persisted `:damage_per_own_basic_pokemon_in_play` slice for Passimian `SSP-111` `Coordinated Throwing`, counting the attacker's own Active plus Benched Basic Pokémon for authored attack damage.
 - Files changed: updated `lib/prizmo/tcg_engine/attack_effects.ex`, `lib/prizmo/tcg_engine/attack_damage.ex`, this log, and the TCG engine playtest handoff.
