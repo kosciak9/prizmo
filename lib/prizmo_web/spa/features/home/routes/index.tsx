@@ -739,7 +739,7 @@ export function HomeRoute() {
 
   return (
     <main className="min-h-screen bg-stone-50 text-stone-950">
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-5 py-6 sm:px-8 lg:px-10">
+      <div className="mx-auto flex w-full max-w-[96rem] flex-col gap-8 px-5 py-6 sm:px-8 lg:px-10">
         <header className="flex flex-col gap-5 border-b border-stone-200 pb-6 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-3xl">
             <p className="text-xs font-semibold uppercase tracking-[0.28em] text-stone-500">
@@ -1914,47 +1914,58 @@ function GameStateWorkbench({
         </div>
       </Panel>
 
-      <ActionAffordancesPanel
-        actions={gameState.actionAffordances}
-        cardsById={cardsById}
-        chooseReplacementActivePendingCardId={chooseReplacementActivePendingCardId}
-        onAttachEnergy={onAttachEnergy}
-        onChooseReplacementActive={onChooseReplacementActive}
-        onDeclareAttack={onDeclareAttack}
-        onEndTurn={onEndTurn}
-        onEvolveFromHand={onEvolveFromHand}
-        onPlayBasicToBench={onPlayBasicToBench}
-        onPlayCard={onPlayCard}
-        onRetreat={onRetreat}
-        attachEnergyPendingKey={attachEnergyPendingKey}
-        declareAttackPendingKey={declareAttackPendingKey}
-        endTurnPendingPlayerId={endTurnPendingPlayerId}
-        evolveFromHandPendingKey={evolveFromHandPendingKey}
-        playBasicToBenchPendingCardId={playBasicToBenchPendingCardId}
-        playCardPendingCardId={playCardPendingCardId}
-        retreatPendingKey={retreatPendingKey}
-      />
+      <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(19rem,24rem)]">
+        <BattlefieldPanel
+          activePlayerId={gameState.activePlayerId}
+          currentTurn={gameState.currentTurn}
+          deckNamesByKey={deckNamesByKey}
+          players={gameState.players}
+          stadium={gameState.stadium}
+          viewerPlayerId={viewerPlayerId}
+        />
 
-      <AttackProgressPanel
-        cardsById={cardsById}
-        finishAttackPendingPlayerId={finishAttackPendingPlayerId}
-        gameState={gameState}
-        onFinishAttack={onFinishAttack}
-        onResolveDeclaredAttack={onResolveDeclaredAttack}
-        resolveDeclaredAttackPendingPlayerId={resolveDeclaredAttackPendingPlayerId}
-        viewerPlayerId={viewerPlayerId}
-      />
+        <aside className="space-y-5 xl:sticky xl:top-6" aria-label="Player command rail">
+          <ViewerPromptsPanel
+            cardsById={cardsById}
+            onChoosePrompt={onChoosePrompt}
+            promptPendingId={promptPendingId}
+            prompts={gameState.prompts}
+          />
 
-      <BattlefieldPanel
-        activePlayerId={gameState.activePlayerId}
-        currentTurn={gameState.currentTurn}
-        deckNamesByKey={deckNamesByKey}
-        players={gameState.players}
-        stadium={gameState.stadium}
-        viewerPlayerId={viewerPlayerId}
-      />
+          <AttackProgressPanel
+            cardsById={cardsById}
+            finishAttackPendingPlayerId={finishAttackPendingPlayerId}
+            gameState={gameState}
+            onFinishAttack={onFinishAttack}
+            onResolveDeclaredAttack={onResolveDeclaredAttack}
+            resolveDeclaredAttackPendingPlayerId={resolveDeclaredAttackPendingPlayerId}
+            viewerPlayerId={viewerPlayerId}
+          />
 
-      <div className="grid gap-5 xl:grid-cols-[1fr_minmax(18rem,24rem)]">
+          <ActionAffordancesPanel
+            actions={gameState.actionAffordances}
+            cardsById={cardsById}
+            chooseReplacementActivePendingCardId={chooseReplacementActivePendingCardId}
+            onAttachEnergy={onAttachEnergy}
+            onChooseReplacementActive={onChooseReplacementActive}
+            onDeclareAttack={onDeclareAttack}
+            onEndTurn={onEndTurn}
+            onEvolveFromHand={onEvolveFromHand}
+            onPlayBasicToBench={onPlayBasicToBench}
+            onPlayCard={onPlayCard}
+            onRetreat={onRetreat}
+            attachEnergyPendingKey={attachEnergyPendingKey}
+            declareAttackPendingKey={declareAttackPendingKey}
+            endTurnPendingPlayerId={endTurnPendingPlayerId}
+            evolveFromHandPendingKey={evolveFromHandPendingKey}
+            playBasicToBenchPendingCardId={playBasicToBenchPendingCardId}
+            playCardPendingCardId={playCardPendingCardId}
+            retreatPendingKey={retreatPendingKey}
+          />
+        </aside>
+      </div>
+
+      <div className="grid gap-5">
         <Panel title="Event log">
           {gameState.events.length > 0 ? (
             <ol className="space-y-2">
@@ -1978,12 +1989,6 @@ function GameStateWorkbench({
           )}
         </Panel>
 
-        <ViewerPromptsPanel
-          cardsById={cardsById}
-          onChoosePrompt={onChoosePrompt}
-          promptPendingId={promptPendingId}
-          prompts={gameState.prompts}
-        />
       </div>
     </div>
   )

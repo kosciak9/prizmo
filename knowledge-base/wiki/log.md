@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-31] iteration 86 | Command rail layout polish
+- Task attempted: continued the Web UI polish pass by moving normal-path prompts, attack resolution, and legal actions into a responsive command rail beside the Battlefield panel on wide screens, with the Battlefield shown before command controls and the event log moved below the play area.
+- Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.
+- Validation: `mix format && mix assets.build` passed; browser smoke on `http://localhost:4003` rendered the wider play area with Battlefield beside the `Player command rail`, showed prompt/action panels in the rail, and reported no browser warnings or errors; `mix check --no-test` passed.
+- Remaining/blocking notes: no code blocker for this command-rail layout slice. Further Web UI polish should refine card/action surfaces, empty states, error placement near command controls, and debug disclosure boundaries before rerunning the formal two-browser playtest milestone.
+
 ## [2026-05-31] iteration 85 | Battlefield layout polish
 - Task attempted: started the substantial Web UI polish pass with a narrow normal-path board slice, replacing the generic two-column player state panels with a PTCGL-adjacent Battlefield panel that places the opponent above the viewer and clarifies Active, Bench, Deck, Prizes, Discard, Hand, attached cards, and Stadium zones while leaving existing command and prompt controls intact.
 - Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.
