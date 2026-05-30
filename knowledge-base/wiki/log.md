@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-31] iteration 89 | Command rail game flow controls
+- Task attempted: continued the Web UI polish pass by moving setup and turn-step progression out of the create/reconnect sidebar and into a new `Game flow` panel at the top of the player command rail beside the Battlefield.
+- Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.
+- Validation: `mix format && mix assets.build && mix check --no-test` passed; browser smoke on `http://localhost:4003` refreshed an existing local game, confirmed the create/reconnect sidebar now stops at game refresh/clear while the command rail shows `Game flow` with table setup and turn-step controls, and reported no browser warnings or errors.
+- Remaining/blocking notes: no code blocker for this flow-control integration slice. Further Web UI polish should compress completed setup state, refine prompt/attack rail density, and continue making current legal actions feel closer to a PTCGL-adjacent play surface before rerunning the formal two-browser playtest milestone.
+
 ## [2026-05-31] iteration 88 | Command rail action surface density
 - Task attempted: continued the Web UI polish pass by tightening grouped command-rail action rows, moving command kind/player/engine detail metadata into denser surfaces, and distinguishing primary action buttons from secondary hand/board commands.
 - Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.

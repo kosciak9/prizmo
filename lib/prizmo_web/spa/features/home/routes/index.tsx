@@ -438,6 +438,15 @@ type ChoosePromptCommand = {
   selectedCardInstanceIds: string[]
 }
 
+type SetupCardCommand = {
+  playerId: string
+  cardInstanceId: string
+}
+
+type TurnPlayerCommand = {
+  playerId: string
+}
+
 type GameState = {
   gameId: string
   viewerPlayerId: string
@@ -689,90 +698,27 @@ export function HomeRoute() {
     queriedGameState && queriedGameState.viewerPlayerId !== session.viewerPlayerId
   )
   const gameState = gameStateHasViewerMismatch ? undefined : queriedGameState
-  const viewerPlayer = gameState?.players.find(player => player.playerId === session.viewerPlayerId)
-  const currentTurnActivePlayerId = gameState?.currentTurn?.activePlayerId
-  const setupActiveCandidates = viewerPlayer?.hand.filter(isSetupActiveCandidate) ?? []
-  const setupBenchCandidates = viewerPlayer?.hand.filter(isSetupBenchCandidate) ?? []
-  const allPlayersHaveSetupActive = gameState?.players.every(player => player.active) ?? false
-  const setupPrizesAreUnplaced = gameState?.players.every(player => player.prizeCount === 0) ?? false
   const deckNamesByKey = useMemo(
     () => new Map(decks.map(deck => [deck.deckKey, deck.name])),
     [decks]
   )
   const canCreateGame =
     Boolean(selectedPlayerOneDeckKey && selectedPlayerTwoDeckKey) && !createGameMutation.isPending
-  const canStartSetup =
-    Boolean(normalisedGameId && gameState && !gameState.setup) && !startSetupMutation.isPending
-  const canDrawOpeningHand =
-    Boolean(normalisedGameId && gameState?.setup?.status === 'waiting_to_draw') && !drawOpeningHandMutation.isPending
-  const canChooseSetupActive =
-    Boolean(
-      normalisedGameId &&
-        gameState?.setup?.status === 'hands_drawn' &&
-        viewerPlayer &&
-        !viewerPlayer.active &&
-        setupActiveCandidates.length > 0
-    ) && !chooseActiveMutation.isPending
-  const canChooseSetupBench =
-    Boolean(
-      normalisedGameId &&
-        gameState?.setup?.status === 'hands_drawn' &&
-        viewerPlayer &&
-        viewerPlayer.active &&
-        viewerPlayer.bench.length < 5 &&
-        setupBenchCandidates.length > 0
-    ) && !chooseSetupBenchMutation.isPending
-  const canPlacePrizes =
-    Boolean(
-      normalisedGameId &&
-        gameState?.setup?.status === 'hands_drawn' &&
-        allPlayersHaveSetupActive &&
-        setupPrizesAreUnplaced
-    ) && !placePrizesMutation.isPending
-  const canCompleteSetup =
-    Boolean(normalisedGameId && gameState?.setup?.status === 'prizes_placed') && !completeSetupMutation.isPending
-  const canStartNextTurn =
-    Boolean(
-      normalisedGameId &&
-        gameState?.status === 'in_progress' &&
-        gameState.setup?.status === 'completed' &&
-        (!gameState.currentTurn || gameState.currentTurn.status === 'ended')
-    ) && !startNextTurnMutation.isPending
-  const canDrawForTurn =
-    Boolean(
-      normalisedGameId &&
-        gameState?.status === 'in_progress' &&
-        gameState.currentTurn?.status === 'start' &&
-        currentTurnActivePlayerId &&
-        isPlayerId(currentTurnActivePlayerId)
-    ) &&
-    !drawForTurnMutation.isPending &&
-    !skipDrawForTurnMutation.isPending &&
-    !openActionWindowMutation.isPending
-  const canSkipDrawForTurn =
-    Boolean(
-      normalisedGameId &&
-        gameState?.status === 'in_progress' &&
-        gameState.currentTurn?.status === 'start' &&
-        currentTurnActivePlayerId &&
-        isPlayerId(currentTurnActivePlayerId)
-    ) &&
-    !drawForTurnMutation.isPending &&
-    !skipDrawForTurnMutation.isPending &&
-    !openActionWindowMutation.isPending
-  const canOpenActionWindow =
-    Boolean(
-      normalisedGameId &&
-        gameState?.status === 'in_progress' &&
-        gameState.currentTurn?.status === 'drawn'
-    ) &&
-    !drawForTurnMutation.isPending &&
-    !skipDrawForTurnMutation.isPending &&
-    !openActionWindowMutation.isPending
   const promptCommandError = commandErrorNotice(choosePromptMutation.error, 'Prompt choice failed')
   const attackCommandError =
     commandErrorNotice(resolveDeclaredAttackMutation.error, 'Attack resolution failed') ??
     commandErrorNotice(finishAttackMutation.error, 'Finish attack failed')
+  const flowCommandError =
+    commandErrorNotice(startSetupMutation.error, 'Setup start failed') ??
+    commandErrorNotice(drawOpeningHandMutation.error, 'Opening hand failed') ??
+    commandErrorNotice(chooseActiveMutation.error, 'Setup Active choice failed') ??
+    commandErrorNotice(chooseSetupBenchMutation.error, 'Setup Bench choice failed') ??
+    commandErrorNotice(placePrizesMutation.error, 'Prize placement failed') ??
+    commandErrorNotice(completeSetupMutation.error, 'Setup completion failed') ??
+    commandErrorNotice(startNextTurnMutation.error, 'Turn start failed') ??
+    commandErrorNotice(drawForTurnMutation.error, 'Draw for turn failed') ??
+    commandErrorNotice(skipDrawForTurnMutation.error, 'Skip draw failed') ??
+    commandErrorNotice(openActionWindowMutation.error, 'Open action window failed')
   const actionCommandError =
     commandErrorNotice(playCardMutation.error, 'Play card failed') ??
     commandErrorNotice(playBasicToBenchMutation.error, 'Bench Basic failed') ??
@@ -921,329 +867,6 @@ export function HomeRoute() {
                   </button>
                 </div>
 
-                <div className="rounded-2xl border border-stone-200 bg-stone-50 p-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-medium text-stone-950">Setup commands</p>
-                      <p className="mt-1 text-xs leading-5 text-stone-500">
-                        Advance setup through Ash RPC, then refresh the viewer-scoped state.
-                      </p>
-                    </div>
-                    <StatusBadge tone={gameState?.setup ? 'active' : 'neutral'}>
-                      {gameState?.setup?.status ?? 'not started'}
-                    </StatusBadge>
-                  </div>
-
-                  <div className="mt-3 space-y-2">
-                    <button
-                      className="w-full rounded-xl border border-emerald-700 px-3 py-2 text-sm font-semibold text-emerald-800 transition hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:border-stone-300 disabled:text-stone-400 disabled:hover:bg-transparent"
-                      disabled={!canStartSetup}
-                      onClick={() => startSetupMutation.mutate(normalisedGameId)}
-                      type="button"
-                    >
-                      {startSetupMutation.isPending
-                        ? 'Starting setup...'
-                        : gameState?.setup
-                          ? 'Setup already started'
-                          : 'Start setup'}
-                    </button>
-                    <button
-                      className="w-full rounded-xl border border-emerald-700 px-3 py-2 text-sm font-semibold text-emerald-800 transition hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:border-stone-300 disabled:text-stone-400 disabled:hover:bg-transparent"
-                      disabled={!canDrawOpeningHand}
-                      onClick={() => drawOpeningHandMutation.mutate(normalisedGameId)}
-                      type="button"
-                    >
-                      {drawOpeningHandMutation.isPending
-                        ? 'Drawing hands...'
-                        : gameState?.setup?.status === 'waiting_to_draw'
-                          ? 'Draw opening hands'
-                          : gameState?.setup
-                            ? 'Opening hands resolved'
-                            : 'Start setup first'}
-                    </button>
-                    <div className="rounded-xl border border-stone-200 bg-stone-50 p-3">
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <p className="text-sm font-medium text-stone-950">Choose setup Active</p>
-                          <p className="mt-1 text-xs leading-5 text-stone-500">
-                            Select a Basic Pokémon from {formatPlayerId(session.viewerPlayerId)}'s hand.
-                          </p>
-                        </div>
-                        <StatusBadge tone={viewerPlayer?.active ? 'active' : 'neutral'}>
-                          {viewerPlayer?.active ? 'chosen' : 'pending'}
-                        </StatusBadge>
-                      </div>
-
-                      {gameState?.setup?.status === 'hands_drawn' && viewerPlayer && !viewerPlayer.active ? (
-                        setupActiveCandidates.length > 0 ? (
-                          <div className="mt-3 space-y-2">
-                            {setupActiveCandidates.map(card => (
-                              <button
-                                className="w-full rounded-xl border border-emerald-700 px-3 py-2 text-left text-sm font-semibold text-emerald-800 transition hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:border-stone-300 disabled:text-stone-400 disabled:hover:bg-transparent"
-                                disabled={!canChooseSetupActive}
-                                key={card.id}
-                                onClick={() =>
-                                  chooseActiveMutation.mutate({
-                                    gameId: normalisedGameId,
-                                    playerId: session.viewerPlayerId,
-                                    cardInstanceId: card.id
-                                  })
-                                }
-                                type="button"
-                              >
-                                {chooseActiveMutation.isPending ? 'Choosing Active...' : `Choose ${card.name}`}
-                              </button>
-                            ))}
-                          </div>
-                        ) : (
-                          <p className="mt-3 rounded-lg border border-dashed border-stone-300 px-3 py-3 text-sm text-stone-500">
-                            No Basic Pokémon are visible in this viewer's hand.
-                          </p>
-                        )
-                      ) : (
-                        <p className="mt-3 rounded-lg border border-dashed border-stone-300 px-3 py-3 text-sm text-stone-500">
-                          Draw opening hands, then view a player without an Active Pokémon to choose one.
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="rounded-xl border border-stone-200 bg-stone-50 p-3">
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <p className="text-sm font-medium text-stone-950">Choose setup Bench</p>
-                          <p className="mt-1 text-xs leading-5 text-stone-500">
-                            Optionally bench Basic Pokémon from {formatPlayerId(session.viewerPlayerId)}'s hand.
-                          </p>
-                        </div>
-                        <StatusBadge tone={viewerPlayer?.bench.length ? 'active' : 'neutral'}>
-                          {viewerPlayer?.bench.length ?? 0}/5
-                        </StatusBadge>
-                      </div>
-
-                      {gameState?.setup?.status === 'hands_drawn' && viewerPlayer && viewerPlayer.active ? (
-                        viewerPlayer.bench.length >= 5 ? (
-                          <p className="mt-3 rounded-lg border border-dashed border-stone-300 px-3 py-3 text-sm text-stone-500">
-                            This viewer's Bench is full.
-                          </p>
-                        ) : setupBenchCandidates.length > 0 ? (
-                          <div className="mt-3 space-y-2">
-                            {setupBenchCandidates.map(card => (
-                              <button
-                                className="w-full rounded-xl border border-emerald-700 px-3 py-2 text-left text-sm font-semibold text-emerald-800 transition hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:border-stone-300 disabled:text-stone-400 disabled:hover:bg-transparent"
-                                disabled={!canChooseSetupBench}
-                                key={card.id}
-                                onClick={() =>
-                                  chooseSetupBenchMutation.mutate({
-                                    gameId: normalisedGameId,
-                                    playerId: session.viewerPlayerId,
-                                    cardInstanceId: card.id
-                                  })
-                                }
-                                type="button"
-                              >
-                                {chooseSetupBenchMutation.isPending ? 'Benching Pokémon...' : `Bench ${card.name}`}
-                              </button>
-                            ))}
-                          </div>
-                        ) : (
-                          <p className="mt-3 rounded-lg border border-dashed border-stone-300 px-3 py-3 text-sm text-stone-500">
-                            No additional Basic Pokémon are visible in this viewer's hand.
-                          </p>
-                        )
-                      ) : (
-                        <p className="mt-3 rounded-lg border border-dashed border-stone-300 px-3 py-3 text-sm text-stone-500">
-                          Draw opening hands and choose this viewer's Active Pokémon before benching setup Pokémon.
-                        </p>
-                      )}
-                    </div>
-
-                    <button
-                      className="w-full rounded-xl border border-emerald-700 px-3 py-2 text-sm font-semibold text-emerald-800 transition hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:border-stone-300 disabled:text-stone-400 disabled:hover:bg-transparent"
-                      disabled={!canPlacePrizes}
-                      onClick={() => placePrizesMutation.mutate(normalisedGameId)}
-                      type="button"
-                    >
-                      {placePrizesMutation.isPending
-                        ? 'Placing prizes...'
-                        : gameState?.setup?.status === 'prizes_placed'
-                          ? 'Prizes placed'
-                          : gameState?.setup?.status === 'hands_drawn'
-                            ? allPlayersHaveSetupActive
-                              ? 'Place setup prizes'
-                              : 'Choose both Active Pokémon first'
-                            : 'Choose Active Pokémon first'}
-                    </button>
-                    <button
-                      className="w-full rounded-xl border border-emerald-700 px-3 py-2 text-sm font-semibold text-emerald-800 transition hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:border-stone-300 disabled:text-stone-400 disabled:hover:bg-transparent"
-                      disabled={!canCompleteSetup}
-                      onClick={() => completeSetupMutation.mutate(normalisedGameId)}
-                      type="button"
-                    >
-                      {completeSetupMutation.isPending
-                        ? 'Completing setup...'
-                        : gameState?.setup?.status === 'prizes_placed'
-                          ? 'Complete setup'
-                          : gameState?.setup?.status === 'completed'
-                            ? 'Setup completed'
-                            : 'Place prizes first'}
-                    </button>
-                  </div>
-                </div>
-
-                {startSetupMutation.error ? (
-                  <InlineNotice tone="error" title="Setup command failed">
-                    {errorMessage(startSetupMutation.error)}
-                  </InlineNotice>
-                ) : null}
-
-                {drawOpeningHandMutation.error ? (
-                  <InlineNotice tone="error" title="Opening hand command failed">
-                    {errorMessage(drawOpeningHandMutation.error)}
-                  </InlineNotice>
-                ) : null}
-
-                {chooseActiveMutation.error ? (
-                  <InlineNotice tone="error" title="Active choice command failed">
-                    {errorMessage(chooseActiveMutation.error)}
-                  </InlineNotice>
-                ) : null}
-
-                {chooseSetupBenchMutation.error ? (
-                  <InlineNotice tone="error" title="Bench choice command failed">
-                    {errorMessage(chooseSetupBenchMutation.error)}
-                  </InlineNotice>
-                ) : null}
-
-                {placePrizesMutation.error ? (
-                  <InlineNotice tone="error" title="Prize placement command failed">
-                    {errorMessage(placePrizesMutation.error)}
-                  </InlineNotice>
-                ) : null}
-
-                {completeSetupMutation.error ? (
-                  <InlineNotice tone="error" title="Setup completion command failed">
-                    {errorMessage(completeSetupMutation.error)}
-                  </InlineNotice>
-                ) : null}
-
-                <div className="rounded-2xl border border-stone-200 bg-stone-50 p-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-medium text-stone-950">Turn commands</p>
-                      <p className="mt-1 text-xs leading-5 text-stone-500">
-                        Start the first or next persisted turn, then draw, skip draw, or open the action window.
-                      </p>
-                    </div>
-                    <StatusBadge tone={gameState?.currentTurn ? 'active' : 'neutral'}>
-                      {gameState?.currentTurn
-                        ? `turn ${gameState.currentTurn.turnNumber}: ${gameState.currentTurn.status}`
-                        : 'no turn'}
-                    </StatusBadge>
-                  </div>
-
-                  <button
-                    className="mt-3 w-full rounded-xl border border-emerald-700 px-3 py-2 text-sm font-semibold text-emerald-800 transition hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:border-stone-300 disabled:text-stone-400 disabled:hover:bg-transparent"
-                    disabled={!canStartNextTurn}
-                    onClick={() => startNextTurnMutation.mutate(normalisedGameId)}
-                    type="button"
-                  >
-                    {startNextTurnMutation.isPending
-                      ? 'Starting turn...'
-                      : gameState?.currentTurn?.status === 'ended'
-                        ? 'Start next turn'
-                        : gameState?.currentTurn
-                          ? `Turn ${gameState.currentTurn.turnNumber} in progress`
-                        : gameState?.setup?.status === 'completed'
-                          ? 'Start first turn'
-                          : 'Complete setup first'}
-                  </button>
-                  <button
-                    className="mt-2 w-full rounded-xl border border-emerald-700 px-3 py-2 text-sm font-semibold text-emerald-800 transition hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:border-stone-300 disabled:text-stone-400 disabled:hover:bg-transparent"
-                    disabled={!canDrawForTurn}
-                    onClick={() => {
-                      if (currentTurnActivePlayerId && isPlayerId(currentTurnActivePlayerId)) {
-                        drawForTurnMutation.mutate({
-                          gameId: normalisedGameId,
-                          playerId: currentTurnActivePlayerId
-                        })
-                      }
-                    }}
-                    type="button"
-                  >
-                    {drawForTurnMutation.isPending
-                      ? 'Drawing for turn...'
-                      : gameState?.currentTurn?.status === 'start'
-                        ? `Draw for ${formatPlayerId(gameState.currentTurn.activePlayerId)}`
-                        : gameState?.currentTurn?.status === 'drawn'
-                          ? 'Draw for turn resolved'
-                          : gameState?.currentTurn
-                            ? 'Turn is not in draw step'
-                            : 'Start first turn first'}
-                  </button>
-                  <button
-                    className="mt-2 w-full rounded-xl border border-emerald-700 px-3 py-2 text-sm font-semibold text-emerald-800 transition hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:border-stone-300 disabled:text-stone-400 disabled:hover:bg-transparent"
-                    disabled={!canSkipDrawForTurn}
-                    onClick={() => {
-                      if (currentTurnActivePlayerId && isPlayerId(currentTurnActivePlayerId)) {
-                        skipDrawForTurnMutation.mutate({
-                          gameId: normalisedGameId,
-                          playerId: currentTurnActivePlayerId
-                        })
-                      }
-                    }}
-                    type="button"
-                  >
-                    {skipDrawForTurnMutation.isPending
-                      ? 'Skipping draw...'
-                      : gameState?.currentTurn?.status === 'start'
-                        ? `Skip draw for ${formatPlayerId(gameState.currentTurn.activePlayerId)}`
-                        : gameState?.currentTurn?.status === 'action_window'
-                          ? 'Draw step skipped'
-                          : gameState?.currentTurn
-                            ? 'Turn is not in draw step'
-                            : 'Start first turn first'}
-                  </button>
-                  <button
-                    className="mt-2 w-full rounded-xl border border-emerald-700 px-3 py-2 text-sm font-semibold text-emerald-800 transition hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:border-stone-300 disabled:text-stone-400 disabled:hover:bg-transparent"
-                    disabled={!canOpenActionWindow}
-                    onClick={() => openActionWindowMutation.mutate(normalisedGameId)}
-                    type="button"
-                  >
-                    {openActionWindowMutation.isPending
-                      ? 'Opening action window...'
-                      : gameState?.currentTurn?.status === 'drawn'
-                        ? 'Open action window'
-                        : gameState?.currentTurn?.status === 'action_window'
-                          ? 'Action window open'
-                          : gameState?.currentTurn
-                            ? 'Draw or skip draw first'
-                            : 'Start first turn first'}
-                  </button>
-                </div>
-
-                {startNextTurnMutation.error ? (
-                  <InlineNotice tone="error" title="Turn start command failed">
-                    {errorMessage(startNextTurnMutation.error)}
-                  </InlineNotice>
-                ) : null}
-
-                {drawForTurnMutation.error ? (
-                  <InlineNotice tone="error" title="Draw for turn command failed">
-                    {errorMessage(drawForTurnMutation.error)}
-                  </InlineNotice>
-                ) : null}
-
-                {skipDrawForTurnMutation.error ? (
-                  <InlineNotice tone="error" title="Skip draw command failed">
-                    {errorMessage(skipDrawForTurnMutation.error)}
-                  </InlineNotice>
-                ) : null}
-
-                {openActionWindowMutation.error ? (
-                  <InlineNotice tone="error" title="Open action window command failed">
-                    {errorMessage(openActionWindowMutation.error)}
-                  </InlineNotice>
-                ) : null}
               </div>
             </Panel>
 
@@ -1293,9 +916,44 @@ export function HomeRoute() {
                 actionCommandError={actionCommandError}
                 attackCommandError={attackCommandError}
                 deckNamesByKey={deckNamesByKey}
+                flowCommandError={flowCommandError}
                 gameState={gameState}
                 promptCommandError={promptCommandError}
                 viewerPlayerId={session.viewerPlayerId}
+                onStartSetup={() => startSetupMutation.mutate(normalisedGameId)}
+                onDrawOpeningHand={() => drawOpeningHandMutation.mutate(normalisedGameId)}
+                onChooseSetupActive={({ playerId, cardInstanceId }) => {
+                  if (isPlayerId(playerId)) {
+                    chooseActiveMutation.mutate({
+                      gameId: normalisedGameId,
+                      playerId,
+                      cardInstanceId
+                    })
+                  }
+                }}
+                onChooseSetupBench={({ playerId, cardInstanceId }) => {
+                  if (isPlayerId(playerId)) {
+                    chooseSetupBenchMutation.mutate({
+                      gameId: normalisedGameId,
+                      playerId,
+                      cardInstanceId
+                    })
+                  }
+                }}
+                onPlacePrizes={() => placePrizesMutation.mutate(normalisedGameId)}
+                onCompleteSetup={() => completeSetupMutation.mutate(normalisedGameId)}
+                onStartNextTurn={() => startNextTurnMutation.mutate(normalisedGameId)}
+                onDrawForTurn={({ playerId }) => {
+                  if (isPlayerId(playerId)) {
+                    drawForTurnMutation.mutate({ gameId: normalisedGameId, playerId })
+                  }
+                }}
+                onSkipDrawForTurn={({ playerId }) => {
+                  if (isPlayerId(playerId)) {
+                    skipDrawForTurnMutation.mutate({ gameId: normalisedGameId, playerId })
+                  }
+                }}
+                onOpenActionWindow={() => openActionWindowMutation.mutate(normalisedGameId)}
                 onChooseReplacementActive={({ playerId, benchCardInstanceId }) => {
                   if (isPlayerId(playerId)) {
                     chooseReplacementActiveMutation.mutate({
@@ -1435,13 +1093,24 @@ export function HomeRoute() {
                       )
                     : null
                 }
+                chooseSetupActivePendingCardId={
+                  chooseActiveMutation.isPending ? chooseActiveMutation.variables?.cardInstanceId ?? null : null
+                }
+                chooseSetupBenchPendingCardId={
+                  chooseSetupBenchMutation.isPending ? chooseSetupBenchMutation.variables?.cardInstanceId ?? null : null
+                }
                 chooseReplacementActivePendingCardId={
                   chooseReplacementActiveMutation.isPending
                     ? chooseReplacementActiveMutation.variables?.benchCardInstanceId ?? null
                     : null
                 }
+                completeSetupPending={completeSetupMutation.isPending}
+                drawForTurnPending={drawForTurnMutation.isPending}
+                drawOpeningHandPending={drawOpeningHandMutation.isPending}
                 promptPendingId={choosePromptMutation.isPending ? choosePromptMutation.variables?.promptId ?? null : null}
                 endTurnPendingPlayerId={endTurnMutation.isPending ? endTurnMutation.variables?.playerId ?? null : null}
+                openActionWindowPending={openActionWindowMutation.isPending}
+                placePrizesPending={placePrizesMutation.isPending}
                 playCardPendingCardId={playCardMutation.isPending ? playCardMutation.variables?.cardInstanceId ?? null : null}
                 retreatPendingKey={
                   retreatMutation.isPending && retreatMutation.variables
@@ -1464,6 +1133,9 @@ export function HomeRoute() {
                 finishAttackPendingPlayerId={
                   finishAttackMutation.isPending ? finishAttackMutation.variables?.playerId ?? null : null
                 }
+                skipDrawForTurnPending={skipDrawForTurnMutation.isPending}
+                startNextTurnPending={startNextTurnMutation.isPending}
+                startSetupPending={startSetupMutation.isPending}
               />
             ) : null}
           </section>
@@ -1828,61 +1500,103 @@ async function choosePrompt(input: ChoosePromptInput): Promise<CreatedGame> {
 function GameStateWorkbench({
   actionCommandError,
   attackCommandError,
+  flowCommandError,
   gameState,
   viewerPlayerId,
   deckNamesByKey,
   promptCommandError,
+  onChooseSetupActive,
+  onChooseSetupBench,
   onChoosePrompt,
   onChooseReplacementActive,
   onAttachEnergy,
   onDeclareAttack,
+  onCompleteSetup,
+  onDrawForTurn,
+  onDrawOpeningHand,
   onEndTurn,
   onEvolveFromHand,
+  onOpenActionWindow,
+  onPlacePrizes,
   onFinishAttack,
   onPlayBasicToBench,
   onPlayCard,
   onRetreat,
   onResolveDeclaredAttack,
+  onSkipDrawForTurn,
+  onStartNextTurn,
+  onStartSetup,
   attachEnergyPendingKey,
+  chooseSetupActivePendingCardId,
+  chooseSetupBenchPendingCardId,
   chooseReplacementActivePendingCardId,
+  completeSetupPending,
   declareAttackPendingKey,
+  drawForTurnPending,
+  drawOpeningHandPending,
   endTurnPendingPlayerId,
   evolveFromHandPendingKey,
   finishAttackPendingPlayerId,
+  openActionWindowPending,
+  placePrizesPending,
   playBasicToBenchPendingCardId,
   promptPendingId,
   playCardPendingCardId,
   resolveDeclaredAttackPendingPlayerId,
-  retreatPendingKey
+  retreatPendingKey,
+  skipDrawForTurnPending,
+  startNextTurnPending,
+  startSetupPending
 }: {
   actionCommandError: CommandErrorNotice | null
   attackCommandError: CommandErrorNotice | null
+  flowCommandError: CommandErrorNotice | null
   gameState: GameState
   viewerPlayerId: PlayerId
   deckNamesByKey: Map<string, string>
   promptCommandError: CommandErrorNotice | null
+  onChooseSetupActive: (input: SetupCardCommand) => void
+  onChooseSetupBench: (input: SetupCardCommand) => void
   onChoosePrompt: (input: ChoosePromptCommand) => void
   onChooseReplacementActive: (input: ChooseReplacementActiveCommand) => void
   onAttachEnergy: (input: AttachEnergyCommand) => void
   onDeclareAttack: (input: DeclareAttackCommand) => void
+  onCompleteSetup: () => void
+  onDrawForTurn: (input: TurnPlayerCommand) => void
+  onDrawOpeningHand: () => void
   onEndTurn: (input: EndTurnCommand) => void
   onEvolveFromHand: (input: EvolveFromHandCommand) => void
+  onOpenActionWindow: () => void
+  onPlacePrizes: () => void
   onFinishAttack: (input: FinishAttackCommand) => void
   onPlayBasicToBench: (input: PlayBasicToBenchCommand) => void
   onPlayCard: (input: PlayCardCommand) => void
   onRetreat: (input: RetreatCommand) => void
   onResolveDeclaredAttack: (input: ResolveDeclaredAttackCommand) => void
+  onSkipDrawForTurn: (input: TurnPlayerCommand) => void
+  onStartNextTurn: () => void
+  onStartSetup: () => void
   attachEnergyPendingKey: string | null
+  chooseSetupActivePendingCardId: string | null
+  chooseSetupBenchPendingCardId: string | null
   chooseReplacementActivePendingCardId: string | null
+  completeSetupPending: boolean
   declareAttackPendingKey: string | null
+  drawForTurnPending: boolean
+  drawOpeningHandPending: boolean
   endTurnPendingPlayerId: string | null
   evolveFromHandPendingKey: string | null
   finishAttackPendingPlayerId: string | null
+  openActionWindowPending: boolean
+  placePrizesPending: boolean
   playBasicToBenchPendingCardId: string | null
   promptPendingId: string | null
   playCardPendingCardId: string | null
   resolveDeclaredAttackPendingPlayerId: string | null
   retreatPendingKey: string | null
+  skipDrawForTurnPending: boolean
+  startNextTurnPending: boolean
+  startSetupPending: boolean
 }) {
   const cardsById = useMemo(() => visibleCardsById(gameState), [gameState])
 
@@ -1925,6 +1639,32 @@ function GameStateWorkbench({
         />
 
         <aside className="space-y-5 xl:sticky xl:top-6" aria-label="Player command rail">
+          <GameFlowPanel
+            commandError={flowCommandError}
+            completeSetupPending={completeSetupPending}
+            chooseSetupActivePendingCardId={chooseSetupActivePendingCardId}
+            chooseSetupBenchPendingCardId={chooseSetupBenchPendingCardId}
+            drawForTurnPending={drawForTurnPending}
+            drawOpeningHandPending={drawOpeningHandPending}
+            gameState={gameState}
+            onChooseSetupActive={onChooseSetupActive}
+            onChooseSetupBench={onChooseSetupBench}
+            onCompleteSetup={onCompleteSetup}
+            onDrawForTurn={onDrawForTurn}
+            onDrawOpeningHand={onDrawOpeningHand}
+            onOpenActionWindow={onOpenActionWindow}
+            onPlacePrizes={onPlacePrizes}
+            onSkipDrawForTurn={onSkipDrawForTurn}
+            onStartNextTurn={onStartNextTurn}
+            onStartSetup={onStartSetup}
+            openActionWindowPending={openActionWindowPending}
+            placePrizesPending={placePrizesPending}
+            skipDrawForTurnPending={skipDrawForTurnPending}
+            startNextTurnPending={startNextTurnPending}
+            startSetupPending={startSetupPending}
+            viewerPlayerId={viewerPlayerId}
+          />
+
           <ViewerPromptsPanel
             cardsById={cardsById}
             commandError={promptCommandError}
@@ -1994,6 +1734,349 @@ function GameStateWorkbench({
 
       </div>
     </div>
+  )
+}
+
+function GameFlowPanel({
+  commandError,
+  completeSetupPending,
+  chooseSetupActivePendingCardId,
+  chooseSetupBenchPendingCardId,
+  drawForTurnPending,
+  drawOpeningHandPending,
+  gameState,
+  onChooseSetupActive,
+  onChooseSetupBench,
+  onCompleteSetup,
+  onDrawForTurn,
+  onDrawOpeningHand,
+  onOpenActionWindow,
+  onPlacePrizes,
+  onSkipDrawForTurn,
+  onStartNextTurn,
+  onStartSetup,
+  openActionWindowPending,
+  placePrizesPending,
+  skipDrawForTurnPending,
+  startNextTurnPending,
+  startSetupPending,
+  viewerPlayerId
+}: {
+  commandError: CommandErrorNotice | null
+  completeSetupPending: boolean
+  chooseSetupActivePendingCardId: string | null
+  chooseSetupBenchPendingCardId: string | null
+  drawForTurnPending: boolean
+  drawOpeningHandPending: boolean
+  gameState: GameState
+  onChooseSetupActive: (input: SetupCardCommand) => void
+  onChooseSetupBench: (input: SetupCardCommand) => void
+  onCompleteSetup: () => void
+  onDrawForTurn: (input: TurnPlayerCommand) => void
+  onDrawOpeningHand: () => void
+  onOpenActionWindow: () => void
+  onPlacePrizes: () => void
+  onSkipDrawForTurn: (input: TurnPlayerCommand) => void
+  onStartNextTurn: () => void
+  onStartSetup: () => void
+  openActionWindowPending: boolean
+  placePrizesPending: boolean
+  skipDrawForTurnPending: boolean
+  startNextTurnPending: boolean
+  startSetupPending: boolean
+  viewerPlayerId: PlayerId
+}) {
+  const viewerPlayer = gameState.players.find(player => player.playerId === viewerPlayerId)
+  const currentTurnActivePlayerId = gameState.currentTurn?.activePlayerId
+  const setupActiveCandidates = viewerPlayer?.hand.filter(isSetupActiveCandidate) ?? []
+  const setupBenchCandidates = viewerPlayer?.hand.filter(isSetupBenchCandidate) ?? []
+  const allPlayersHaveSetupActive = gameState.players.every(player => player.active)
+  const setupPrizesAreUnplaced = gameState.players.every(player => player.prizeCount === 0)
+  const turnStepPending = drawForTurnPending || skipDrawForTurnPending || openActionWindowPending
+  const setupStatus = gameState.setup?.status ?? 'not started'
+  const setupChoicesClosed = gameState.setup?.status === 'prizes_placed' || gameState.setup?.status === 'completed'
+  const turnStatus = gameState.currentTurn
+    ? `turn ${gameState.currentTurn.turnNumber}: ${formatEventType(gameState.currentTurn.status)}`
+    : 'no turn'
+  const flowStatus = gameState.setup?.status === 'completed' ? turnStatus : setupStatus
+  const canStartSetup = !gameState.setup && !startSetupPending
+  const canDrawOpeningHand = gameState.setup?.status === 'waiting_to_draw' && !drawOpeningHandPending
+  const canChooseSetupActive = Boolean(
+    gameState.setup?.status === 'hands_drawn' &&
+      viewerPlayer &&
+      !viewerPlayer.active &&
+      setupActiveCandidates.length > 0 &&
+      !chooseSetupActivePendingCardId
+  )
+  const canChooseSetupBench = Boolean(
+    gameState.setup?.status === 'hands_drawn' &&
+      viewerPlayer &&
+      viewerPlayer.active &&
+      viewerPlayer.bench.length < 5 &&
+      setupBenchCandidates.length > 0 &&
+      !chooseSetupBenchPendingCardId
+  )
+  const canPlacePrizes = Boolean(
+    gameState.setup?.status === 'hands_drawn' &&
+      allPlayersHaveSetupActive &&
+      setupPrizesAreUnplaced &&
+      !placePrizesPending
+  )
+  const canCompleteSetup = gameState.setup?.status === 'prizes_placed' && !completeSetupPending
+  const canStartNextTurn = Boolean(
+    gameState.status === 'in_progress' &&
+      gameState.setup?.status === 'completed' &&
+      (!gameState.currentTurn || gameState.currentTurn.status === 'ended') &&
+      !startNextTurnPending
+  )
+  const canDrawForTurn = Boolean(
+    gameState.status === 'in_progress' &&
+      gameState.currentTurn?.status === 'start' &&
+      currentTurnActivePlayerId &&
+      isPlayerId(currentTurnActivePlayerId) &&
+      !turnStepPending
+  )
+  const canSkipDrawForTurn = canDrawForTurn
+  const canOpenActionWindow = Boolean(
+    gameState.status === 'in_progress' && gameState.currentTurn?.status === 'drawn' && !turnStepPending
+  )
+  const openingActiveStatusMessage = viewerPlayer?.active
+    ? `${viewerPlayer.active.name} is this viewer's setup Active.`
+    : setupChoicesClosed
+      ? 'Setup Active choices are locked after Prize placement.'
+      : 'Draw opening hands, then view a player without an Active Pokémon to choose one.'
+  const openingBenchUnavailableMessage = setupChoicesClosed
+    ? 'Setup Bench choices are locked after Prize placement.'
+    : 'Draw opening hands and choose this viewer\'s Active Pokémon before benching setup Pokémon.'
+  const placePrizesButtonLabel = placePrizesPending
+    ? 'Placing prizes...'
+    : setupChoicesClosed
+      ? 'Prizes placed'
+      : gameState.setup?.status === 'hands_drawn'
+        ? allPlayersHaveSetupActive
+          ? 'Place setup prizes'
+          : 'Choose both Active Pokémon first'
+        : 'Choose Active Pokémon first'
+
+  return (
+    <Panel title="Game flow" trailing={<StatusBadge tone={gameState.setup ? 'active' : 'neutral'}>{flowStatus}</StatusBadge>}>
+      <div className="space-y-4">
+        {commandError ? <InlineNotice tone="error" title={commandError.title}>{commandError.message}</InlineNotice> : null}
+
+        <section className="rounded-xl border border-stone-200 bg-white p-3">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-semibold text-stone-950">Table setup</h3>
+              <p className="mt-1 text-xs leading-5 text-stone-500">
+                Build the opening board from the viewer hand, then move into the first turn.
+              </p>
+            </div>
+            <StatusBadge tone={gameState.setup?.status === 'completed' ? 'active' : 'warning'}>
+              {formatEventType(setupStatus)}
+            </StatusBadge>
+          </div>
+
+          <div className="mt-3 space-y-2">
+            <ActionCommandButton disabled={!canStartSetup} onClick={onStartSetup} tone={gameState.setup ? 'secondary' : 'primary'}>
+              {startSetupPending ? 'Starting setup...' : gameState.setup ? 'Setup already started' : 'Start setup'}
+            </ActionCommandButton>
+
+            <ActionCommandButton disabled={!canDrawOpeningHand} onClick={onDrawOpeningHand} tone="primary">
+              {drawOpeningHandPending
+                ? 'Drawing opening hands...'
+                : gameState.setup?.status === 'waiting_to_draw'
+                  ? 'Draw opening hands'
+                  : gameState.setup
+                    ? 'Opening hands resolved'
+                    : 'Start setup first'}
+            </ActionCommandButton>
+          </div>
+
+          <div className="mt-3 rounded-xl border border-stone-200 bg-stone-50 p-3">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h4 className="text-xs font-semibold uppercase tracking-[0.14em] text-stone-500">Opening Active</h4>
+                <p className="mt-1 text-xs leading-5 text-stone-500">
+                  Choose {formatPlayerId(viewerPlayerId)}'s first Basic Pokémon.
+                </p>
+              </div>
+              <StatusBadge tone={viewerPlayer?.active ? 'active' : 'neutral'}>
+                {viewerPlayer?.active ? 'chosen' : 'pending'}
+              </StatusBadge>
+            </div>
+
+            {gameState.setup?.status === 'hands_drawn' && viewerPlayer && !viewerPlayer.active ? (
+              setupActiveCandidates.length > 0 ? (
+                <div className="mt-3 space-y-1.5">
+                  {setupActiveCandidates.map(card => {
+                    const isPending = chooseSetupActivePendingCardId === card.id
+
+                    return (
+                      <ActionCommandButton
+                        disabled={!canChooseSetupActive}
+                        key={card.id}
+                        onClick={() => onChooseSetupActive({ playerId: viewerPlayerId, cardInstanceId: card.id })}
+                        tone="primary"
+                      >
+                        {isPending ? `Choosing ${card.name}...` : `Choose ${card.name}`}
+                      </ActionCommandButton>
+                    )
+                  })}
+                </div>
+              ) : (
+                <p className="mt-3 rounded-lg border border-dashed border-stone-300 px-3 py-3 text-sm text-stone-500">
+                  No Basic Pokémon are visible in this viewer's hand.
+                </p>
+              )
+            ) : (
+              <p className="mt-3 rounded-lg border border-dashed border-stone-300 px-3 py-3 text-sm text-stone-500">
+                {openingActiveStatusMessage}
+              </p>
+            )}
+          </div>
+
+          <div className="mt-3 rounded-xl border border-stone-200 bg-stone-50 p-3">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h4 className="text-xs font-semibold uppercase tracking-[0.14em] text-stone-500">Opening Bench</h4>
+                <p className="mt-1 text-xs leading-5 text-stone-500">
+                  Add optional Basic Pokémon before Prizes are placed.
+                </p>
+              </div>
+              <StatusBadge tone={viewerPlayer?.bench.length ? 'active' : 'neutral'}>
+                {viewerPlayer?.bench.length ?? 0}/5
+              </StatusBadge>
+            </div>
+
+            {gameState.setup?.status === 'hands_drawn' && viewerPlayer && viewerPlayer.active ? (
+              viewerPlayer.bench.length >= 5 ? (
+                <p className="mt-3 rounded-lg border border-dashed border-stone-300 px-3 py-3 text-sm text-stone-500">
+                  This viewer's Bench is full.
+                </p>
+              ) : setupBenchCandidates.length > 0 ? (
+                <div className="mt-3 space-y-1.5">
+                  {setupBenchCandidates.map(card => {
+                    const isPending = chooseSetupBenchPendingCardId === card.id
+
+                    return (
+                      <ActionCommandButton
+                        disabled={!canChooseSetupBench}
+                        key={card.id}
+                        onClick={() => onChooseSetupBench({ playerId: viewerPlayerId, cardInstanceId: card.id })}
+                      >
+                        {isPending ? `Benching ${card.name}...` : `Bench ${card.name}`}
+                      </ActionCommandButton>
+                    )
+                  })}
+                </div>
+              ) : (
+                <p className="mt-3 rounded-lg border border-dashed border-stone-300 px-3 py-3 text-sm text-stone-500">
+                  No additional Basic Pokémon are visible in this viewer's hand.
+                </p>
+              )
+            ) : (
+              <p className="mt-3 rounded-lg border border-dashed border-stone-300 px-3 py-3 text-sm text-stone-500">
+                {openingBenchUnavailableMessage}
+              </p>
+            )}
+          </div>
+
+          <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
+            <ActionCommandButton disabled={!canPlacePrizes} onClick={onPlacePrizes} tone="primary">
+              {placePrizesButtonLabel}
+            </ActionCommandButton>
+
+            <ActionCommandButton disabled={!canCompleteSetup} onClick={onCompleteSetup} tone="primary">
+              {completeSetupPending
+                ? 'Completing setup...'
+                : gameState.setup?.status === 'prizes_placed'
+                  ? 'Complete setup'
+                  : gameState.setup?.status === 'completed'
+                    ? 'Setup completed'
+                    : 'Place prizes first'}
+            </ActionCommandButton>
+          </div>
+        </section>
+
+        <section className="rounded-xl border border-stone-200 bg-white p-3">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-semibold text-stone-950">Turn step</h3>
+              <p className="mt-1 text-xs leading-5 text-stone-500">
+                Start the turn, resolve draw-step timing, then open the action window.
+              </p>
+            </div>
+            <StatusBadge tone={gameState.currentTurn ? 'active' : 'neutral'}>{turnStatus}</StatusBadge>
+          </div>
+
+          <div className="mt-3 space-y-2">
+            <ActionCommandButton disabled={!canStartNextTurn} onClick={onStartNextTurn} tone="primary">
+              {startNextTurnPending
+                ? 'Starting turn...'
+                : gameState.currentTurn?.status === 'ended'
+                  ? 'Start next turn'
+                  : gameState.currentTurn
+                    ? `Turn ${gameState.currentTurn.turnNumber} in progress`
+                    : gameState.setup?.status === 'completed'
+                      ? 'Start first turn'
+                      : 'Complete setup first'}
+            </ActionCommandButton>
+
+            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
+              <ActionCommandButton
+                disabled={!canDrawForTurn}
+                onClick={() => {
+                  if (currentTurnActivePlayerId && isPlayerId(currentTurnActivePlayerId)) {
+                    onDrawForTurn({ playerId: currentTurnActivePlayerId })
+                  }
+                }}
+              >
+                {drawForTurnPending
+                  ? 'Drawing for turn...'
+                  : gameState.currentTurn?.status === 'start'
+                    ? `Draw for ${formatPlayerId(gameState.currentTurn.activePlayerId)}`
+                    : gameState.currentTurn?.status === 'drawn'
+                      ? 'Draw for turn resolved'
+                      : gameState.currentTurn
+                        ? 'Turn is not in draw step'
+                        : 'Start first turn first'}
+              </ActionCommandButton>
+
+              <ActionCommandButton
+                disabled={!canSkipDrawForTurn}
+                onClick={() => {
+                  if (currentTurnActivePlayerId && isPlayerId(currentTurnActivePlayerId)) {
+                    onSkipDrawForTurn({ playerId: currentTurnActivePlayerId })
+                  }
+                }}
+              >
+                {skipDrawForTurnPending
+                  ? 'Skipping draw...'
+                  : gameState.currentTurn?.status === 'start'
+                    ? `Skip draw for ${formatPlayerId(gameState.currentTurn.activePlayerId)}`
+                    : gameState.currentTurn?.status === 'action_window'
+                      ? 'Draw step skipped'
+                      : gameState.currentTurn
+                        ? 'Turn is not in draw step'
+                        : 'Start first turn first'}
+              </ActionCommandButton>
+            </div>
+
+            <ActionCommandButton disabled={!canOpenActionWindow} onClick={onOpenActionWindow} tone="primary">
+              {openActionWindowPending
+                ? 'Opening action window...'
+                : gameState.currentTurn?.status === 'drawn'
+                  ? 'Open action window'
+                  : gameState.currentTurn?.status === 'action_window'
+                    ? 'Action window open'
+                    : gameState.currentTurn
+                      ? 'Draw or skip draw first'
+                      : 'Start first turn first'}
+            </ActionCommandButton>
+          </div>
+        </section>
+      </div>
+    </Panel>
   )
 }
 
@@ -3196,8 +3279,8 @@ function ActionAffordancesPanel({
           ))
         ) : (
           <EmptyState title="No viewer action available">
-            Turn commands appear here for the active viewer. Prompts and forced replacement choices appear when the
-            engine asks this player to choose.
+            Hand, board, battle, and end-turn actions appear here for the active viewer. Prompts and forced replacement
+            choices appear when the engine asks this player to choose.
           </EmptyState>
         )}
       </div>
