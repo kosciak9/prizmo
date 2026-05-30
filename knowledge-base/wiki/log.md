@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-30] iteration 63 | Next-turn attack lock effect
+- Task attempted: continued the rejected authored attack-effect inventory and implemented the deterministic persisted `:attacker_cannot_attack_next_turn` slice for Latias ex `SSP-076` `Eon Blade` and Iron Leaves ex `TEF-025` `Prism Edge`, storing an expiring card marker and enforcing it at both attack declaration and viewer affordance generation.
+- Files changed: added `lib/prizmo/tcg_engine/attack_locks.ex`; updated `lib/prizmo/tcg_engine/attack_effects.ex`, `lib/prizmo/tcg_engine/attack_damage.ex`, `lib/prizmo/tcg_engine/card_instance.ex`, `lib/prizmo/tcg_engine/requirements.ex`, `lib/prizmo/tcg_engine/mechanics.ex`, `lib/prizmo/tcg_engine/game_view/action_affordances.ex`, this log, and the TCG engine playtest handoff.
+- Validation: initial compile caught a helper-name collision and the first rollback smoke caught duplicate Energy staging in the smoke; after fixes, `mix format && mix compile --warnings-as-errors` passed, `mix test test/prizmo/tcg_engine/mechanics_test.exs` passed (4 tests), Tidewave rollback smokes passed for `Eon Blade` appearing as executable, resolving with a blocked-turn marker, hiding/rejecting attack declaration on the attacker's next turn, and reappearing/declaring after that turn expired; `mix prizmo.cards.coverage` passed; `mix check --no-test` passed.
+- Remaining/blocking notes: no code blocker for Latias/Iron Leaves next-turn attack-lock semantics; additional rejected authored attack effects remain and should continue to be enabled one deterministic persisted effect at a time.
+
 ## [2026-05-30] iteration 62 | Raging Bolt discard-draw attack effect
 - Task attempted: continued the rejected authored attack-effect inventory and implemented the narrow persisted `:discard_hand_then_draw` slice for Raging Bolt ex `TEF-123` `Burst Roar`, preserving its no-damage attack while discarding the attacker's hand and drawing up to the authored six cards after resolution.
 - Files changed: updated `lib/prizmo/tcg_engine/attack_effects.ex`, `lib/prizmo/tcg_engine/attack_damage.ex`, this log, and the TCG engine playtest handoff.

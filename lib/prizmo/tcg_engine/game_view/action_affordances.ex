@@ -2,6 +2,7 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
   @moduledoc false
 
   alias Prizmo.TcgEngine.AttackCosts
+  alias Prizmo.TcgEngine.AttackLocks
   alias Prizmo.TcgEngine.CardCatalog
   alias Prizmo.TcgEngine.CardInstance
   alias Prizmo.TcgEngine.Cards.Registry, as: EngineCardRegistry
@@ -103,7 +104,7 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
       retreat_affordance(player, cards)
     ] ++
       evolve_from_hand_affordances(player, current_turn, cards) ++
-      declare_attack_affordances(player, cards, all_cards) ++
+      declare_attack_affordances(player, current_turn, cards, all_cards) ++
       [
         end_turn_affordance(player)
       ]
@@ -209,9 +210,15 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
     end
   end
 
-  defp declare_attack_affordances(%GamePlayer{} = player, cards, all_cards) do
+  defp declare_attack_affordances(
+         %GamePlayer{} = player,
+         %Turn{} = current_turn,
+         cards,
+         all_cards
+       ) do
     with %CardInstance{} = active_card <- active_pokemon_card(cards),
          false <- blocked_attack_status?(active_card),
+         false <- AttackLocks.blocked_this_turn?(active_card, current_turn),
          %CardInstance{} = defender_card <-
            opponent_active_pokemon_card(all_cards, player.player_id),
          {:ok, %{attacks: attacks}} <- CardCatalog.fetch(active_card.card_id) do

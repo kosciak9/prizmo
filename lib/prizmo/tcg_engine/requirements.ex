@@ -1,6 +1,7 @@
 defmodule Prizmo.TcgEngine.Requirements do
   @moduledoc false
 
+  alias Prizmo.TcgEngine.AttackLocks
   alias Prizmo.TcgEngine.CardInstance
   alias Prizmo.TcgEngine.Game
   alias Prizmo.TcgEngine.GamePlayer
@@ -134,6 +135,16 @@ defmodule Prizmo.TcgEngine.Requirements do
   end
 
   def require_can_attack(%CardInstance{}), do: :ok
+
+  def require_can_attack(%CardInstance{} = card, %Turn{} = turn) do
+    with :ok <- require_can_attack(card) do
+      if AttackLocks.blocked_this_turn?(card, turn) do
+        {:error, :attacker_cannot_attack_this_turn}
+      else
+        :ok
+      end
+    end
+  end
 
   def require_can_retreat(%CardInstance{status: status}) when status in [:asleep, :paralyzed] do
     {:error, {:cannot_retreat_while, status}}

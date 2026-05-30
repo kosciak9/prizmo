@@ -17,9 +17,11 @@ defmodule Prizmo.TcgEngine.AttackEffects do
   import Prizmo.TcgEngine.Requirements,
     only: [require_card_owned_by_player: 2, require_card_zone: 2]
 
+  alias Prizmo.TcgEngine.AttackLocks
   alias Prizmo.TcgEngine.BattleActions
   alias Prizmo.TcgEngine.CardInstance
   alias Prizmo.TcgEngine.PlayerStore
+  alias Prizmo.TcgEngine.TurnStore
 
   @supported_effect_types [
     :bonus_damage_per_benched_pokemon,
@@ -28,6 +30,7 @@ defmodule Prizmo.TcgEngine.AttackEffects do
     :bonus_damage_if_moved_from_bench_to_active_this_turn,
     :bonus_damage_per_energy_attached_to_both_active,
     :bonus_damage_per_energy_attached_to_defender,
+    :attacker_cannot_attack_next_turn,
     :damage_unaffected_by_effects_on_opponent_active,
     :damage_only_if_stadium_in_play,
     :discard_hand_then_draw,
@@ -77,6 +80,9 @@ defmodule Prizmo.TcgEngine.AttackEffects do
 
       %{type: :bonus_damage_per_energy_attached_to_defender} ->
         {:ok, %{}}
+
+      %{type: :attacker_cannot_attack_next_turn} ->
+        attacker_cannot_attack_next_turn(game_id, attacker_card)
 
       %{type: :damage_per_own_benched_pokemon} ->
         {:ok, %{}}
@@ -139,6 +145,19 @@ defmodule Prizmo.TcgEngine.AttackEffects do
          effect_type: "draw_after_attack",
          requested_draw_count: count,
          drawn_count: length(drawn_cards)
+       }}
+    end
+  end
+
+  defp attacker_cannot_attack_next_turn(game_id, %CardInstance{} = attacker_card) do
+    with {:ok, turn} <- TurnStore.current_turn(game_id),
+         markers = AttackLocks.put_cannot_attack_next_turn_marker(attacker_card, turn),
+         {:ok, _attacker_card} <- update(attacker_card, :set_markers, %{markers: markers}) do
+      {:ok,
+       %{
+         effect_type: "attacker_cannot_attack_next_turn",
+         cannot_attack_card_instance_id: attacker_card.id,
+         blocked_turn_number: turn.turn_number + 2
        }}
     end
   end

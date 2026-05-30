@@ -67,6 +67,7 @@ defmodule Prizmo.TcgEngine.CardInstance do
     define :lost_zone
     define :set_damage
     define :set_status
+    define :set_markers
     define :clear_status
     define :restore
   end
@@ -187,6 +188,10 @@ defmodule Prizmo.TcgEngine.CardInstance do
 
     update :set_status do
       accept [:status]
+    end
+
+    update :set_markers do
+      accept [:markers]
     end
 
     update :clear_status do
