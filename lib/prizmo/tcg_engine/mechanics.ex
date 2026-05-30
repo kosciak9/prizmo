@@ -1034,12 +1034,15 @@ defmodule Prizmo.TcgEngine.Mechanics do
            {:ok, damage_result} <-
              apply_attack_damage(game.id, attacking_player_id, target_card, damage),
            {:ok, event} <-
-             write_event(game, :resolve_attack_damage, attacking_player_id, %{
-               target_card_instance_id: target_card.id,
-               damage: damage,
-               resulting_damage: damage_result.resulting_damage,
-               knocked_out?: damage_result.knocked_out?
-             }),
+             write_event(
+               game,
+               :resolve_attack_damage,
+               attacking_player_id,
+               Map.merge(
+                 %{target_card_instance_id: target_card.id},
+                 attack_damage_payload(damage_result)
+               )
+             ),
            {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do
         resolve_knockout_after_attack_damage(
           game.id,
@@ -1145,17 +1148,13 @@ defmodule Prizmo.TcgEngine.Mechanics do
                game,
                :resolve_declared_attack,
                player_id,
-               Map.merge(
-                 %{
-                   turn_id: turn.id,
-                   attack_id: Atom.to_string(turn.pending_attack_id),
-                   defender_card_instance_id: defender_card.id,
-                   damage: damage_result.damage,
-                   resulting_damage: damage_result.resulting_damage,
-                   knocked_out?: damage_result.knocked_out?
-                 },
-                 effect_payload
-               )
+               %{
+                 turn_id: turn.id,
+                 attack_id: Atom.to_string(turn.pending_attack_id),
+                 defender_card_instance_id: defender_card.id
+               }
+               |> Map.merge(attack_damage_payload(damage_result))
+               |> Map.merge(effect_payload)
              ),
            {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do
         with {:ok, game} <-
@@ -1424,6 +1423,40 @@ defmodule Prizmo.TcgEngine.Mechanics do
       {:error, reason} -> {:error, reason}
     end
   end
+
+  defp attack_damage_payload(damage_result) do
+    %{
+      damage: damage_result.damage,
+      resulting_damage: damage_result.resulting_damage,
+      knocked_out?: damage_result.knocked_out?
+    }
+    |> maybe_put(:damage_prevented?, Map.get(damage_result, :damage_prevented?))
+    |> maybe_put(:prevented_damage, Map.get(damage_result, :prevented_damage))
+    |> maybe_put(
+      :attack_prevention_source_card_id,
+      Map.get(damage_result, :attack_prevention_source_card_id)
+    )
+    |> maybe_put(
+      :attack_prevention_source_attack_id,
+      Map.get(damage_result, :attack_prevention_source_attack_id)
+    )
+    |> maybe_put(
+      :attack_prevention_source_player_id,
+      Map.get(damage_result, :attack_prevention_source_player_id)
+    )
+    |> maybe_put(
+      :attack_prevention_source_turn_number,
+      Map.get(damage_result, :attack_prevention_source_turn_number)
+    )
+    |> maybe_put(
+      :attack_prevention_blocked_turn_number,
+      Map.get(damage_result, :attack_prevention_blocked_turn_number)
+    )
+    |> maybe_put(:protected_card_instance_id, Map.get(damage_result, :protected_card_instance_id))
+  end
+
+  defp maybe_put(map, _key, nil), do: map
+  defp maybe_put(map, key, value), do: Map.put(map, key, value)
 
   @spec draw_for_turn(Game.t() | String.t(), String.t()) :: {:ok, Game.t()} | {:error, term()}
   def draw_for_turn(game_or_id, player_id) when is_binary(player_id) do

@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-30] iteration 75 | Dig attack prevention
+- Task attempted: continued the rejected authored attack-effect inventory and implemented Dunsparce `TEF-128` `Dig`, using a command-provided deterministic coin result so heads marks the attacker to prevent opponent attack damage/effects during the opponent's next turn.
+- Files changed: added `lib/prizmo/tcg_engine/attack_prevention.ex`; updated `lib/prizmo/tcg_engine/attack_effects.ex`, `lib/prizmo/tcg_engine/attack_damage.ex`, `lib/prizmo/tcg_engine/battle_actions.ex`, `lib/prizmo/tcg_engine/game_view.ex`, `lib/prizmo/tcg_engine/mechanics.ex`, `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.
+- Validation: `mix format` passed; `mix compile --warnings-as-errors` passed; Tidewave helper checks passed for missing/invalid/heads/tails `coin_result` on `Dig` damage calculation; Tidewave rollback smoke passed for `TEF-128` `Dig` fetching as executable, resolving heads with a prevention marker, and preventing both damage and `Mind Bend` Confused status from opponent `TWM-095` `Mind Bend` on the next turn; `mix ash_typescript.codegen --check && mix assets.build && mix test test/prizmo/tcg_engine/mechanics_test.exs && mix prizmo.cards.coverage` passed; `mix check --no-test` passed.
+- Remaining/blocking notes: no code blocker for `Dig`'s command-provided heads prevention path. Remaining unsupported authored attack effects still include `TWM-044` `Whirlpool` coin-gated Energy discard and `DRI-087` `Gemstone Mimicry` copy-attack semantics.
+
 ## [2026-05-30] iteration 74 | Rapid-Fire Combo heads-count bonus damage
 - Task attempted: continued the rejected authored attack-effect inventory and implemented Mega Kangaskhan ex `MEG-104` `Rapid-Fire Combo`, using a command-provided deterministic non-negative heads count so each heads adds the authored 50 bonus damage.
 - Files changed: updated `lib/prizmo/tcg_engine/attack_effects.ex`, `lib/prizmo/tcg_engine/attack_damage.ex`, `lib/prizmo/tcg_engine/game/action_commands.ex`, `lib/prizmo/tcg_engine/game_view.ex`, `lib/prizmo/tcg_engine/game_view/fields.ex`, `lib/prizmo_web/spa/features/home/routes/index.tsx`, generated `lib/prizmo_web/spa/lib/ash/generated/ash_rpc.ts`, this log, and the TCG engine playtest handoff.

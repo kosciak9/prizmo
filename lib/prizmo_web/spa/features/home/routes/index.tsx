@@ -2454,7 +2454,8 @@ function AttackProgressPanel({
             <div className="space-y-1">
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-yellow-900">Coin result</p>
               <p className="text-xs leading-5 text-yellow-900/80">
-                This attack needs a deterministic coin result before the persisted engine can resolve its bonus damage.
+                This attack needs a deterministic coin result before the persisted engine can resolve its coin-gated
+                damage or effect.
               </p>
             </div>
 
@@ -2482,7 +2483,7 @@ function AttackProgressPanel({
                     <span className="min-w-0">
                       <span className="block font-medium">{result === 'heads' ? 'Heads' : 'Tails'}</span>
                       <span className="mt-0.5 block text-[0.68rem] opacity-70">
-                        {result === 'heads' ? 'Apply the authored bonus damage.' : 'Resolve without bonus damage.'}
+                        {result === 'heads' ? 'Apply the authored heads result.' : 'Resolve without the heads result.'}
                       </span>
                     </span>
                   </label>

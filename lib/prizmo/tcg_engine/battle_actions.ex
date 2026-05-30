@@ -5,9 +5,11 @@ defmodule Prizmo.TcgEngine.BattleActions do
   import Prizmo.TcgEngine.Operation, only: [update: 3]
   import Prizmo.TcgEngine.Requirements, only: [require_attached_to: 2, require_card_zone: 2]
 
+  alias Prizmo.TcgEngine.AttackPrevention
   alias Prizmo.TcgEngine.CardCatalog
   alias Prizmo.TcgEngine.CardInstance
   alias Prizmo.TcgEngine.CardStore
+  alias Prizmo.TcgEngine.TurnStore
 
   def attached_energy_cards_for_retreat(game_id, active_card_id, energy_card_instance_ids) do
     energy_card_instance_ids
@@ -65,17 +67,47 @@ defmodule Prizmo.TcgEngine.BattleActions do
   def apply_attack_damage(game_id, attacking_player_id, target_card, damage) do
     damage = damage || 0
 
-    with {:ok, target_hp} <- pokemon_hp(target_card.card_id),
-         new_damage = target_card.damage + damage,
-         {:ok, _target_card} <- update(target_card, :set_damage, %{damage: new_damage}),
-         {:ok, knocked_out?} <-
-           maybe_knock_out(game_id, attacking_player_id, target_card, new_damage, target_hp) do
+    case prevented_attack_damage_result(game_id, attacking_player_id, target_card, damage) do
+      {:ok, damage_result} ->
+        {:ok, damage_result}
+
+      :not_prevented ->
+        with {:ok, target_hp} <- pokemon_hp(target_card.card_id),
+             new_damage = target_card.damage + damage,
+             {:ok, _target_card} <- update(target_card, :set_damage, %{damage: new_damage}),
+             {:ok, knocked_out?} <-
+               maybe_knock_out(game_id, attacking_player_id, target_card, new_damage, target_hp) do
+          {:ok,
+           %{
+             damage: damage,
+             resulting_damage: new_damage,
+             knocked_out?: knocked_out?
+           }}
+        end
+    end
+  end
+
+  defp prevented_attack_damage_result(game_id, attacking_player_id, target_card, damage) do
+    with {:ok, turn} <- TurnStore.current_turn(game_id),
+         true <-
+           AttackPrevention.damage_and_effects_prevented_this_turn?(
+             target_card,
+             turn,
+             attacking_player_id
+           ) do
       {:ok,
-       %{
-         damage: damage,
-         resulting_damage: new_damage,
-         knocked_out?: knocked_out?
-       }}
+       Map.merge(
+         %{
+           damage: 0,
+           prevented_damage: damage,
+           resulting_damage: target_card.damage,
+           knocked_out?: false,
+           damage_prevented?: true
+         },
+         AttackPrevention.prevention_payload(target_card, turn)
+       )}
+    else
+      _not_prevented -> :not_prevented
     end
   end
 

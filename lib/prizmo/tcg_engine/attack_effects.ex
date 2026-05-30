@@ -42,6 +42,7 @@ defmodule Prizmo.TcgEngine.AttackEffects do
     ]
 
   alias Prizmo.TcgEngine.AttackLocks
+  alias Prizmo.TcgEngine.AttackPrevention
   alias Prizmo.TcgEngine.BattleActions
   alias Prizmo.TcgEngine.CardInstance
   alias Prizmo.TcgEngine.EventPayloads
@@ -77,6 +78,7 @@ defmodule Prizmo.TcgEngine.AttackEffects do
     :recover_trainer_from_discard_to_hand,
     :return_attached_energy_to_hand,
     :opponent_bench_damage_counters,
+    :prevent_damage_and_effects_from_attacks_next_turn_on_coin_heads,
     :search_pokemon_to_hand,
     :self_damage,
     :shuffle_attached_energy_into_deck_then_damage_opponent_bench,
@@ -152,6 +154,9 @@ defmodule Prizmo.TcgEngine.AttackEffects do
       when is_integer(bonus_damage) and bonus_damage >= 0 ->
         coin_heads_count_bonus_damage_payload(opts, bonus_damage)
 
+      %{type: :prevent_damage_and_effects_from_attacks_next_turn_on_coin_heads} ->
+        prevent_damage_and_effects_next_turn_on_coin_heads(game_id, attacker_card, opts)
+
       %{type: :bonus_damage_if_attacker_has_team_rocket_energy} ->
         {:ok, %{}}
 
@@ -171,10 +176,10 @@ defmodule Prizmo.TcgEngine.AttackEffects do
         attacker_cannot_attack_next_turn(game_id, attacker_card)
 
       %{type: :confuse_defender_active} ->
-        set_defender_status(game_id, defender_card, :confused)
+        set_defender_status(game_id, player_id, defender_card, :confused)
 
       %{type: :defending_pokemon_cannot_retreat_next_turn} ->
-        defender_cannot_retreat_next_turn(game_id, defender_card)
+        defender_cannot_retreat_next_turn(game_id, player_id, defender_card)
 
       %{type: :damage_per_own_benched_pokemon} ->
         {:ok, %{}}
@@ -627,6 +632,43 @@ defmodule Prizmo.TcgEngine.AttackEffects do
     end
   end
 
+  defp prevent_damage_and_effects_next_turn_on_coin_heads(
+         game_id,
+         %CardInstance{} = attacker_card,
+         opts
+       ) do
+    with {:ok, result} <- coin_result(opts) do
+      case result do
+        :heads ->
+          put_attack_prevention_marker(game_id, attacker_card, result)
+
+        :tails ->
+          {:ok,
+           %{
+             effect_type: "prevent_damage_and_effects_from_attacks_next_turn_on_coin_heads",
+             coin_result: Atom.to_string(result),
+             protection_applied?: false,
+             protected_card_instance_id: attacker_card.id
+           }}
+      end
+    end
+  end
+
+  defp put_attack_prevention_marker(game_id, %CardInstance{} = attacker_card, result) do
+    with {:ok, turn} <- TurnStore.current_turn(game_id),
+         markers = AttackPrevention.put_damage_and_effects_next_turn_marker(attacker_card, turn),
+         {:ok, _attacker_card} <- update(attacker_card, :set_markers, %{markers: markers}) do
+      {:ok,
+       %{
+         effect_type: "prevent_damage_and_effects_from_attacks_next_turn_on_coin_heads",
+         coin_result: Atom.to_string(result),
+         protection_applied?: true,
+         protected_card_instance_id: attacker_card.id,
+         protection_blocked_turn_number: turn.turn_number + 1
+       }}
+    end
+  end
+
   defp attacker_cannot_attack_next_turn(game_id, %CardInstance{} = attacker_card) do
     with {:ok, turn} <- TurnStore.current_turn(game_id),
          markers = AttackLocks.put_cannot_attack_next_turn_marker(attacker_card, turn),
@@ -640,61 +682,115 @@ defmodule Prizmo.TcgEngine.AttackEffects do
     end
   end
 
-  defp set_defender_status(game_id, %CardInstance{} = defender_card, status) do
+  defp set_defender_status(game_id, attacking_player_id, %CardInstance{} = defender_card, status) do
     with {:ok, current_defender_card} <- get_card(game_id, defender_card.id) do
-      case current_defender_card.zone do
-        :active ->
-          with {:ok, _defender_card} <-
-                 update(current_defender_card, :set_status, %{status: status}) do
-            {:ok,
+      case attack_effect_prevention_payload(game_id, attacking_player_id, current_defender_card) do
+        {:prevented, prevention_payload} ->
+          {:ok,
+           Map.merge(
              %{
                effect_type: "confuse_defender_active",
                defender_status: Atom.to_string(status),
-               defender_status_applied?: true,
-               defender_status_card_instance_id: current_defender_card.id
-             }}
-          end
+               defender_status_applied?: false,
+               defender_status_card_instance_id: current_defender_card.id,
+               attack_effect_prevented?: true
+             },
+             prevention_payload
+           )}
 
-        _other_zone ->
-          {:ok,
-           %{
-             effect_type: "confuse_defender_active",
-             defender_status: Atom.to_string(status),
-             defender_status_applied?: false,
-             defender_status_card_instance_id: defender_card.id
-           }}
+        :not_prevented ->
+          case current_defender_card.zone do
+            :active ->
+              with {:ok, _defender_card} <-
+                     update(current_defender_card, :set_status, %{status: status}) do
+                {:ok,
+                 %{
+                   effect_type: "confuse_defender_active",
+                   defender_status: Atom.to_string(status),
+                   defender_status_applied?: true,
+                   defender_status_card_instance_id: current_defender_card.id
+                 }}
+              end
+
+            _other_zone ->
+              {:ok,
+               %{
+                 effect_type: "confuse_defender_active",
+                 defender_status: Atom.to_string(status),
+                 defender_status_applied?: false,
+                 defender_status_card_instance_id: defender_card.id
+               }}
+          end
       end
     end
   end
 
-  defp defender_cannot_retreat_next_turn(game_id, %CardInstance{} = defender_card) do
+  defp defender_cannot_retreat_next_turn(
+         game_id,
+         attacking_player_id,
+         %CardInstance{} = defender_card
+       ) do
     with {:ok, turn} <- TurnStore.current_turn(game_id),
          {:ok, current_defender_card} <- get_card(game_id, defender_card.id) do
-      case current_defender_card.zone do
-        :active ->
-          markers =
-            RetreatLocks.put_cannot_retreat_next_turn_marker(current_defender_card, turn)
-
-          with {:ok, _defender_card} <-
-                 update(current_defender_card, :set_markers, %{markers: markers}) do
-            {:ok,
+      case attack_effect_prevention_payload(game_id, attacking_player_id, current_defender_card) do
+        {:prevented, prevention_payload} ->
+          {:ok,
+           Map.merge(
              %{
                effect_type: "defending_pokemon_cannot_retreat_next_turn",
                cannot_retreat_card_instance_id: current_defender_card.id,
                retreat_blocked_turn_number: turn.turn_number + 1,
-               retreat_lock_applied?: true
-             }}
-          end
+               retreat_lock_applied?: false,
+               attack_effect_prevented?: true
+             },
+             prevention_payload
+           )}
 
-        _other_zone ->
-          {:ok,
-           %{
-             effect_type: "defending_pokemon_cannot_retreat_next_turn",
-             cannot_retreat_card_instance_id: defender_card.id,
-             retreat_blocked_turn_number: turn.turn_number + 1,
-             retreat_lock_applied?: false
-           }}
+        :not_prevented ->
+          case current_defender_card.zone do
+            :active ->
+              markers =
+                RetreatLocks.put_cannot_retreat_next_turn_marker(current_defender_card, turn)
+
+              with {:ok, _defender_card} <-
+                     update(current_defender_card, :set_markers, %{markers: markers}) do
+                {:ok,
+                 %{
+                   effect_type: "defending_pokemon_cannot_retreat_next_turn",
+                   cannot_retreat_card_instance_id: current_defender_card.id,
+                   retreat_blocked_turn_number: turn.turn_number + 1,
+                   retreat_lock_applied?: true
+                 }}
+              end
+
+            _other_zone ->
+              {:ok,
+               %{
+                 effect_type: "defending_pokemon_cannot_retreat_next_turn",
+                 cannot_retreat_card_instance_id: defender_card.id,
+                 retreat_blocked_turn_number: turn.turn_number + 1,
+                 retreat_lock_applied?: false
+               }}
+          end
       end
+    end
+  end
+
+  defp attack_effect_prevention_payload(
+         game_id,
+         attacking_player_id,
+         %CardInstance{} = target_card
+       ) do
+    with {:ok, turn} <- TurnStore.current_turn(game_id),
+         true <-
+           AttackPrevention.damage_and_effects_prevented_this_turn?(
+             target_card,
+             turn,
+             attacking_player_id
+           ) do
+      {:prevented, AttackPrevention.prevention_payload(target_card, turn)}
+    else
+      _not_prevented -> :not_prevented
     end
   end
 
@@ -821,7 +917,12 @@ defmodule Prizmo.TcgEngine.AttackEffects do
            ),
          {:ok, bench_target} <- bench_damage_target_card(game_id, player_id, opts),
          {:ok, damage_result} <-
-           apply_bench_attack_damage_without_knockout(bench_target, bench_damage),
+           apply_bench_attack_damage_without_knockout(
+             game_id,
+             player_id,
+             bench_target,
+             bench_damage
+           ),
          {:ok, shuffled_energy_cards} <-
            shuffle_attached_cards_into_deck(game_id, player_id, energy_cards) do
       {:ok,
@@ -846,7 +947,12 @@ defmodule Prizmo.TcgEngine.AttackEffects do
          :ok <- require_bench_counter_allocation_targets(allocations, opponent_bench_cards),
          :ok <- require_bench_counter_total(allocations, opponent_bench_cards, total_counters),
          {:ok, damage_results} <-
-           apply_bench_damage_counter_allocations(allocations, opponent_bench_cards) do
+           apply_bench_damage_counter_allocations(
+             game_id,
+             player_id,
+             allocations,
+             opponent_bench_cards
+           ) do
       {:ok,
        %{
          effect_type: "opponent_bench_damage_counters",
@@ -941,9 +1047,15 @@ defmodule Prizmo.TcgEngine.AttackEffects do
     Enum.reduce(allocations, 0, fn {_card_instance_id, counters}, total -> total + counters end)
   end
 
-  defp apply_bench_damage_counter_allocations([], _opponent_bench_cards), do: {:ok, []}
+  defp apply_bench_damage_counter_allocations(_game_id, _player_id, [], _opponent_bench_cards),
+    do: {:ok, []}
 
-  defp apply_bench_damage_counter_allocations(allocations, opponent_bench_cards) do
+  defp apply_bench_damage_counter_allocations(
+         game_id,
+         player_id,
+         allocations,
+         opponent_bench_cards
+       ) do
     opponent_bench_cards_by_id = Map.new(opponent_bench_cards, &{&1.id, &1})
 
     allocations
@@ -951,14 +1063,16 @@ defmodule Prizmo.TcgEngine.AttackEffects do
       bench_card = Map.fetch!(opponent_bench_cards_by_id, card_instance_id)
       damage = counters * 10
 
-      with {:ok, damage_result} <- apply_bench_attack_damage_without_knockout(bench_card, damage) do
+      with {:ok, damage_result} <-
+             apply_bench_attack_damage_without_knockout(game_id, player_id, bench_card, damage) do
         {:ok,
          %{
            card_instance_id: bench_card.id,
            counters: counters,
            damage: damage_result.damage,
            resulting_damage: damage_result.resulting_damage,
-           knocked_out?: damage_result.knocked_out?
+           knocked_out?: damage_result.knocked_out?,
+           damage_prevented?: Map.get(damage_result, :damage_prevented?, false)
          }}
       end
     end)
@@ -1081,17 +1195,52 @@ defmodule Prizmo.TcgEngine.AttackEffects do
     end
   end
 
-  defp apply_bench_attack_damage_without_knockout(%CardInstance{} = bench_target, damage) do
-    with {:ok, target_hp} <- pokemon_hp(bench_target.card_id),
-         new_damage = bench_target.damage + damage,
-         :ok <- require_bench_damage_does_not_knock_out(new_damage, target_hp),
-         {:ok, _bench_target} <- update(bench_target, :set_damage, %{damage: new_damage}) do
+  defp apply_bench_attack_damage_without_knockout(
+         game_id,
+         attacking_player_id,
+         %CardInstance{} = bench_target,
+         damage
+       ) do
+    case prevented_bench_attack_damage_result(game_id, attacking_player_id, bench_target, damage) do
+      {:ok, damage_result} ->
+        {:ok, damage_result}
+
+      :not_prevented ->
+        with {:ok, target_hp} <- pokemon_hp(bench_target.card_id),
+             new_damage = bench_target.damage + damage,
+             :ok <- require_bench_damage_does_not_knock_out(new_damage, target_hp),
+             {:ok, _bench_target} <- update(bench_target, :set_damage, %{damage: new_damage}) do
+          {:ok,
+           %{
+             damage: damage,
+             resulting_damage: new_damage,
+             knocked_out?: false
+           }}
+        end
+    end
+  end
+
+  defp prevented_bench_attack_damage_result(game_id, attacking_player_id, bench_target, damage) do
+    with {:ok, turn} <- TurnStore.current_turn(game_id),
+         true <-
+           AttackPrevention.damage_and_effects_prevented_this_turn?(
+             bench_target,
+             turn,
+             attacking_player_id
+           ) do
       {:ok,
-       %{
-         damage: damage,
-         resulting_damage: new_damage,
-         knocked_out?: false
-       }}
+       Map.merge(
+         %{
+           damage: 0,
+           prevented_damage: damage,
+           resulting_damage: bench_target.damage,
+           knocked_out?: false,
+           damage_prevented?: true
+         },
+         AttackPrevention.prevention_payload(bench_target, turn)
+       )}
+    else
+      _not_prevented -> :not_prevented
     end
   end
 

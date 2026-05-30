@@ -133,7 +133,10 @@ defmodule Prizmo.TcgEngine.GameView do
       pending_attack_requires_bench_damage_counters:
         pending_attack_effect_type == :opponent_bench_damage_counters,
       pending_attack_requires_coin_result:
-        pending_attack_effect_type == :bonus_damage_on_coin_heads,
+        pending_attack_effect_type in [
+          :bonus_damage_on_coin_heads,
+          :prevent_damage_and_effects_from_attacks_next_turn_on_coin_heads
+        ],
       pending_attack_requires_heads_count:
         pending_attack_effect_type == :bonus_damage_per_coin_heads_count,
       pending_attacker_card_instance_id: turn.pending_attacker_card_instance_id,
