@@ -1,6 +1,7 @@
 defmodule Prizmo.TcgEngine.GameView do
   @moduledoc false
 
+  alias Prizmo.TcgEngine.AttackEffects
   alias Prizmo.TcgEngine.CardCatalog
   alias Prizmo.TcgEngine.CardInstance
   alias Prizmo.TcgEngine.CardStore
@@ -40,7 +41,7 @@ defmodule Prizmo.TcgEngine.GameView do
          cursor_index: game.cursor_index,
          latest_event_index: game.latest_event_index,
          setup: setup_view(setup),
-         current_turn: turn_view(current_turn),
+         current_turn: turn_view(current_turn, cards),
          action_affordances:
            ActionAffordances.for_viewer(
              game,
@@ -101,9 +102,11 @@ defmodule Prizmo.TcgEngine.GameView do
     }
   end
 
-  defp turn_view(nil), do: nil
+  defp turn_view(nil, _cards), do: nil
 
-  defp turn_view(%Turn{} = turn) do
+  defp turn_view(%Turn{} = turn, cards) do
+    pending_attack_effect_type = pending_attack_effect_type(turn, cards)
+
     %{
       id: turn.id,
       turn_number: turn.turn_number,
@@ -111,10 +114,29 @@ defmodule Prizmo.TcgEngine.GameView do
       status: stringify(turn.status),
       visible: turn.visible?,
       pending_attack_id: stringify(turn.pending_attack_id),
+      pending_attack_effect_type: stringify(pending_attack_effect_type),
+      pending_attack_requires_switch_target:
+        pending_attack_effect_type == :switch_self_with_bench,
       pending_attacker_card_instance_id: turn.pending_attacker_card_instance_id,
       pending_defender_card_instance_id: turn.pending_defender_card_instance_id
     }
   end
+
+  defp pending_attack_effect_type(
+         %Turn{pending_attack_id: attack_id, pending_attacker_card_instance_id: attacker_id},
+         cards
+       )
+       when not is_nil(attack_id) and not is_nil(attacker_id) do
+    with %CardInstance{} = attacker_card <- Enum.find(cards, &(&1.id == attacker_id)),
+         {:ok, %{effect: effect}} when is_map(effect) <-
+           CardCatalog.fetch_attack(attacker_card.card_id, attack_id) do
+      AttackEffects.type(effect)
+    else
+      _other -> nil
+    end
+  end
+
+  defp pending_attack_effect_type(%Turn{}, _cards), do: nil
 
   defp stadium_view(cards, attached_cards_by_target) do
     cards

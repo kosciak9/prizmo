@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-30] iteration 43 | Switch attack target chooser
+- Task attempted: added an engine-backed read-model hint and minimal React attack-resolution chooser so switch-self attacks such as `Run Around` / `Trading Places` can pass an explicit `switchBenchCardInstanceId` from the browser when multiple Bench targets are visible.
+- Files changed: updated `lib/prizmo/tcg_engine/game_view.ex`, `lib/prizmo/tcg_engine/game_view/fields.ex`, `lib/prizmo_web/spa/features/home/routes/index.tsx`, generated `lib/prizmo_web/spa/lib/ash/generated/ash_rpc.ts`, this log, and the TCG engine playtest handoff.
+- Validation: initial `mix ash_typescript.codegen --check` reported pending codegen, then `mix ash_typescript.codegen` regenerated RPC field types and the rerun passed; `mix assets.build` passed; `mix test test/prizmo/tcg_engine/mechanics_test.exs` passed (4 tests); initial Tidewave rollback smoke exposed an invalid direct `created` → `in_progress` staging shortcut, then corrected smoke passed by verifying `pending_attack_effect_type: "switch_self_with_bench"`, `pending_attack_requires_switch_target: true`, two visible Bench choices, and explicit target resolution switching the selected Bench Pokémon Active; `mix check --no-test` passed; `git diff --check` passed.
+- Remaining/blocking notes: no code blocker for multi-Bench switch-self browser resolution; the manual-tester milestone still needs guaranteed separate browser contexts, and broader attack playtesting still lacks KO/prize/replacement Active handling.
+
 ## [2026-05-30] iteration 42 | Switch-self attack effect
 - Task attempted: implemented the persisted `:switch_self_with_bench` attack effect so authored Buneary `Run Around` and Dunsparce `Trading Places` attacks are executable instead of catalog-rejected, with optional RPC target input for callers that need to choose among multiple Benched Pokémon.
 - Files changed: updated `lib/prizmo/tcg_engine/attack_effects.ex`, `lib/prizmo/tcg_engine/attack_damage.ex`, `lib/prizmo/tcg_engine/mechanics.ex`, `lib/prizmo/tcg_engine/game/action_commands.ex`, generated `lib/prizmo_web/spa/lib/ash/generated/ash_rpc.ts`, this log, and the TCG engine playtest handoff.

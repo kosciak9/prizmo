@@ -115,6 +115,8 @@ const GAME_STATE_FIELDS = [
       'status',
       'visible',
       'pendingAttackId',
+      'pendingAttackEffectType',
+      'pendingAttackRequiresSwitchTarget',
       'pendingAttackerCardInstanceId',
       'pendingDefenderCardInstanceId'
     ]
@@ -298,10 +300,12 @@ type DeclareAttackCommand = {
 type ResolveDeclaredAttackInput = {
   gameId: string
   playerId: PlayerId
+  switchBenchCardInstanceId?: string | null
 }
 
 type ResolveDeclaredAttackCommand = {
   playerId: string
+  switchBenchCardInstanceId?: string | null
 }
 
 type FinishAttackInput = {
@@ -343,6 +347,8 @@ type GameState = {
     status: string
     visible: boolean
     pendingAttackId: string | null
+    pendingAttackEffectType: string | null
+    pendingAttackRequiresSwitchTarget: boolean
     pendingAttackerCardInstanceId: string | null
     pendingDefenderCardInstanceId: string | null
   } | null
@@ -1243,11 +1249,12 @@ export function HomeRoute() {
                     })
                   }
                 }}
-                onResolveDeclaredAttack={({ playerId }) => {
+                onResolveDeclaredAttack={({ playerId, switchBenchCardInstanceId }) => {
                   if (isPlayerId(playerId)) {
                     resolveDeclaredAttackMutation.mutate({
                       gameId: normalisedGameId,
-                      playerId
+                      playerId,
+                      switchBenchCardInstanceId
                     })
                   }
                 }}
@@ -1954,7 +1961,17 @@ function AttackProgressPanel({
   resolveDeclaredAttackPendingPlayerId: string | null
   viewerPlayerId: PlayerId
 }) {
+  const [selectedSwitchBenchCardInstanceId, setSelectedSwitchBenchCardInstanceId] = useState('')
   const turn = gameState.currentTurn
+  const activePlayer = turn ? gameState.players.find(player => player.playerId === turn.activePlayerId) : undefined
+  const switchTargetOptions = turn?.pendingAttackRequiresSwitchTarget ? (activePlayer?.bench ?? []) : []
+  const selectedSwitchTargetIsValid = switchTargetOptions.some(card => card.id === selectedSwitchBenchCardInstanceId)
+
+  useEffect(() => {
+    if (selectedSwitchBenchCardInstanceId && !selectedSwitchTargetIsValid) {
+      setSelectedSwitchBenchCardInstanceId('')
+    }
+  }, [selectedSwitchBenchCardInstanceId, selectedSwitchTargetIsValid])
 
   if (!turn || (turn.status !== 'attack_declared' && turn.status !== 'attack_resolving')) {
     return null
@@ -1965,6 +1982,14 @@ function AttackProgressPanel({
   const attackLabel = turn.pendingAttackId ? formatEventType(turn.pendingAttackId) : 'declared attack'
   const viewerCanAdvanceAttack = viewerPlayerId === turn.activePlayerId && isPlayerId(turn.activePlayerId)
   const commandPending = Boolean(resolveDeclaredAttackPendingPlayerId || finishAttackPendingPlayerId)
+  const switchTargetRequired = turn.pendingAttackRequiresSwitchTarget && switchTargetOptions.length > 1
+  const resolveDisabled =
+    !viewerCanAdvanceAttack || commandPending || (switchTargetRequired && !selectedSwitchTargetIsValid)
+  const resolveButtonLabel = resolveDeclaredAttackPendingPlayerId === turn.activePlayerId
+    ? `Resolving ${attackLabel}...`
+    : switchTargetRequired && !selectedSwitchTargetIsValid
+      ? `Choose a switch target for ${attackLabel}`
+      : `Resolve ${attackLabel}`
 
   return (
     <Panel title="Attack resolution" trailing={<StatusBadge tone="warning">{turn.status}</StatusBadge>}>
@@ -1981,6 +2006,58 @@ function AttackProgressPanel({
           attack and ends the turn after resolution.
         </p>
 
+        {turn.pendingAttackRequiresSwitchTarget ? (
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-3">
+            <div className="space-y-1">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-900">Switch target</p>
+              <p className="text-xs leading-5 text-emerald-900/80">
+                This attack switches the attacking Active Pokémon with one of {formatPlayerId(turn.activePlayerId)}'s
+                Benched Pokémon after damage.
+              </p>
+            </div>
+
+            {switchTargetOptions.length > 1 ? (
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                {switchTargetOptions.map(card => {
+                  const selected = card.id === selectedSwitchBenchCardInstanceId
+
+                  return (
+                    <label
+                      className={`flex cursor-pointer items-start gap-2 rounded-lg border px-3 py-2 text-xs transition ${
+                        selected
+                          ? 'border-emerald-700 bg-emerald-100 text-emerald-950'
+                          : 'border-emerald-200 bg-stone-50 text-stone-700 hover:border-emerald-400'
+                      }`}
+                      key={card.id}
+                    >
+                      <input
+                        checked={selected}
+                        className="mt-0.5"
+                        disabled={!viewerCanAdvanceAttack || commandPending}
+                        name="switch-bench-card-instance-id"
+                        onChange={() => setSelectedSwitchBenchCardInstanceId(card.id)}
+                        type="radio"
+                      />
+                      <span className="min-w-0">
+                        <span className="block font-medium">{card.name}</span>
+                        <span className="mt-0.5 block font-mono text-[0.68rem] opacity-70">{card.cardId}</span>
+                      </span>
+                    </label>
+                  )
+                })}
+              </div>
+            ) : switchTargetOptions.length === 1 ? (
+              <p className="mt-3 rounded-lg border border-emerald-200 bg-stone-50 px-3 py-2 text-xs text-emerald-900">
+                Only {switchTargetOptions[0]?.name} is Benched, so resolution will switch with it automatically.
+              </p>
+            ) : (
+              <p className="mt-3 rounded-lg border border-emerald-200 bg-stone-50 px-3 py-2 text-xs text-emerald-900">
+                No Benched Pokémon are available, so resolution will apply the attack without switching.
+              </p>
+            )}
+          </div>
+        ) : null}
+
         {!viewerCanAdvanceAttack ? (
           <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
             Switch this tab to {formatPlayerId(turn.activePlayerId)} to advance the attack.
@@ -1990,13 +2067,16 @@ function AttackProgressPanel({
         {turn.status === 'attack_declared' ? (
           <button
             className="w-full rounded-xl border border-emerald-700 px-3 py-2 text-left text-sm font-semibold text-emerald-800 transition hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:border-stone-300 disabled:text-stone-400 disabled:hover:bg-transparent"
-            disabled={!viewerCanAdvanceAttack || commandPending}
-            onClick={() => onResolveDeclaredAttack({ playerId: turn.activePlayerId })}
+            disabled={resolveDisabled}
+            onClick={() =>
+              onResolveDeclaredAttack({
+                playerId: turn.activePlayerId,
+                switchBenchCardInstanceId: selectedSwitchTargetIsValid ? selectedSwitchBenchCardInstanceId : null
+              })
+            }
             type="button"
           >
-            {resolveDeclaredAttackPendingPlayerId === turn.activePlayerId
-              ? `Resolving ${attackLabel}...`
-              : `Resolve ${attackLabel}`}
+            {resolveButtonLabel}
           </button>
         ) : null}
 

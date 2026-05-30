@@ -42,6 +42,8 @@ defmodule Prizmo.TcgEngine.GameView.Fields do
     status: [type: :string, allow_nil?: false],
     visible: [type: :boolean, allow_nil?: false],
     pending_attack_id: [type: :string],
+    pending_attack_effect_type: [type: :string],
+    pending_attack_requires_switch_target: [type: :boolean, allow_nil?: false],
     pending_attacker_card_instance_id: [type: :uuid],
     pending_defender_card_instance_id: [type: :uuid]
   ]

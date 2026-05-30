@@ -130,28 +130,34 @@ Updated: 2026-05-30
 - `Prizmo.TcgEngine.AttackEffects` now resolves after-damage effects and can switch the attacking Active Pokémon with a requested Benched Pokémon, using the same active/bench movement semantics as manual switch/retreat without marking the player as retreated.
 - `Prizmo.TcgEngine.AttackDamage.damage_for/3` treats `:switch_self_with_bench` as a non-damage modifier, while `Prizmo.TcgEngine.CardCatalog.fetch_attack/2` now accepts `PFL-083` `Run Around` and `JTG-120` `Trading Places` as executable attacks.
 - `Prizmo.TcgEngine.Mechanics.resolve_declared_attack/3` accepts an optional `:switch_bench_card_instance_id`; if omitted, no-Bench attacks no-op and exactly-one-Bench attacks switch implicitly, while multiple Benched Pokémon return `:switch_self_with_bench_requires_target` instead of choosing silently.
-- The Ash/RPC `resolveTcgEngineDeclaredAttack` input now includes optional `switchBenchCardInstanceId`, generated in `lib/prizmo_web/spa/lib/ash/generated/ash_rpc.ts`; the React shell does not yet render a dedicated attack-effect target chooser.
+- The Ash/RPC `resolveTcgEngineDeclaredAttack` input now includes optional `switchBenchCardInstanceId`, generated in `lib/prizmo_web/spa/lib/ash/generated/ash_rpc.ts`; the React target chooser for that input was added in iteration 43.
+- Iteration 43 added a minimal browser chooser for switch-self attack targets.
+- `Prizmo.TcgEngine.GameView` now derives `pending_attack_effect_type` and `pending_attack_requires_switch_target` for the current turn by looking up the pending attack's executable behavior, and `Prizmo.TcgEngine.GameView.Fields` exposes those fields through the typed map schema.
+- AshTypescript regenerated `getTcgEngineGameState` field-selection types for the new current-turn fields, and the React shell requests them in `GAME_STATE_FIELDS`.
+- The React `AttackProgressPanel` now renders a Switch target section only when the engine marks the pending attack as requiring a switch-self target. With multiple Benched Pokémon it requires the active viewer to choose one visible Bench card before resolving, then passes `switchBenchCardInstanceId` to `runResolveTcgEngineDeclaredAttack`; with zero or one Bench target it explains the implicit engine behavior.
+- A rollback smoke verified `Run Around` exposes `pending_attack_effect_type: "switch_self_with_bench"`, surfaces two visible Bench choices, and resolves to the selected Bench Pokémon becoming Active when the explicit target is passed.
 
 ## Last commit
 
 - Baseline entering iteration 42: `63808c6 fix(tcg-engine): reject unsupported attack effects`.
-- This handoff was written before committing iteration 42; expected commit message is `feat(tcg-engine): resolve switch-self attack effects`.
+- Baseline entering iteration 43: `77f1706 feat(tcg-engine): resolve switch-self attack effects`.
+- This handoff was written before committing iteration 43; expected commit message is `feat(spa): choose switch attack targets`.
 
 ## Remaining tasks
 
 - Decide whether old `Prizmo.Tcg.Sim` tests are kept as historical reference, quarantined, or ported scenario-by-scenario.
-- Build the minimal playable React SPA loop beyond prompt resolution, Bench commands, Attach Energy, attached-card board visibility, Retreat, paid attack declaration, static/executable attack resolution and finish controls, End Turn, next-turn progression, deterministic playtest fixture order, hardened tab-scoped viewer identity, and reduced prompt/action debug noise: rerun the full two-browser/manual-tester playtest milestone only after the validation harness can guarantee separate browser contexts, then address any remaining command-loop gaps it exposes.
-- Expand persisted Ash engine mechanics: implement explicit support for one rejected authored attack effect at a time beyond Moltres's Pokémon ex bonus and switch-self effects, damage/KO/prizes/replacement Active, evolution UI/RPC wiring, turn transitions, and snapshot-backed undo/debug support.
+- Build the minimal playable React SPA loop beyond prompt resolution, Bench commands, Attach Energy, attached-card board visibility, Retreat, paid attack declaration, static/executable attack resolution/finish controls, switch-self target choice, End Turn, next-turn progression, deterministic playtest fixture order, hardened tab-scoped viewer identity, and reduced prompt/action debug noise: rerun the full two-browser/manual-tester playtest milestone only after the validation harness can guarantee separate browser contexts, then address any remaining command-loop gaps it exposes.
+- Expand persisted Ash engine mechanics: implement explicit support for one rejected authored attack effect at a time beyond Moltres's Pokémon ex bonus and switch-self effects, KO/prizes/replacement Active, evolution UI/RPC wiring, turn transitions, and snapshot-backed undo/debug support.
 - Continue migrating executable card behavior into engine-owned definitions with explicit unsupported-behavior tracking.
 - Spike Electric Streams only after the command/read loop has enough event shape to publish safely.
 
 ## Blockers
 
-- No known code blocker after the iteration 33 viewer hardening, isolated-context playtest pass, iteration 34 action/prompt clarity pass, iteration 35 retreat command pass, iteration 36 attached-card visibility pass, iteration 37 paid attack declaration pass, iteration 38 static/executable attack resolution/finish pass, iteration 39 Moltres `Fighting Wings` behavior pass, iteration 40 unsupported attack declaration guard, and iteration 41 unsupported authored-effect guard.
+- No known code blocker after the iteration 33 viewer hardening, isolated-context playtest pass, iteration 34 action/prompt clarity pass, iteration 35 retreat command pass, iteration 36 attached-card visibility pass, iteration 37 paid attack declaration pass, iteration 38 static/executable attack resolution/finish pass, iteration 39 Moltres `Fighting Wings` behavior pass, iteration 40 unsupported attack declaration guard, iteration 41 unsupported authored-effect guard, iteration 42 switch-self attack resolution, and iteration 43 switch target chooser.
 - Raw printed attacks with missing authored behavior and authored attacks with unsupported effect types are hidden/rejected before declaration; new attack-effect slices should opt into `Prizmo.TcgEngine.AttackEffects` only when persisted resolution semantics are implemented.
-- Switch-self attacks are executable, but when the attacking player has multiple Benched Pokémon, attack resolution requires an explicit `switch_bench_card_instance_id`; the current React attack-resolution panel does not yet expose that target choice.
+- Switch-self attacks are executable from the browser, including the multiple-Bench case where the active viewer must choose a visible Bench target before resolving.
 - Validation blocker: the available manual-tester subagents still appear to share/contend over one browser/session, so their reported viewer flips are not reliable proof of independent-browser behavior. The documented manual-tester milestone needs a harness that guarantees separate browser contexts before it can be marked formally complete.
 
 ## Recommended next atomic task
 
-- Add a minimal React attack-resolution target chooser for attacks that need `switchBenchCardInstanceId`, reusing visible Active/Bench cards so `Run Around` / `Trading Places` can resolve from the browser when multiple Bench targets are available.
+- Implement the next narrow persisted attack outcome slice: KO/prize/replacement Active handling for resolved attacks, starting with a minimal single-KO path that preserves explicit events/snapshots and does not require client-side state mutation.
