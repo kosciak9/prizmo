@@ -6,6 +6,7 @@ export {
   drawTcgEngineOpeningHand as runDrawTcgEngineOpeningHand,
   listSupportedTcgDecks as runListSupportedTcgDecks,
   listUsers as runListUsers,
+  placeTcgEnginePrizes as runPlaceTcgEnginePrizes,
   startTcgEngineSetup as runStartTcgEngineSetup,
 } from './generated/ash_rpc'
 
@@ -19,6 +20,8 @@ export type {
   DrawTcgEngineOpeningHandInput,
   DrawTcgEngineOpeningHandResult,
   ListSupportedTcgDecksResult,
+  PlaceTcgEnginePrizesInput,
+  PlaceTcgEnginePrizesResult,
   StartTcgEngineSetupInput,
   StartTcgEngineSetupResult,
 } from './generated/ash_rpc'

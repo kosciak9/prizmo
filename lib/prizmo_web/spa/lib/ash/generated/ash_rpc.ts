@@ -427,6 +427,50 @@ export async function listSupportedTcgDecks<Fields extends ListSupportedTcgDecks
 }
 
 
+export type PlaceTcgEnginePrizesInput = {
+  gameId: UUID;
+};
+
+export type PlaceTcgEnginePrizesFields = UnifiedFieldSelection<TcgEngineGameResourceSchema>[];
+
+export type InferPlaceTcgEnginePrizesResult<
+  Fields extends PlaceTcgEnginePrizesFields | undefined,
+> = InferResult<TcgEngineGameResourceSchema, Fields>;
+
+export type PlaceTcgEnginePrizesResult<Fields extends PlaceTcgEnginePrizesFields | undefined = undefined> = | { success: true; data: InferPlaceTcgEnginePrizesResult<Fields>; }
+| { success: false; errors: AshRpcError[]; }
+
+;
+
+/**
+ * Execute generic action on Game
+ *
+ * @ashActionType :action
+ */
+export async function placeTcgEnginePrizes<Fields extends PlaceTcgEnginePrizesFields | undefined = undefined>(
+  config: {
+  tenant?: string;
+  input: PlaceTcgEnginePrizesInput;
+  fields: Fields;
+  headers?: Record<string, string>;
+  fetchOptions?: RequestInit;
+  customFetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+}
+): Promise<PlaceTcgEnginePrizesResult<Fields extends undefined ? [] : Fields>> {
+  const payload = {
+    action: "place_tcg_engine_prizes",
+    ...(config.tenant !== undefined && { tenant: config.tenant }),
+    input: config.input,
+    ...(config.fields !== undefined && { fields: config.fields })
+  };
+
+  return executeActionRpcRequest<PlaceTcgEnginePrizesResult<Fields extends undefined ? [] : Fields>>(
+    payload,
+    config
+  );
+}
+
+
 export type StartTcgEngineSetupInput = {
   gameId: UUID;
 };

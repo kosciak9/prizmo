@@ -23,16 +23,19 @@ Updated: 2026-05-30
 - Iteration 6 added `Prizmo.TcgEngine.Game.choose_setup_bench_from_hand_command`, exposed through the domain as `Prizmo.TcgEngine.choose_setup_bench_from_hand_for_game/3` and through AshTypescript RPC as `chooseTcgEngineSetupBenchFromHand`.
 - The SPA Ash client wrapper exports the generated setup-bench command as `runChooseTcgEngineSetupBenchFromHand`, with `ChooseTcgEngineSetupBenchFromHandInput` and `ChooseTcgEngineSetupBenchFromHandResult` types.
 - The choose-setup-bench command delegates to `Prizmo.TcgEngine.Mechanics.choose_setup_bench_from_hand/3`, so it validates setup status, ownership, hand zone, Basic Pokémon status, and next Bench position before writing the `choose_setup_bench_from_hand` event and snapshot.
+- Iteration 7 added `Prizmo.TcgEngine.Game.place_prizes_command`, exposed through the domain as `Prizmo.TcgEngine.place_prizes_for_game/1` and through AshTypescript RPC as `placeTcgEnginePrizes`.
+- The SPA Ash client wrapper exports the generated prize-placement command as `runPlaceTcgEnginePrizes`, with `PlaceTcgEnginePrizesInput` and `PlaceTcgEnginePrizesResult` types.
+- The place-prizes command delegates to `Prizmo.TcgEngine.Mechanics.place_prizes/1`, so it validates setup status, Active Pokémon presence, and absence of existing prizes before writing the `place_prizes` event and snapshot.
 
 ## Last commit
 
-- Baseline entering iteration 6: `605139a feat(tcg): expose choose active setup rpc`.
-- This handoff was written before committing iteration 6; expected commit message is `feat(tcg): expose setup bench rpc`.
+- Baseline entering iteration 7: `a5dbc12 feat(tcg): expose setup bench rpc`.
+- This handoff was written before committing iteration 7; expected commit message is `feat(tcg): expose prize placement rpc`.
 
 ## Remaining tasks
 
 - Decide whether old `Prizmo.Tcg.Sim` tests are kept as historical reference, quarantined, or ported scenario-by-scenario.
-- Build the minimal playable React SPA loop: wire game creation, setup start, draw-opening-hand, active choice, and setup Bench choice to the new RPCs; expose the remaining setup commands; expose legal action affordances, prompt resolution, simple board/hand/discard/prize/turn/event rendering, and reconnect recovery.
+- Build the minimal playable React SPA loop: wire game creation, setup start, draw-opening-hand, active choice, setup Bench choice, and prize placement to the new RPCs; expose setup completion; expose legal action affordances, prompt resolution, simple board/hand/discard/prize/turn/event rendering, and reconnect recovery.
 - Expand persisted Ash engine mechanics: draw for turn, bench Basic Pokémon, one Energy attachment per turn, evolution timing, retreat/switch, attacks/damage/KO/prizes/replacement Active, turn transitions, and snapshot-backed undo/debug support.
 - Continue migrating executable card behavior into engine-owned definitions with explicit unsupported-behavior tracking.
 - Spike Electric Streams only after the command/read loop has enough event shape to publish safely.
@@ -43,4 +46,4 @@ Updated: 2026-05-30
 
 ## Recommended next atomic task
 
-- Expose the next setup command through an engine-owned Ash/RPC action, likely `place_tcg_engine_prizes(game_id)`, delegating to `Prizmo.TcgEngine.Mechanics.place_prizes/1` and returning the persisted `Game` so the SPA can move from setup Pokémon choices into prize placement without direct test-helper or IEx intervention.
+- Expose the next setup command through an engine-owned Ash/RPC action, likely `complete_tcg_engine_setup(game_id)`, delegating to `Prizmo.TcgEngine.Mechanics.complete_setup/1` and returning the persisted `Game` so the SPA can move from prize placement into an in-progress game without direct test-helper or IEx intervention.

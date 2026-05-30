@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-30] iteration 7 | Setup Prize placement RPC boundary
+- Task attempted: exposed the next setup command through an engine-owned Ash/RPC action so SPA callers can place setup Prize cards for a persisted game by `game_id` without bypassing `Prizmo.TcgEngine.Mechanics.place_prizes/1`.
+- Files changed: updated `lib/prizmo/tcg_engine/game.ex`, `lib/prizmo/tcg_engine.ex`, `lib/prizmo_web/spa/lib/ash/client.ts`, and regenerated `lib/prizmo_web/spa/lib/ash/generated/ash_rpc.ts`; updated this log and the TCG engine playtest handoff.
+- Validation: `MIX_ENV=test mix run -e ...` place-prizes boundary smoke passed after creating a supported game, starting setup, drawing opening hands, choosing Active Basic Pokémon for both players, placing prizes, and verifying `:prizes_placed`, prize counts, and event cursor; `mix ash_typescript.codegen --check` passed; `mix test test/prizmo/tcg_engine/mechanics_test.exs` passed (4 tests); `mix check --no-test` passed.
+- Remaining/blocking notes: no blocker; the SPA can now import `runPlaceTcgEnginePrizes`, but setup completion, turn start, and a game-state/read-model UI are still missing.
+
 ## [2026-05-30] iteration 6 | Setup Bench choice RPC boundary
 - Task attempted: exposed the next setup choice command through an engine-owned Ash/RPC action so SPA callers can choose a player's optional setup Benched Basic Pokémon from hand by `game_id`, `player_id`, and `card_instance_id` without bypassing `Prizmo.TcgEngine.Mechanics.choose_setup_bench_from_hand/3`.
 - Files changed: updated `lib/prizmo/tcg_engine/game.ex`, `lib/prizmo/tcg_engine.ex`, `lib/prizmo_web/spa/lib/ash/client.ts`, and regenerated `lib/prizmo_web/spa/lib/ash/generated/ash_rpc.ts`; updated this log and the TCG engine playtest handoff.
