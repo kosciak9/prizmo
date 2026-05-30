@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-30] iteration 62 | Raging Bolt discard-draw attack effect
+- Task attempted: continued the rejected authored attack-effect inventory and implemented the narrow persisted `:discard_hand_then_draw` slice for Raging Bolt ex `TEF-123` `Burst Roar`, preserving its no-damage attack while discarding the attacker's hand and drawing up to the authored six cards after resolution.
+- Files changed: updated `lib/prizmo/tcg_engine/attack_effects.ex`, `lib/prizmo/tcg_engine/attack_damage.ex`, this log, and the TCG engine playtest handoff.
+- Validation: `mix format && mix compile --warnings-as-errors` passed; Tidewave rollback smoke passed for `TEF-123` `Burst Roar` fetching as executable, surfacing a browser `declare_attack` affordance, resolving after discarding three hand cards, drawing six cards into Player 1's hand, and recording `effect_type: "discard_hand_then_draw"` with discarded/requested/drawn counts; `mix test test/prizmo/tcg_engine/mechanics_test.exs` passed (4 tests); `mix prizmo.cards.coverage` passed; `mix check --no-test` passed.
+- Remaining/blocking notes: no code blocker for Raging Bolt's discard-then-draw path; additional rejected authored attack effects remain and should continue to be enabled one deterministic persisted effect at a time.
+
 ## [2026-05-30] iteration 61 | Rapid Draw attack effect
 - Task attempted: continued the rejected authored attack-effect inventory and implemented the narrow persisted `:draw_after_attack` slice for Seaking `PRE-021` `Rapid Draw`, preserving its authored 60 defender damage while drawing up to the authored two cards for the attacker after damage.
 - Files changed: updated `lib/prizmo/tcg_engine/attack_effects.ex`, `lib/prizmo/tcg_engine/attack_damage.ex`, this log, and the TCG engine playtest handoff.

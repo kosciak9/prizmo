@@ -4,7 +4,13 @@ defmodule Prizmo.TcgEngine.AttackEffects do
   import Prizmo.TcgEngine.BoardState, only: [active_card: 2]
 
   import Prizmo.TcgEngine.CardStore,
-    only: [cards_in_zone: 3, deck_cards_for_player: 2, get_card: 2, next_hand_position_result: 2]
+    only: [
+      cards_in_zone: 3,
+      deck_cards_for_player: 2,
+      discard_cards_from_hand: 3,
+      get_card: 2,
+      next_hand_position_result: 2
+    ]
 
   import Prizmo.TcgEngine.Operation, only: [update: 3]
 
@@ -24,6 +30,7 @@ defmodule Prizmo.TcgEngine.AttackEffects do
     :bonus_damage_per_energy_attached_to_defender,
     :damage_unaffected_by_effects_on_opponent_active,
     :damage_only_if_stadium_in_play,
+    :discard_hand_then_draw,
     :draw_after_attack,
     :damage_per_own_basic_pokemon_in_play,
     :damage_per_own_benched_pokemon,
@@ -86,6 +93,9 @@ defmodule Prizmo.TcgEngine.AttackEffects do
       %{type: :damage_unaffected_by_effects_on_opponent_active} ->
         {:ok, %{}}
 
+      %{type: :discard_hand_then_draw, count: count} when is_integer(count) and count >= 0 ->
+        discard_hand_then_draw(game_id, player_id, count)
+
       %{type: :draw_after_attack, count: count} when is_integer(count) and count >= 0 ->
         draw_after_attack(game_id, player_id, count)
 
@@ -127,6 +137,22 @@ defmodule Prizmo.TcgEngine.AttackEffects do
       {:ok,
        %{
          effect_type: "draw_after_attack",
+         requested_draw_count: count,
+         drawn_count: length(drawn_cards)
+       }}
+    end
+  end
+
+  defp discard_hand_then_draw(game_id, player_id, count) do
+    with {:ok, hand_cards} <- cards_in_zone(game_id, player_id, :hand),
+         {:ok, discarded_cards} <- discard_cards_from_hand(game_id, player_id, hand_cards),
+         {:ok, player} <- PlayerStore.get_player(game_id, player_id),
+         {:ok, deck_cards} <- deck_cards_for_player(player.id, count),
+         {:ok, drawn_cards} <- draw_cards_to_hand(game_id, player_id, deck_cards) do
+      {:ok,
+       %{
+         effect_type: "discard_hand_then_draw",
+         discarded_count: length(discarded_cards),
          requested_draw_count: count,
          drawn_count: length(drawn_cards)
        }}
