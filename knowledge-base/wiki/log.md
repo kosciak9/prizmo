@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-30] iteration 65 | Defender next-turn retreat lock
+- Task attempted: continued the rejected authored attack-effect inventory and implemented the narrow persisted `:defending_pokemon_cannot_retreat_next_turn` slice for Wellspring Mask Ogerpon ex `TWM-064` `Sob`, marking the surviving Defending Pokémon so it cannot retreat during its controller's next turn.
+- Files changed: added `lib/prizmo/tcg_engine/retreat_locks.ex`; updated `lib/prizmo/tcg_engine/attack_effects.ex`, `lib/prizmo/tcg_engine/attack_damage.ex`, `lib/prizmo/tcg_engine/requirements.ex`, `lib/prizmo/tcg_engine/mechanics.ex`, `lib/prizmo/tcg_engine/game_view/action_affordances.ex`, this log, and the TCG engine playtest handoff.
+- Validation: `mix format && mix compile --warnings-as-errors` passed; `mix test test/prizmo/tcg_engine/mechanics_test.exs` passed (4 tests); Tidewave rollback smoke passed for `TWM-064` `Sob` fetching as executable, surfacing a browser `declare_attack` affordance, resolving for 20 damage, persisting a `cannot_retreat_next_turn` marker with blocked turn 2, hiding the defender's `retreat` affordance on that turn, and showing retreat again after the blocked turn expired; a separate cleaned Tidewave command-guard smoke verified Ash/RPC and `Mechanics.retreat/4` reject blocked retreat with `:active_cannot_retreat_this_turn`; `mix prizmo.cards.coverage` passed; `mix check --no-test` passed.
+- Remaining/blocking notes: no code blocker for Wellspring Mask Ogerpon ex `Sob`; additional rejected authored attack effects remain and should continue to be enabled one deterministic persisted effect at a time.
+
 ## [2026-05-30] iteration 64 | Munkidori confuse attack effect
 - Task attempted: continued the rejected authored attack-effect inventory and implemented the narrow persisted `:confuse_defender_active` slice for Munkidori `TWM-095` `Mind Bend`, preserving its 60 defender damage while setting the surviving defender Active Pokémon's status to Confused.
 - Files changed: updated `lib/prizmo/tcg/cards/behaviors/twm.ex`, `lib/prizmo/tcg_engine/attack_effects.ex`, `lib/prizmo/tcg_engine/attack_damage.ex`, `lib/prizmo/tcg_engine/mechanics.ex`, this log, and the TCG engine playtest handoff.

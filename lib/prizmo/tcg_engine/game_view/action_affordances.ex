@@ -9,6 +9,7 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
   alias Prizmo.TcgEngine.Game
   alias Prizmo.TcgEngine.GamePlayer
   alias Prizmo.TcgEngine.Prompt
+  alias Prizmo.TcgEngine.RetreatLocks
   alias Prizmo.TcgEngine.Turn
 
   @doc "Returns action affordances visible to the current game viewer."
@@ -101,7 +102,7 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
       play_card_affordance(player, cards),
       play_basic_to_bench_affordance(player, cards),
       attach_energy_affordance(player, cards),
-      retreat_affordance(player, cards)
+      retreat_affordance(player, current_turn, cards)
     ] ++
       evolve_from_hand_affordances(player, current_turn, cards) ++
       declare_attack_affordances(player, current_turn, cards, all_cards) ++
@@ -189,11 +190,12 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
 
   defp evolve_from_hand_affordances(_player, _current_turn, _cards), do: []
 
-  defp retreat_affordance(%GamePlayer{retreated_this_turn?: true}, _cards), do: nil
+  defp retreat_affordance(%GamePlayer{retreated_this_turn?: true}, _current_turn, _cards), do: nil
 
-  defp retreat_affordance(%GamePlayer{} = player, cards) do
+  defp retreat_affordance(%GamePlayer{} = player, %Turn{} = current_turn, cards) do
     with %CardInstance{} = active_card <- active_pokemon_card(cards),
          false <- blocked_retreat_status?(active_card),
+         false <- RetreatLocks.blocked_this_turn?(active_card, current_turn),
          target_ids when target_ids != [] <- cards |> bench_pokemon_cards() |> card_ids(),
          {:ok, retreat_cost} <- retreat_cost(active_card),
          source_ids = cards |> active_attached_energy_cards(active_card.id) |> card_ids(),

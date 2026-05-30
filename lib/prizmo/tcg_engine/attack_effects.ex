@@ -21,6 +21,7 @@ defmodule Prizmo.TcgEngine.AttackEffects do
   alias Prizmo.TcgEngine.BattleActions
   alias Prizmo.TcgEngine.CardInstance
   alias Prizmo.TcgEngine.PlayerStore
+  alias Prizmo.TcgEngine.RetreatLocks
   alias Prizmo.TcgEngine.TurnStore
 
   @supported_effect_types [
@@ -34,6 +35,7 @@ defmodule Prizmo.TcgEngine.AttackEffects do
     :confuse_defender_active,
     :damage_unaffected_by_effects_on_opponent_active,
     :damage_only_if_stadium_in_play,
+    :defending_pokemon_cannot_retreat_next_turn,
     :discard_hand_then_draw,
     :draw_after_attack,
     :damage_per_own_basic_pokemon_in_play,
@@ -101,6 +103,9 @@ defmodule Prizmo.TcgEngine.AttackEffects do
 
       %{type: :confuse_defender_active} ->
         set_defender_status(game_id, defender_card, :confused)
+
+      %{type: :defending_pokemon_cannot_retreat_next_turn} ->
+        defender_cannot_retreat_next_turn(game_id, defender_card)
 
       %{type: :damage_per_own_benched_pokemon} ->
         {:ok, %{}}
@@ -202,6 +207,37 @@ defmodule Prizmo.TcgEngine.AttackEffects do
              defender_status: Atom.to_string(status),
              defender_status_applied?: false,
              defender_status_card_instance_id: defender_card.id
+           }}
+      end
+    end
+  end
+
+  defp defender_cannot_retreat_next_turn(game_id, %CardInstance{} = defender_card) do
+    with {:ok, turn} <- TurnStore.current_turn(game_id),
+         {:ok, current_defender_card} <- get_card(game_id, defender_card.id) do
+      case current_defender_card.zone do
+        :active ->
+          markers =
+            RetreatLocks.put_cannot_retreat_next_turn_marker(current_defender_card, turn)
+
+          with {:ok, _defender_card} <-
+                 update(current_defender_card, :set_markers, %{markers: markers}) do
+            {:ok,
+             %{
+               effect_type: "defending_pokemon_cannot_retreat_next_turn",
+               cannot_retreat_card_instance_id: current_defender_card.id,
+               retreat_blocked_turn_number: turn.turn_number + 1,
+               retreat_lock_applied?: true
+             }}
+          end
+
+        _other_zone ->
+          {:ok,
+           %{
+             effect_type: "defending_pokemon_cannot_retreat_next_turn",
+             cannot_retreat_card_instance_id: defender_card.id,
+             retreat_blocked_turn_number: turn.turn_number + 1,
+             retreat_lock_applied?: false
            }}
       end
     end

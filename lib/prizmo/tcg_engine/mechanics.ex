@@ -918,7 +918,7 @@ defmodule Prizmo.TcgEngine.Mechanics do
            {:ok, player} <- get_player(game.id, player_id),
            :ok <- require_not_retreated_this_turn(player),
            {:ok, active_card} <- active_card(game.id, player_id),
-           :ok <- require_can_retreat(active_card),
+           :ok <- require_can_retreat(active_card, turn),
            {:ok, bench_card} <- get_card(game.id, bench_card_instance_id),
            :ok <- require_card_owned_by_player(bench_card, player_id),
            :ok <- require_card_zone(bench_card, :bench),

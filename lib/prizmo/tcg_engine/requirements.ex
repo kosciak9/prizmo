@@ -7,6 +7,7 @@ defmodule Prizmo.TcgEngine.Requirements do
   alias Prizmo.TcgEngine.GamePlayer
   alias Prizmo.TcgEngine.PendingEffect
   alias Prizmo.TcgEngine.Prompt
+  alias Prizmo.TcgEngine.RetreatLocks
   alias Prizmo.TcgEngine.Turn
 
   def require_card_owned_by_player(%CardInstance{} = card, player_id) do
@@ -151,6 +152,16 @@ defmodule Prizmo.TcgEngine.Requirements do
   end
 
   def require_can_retreat(%CardInstance{}), do: :ok
+
+  def require_can_retreat(%CardInstance{} = card, %Turn{} = turn) do
+    with :ok <- require_can_retreat(card) do
+      if RetreatLocks.blocked_this_turn?(card, turn) do
+        {:error, :active_cannot_retreat_this_turn}
+      else
+        :ok
+      end
+    end
+  end
 
   def require_supported_status(nil), do: :ok
 
