@@ -8,6 +8,7 @@ defmodule Prizmo.TcgEngine.Game do
     authorizers: [Ash.Policy.Authorizer],
     extensions: [AshStateMachine, AshTypescript.Resource]
 
+  alias Prizmo.TcgEngine.Game
   alias Prizmo.TcgEngine.SupportedDecks
 
   @supported_deck_fields [
@@ -49,6 +50,7 @@ defmodule Prizmo.TcgEngine.Game do
     define :read
     define :list_supported_decks
     define :create_from_supported_decks, args: [:players]
+    define :start_setup_command, args: [:game_id]
     define :start_setup
     define :complete_setup
     define :finish
@@ -75,7 +77,7 @@ defmodule Prizmo.TcgEngine.Game do
     action :create_from_supported_decks, :struct do
       description "Create a TCG engine game from supported deck fixture keys."
 
-      constraints instance_of: Prizmo.TcgEngine.Game
+      constraints instance_of: Game
 
       argument :players, {:array, :map} do
         allow_nil? false
@@ -92,6 +94,20 @@ defmodule Prizmo.TcgEngine.Game do
           end
 
         SupportedDecks.create_game(input.arguments.players, opts)
+      end
+    end
+
+    action :start_setup_command, :struct do
+      description "Start setup for a persisted TCG engine game through the mechanics layer."
+
+      constraints instance_of: Game
+
+      argument :game_id, :uuid do
+        allow_nil? false
+      end
+
+      run fn input, _context ->
+        Prizmo.TcgEngine.Mechanics.start_setup(input.arguments.game_id)
       end
     end
 

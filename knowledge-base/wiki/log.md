@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-30] iteration 3 | Setup command RPC boundary
+- Task attempted: exposed the first setup command through an engine-owned Ash/RPC action so SPA callers can start setup for a persisted game by `game_id` without bypassing `Prizmo.TcgEngine.Mechanics.start_setup/1`.
+- Files changed: updated `lib/prizmo/tcg_engine/game.ex`, `lib/prizmo/tcg_engine.ex`, `lib/prizmo_web/spa/lib/ash/client.ts`, and regenerated `lib/prizmo_web/spa/lib/ash/generated/ash_rpc.ts`; updated this log and the TCG engine playtest handoff.
+- Validation: initial smoke failed because it used stale descriptive deck keys instead of supported numeric fixture IDs; rerun `MIX_ENV=test mix run -e ...` setup-command smoke passed with deck keys `27147` and `27431`; `mix ash_typescript.codegen --check` passed; `mix test test/prizmo/tcg_engine/mechanics_test.exs` passed (4 tests); `mix check --no-test` passed.
+- Remaining/blocking notes: no blocker; the SPA can now import `runStartTcgEngineSetup`, but draw-opening-hand, active/bench setup choices, prize placement, and setup completion still need command RPC/read-model exposure.
+
 ## [2026-05-30] iteration 2 | Supported TCG engine deck RPC boundary
 - Task attempted: added an engine/UI-facing supported deck boundary so callers can list committed deck fixtures and create persisted Ash-backed games from stable `deck_key` strings instead of deck modules.
 - Files changed: added `lib/prizmo/tcg/decks.ex` and `lib/prizmo/tcg_engine/supported_decks.ex`; updated `lib/prizmo/tcg/data/tcgdex.ex`, `lib/prizmo/tcg_engine.ex`, `lib/prizmo/tcg_engine/game.ex`, `lib/prizmo_web/spa/lib/ash/client.ts`, and regenerated `lib/prizmo_web/spa/lib/ash/generated/{ash_rpc.ts,ash_types.ts}`; updated this log and the TCG engine playtest handoff.
