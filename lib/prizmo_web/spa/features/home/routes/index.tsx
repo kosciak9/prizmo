@@ -1794,11 +1794,12 @@ function GameFlowPanel({
   const setupPrizesAreUnplaced = gameState.players.every(player => player.prizeCount === 0)
   const turnStepPending = drawForTurnPending || skipDrawForTurnPending || openActionWindowPending
   const setupStatus = gameState.setup?.status ?? 'not started'
-  const setupChoicesClosed = gameState.setup?.status === 'prizes_placed' || gameState.setup?.status === 'completed'
+  const setupCompleted = gameState.setup?.status === 'completed'
+  const setupChoicesClosed = gameState.setup?.status === 'prizes_placed' || setupCompleted
   const turnStatus = gameState.currentTurn
     ? `turn ${gameState.currentTurn.turnNumber}: ${formatEventType(gameState.currentTurn.status)}`
     : 'no turn'
-  const flowStatus = gameState.setup?.status === 'completed' ? turnStatus : setupStatus
+  const flowStatus = setupCompleted ? turnStatus : setupStatus
   const canStartSetup = !gameState.setup && !startSetupPending
   const canDrawOpeningHand = gameState.setup?.status === 'waiting_to_draw' && !drawOpeningHandPending
   const canChooseSetupActive = Boolean(
@@ -1863,7 +1864,7 @@ function GameFlowPanel({
       <div className="space-y-4">
         {commandError ? <InlineNotice tone="error" title={commandError.title}>{commandError.message}</InlineNotice> : null}
 
-        <section className="rounded-xl border border-stone-200 bg-white p-3">
+        <section className={setupCompleted ? 'rounded-xl border border-emerald-100 bg-emerald-50/70 p-3' : 'rounded-xl border border-stone-200 bg-white p-3'}>
           <div className="flex items-start justify-between gap-3">
             <div>
               <h3 className="text-sm font-semibold text-stone-950">Table setup</h3>
@@ -1876,126 +1877,132 @@ function GameFlowPanel({
             </StatusBadge>
           </div>
 
-          <div className="mt-3 space-y-2">
-            <ActionCommandButton disabled={!canStartSetup} onClick={onStartSetup} tone={gameState.setup ? 'secondary' : 'primary'}>
-              {startSetupPending ? 'Starting setup...' : gameState.setup ? 'Setup already started' : 'Start setup'}
-            </ActionCommandButton>
+          {setupCompleted ? (
+            <CompletedSetupSummary firstPlayerId={gameState.firstPlayerId} players={gameState.players} />
+          ) : (
+            <>
+              <div className="mt-3 space-y-2">
+                <ActionCommandButton disabled={!canStartSetup} onClick={onStartSetup} tone={gameState.setup ? 'secondary' : 'primary'}>
+                  {startSetupPending ? 'Starting setup...' : gameState.setup ? 'Setup already started' : 'Start setup'}
+                </ActionCommandButton>
 
-            <ActionCommandButton disabled={!canDrawOpeningHand} onClick={onDrawOpeningHand} tone="primary">
-              {drawOpeningHandPending
-                ? 'Drawing opening hands...'
-                : gameState.setup?.status === 'waiting_to_draw'
-                  ? 'Draw opening hands'
-                  : gameState.setup
-                    ? 'Opening hands resolved'
-                    : 'Start setup first'}
-            </ActionCommandButton>
-          </div>
-
-          <div className="mt-3 rounded-xl border border-stone-200 bg-stone-50 p-3">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h4 className="text-xs font-semibold uppercase tracking-[0.14em] text-stone-500">Opening Active</h4>
-                <p className="mt-1 text-xs leading-5 text-stone-500">
-                  Choose {formatPlayerId(viewerPlayerId)}'s first Basic Pokémon.
-                </p>
+                <ActionCommandButton disabled={!canDrawOpeningHand} onClick={onDrawOpeningHand} tone="primary">
+                  {drawOpeningHandPending
+                    ? 'Drawing opening hands...'
+                    : gameState.setup?.status === 'waiting_to_draw'
+                      ? 'Draw opening hands'
+                      : gameState.setup
+                        ? 'Opening hands resolved'
+                        : 'Start setup first'}
+                </ActionCommandButton>
               </div>
-              <StatusBadge tone={viewerPlayer?.active ? 'active' : 'neutral'}>
-                {viewerPlayer?.active ? 'chosen' : 'pending'}
-              </StatusBadge>
-            </div>
 
-            {gameState.setup?.status === 'hands_drawn' && viewerPlayer && !viewerPlayer.active ? (
-              setupActiveCandidates.length > 0 ? (
-                <div className="mt-3 space-y-1.5">
-                  {setupActiveCandidates.map(card => {
-                    const isPending = chooseSetupActivePendingCardId === card.id
-
-                    return (
-                      <ActionCommandButton
-                        disabled={!canChooseSetupActive}
-                        key={card.id}
-                        onClick={() => onChooseSetupActive({ playerId: viewerPlayerId, cardInstanceId: card.id })}
-                        tone="primary"
-                      >
-                        {isPending ? `Choosing ${card.name}...` : `Choose ${card.name}`}
-                      </ActionCommandButton>
-                    )
-                  })}
+              <div className="mt-3 rounded-xl border border-stone-200 bg-stone-50 p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h4 className="text-xs font-semibold uppercase tracking-[0.14em] text-stone-500">Opening Active</h4>
+                    <p className="mt-1 text-xs leading-5 text-stone-500">
+                      Choose {formatPlayerId(viewerPlayerId)}'s first Basic Pokémon.
+                    </p>
+                  </div>
+                  <StatusBadge tone={viewerPlayer?.active ? 'active' : 'neutral'}>
+                    {viewerPlayer?.active ? 'chosen' : 'pending'}
+                  </StatusBadge>
                 </div>
-              ) : (
-                <p className="mt-3 rounded-lg border border-dashed border-stone-300 px-3 py-3 text-sm text-stone-500">
-                  No Basic Pokémon are visible in this viewer's hand.
-                </p>
-              )
-            ) : (
-              <p className="mt-3 rounded-lg border border-dashed border-stone-300 px-3 py-3 text-sm text-stone-500">
-                {openingActiveStatusMessage}
-              </p>
-            )}
-          </div>
 
-          <div className="mt-3 rounded-xl border border-stone-200 bg-stone-50 p-3">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h4 className="text-xs font-semibold uppercase tracking-[0.14em] text-stone-500">Opening Bench</h4>
-                <p className="mt-1 text-xs leading-5 text-stone-500">
-                  Add optional Basic Pokémon before Prizes are placed.
-                </p>
+                {gameState.setup?.status === 'hands_drawn' && viewerPlayer && !viewerPlayer.active ? (
+                  setupActiveCandidates.length > 0 ? (
+                    <div className="mt-3 space-y-1.5">
+                      {setupActiveCandidates.map(card => {
+                        const isPending = chooseSetupActivePendingCardId === card.id
+
+                        return (
+                          <ActionCommandButton
+                            disabled={!canChooseSetupActive}
+                            key={card.id}
+                            onClick={() => onChooseSetupActive({ playerId: viewerPlayerId, cardInstanceId: card.id })}
+                            tone="primary"
+                          >
+                            {isPending ? `Choosing ${card.name}...` : `Choose ${card.name}`}
+                          </ActionCommandButton>
+                        )
+                      })}
+                    </div>
+                  ) : (
+                    <p className="mt-3 rounded-lg border border-dashed border-stone-300 px-3 py-3 text-sm text-stone-500">
+                      No Basic Pokémon are visible in this viewer's hand.
+                    </p>
+                  )
+                ) : (
+                  <p className="mt-3 rounded-lg border border-dashed border-stone-300 px-3 py-3 text-sm text-stone-500">
+                    {openingActiveStatusMessage}
+                  </p>
+                )}
               </div>
-              <StatusBadge tone={viewerPlayer?.bench.length ? 'active' : 'neutral'}>
-                {viewerPlayer?.bench.length ?? 0}/5
-              </StatusBadge>
-            </div>
 
-            {gameState.setup?.status === 'hands_drawn' && viewerPlayer && viewerPlayer.active ? (
-              viewerPlayer.bench.length >= 5 ? (
-                <p className="mt-3 rounded-lg border border-dashed border-stone-300 px-3 py-3 text-sm text-stone-500">
-                  This viewer's Bench is full.
-                </p>
-              ) : setupBenchCandidates.length > 0 ? (
-                <div className="mt-3 space-y-1.5">
-                  {setupBenchCandidates.map(card => {
-                    const isPending = chooseSetupBenchPendingCardId === card.id
-
-                    return (
-                      <ActionCommandButton
-                        disabled={!canChooseSetupBench}
-                        key={card.id}
-                        onClick={() => onChooseSetupBench({ playerId: viewerPlayerId, cardInstanceId: card.id })}
-                      >
-                        {isPending ? `Benching ${card.name}...` : `Bench ${card.name}`}
-                      </ActionCommandButton>
-                    )
-                  })}
+              <div className="mt-3 rounded-xl border border-stone-200 bg-stone-50 p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h4 className="text-xs font-semibold uppercase tracking-[0.14em] text-stone-500">Opening Bench</h4>
+                    <p className="mt-1 text-xs leading-5 text-stone-500">
+                      Add optional Basic Pokémon before Prizes are placed.
+                    </p>
+                  </div>
+                  <StatusBadge tone={viewerPlayer?.bench.length ? 'active' : 'neutral'}>
+                    {viewerPlayer?.bench.length ?? 0}/5
+                  </StatusBadge>
                 </div>
-              ) : (
-                <p className="mt-3 rounded-lg border border-dashed border-stone-300 px-3 py-3 text-sm text-stone-500">
-                  No additional Basic Pokémon are visible in this viewer's hand.
-                </p>
-              )
-            ) : (
-              <p className="mt-3 rounded-lg border border-dashed border-stone-300 px-3 py-3 text-sm text-stone-500">
-                {openingBenchUnavailableMessage}
-              </p>
-            )}
-          </div>
 
-          <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
-            <ActionCommandButton disabled={!canPlacePrizes} onClick={onPlacePrizes} tone="primary">
-              {placePrizesButtonLabel}
-            </ActionCommandButton>
+                {gameState.setup?.status === 'hands_drawn' && viewerPlayer && viewerPlayer.active ? (
+                  viewerPlayer.bench.length >= 5 ? (
+                    <p className="mt-3 rounded-lg border border-dashed border-stone-300 px-3 py-3 text-sm text-stone-500">
+                      This viewer's Bench is full.
+                    </p>
+                  ) : setupBenchCandidates.length > 0 ? (
+                    <div className="mt-3 space-y-1.5">
+                      {setupBenchCandidates.map(card => {
+                        const isPending = chooseSetupBenchPendingCardId === card.id
 
-            <ActionCommandButton disabled={!canCompleteSetup} onClick={onCompleteSetup} tone="primary">
-              {completeSetupPending
-                ? 'Completing setup...'
-                : gameState.setup?.status === 'prizes_placed'
-                  ? 'Complete setup'
-                  : gameState.setup?.status === 'completed'
-                    ? 'Setup completed'
-                    : 'Place prizes first'}
-            </ActionCommandButton>
-          </div>
+                        return (
+                          <ActionCommandButton
+                            disabled={!canChooseSetupBench}
+                            key={card.id}
+                            onClick={() => onChooseSetupBench({ playerId: viewerPlayerId, cardInstanceId: card.id })}
+                          >
+                            {isPending ? `Benching ${card.name}...` : `Bench ${card.name}`}
+                          </ActionCommandButton>
+                        )
+                      })}
+                    </div>
+                  ) : (
+                    <p className="mt-3 rounded-lg border border-dashed border-stone-300 px-3 py-3 text-sm text-stone-500">
+                      No additional Basic Pokémon are visible in this viewer's hand.
+                    </p>
+                  )
+                ) : (
+                  <p className="mt-3 rounded-lg border border-dashed border-stone-300 px-3 py-3 text-sm text-stone-500">
+                    {openingBenchUnavailableMessage}
+                  </p>
+                )}
+              </div>
+
+              <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
+                <ActionCommandButton disabled={!canPlacePrizes} onClick={onPlacePrizes} tone="primary">
+                  {placePrizesButtonLabel}
+                </ActionCommandButton>
+
+                <ActionCommandButton disabled={!canCompleteSetup} onClick={onCompleteSetup} tone="primary">
+                  {completeSetupPending
+                    ? 'Completing setup...'
+                    : gameState.setup?.status === 'prizes_placed'
+                      ? 'Complete setup'
+                      : gameState.setup?.status === 'completed'
+                        ? 'Setup completed'
+                        : 'Place prizes first'}
+                </ActionCommandButton>
+              </div>
+            </>
+          )}
         </section>
 
         <section className="rounded-xl border border-stone-200 bg-white p-3">
@@ -2077,6 +2084,44 @@ function GameFlowPanel({
         </section>
       </div>
     </Panel>
+  )
+}
+
+function CompletedSetupSummary({
+  firstPlayerId,
+  players
+}: {
+  firstPlayerId: string
+  players: PlayerView[]
+}) {
+  return (
+    <div className="mt-3 space-y-3">
+      <p className="text-xs leading-5 text-emerald-900">
+        Opening choices are locked. Continue through Turn step, prompts, and legal actions below.
+      </p>
+
+      <dl className="grid gap-2">
+        {players.map(player => (
+          <div className="rounded-lg border border-emerald-100 bg-white/80 px-3 py-2" key={player.playerId}>
+            <div className="flex items-center justify-between gap-3">
+              <dt className="text-xs font-semibold uppercase tracking-[0.14em] text-stone-500">
+                {formatPlayerId(player.playerId)}
+              </dt>
+              <dd className="text-xs font-medium text-emerald-800">
+                {player.playerId === firstPlayerId ? 'First player' : 'Second player'}
+              </dd>
+            </div>
+
+            <p className="mt-1 truncate text-sm font-semibold text-stone-950">
+              {player.active?.name ?? 'No Active Pokémon'}
+            </p>
+            <p className="mt-1 text-xs leading-5 text-stone-500">
+              {player.bench.length}/5 Bench · {player.prizeCount} Prizes left · {player.handCount} cards in hand
+            </p>
+          </div>
+        ))}
+      </dl>
+    </div>
   )
 }
 

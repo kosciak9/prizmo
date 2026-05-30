@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-31] iteration 90 | Game flow setup summary
+- Task attempted: continued the Web UI polish pass by compressing completed setup controls in the command rail into a concise setup summary, keeping the current turn/action path prominent once setup is locked.
+- Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.
+- Validation: `mix format && mix assets.build` passed; `mix check --no-test` passed; browser smoke on `http://localhost:4003` confirmed the `Game flow` rail shows completed setup as a compact per-player summary above `Turn step`, with no browser warnings or errors.
+- Remaining/blocking notes: no code blocker for this setup-summary polish slice. Further Web UI polish should continue reducing inactive rail noise in prompt/attack/action panels and refining product-quality empty states before rerunning the formal two-browser playtest milestone.
+
 ## [2026-05-31] iteration 89 | Command rail game flow controls
 - Task attempted: continued the Web UI polish pass by moving setup and turn-step progression out of the create/reconnect sidebar and into a new `Game flow` panel at the top of the player command rail beside the Battlefield.
 - Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.
