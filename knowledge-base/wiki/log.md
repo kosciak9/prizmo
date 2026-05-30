@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-31] iteration 83 | Queued Prize prompt read-model polish
+- Task attempted: polished the queued cross-player KO Prize prompt browser path by exposing non-sensitive awaiting prompt player IDs in the viewer read model, using that field to block/explain attack finish while another player has a queued prompt, and adding product-facing face-down Prize prompt guidance in the SPA.
+- Files changed: updated `lib/prizmo/tcg_engine/game_view.ex`, `lib/prizmo/tcg_engine/game_view/fields.ex`, `lib/prizmo_web/spa/features/home/routes/index.tsx`, generated `lib/prizmo_web/spa/lib/ash/generated/ash_rpc.ts`, this log, and the TCG engine playtest handoff.
+- Validation: `mix format && mix ash_typescript.codegen` passed; `mix compile --warnings-as-errors && mix ash_typescript.codegen --check && mix assets.build && mix test test/prizmo/tcg_engine/mechanics_test.exs` passed; Tidewave rollback smoke passed for `DRI-019` `Take Down` KOing Player 2's Active `MEG-054` and self-KOing the attacker, showing `awaiting_prompt_player_ids: ["player_1"]` to both viewers for the first Prize prompt, then `["player_2"]` to both viewers after Player 1 resolved while only Player 2 saw the queued prompt, then clearing prompts and finishing the attack after Player 2 resolved; `mix check --no-test` passed.
+- Remaining/blocking notes: no code blocker for the read-model/UI finish-blocking polish. The full documented two-browser/manual-tester milestone still needs a harness that guarantees separate browser contexts before it can be marked formally complete.
+
 ## [2026-05-31] iteration 82 | Queued cross-player Prize prompts
 - Task attempted: implemented queued knockout Prize prompt sequencing for cross-player simultaneous KOs, so an attack that KOs the defender and self-KOs the attacker can create one awaiting Prize prompt and queue the other player's prompt without violating the single-awaiting-pending-effect invariant.
 - Files changed: updated `lib/prizmo/tcg_engine/mechanics.ex`, this log, and the TCG engine playtest handoff.

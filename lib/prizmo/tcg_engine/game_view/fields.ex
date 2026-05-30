@@ -139,6 +139,7 @@ defmodule Prizmo.TcgEngine.GameView.Fields do
     winner_player_id: [type: :string],
     cursor_index: [type: :integer, allow_nil?: false],
     latest_event_index: [type: :integer, allow_nil?: false],
+    awaiting_prompt_player_ids: [type: {:array, :string}, allow_nil?: false],
     setup: [type: :map, constraints: [fields: @setup_view_fields]],
     current_turn: [type: :map, constraints: [fields: @turn_view_fields]],
     action_affordances: [

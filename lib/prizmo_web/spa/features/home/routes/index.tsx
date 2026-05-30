@@ -114,6 +114,7 @@ const GAME_STATE_FIELDS = [
   'winnerPlayerId',
   'cursorIndex',
   'latestEventIndex',
+  'awaitingPromptPlayerIds',
   { setup: ['id', 'status'] },
   {
     currentTurn: [
@@ -404,6 +405,7 @@ type GameState = {
   winnerPlayerId: string | null
   cursorIndex: number
   latestEventIndex: number
+  awaitingPromptPlayerIds: string[]
   setup: { id: string; status: string } | null
   currentTurn: {
     id: string
@@ -2053,6 +2055,7 @@ function PromptChoiceCard({
     selectedCardInstanceIds.length <= max &&
     !promptPendingId &&
     isPlayerId(prompt.playerId)
+  const promptGuidance = promptGuidanceMessages(prompt, min, max, legalChoiceIds.length)
 
   function toggleChoice(cardInstanceId: string) {
     setSelectedCardInstanceIds(current => {
@@ -2080,6 +2083,14 @@ function PromptChoiceCard({
         </div>
         <StatusBadge tone="warning">{prompt.status}</StatusBadge>
       </div>
+
+      {promptGuidance.length > 0 ? (
+        <div className="mt-3 rounded-lg border border-emerald-200 bg-stone-50 px-3 py-2 text-xs leading-5 text-emerald-900">
+          {promptGuidance.map(message => (
+            <p key={message}>{message}</p>
+          ))}
+        </div>
+      ) : null}
 
       {legalChoiceIds.length > 0 ? (
         <div className="mt-3 space-y-2">
@@ -2437,8 +2448,19 @@ function AttackProgressPanel({
     selectedDiscardedEnergyIdsForResolve.length !== 1
   const headsCountRequired = pendingAttackRequiresHeadsCount && headsCountForResolve === null
   const missingActivePlayers = gameState.players.filter(player => !player.active)
-  const viewerPromptBlocksFinish = viewerCanAdvanceAttack && gameState.prompts.length > 0
-  const attackCannotFinish = missingActivePlayers.length > 0 || viewerPromptBlocksFinish
+  const awaitingPromptPlayerIds = gameState.awaitingPromptPlayerIds
+  const awaitingPromptBlocksFinish = viewerCanAdvanceAttack && awaitingPromptPlayerIds.length > 0
+  const awaitingOwnPrompt = awaitingPromptPlayerIds.includes(viewerPlayerId)
+  const attackCannotFinish = missingActivePlayers.length > 0 || awaitingPromptBlocksFinish
+  const finishAttackButtonLabel = finishAttackPendingPlayerId === turn.activePlayerId
+    ? 'Finishing attack...'
+    : missingActivePlayers.length > 0
+      ? 'Choose replacement Active before finishing'
+      : awaitingPromptBlocksFinish
+        ? awaitingOwnPrompt
+          ? 'Resolve your prompt before finishing'
+          : `Waiting for ${formatPlayerList(awaitingPromptPlayerIds)} prompt`
+        : 'Finish attack and end turn'
   const resolveDisabled =
     !viewerCanAdvanceAttack ||
     commandPending ||
@@ -2941,8 +2963,8 @@ function AttackProgressPanel({
               </p>
               <p className="text-xs leading-5 text-fuchsia-900/80">
                 This attack puts exactly {benchDamageCounterRequiredCount} damage counters on the opponent's Benched
-                Pokémon in any allocation. Bench knockouts are currently blocked by the engine until multi-KO Prize
-                sequencing is implemented.
+                Pokémon in any allocation. Bench knockouts now route through the engine's face-down Prize prompt
+                sequence before the attack can finish.
               </p>
             </div>
 
@@ -3030,14 +3052,24 @@ function AttackProgressPanel({
         ) : null}
 
         {turn.status === 'attack_resolving' ? (
-          <button
-            className="w-full rounded-xl border border-emerald-700 px-3 py-2 text-left text-sm font-semibold text-emerald-800 transition hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:border-stone-300 disabled:text-stone-400 disabled:hover:bg-transparent"
-            disabled={!viewerCanAdvanceAttack || commandPending || attackCannotFinish}
-            onClick={() => onFinishAttack({ playerId: turn.activePlayerId })}
-            type="button"
-          >
-            {finishAttackPendingPlayerId === turn.activePlayerId ? 'Finishing attack...' : 'Finish attack and end turn'}
-          </button>
+          <div className="space-y-2">
+            {awaitingPromptBlocksFinish ? (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900">
+                {awaitingOwnPrompt
+                  ? 'Resolve the prompt in the Viewer prompts panel before finishing this attack.'
+                  : `Waiting for ${formatPlayerList(awaitingPromptPlayerIds)} to resolve their prompt before this attack can finish.`}
+              </div>
+            ) : null}
+
+            <button
+              className="w-full rounded-xl border border-emerald-700 px-3 py-2 text-left text-sm font-semibold text-emerald-800 transition hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:border-stone-300 disabled:text-stone-400 disabled:hover:bg-transparent"
+              disabled={!viewerCanAdvanceAttack || commandPending || attackCannotFinish}
+              onClick={() => onFinishAttack({ playerId: turn.activePlayerId })}
+              type="button"
+            >
+              {finishAttackButtonLabel}
+            </button>
+          </div>
         ) : null}
       </div>
     </Panel>
@@ -3797,6 +3829,52 @@ function promptChoiceInstruction(min: number, max: number) {
   return `choose ${min}-${max} cards`
 }
 
+function promptGuidanceMessages(
+  prompt: GameState['prompts'][number],
+  min: number,
+  max: number,
+  legalChoiceCount: number
+) {
+  if (prompt.promptType !== 'choose_knockout_prizes') {
+    return []
+  }
+
+  const prizeCount = max
+  const knockoutCount = promptPayloadArrayCount(prompt.payload, 'knocked_out_card_instance_ids')
+  const queuedPromptCount = promptPayloadNumber(prompt.payload, 'queued_knockout_prize_selection_count', 0)
+  const messages = [
+    `Choose ${prizeCount} face-down Prize ${prizeCount === 1 ? 'card' : 'cards'} from ${legalChoiceCount} legal ${legalChoiceCount === 1 ? 'Prize' : 'Prizes'}. Prize identities stay hidden until selected.`
+  ]
+
+  if (knockoutCount > 1) {
+    messages.push(`This Prize choice covers ${knockoutCount} Knocked Out Pokémon from the resolved attack.`)
+  }
+
+  if (queuedPromptCount > 0) {
+    messages.push(
+      `${queuedPromptCount} queued Prize ${queuedPromptCount === 1 ? 'prompt' : 'prompts'} will appear after this choice, so the attack cannot finish until every Prize prompt resolves.`
+    )
+  }
+
+  if (min !== max) {
+    messages.push(`This prompt accepts ${promptChoiceInstruction(min, max)}.`)
+  }
+
+  return messages
+}
+
+function promptPayloadNumber(payload: Record<string, unknown>, key: string, fallback: number) {
+  const value = payload[key]
+
+  return typeof value === 'number' && Number.isFinite(value) ? value : fallback
+}
+
+function promptPayloadArrayCount(payload: Record<string, unknown>, key: string) {
+  const value = payload[key]
+
+  return Array.isArray(value) ? value.length : 0
+}
+
 function promptChoiceKey(payload: Record<string, unknown>) {
   const value = payload.choice_key
 
@@ -3947,6 +4025,20 @@ function errorMessage(error: unknown) {
 
 function formatPlayerId(playerId: string) {
   return playerId.replace('_', ' ')
+}
+
+function formatPlayerList(playerIds: string[]) {
+  const labels = playerIds.map(formatPlayerId)
+
+  if (labels.length === 0) {
+    return 'no players'
+  }
+
+  if (labels.length === 1) {
+    return labels[0]
+  }
+
+  return `${labels.slice(0, -1).join(', ')} and ${labels[labels.length - 1]}`
 }
 
 function formatEventType(type: string) {

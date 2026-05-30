@@ -27,7 +27,8 @@ defmodule Prizmo.TcgEngine.GameView do
          {:ok, events} <- list_events(game),
          {:ok, setup} <- maybe_setup(game.id),
          {:ok, current_turn} <- maybe_current_turn(game.id),
-         {:ok, prompts} <- list_viewer_prompts(game.id, viewer_player_id) do
+         {:ok, awaiting_prompts} <- list_awaiting_prompts(game.id) do
+      prompts = viewer_prompts(awaiting_prompts, viewer_player_id)
       attached_cards_by_target = attached_cards_by_target(cards)
 
       {:ok,
@@ -40,6 +41,7 @@ defmodule Prizmo.TcgEngine.GameView do
          winner_player_id: game.winner_player_id,
          cursor_index: game.cursor_index,
          latest_event_index: game.latest_event_index,
+         awaiting_prompt_player_ids: awaiting_prompt_player_ids(awaiting_prompts),
          setup: setup_view(setup),
          current_turn: turn_view(current_turn, cards),
          action_affordances:
@@ -84,13 +86,21 @@ defmodule Prizmo.TcgEngine.GameView do
     |> Ash.read()
   end
 
-  defp list_viewer_prompts(game_id, viewer_player_id) do
+  defp list_awaiting_prompts(game_id) do
     Prompt
-    |> Ash.Query.filter(
-      game_id == ^game_id and player_id == ^viewer_player_id and status == :awaiting_choice
-    )
+    |> Ash.Query.filter(game_id == ^game_id and status == :awaiting_choice)
     |> Ash.Query.sort(created_at: :asc)
     |> Ash.read()
+  end
+
+  defp viewer_prompts(prompts, viewer_player_id) do
+    Enum.filter(prompts, &(&1.player_id == viewer_player_id))
+  end
+
+  defp awaiting_prompt_player_ids(prompts) do
+    prompts
+    |> Enum.map(& &1.player_id)
+    |> Enum.uniq()
   end
 
   defp setup_view(nil), do: nil
