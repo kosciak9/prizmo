@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react'
 
 import {
   buildAshRpcHeaders,
+  runChooseTcgEngineActiveFromHand,
   runCreateTcgEngineGame,
   runDrawTcgEngineOpeningHand,
   runGetTcgEngineGameState,
@@ -259,7 +260,16 @@ export function HomeRoute() {
     }
   })
 
+  const chooseActiveMutation = useMutation({
+    mutationFn: (input: { gameId: string; playerId: PlayerId; cardInstanceId: string }) => chooseActiveFromHand(input),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['tcg-engine', 'game-state'] })
+    }
+  })
+
   const gameState = gameStateQuery.data
+  const viewerPlayer = gameState?.players.find(player => player.playerId === gameState.viewerPlayerId)
+  const setupActiveCandidates = viewerPlayer?.hand.filter(isSetupActiveCandidate) ?? []
   const deckNamesByKey = useMemo(
     () => new Map(decks.map(deck => [deck.deckKey, deck.name])),
     [decks]
@@ -270,6 +280,14 @@ export function HomeRoute() {
     Boolean(normalisedGameId && gameState && !gameState.setup) && !startSetupMutation.isPending
   const canDrawOpeningHand =
     Boolean(normalisedGameId && gameState?.setup?.status === 'waiting_to_draw') && !drawOpeningHandMutation.isPending
+  const canChooseSetupActive =
+    Boolean(
+      normalisedGameId &&
+        gameState?.setup?.status === 'hands_drawn' &&
+        viewerPlayer &&
+        !viewerPlayer.active &&
+        setupActiveCandidates.length > 0
+    ) && !chooseActiveMutation.isPending
 
   function updateSession(nextSession: PlaytestSession) {
     setStoredSession(nextSession)
@@ -441,6 +459,51 @@ export function HomeRoute() {
                             ? 'Opening hands resolved'
                             : 'Start setup first'}
                     </button>
+                    <div className="rounded-xl border border-stone-200 bg-stone-50 p-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-medium text-stone-950">Choose setup Active</p>
+                          <p className="mt-1 text-xs leading-5 text-stone-500">
+                            Select a Basic Pokémon from {formatPlayerId(session.viewerPlayerId)}'s hand.
+                          </p>
+                        </div>
+                        <StatusBadge tone={viewerPlayer?.active ? 'active' : 'neutral'}>
+                          {viewerPlayer?.active ? 'chosen' : 'pending'}
+                        </StatusBadge>
+                      </div>
+
+                      {gameState?.setup?.status === 'hands_drawn' && viewerPlayer && !viewerPlayer.active ? (
+                        setupActiveCandidates.length > 0 ? (
+                          <div className="mt-3 space-y-2">
+                            {setupActiveCandidates.map(card => (
+                              <button
+                                className="w-full rounded-xl border border-emerald-700 px-3 py-2 text-left text-sm font-semibold text-emerald-800 transition hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:border-stone-300 disabled:text-stone-400 disabled:hover:bg-transparent"
+                                disabled={!canChooseSetupActive}
+                                key={card.id}
+                                onClick={() =>
+                                  chooseActiveMutation.mutate({
+                                    gameId: normalisedGameId,
+                                    playerId: session.viewerPlayerId,
+                                    cardInstanceId: card.id
+                                  })
+                                }
+                                type="button"
+                              >
+                                {chooseActiveMutation.isPending ? 'Choosing Active...' : `Choose ${card.name}`}
+                              </button>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="mt-3 rounded-lg border border-dashed border-stone-300 px-3 py-3 text-sm text-stone-500">
+                            No Basic Pokémon are visible in this viewer's hand.
+                          </p>
+                        )
+                      ) : (
+                        <p className="mt-3 rounded-lg border border-dashed border-stone-300 px-3 py-3 text-sm text-stone-500">
+                          Draw opening hands, then view a player without an Active Pokémon to choose one.
+                        </p>
+                      )}
+                    </div>
                   </div>
                 </div>
 
@@ -453,6 +516,12 @@ export function HomeRoute() {
                 {drawOpeningHandMutation.error ? (
                   <InlineNotice tone="error" title="Opening hand command failed">
                     {errorMessage(drawOpeningHandMutation.error)}
+                  </InlineNotice>
+                ) : null}
+
+                {chooseActiveMutation.error ? (
+                  <InlineNotice tone="error" title="Active choice command failed">
+                    {errorMessage(chooseActiveMutation.error)}
                   </InlineNotice>
                 ) : null}
               </div>
@@ -571,6 +640,24 @@ async function startSetup(gameId: string): Promise<CreatedGame> {
 async function drawOpeningHand(gameId: string): Promise<CreatedGame> {
   const result = await runDrawTcgEngineOpeningHand({
     input: { gameId },
+    fields: GAME_RESOURCE_FIELDS,
+    headers: buildAshRpcHeaders()
+  })
+
+  if (!result.success) {
+    throw new Error(rpcErrorMessage(result.errors))
+  }
+
+  return result.data as CreatedGame
+}
+
+async function chooseActiveFromHand(input: {
+  gameId: string
+  playerId: PlayerId
+  cardInstanceId: string
+}): Promise<CreatedGame> {
+  const result = await runChooseTcgEngineActiveFromHand({
+    input,
     fields: GAME_RESOURCE_FIELDS,
     headers: buildAshRpcHeaders()
   })
@@ -963,6 +1050,10 @@ function defaultSession(): PlaytestSession {
 
 function isPlayerId(value: unknown): value is PlayerId {
   return PLAYER_IDS.some(playerId => playerId === value)
+}
+
+function isSetupActiveCandidate(card: CardSummary) {
+  return card.category === 'pokemon' && card.stage === 'basic'
 }
 
 function rpcErrorMessage(errors: RpcError[] = []) {

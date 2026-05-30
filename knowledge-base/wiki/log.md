@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-30] iteration 17 | SPA setup Active choice command
+- Task attempted: added the next setup write command to the React SPA playtest shell so the current viewer can choose a Basic Pokémon from their visible hand as setup Active through `runChooseTcgEngineActiveFromHand`, then invalidate the viewer-scoped game-state query and show the Active Spot update.
+- Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`; updated this log and the TCG engine playtest handoff.
+- Validation: `mix assets.build` passed; `mix check --no-test` passed.
+- Remaining/blocking notes: no blocker; setup start, opening-hand draw, and setup Active choice are now clickable from the shell, while setup Bench choices, prize placement, setup completion, turn commands, legal action affordances, and prompt resolution controls remain pending.
+
 ## [2026-05-30] iteration 16 | SPA draw opening hand command
 - Task attempted: added the next setup write command to the React SPA playtest shell so a selected persisted game can draw both opening hands through `runDrawTcgEngineOpeningHand`, then invalidate the viewer-scoped game-state query and show updated hand/deck counts plus the `draw_opening_hand` event transition.
 - Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`; updated this log and the TCG engine playtest handoff.
