@@ -128,6 +128,7 @@ const GAME_STATE_FIELDS = [
       'pendingAttackRequiresShuffledEnergy',
       'pendingAttackRequiresBenchDamageTarget',
       'pendingAttackRequiresBenchDamageCounters',
+      'pendingAttackRequiresCoinResult',
       'pendingAttackerCardInstanceId',
       'pendingDefenderCardInstanceId'
     ]
@@ -157,6 +158,7 @@ const GAME_STATE_FIELDS = [
 ] as unknown as GetTcgEngineGameStateFields
 
 type PlayerId = (typeof PLAYER_IDS)[number]
+type CoinResult = 'heads' | 'tails'
 
 type PlaytestSession = {
   gameId: string
@@ -330,6 +332,7 @@ type ResolveDeclaredAttackInput = {
   shuffledEnergyCardInstanceIds?: string[]
   benchDamageTargetCardInstanceId?: string | null
   benchDamageCounterAllocations?: Record<string, number>
+  coinResult?: CoinResult | null
 }
 
 type ResolveDeclaredAttackCommand = {
@@ -340,6 +343,7 @@ type ResolveDeclaredAttackCommand = {
   shuffledEnergyCardInstanceIds?: string[]
   benchDamageTargetCardInstanceId?: string | null
   benchDamageCounterAllocations?: Record<string, number>
+  coinResult?: CoinResult | null
 }
 
 type FinishAttackInput = {
@@ -399,6 +403,7 @@ type GameState = {
     pendingAttackRequiresShuffledEnergy: boolean
     pendingAttackRequiresBenchDamageTarget: boolean
     pendingAttackRequiresBenchDamageCounters: boolean
+    pendingAttackRequiresCoinResult: boolean
     pendingAttackerCardInstanceId: string | null
     pendingDefenderCardInstanceId: string | null
   } | null
@@ -1341,7 +1346,8 @@ export function HomeRoute() {
                   returnedEnergyCardInstanceId,
                   shuffledEnergyCardInstanceIds,
                   benchDamageTargetCardInstanceId,
-                  benchDamageCounterAllocations
+                  benchDamageCounterAllocations,
+                  coinResult
                 }) => {
                   if (isPlayerId(playerId)) {
                     resolveDeclaredAttackMutation.mutate({
@@ -1352,7 +1358,8 @@ export function HomeRoute() {
                       returnedEnergyCardInstanceId,
                       shuffledEnergyCardInstanceIds,
                       benchDamageTargetCardInstanceId,
-                      benchDamageCounterAllocations
+                      benchDamageCounterAllocations,
+                      coinResult
                     })
                   }
                 }}
@@ -2138,6 +2145,7 @@ function AttackProgressPanel({
   const [selectedBenchDamageCounterAllocations, setSelectedBenchDamageCounterAllocations] = useState<
     Record<string, number>
   >({})
+  const [selectedCoinResult, setSelectedCoinResult] = useState<CoinResult | ''>('')
   const turn = gameState.currentTurn
   const activePlayer = turn ? gameState.players.find(player => player.playerId === turn.activePlayerId) : undefined
   const opponentPlayer = turn ? gameState.players.find(player => player.playerId !== turn.activePlayerId) : undefined
@@ -2230,6 +2238,7 @@ function AttackProgressPanel({
     (total, counters) => total + counters,
     0
   )
+  const coinResultForResolve = turn?.pendingAttackRequiresCoinResult && selectedCoinResult ? selectedCoinResult : null
 
   useEffect(() => {
     if (selectedSwitchBenchCardInstanceId && !selectedSwitchTargetIsValid) {
@@ -2243,6 +2252,7 @@ function AttackProgressPanel({
     setSelectedShuffledEnergyCardInstanceIds([])
     setSelectedBenchDamageTargetCardInstanceId('')
     setSelectedBenchDamageCounterAllocations({})
+    setSelectedCoinResult('')
   }, [turn?.id, turn?.pendingAttackId])
 
   useEffect(() => {
@@ -2324,6 +2334,7 @@ function AttackProgressPanel({
     turn.pendingAttackRequiresBenchDamageCounters && benchDamageCounterOptions.length > 0
   const benchDamageCounterAllocationIncomplete =
     benchDamageCounterAllocationRequired && selectedBenchDamageCounterTotal !== benchDamageCounterRequiredCount
+  const coinResultRequired = turn.pendingAttackRequiresCoinResult && !coinResultForResolve
   const missingActivePlayers = gameState.players.filter(player => !player.active)
   const viewerPromptBlocksFinish = viewerCanAdvanceAttack && gameState.prompts.length > 0
   const attackCannotFinish = missingActivePlayers.length > 0 || viewerPromptBlocksFinish
@@ -2336,7 +2347,8 @@ function AttackProgressPanel({
     shuffledEnergyPartialSelection ||
     benchDamageTargetUnavailable ||
     (benchDamageTargetRequired && !selectedBenchDamageTargetIsValid) ||
-    benchDamageCounterAllocationIncomplete
+    benchDamageCounterAllocationIncomplete ||
+    coinResultRequired
   const resolveButtonLabel = resolveDeclaredAttackPendingPlayerId === turn.activePlayerId
     ? `Resolving ${attackLabel}...`
     : switchTargetRequired && !selectedSwitchTargetIsValid
@@ -2353,6 +2365,8 @@ function AttackProgressPanel({
                 ? `Choose a Bench damage target for ${attackLabel}`
                 : benchDamageCounterAllocationIncomplete
                   ? `Allocate exactly ${benchDamageCounterRequiredCount} Bench damage counters for ${attackLabel}`
+                  : coinResultRequired
+                    ? `Choose a coin result for ${attackLabel}`
       : `Resolve ${attackLabel}`
   const toggleDiscardedEnergyCard = (energyCardInstanceId: string) => {
     setSelectedDiscardedEnergyCardInstanceIds(previousSelectedIds => {
@@ -2413,6 +2427,49 @@ function AttackProgressPanel({
           Resolve applies the declared attack's currently executable damage/effect behavior. Finish closes the
           attack and ends the turn after resolution.
         </p>
+
+        {turn.pendingAttackRequiresCoinResult ? (
+          <div className="rounded-xl border border-yellow-200 bg-yellow-50/70 p-3">
+            <div className="space-y-1">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-yellow-900">Coin result</p>
+              <p className="text-xs leading-5 text-yellow-900/80">
+                This attack needs a deterministic coin result before the persisted engine can resolve its bonus damage.
+              </p>
+            </div>
+
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              {(['heads', 'tails'] as const).map(result => {
+                const selected = selectedCoinResult === result
+
+                return (
+                  <label
+                    className={`flex cursor-pointer items-start gap-2 rounded-lg border px-3 py-2 text-xs transition ${
+                      selected
+                        ? 'border-yellow-700 bg-yellow-100 text-yellow-950'
+                        : 'border-yellow-200 bg-stone-50 text-stone-700 hover:border-yellow-400'
+                    }`}
+                    key={result}
+                  >
+                    <input
+                      checked={selected}
+                      className="mt-0.5"
+                      disabled={!viewerCanAdvanceAttack || commandPending}
+                      name="coin-result"
+                      onChange={() => setSelectedCoinResult(result)}
+                      type="radio"
+                    />
+                    <span className="min-w-0">
+                      <span className="block font-medium">{result === 'heads' ? 'Heads' : 'Tails'}</span>
+                      <span className="mt-0.5 block text-[0.68rem] opacity-70">
+                        {result === 'heads' ? 'Apply the authored bonus damage.' : 'Resolve without bonus damage.'}
+                      </span>
+                    </span>
+                  </label>
+                )
+              })}
+            </div>
+          </div>
+        ) : null}
 
         {turn.pendingAttackRequiresSwitchTarget ? (
           <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-3">
@@ -2763,7 +2820,8 @@ function AttackProgressPanel({
                 returnedEnergyCardInstanceId: returnedEnergyIdForResolve,
                 shuffledEnergyCardInstanceIds: selectedShuffledEnergyIdsForResolve,
                 benchDamageTargetCardInstanceId: benchDamageTargetIdForResolve,
-                benchDamageCounterAllocations: selectedBenchDamageCounterAllocationsForResolve
+                benchDamageCounterAllocations: selectedBenchDamageCounterAllocationsForResolve,
+                coinResult: coinResultForResolve
               })
             }
             type="button"

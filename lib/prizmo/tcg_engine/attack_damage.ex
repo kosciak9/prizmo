@@ -35,6 +35,23 @@ defmodule Prizmo.TcgEngine.AttackDamage do
          damage,
          _attacker_card,
          _defender_card,
+         %{type: :bonus_damage_on_coin_heads, bonus_damage: bonus_damage},
+         opts
+       )
+       when is_integer(bonus_damage) and bonus_damage >= 0 do
+    with {:ok, coin_result} <- AttackEffects.coin_result(opts) do
+      if coin_result == :heads do
+        {:ok, damage + bonus_damage}
+      else
+        {:ok, damage}
+      end
+    end
+  end
+
+  defp apply_effect(
+         damage,
+         _attacker_card,
+         _defender_card,
          %{type: :damage_per_discarded_own_basic_energy, damage_per_energy: damage_per_energy},
          opts
        )

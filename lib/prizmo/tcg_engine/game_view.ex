@@ -132,6 +132,8 @@ defmodule Prizmo.TcgEngine.GameView do
           :shuffle_attached_energy_into_deck_then_damage_opponent_bench,
       pending_attack_requires_bench_damage_counters:
         pending_attack_effect_type == :opponent_bench_damage_counters,
+      pending_attack_requires_coin_result:
+        pending_attack_effect_type == :bonus_damage_on_coin_heads,
       pending_attacker_card_instance_id: turn.pending_attacker_card_instance_id,
       pending_defender_card_instance_id: turn.pending_defender_card_instance_id
     }
