@@ -6,6 +6,7 @@ import {
   runCreateTcgEngineGame,
   runGetTcgEngineGameState,
   runListSupportedTcgDecks,
+  runStartTcgEngineSetup,
   type CreateTcgEngineGameFields,
   type GetTcgEngineGameStateFields,
   type ListSupportedTcgDecksFields
@@ -243,6 +244,13 @@ export function HomeRoute() {
     }
   })
 
+  const startSetupMutation = useMutation({
+    mutationFn: (gameId: string) => startSetup(gameId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['tcg-engine', 'game-state'] })
+    }
+  })
+
   const gameState = gameStateQuery.data
   const deckNamesByKey = useMemo(
     () => new Map(decks.map(deck => [deck.deckKey, deck.name])),
@@ -250,6 +258,8 @@ export function HomeRoute() {
   )
   const canCreateGame =
     Boolean(selectedPlayerOneDeckKey && selectedPlayerTwoDeckKey) && !createGameMutation.isPending
+  const canStartSetup =
+    Boolean(normalisedGameId && gameState && !gameState.setup) && !startSetupMutation.isPending
 
   function updateSession(nextSession: PlaytestSession) {
     setStoredSession(nextSession)
@@ -380,6 +390,39 @@ export function HomeRoute() {
                     Clear
                   </button>
                 </div>
+
+                <div className="rounded-2xl border border-stone-200 bg-stone-50 p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-medium text-stone-950">Setup command</p>
+                      <p className="mt-1 text-xs leading-5 text-stone-500">
+                        Writes setup state and a start setup event through Ash RPC.
+                      </p>
+                    </div>
+                    <StatusBadge tone={gameState?.setup ? 'active' : 'neutral'}>
+                      {gameState?.setup?.status ?? 'not started'}
+                    </StatusBadge>
+                  </div>
+
+                  <button
+                    className="mt-3 w-full rounded-xl border border-emerald-700 px-3 py-2 text-sm font-semibold text-emerald-800 transition hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:border-stone-300 disabled:text-stone-400 disabled:hover:bg-transparent"
+                    disabled={!canStartSetup}
+                    onClick={() => startSetupMutation.mutate(normalisedGameId)}
+                    type="button"
+                  >
+                    {startSetupMutation.isPending
+                      ? 'Starting setup...'
+                      : gameState?.setup
+                        ? 'Setup already started'
+                        : 'Start setup'}
+                  </button>
+                </div>
+
+                {startSetupMutation.error ? (
+                  <InlineNotice tone="error" title="Setup command failed">
+                    {errorMessage(startSetupMutation.error)}
+                  </InlineNotice>
+                ) : null}
               </div>
             </Panel>
 
@@ -477,6 +520,20 @@ async function getGameState(gameId: string, viewerPlayerId: PlayerId): Promise<G
   }
 
   return result.data as unknown as GameState
+}
+
+async function startSetup(gameId: string): Promise<CreatedGame> {
+  const result = await runStartTcgEngineSetup({
+    input: { gameId },
+    fields: GAME_RESOURCE_FIELDS,
+    headers: buildAshRpcHeaders()
+  })
+
+  if (!result.success) {
+    throw new Error(rpcErrorMessage(result.errors))
+  }
+
+  return result.data as CreatedGame
 }
 
 function GameStateWorkbench({

@@ -49,17 +49,19 @@ Updated: 2026-05-30
 - Iteration 14 replaced the placeholder SPA home route with a minimal TCG playtest shell.
 - The shell calls `runListSupportedTcgDecks`, `runCreateTcgEngineGame`, and `runGetTcgEngineGameState` through the SPA Ash client, and `lib/prizmo_web/spa/lib/ash/client.ts` now re-exports the generated field-selection types needed by callers.
 - Browser users can choose supported fixture decks, create a persisted player 1 versus player 2 game, switch the viewer between players, reconnect by game ID via local storage or pasted UUID, refresh state, and inspect status/cursors/setup/current turn, public board zones, deck/hand/prize/discard counts, viewer hand, event metadata, and viewer prompts.
-- The shell intentionally remains read-only after creation; setup and action buttons still need to be wired to the already exposed command RPCs.
+- Iteration 15 added the first write command to the SPA shell.
+- The shell now calls `runStartTcgEngineSetup` for the selected game, invalidates the viewer-scoped game-state query, and surfaces setup command pending/error state plus the refreshed setup status and `start_setup` event metadata.
+- Setup start is no longer read-only in the browser shell; draw-opening-hand, active/bench setup choices, prize placement, setup completion, turn commands, legal action affordances, and prompt resolution controls still need UI wiring.
 
 ## Last commit
 
-- Baseline entering iteration 14: `278d5ee feat(tcg): expose game state rpc`.
-- This handoff was written before committing iteration 14; expected commit message is `feat(spa): add tcg playtest shell`.
+- Baseline entering iteration 15: `13b36f8 feat(spa): add tcg playtest shell`.
+- This handoff was written before committing iteration 15; expected commit message is `feat(spa): wire setup start command`.
 
 ## Remaining tasks
 
 - Decide whether old `Prizmo.Tcg.Sim` tests are kept as historical reference, quarantined, or ported scenario-by-scenario.
-- Build the minimal playable React SPA loop beyond the read-only shell: wire setup start, draw-opening-hand, active choice, setup Bench choice, prize placement, setup completion, turn start, draw for turn, skip draw, and open action window to UI buttons; expose legal action affordances, prompt resolution controls, and two-browser refresh/reconnect validation.
+- Build the minimal playable React SPA loop beyond setup start: wire draw-opening-hand, active choice, setup Bench choice, prize placement, setup completion, turn start, draw for turn, skip draw, and open action window to UI buttons; expose legal action affordances, prompt resolution controls, and two-browser refresh/reconnect validation.
 - Expand persisted Ash engine mechanics: bench Basic Pokémon, one Energy attachment per turn, evolution timing, retreat/switch, attacks/damage/KO/prizes/replacement Active, turn transitions, and snapshot-backed undo/debug support.
 - Continue migrating executable card behavior into engine-owned definitions with explicit unsupported-behavior tracking.
 - Spike Electric Streams only after the command/read loop has enough event shape to publish safely.
@@ -70,4 +72,4 @@ Updated: 2026-05-30
 
 ## Recommended next atomic task
 
-- Add the first setup command button to the SPA shell by calling `runStartTcgEngineSetup` for the selected game, invalidating the game-state query, and rendering the resulting setup status/event transition. Keep the next iteration narrow before adding draw-opening-hand and card-choice controls.
+- Add the draw-opening-hand command button to the SPA shell by calling `runDrawTcgEngineOpeningHand` after setup has started, invalidating the game-state query, and rendering the resulting hand counts/viewer hand/event transition. Keep card-choice controls for a later iteration.

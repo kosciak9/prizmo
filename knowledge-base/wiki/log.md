@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-30] iteration 15 | SPA start setup command
+- Task attempted: added the first write command to the React SPA playtest shell so a selected persisted game can start setup through `runStartTcgEngineSetup`, then invalidate the viewer-scoped game-state query and show the resulting setup status/event transition.
+- Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`; updated this log and the TCG engine playtest handoff.
+- Validation: `mix assets.build` passed; `mix check --no-test` passed.
+- Remaining/blocking notes: no blocker; setup start is now clickable from the shell, while draw-opening-hand, active/bench setup choices, prize placement, setup completion, turn commands, legal action affordances, and prompt resolution controls remain pending.
+
 ## [2026-05-30] iteration 14 | Minimal TCG SPA playtest shell
 - Task attempted: wired the React SPA home route to the AshTypescript TCG engine RPC boundary so a browser can list supported deck fixtures, create a persisted fixture game, reconnect by game ID, switch viewer between player 1 and player 2, and render the viewer-scoped game-state read model.
 - Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx` and `lib/prizmo_web/spa/lib/ash/client.ts`; updated this log and the TCG engine playtest handoff.
