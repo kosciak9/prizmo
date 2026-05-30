@@ -1,6 +1,7 @@
 export {
   buildCSRFHeaders as buildAshRpcHeaders,
   chooseTcgEngineActiveFromHand as runChooseTcgEngineActiveFromHand,
+  chooseTcgEngineSetupBenchFromHand as runChooseTcgEngineSetupBenchFromHand,
   createTcgEngineGame as runCreateTcgEngineGame,
   drawTcgEngineOpeningHand as runDrawTcgEngineOpeningHand,
   listSupportedTcgDecks as runListSupportedTcgDecks,
@@ -11,6 +12,8 @@ export {
 export type {
   ChooseTcgEngineActiveFromHandInput,
   ChooseTcgEngineActiveFromHandResult,
+  ChooseTcgEngineSetupBenchFromHandInput,
+  ChooseTcgEngineSetupBenchFromHandResult,
   CreateTcgEngineGameInput,
   CreateTcgEngineGameResult,
   DrawTcgEngineOpeningHandInput,
