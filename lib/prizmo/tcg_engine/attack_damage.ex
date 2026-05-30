@@ -39,6 +39,20 @@ defmodule Prizmo.TcgEngine.AttackDamage do
   end
 
   defp apply_effect(damage, %CardInstance{} = attacker_card, _defender_card, %{
+         type: :bonus_damage_if_attacker_has_team_rocket_energy,
+         bonus_damage: bonus_damage
+       })
+       when is_integer(bonus_damage) and bonus_damage >= 0 do
+    with {:ok, has_team_rocket_energy?} <- attached_team_rocket_energy?(attacker_card) do
+      if has_team_rocket_energy? do
+        {:ok, damage + bonus_damage}
+      else
+        {:ok, damage}
+      end
+    end
+  end
+
+  defp apply_effect(damage, %CardInstance{} = attacker_card, _defender_card, %{
          type: :bonus_damage_if_moved_from_bench_to_active_this_turn,
          bonus_damage: bonus_damage
        })
@@ -149,6 +163,26 @@ defmodule Prizmo.TcgEngine.AttackDamage do
   defp energy_card?(%CardInstance{card_id: card_id}) do
     case CardCatalog.fetch(card_id) do
       {:ok, %{supertype: :energy}} -> {:ok, true}
+      {:ok, _card} -> {:ok, false}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp attached_team_rocket_energy?(%CardInstance{game_id: game_id, id: card_instance_id}) do
+    with {:ok, attached_cards} <- CardStore.attached_cards(game_id, card_instance_id) do
+      Enum.reduce_while(attached_cards, {:ok, false}, fn card, {:ok, false} ->
+        case team_rocket_energy_card?(card) do
+          {:ok, true} -> {:halt, {:ok, true}}
+          {:ok, false} -> {:cont, {:ok, false}}
+          {:error, reason} -> {:halt, {:error, reason}}
+        end
+      end)
+    end
+  end
+
+  defp team_rocket_energy_card?(%CardInstance{card_id: card_id}) do
+    case CardCatalog.fetch(card_id) do
+      {:ok, %{supertype: :energy, name: "Team Rocket's Energy"}} -> {:ok, true}
       {:ok, _card} -> {:ok, false}
       {:error, reason} -> {:error, reason}
     end

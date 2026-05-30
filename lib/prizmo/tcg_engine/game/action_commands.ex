@@ -222,7 +222,7 @@ defmodule Prizmo.TcgEngine.Game.ActionCommands do
 
       run fn input, _context ->
         Mechanics.resolve_declared_attack(input.arguments.game_id, input.arguments.player_id, %{
-          switch_bench_card_instance_id: input.arguments.switch_bench_card_instance_id
+          switch_bench_card_instance_id: Map.get(input.arguments, :switch_bench_card_instance_id)
         })
       end
     end

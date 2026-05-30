@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-30] iteration 58 | Team Rocket Energy attack damage
+- Task attempted: continued the rejected authored attack-effect inventory and implemented the narrow persisted `:bonus_damage_if_attacker_has_team_rocket_energy` slice for Team Rocket's Articuno `DRI-051` `Dark Frost`, adding the authored bonus when the attacker has Team Rocket's Energy attached.
+- Files changed: updated `lib/prizmo/tcg_engine/attack_effects.ex`, `lib/prizmo/tcg_engine/attack_damage.ex`, `lib/prizmo/tcg_engine/game/action_commands.ex`, this log, and the TCG engine playtest handoff.
+- Validation: `mix format && mix compile --warnings-as-errors` passed; Tidewave rollback smokes passed for `DRI-051` `Dark Frost` fetching as executable, surfacing a browser declare-attack affordance, resolving for 60 damage without Team Rocket's Energy, and resolving for 120 damage with `DRI-182` attached while the RPC resolve command omits the optional switch target; `mix test test/prizmo/tcg_engine/mechanics_test.exs` passed (4 tests); `mix prizmo.cards.coverage` passed; `mix check --no-test` passed.
+- Remaining/blocking notes: no code blocker for Articuno's Team Rocket Energy bonus damage path; broader Team Rocket's Energy attachment/provides semantics and additional rejected authored attack effects remain future slices.
+
 ## [2026-05-30] iteration 57 | Team Rocket in-play attack damage
 - Task attempted: continued the rejected authored attack-effect inventory and implemented the narrow persisted `:damage_per_own_team_rocket_pokemon_in_play` slice for Team Rocket's Spidops `DRI-020` `Rocket Rush`, counting the attacker's own Active plus Benched Team Rocket's Pokémon for authored attack damage.
 - Files changed: updated `lib/prizmo/tcg_engine/attack_effects.ex`, `lib/prizmo/tcg_engine/attack_damage.ex`, this log, and the TCG engine playtest handoff.
