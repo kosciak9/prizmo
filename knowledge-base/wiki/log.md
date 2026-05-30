@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-30] iteration 76 | Whirlpool defending-Energy discard
+- Task attempted: continued the rejected authored attack-effect inventory and implemented Goldeen `TWM-044` `Whirlpool`, using a command-provided deterministic coin result so heads discards one Energy from the opponent's Active Pokémon while tails discards none.
+- Files changed: updated `lib/prizmo/tcg_engine/attack_effects.ex`, `lib/prizmo/tcg_engine/attack_damage.ex`, `lib/prizmo/tcg_engine/game_view.ex`, `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.
+- Validation: `mix format` passed; `mix compile --warnings-as-errors` passed; Tidewave rollback smoke passed for `TWM-044` `Whirlpool` fetching as executable, exposing coin/discard read-model flags, resolving tails while leaving the defending Energy attached, and resolving heads while discarding the defending Energy; `mix assets.build` passed; `mix ash_typescript.codegen --check && mix test test/prizmo/tcg_engine/mechanics_test.exs && mix prizmo.cards.coverage` passed.
+- Remaining/blocking notes: no code blocker for Whirlpool's command-provided coin-result path. Remaining unsupported authored attack effects now center on copy-attack semantics such as `DRI-087` `Gemstone Mimicry` and broader multi-KO/prize sequencing/status lifecycle work.
+
 ## [2026-05-30] iteration 75 | Dig attack prevention
 - Task attempted: continued the rejected authored attack-effect inventory and implemented Dunsparce `TEF-128` `Dig`, using a command-provided deterministic coin result so heads marks the attacker to prevent opponent attack damage/effects during the opponent's next turn.
 - Files changed: added `lib/prizmo/tcg_engine/attack_prevention.ex`; updated `lib/prizmo/tcg_engine/attack_effects.ex`, `lib/prizmo/tcg_engine/attack_damage.ex`, `lib/prizmo/tcg_engine/battle_actions.ex`, `lib/prizmo/tcg_engine/game_view.ex`, `lib/prizmo/tcg_engine/mechanics.ex`, `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.

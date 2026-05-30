@@ -68,6 +68,7 @@ defmodule Prizmo.TcgEngine.AttackEffects do
     :damage_unaffected_by_effects_on_opponent_active,
     :damage_only_if_stadium_in_play,
     :damage_per_discarded_own_basic_energy,
+    :discard_defending_energy_on_coin_heads,
     :discard_energy_from_own_bench_for_bonus_damage,
     :defending_pokemon_cannot_retreat_next_turn,
     :discard_hand_then_draw,
@@ -195,6 +196,9 @@ defmodule Prizmo.TcgEngine.AttackEffects do
 
       %{type: :damage_per_discarded_own_basic_energy} ->
         discard_attached_basic_energy_for_damage(game_id, player_id, opts)
+
+      %{type: :discard_defending_energy_on_coin_heads} ->
+        discard_defending_energy_on_coin_heads(game_id, player_id, defender_card, opts)
 
       %{type: :discard_energy_from_own_bench_for_bonus_damage, max_discards: max_discards}
       when is_integer(max_discards) and max_discards >= 0 ->
@@ -843,6 +847,161 @@ defmodule Prizmo.TcgEngine.AttackEffects do
          discarded_energy_card_instance_ids: Enum.map(discarded_cards, & &1.id),
          discarded_energy_count: length(discarded_cards)
        }}
+    end
+  end
+
+  defp discard_defending_energy_on_coin_heads(
+         game_id,
+         attacking_player_id,
+         %CardInstance{} = defender_card,
+         opts
+       ) do
+    with {:ok, result} <- coin_result(opts) do
+      case result do
+        :heads ->
+          discard_defending_energy_on_heads(game_id, attacking_player_id, defender_card, opts)
+
+        :tails ->
+          {:ok,
+           %{
+             effect_type: "discard_defending_energy_on_coin_heads",
+             coin_result: Atom.to_string(result),
+             defender_card_instance_id: defender_card.id,
+             energy_discarded?: false,
+             discarded_energy_card_instance_ids: [],
+             discarded_energy_count: 0
+           }}
+      end
+    end
+  end
+
+  defp discard_defending_energy_on_heads(
+         game_id,
+         attacking_player_id,
+         %CardInstance{} = defender_card,
+         opts
+       ) do
+    with {:ok, current_defender_card} <- get_card(game_id, defender_card.id) do
+      case attack_effect_prevention_payload(game_id, attacking_player_id, current_defender_card) do
+        {:prevented, prevention_payload} ->
+          {:ok,
+           Map.merge(
+             %{
+               effect_type: "discard_defending_energy_on_coin_heads",
+               coin_result: "heads",
+               defender_card_instance_id: current_defender_card.id,
+               energy_discarded?: false,
+               discarded_energy_card_instance_ids: [],
+               discarded_energy_count: 0,
+               attack_effect_prevented?: true
+             },
+             prevention_payload
+           )}
+
+        :not_prevented ->
+          discard_current_defending_energy_on_heads(game_id, current_defender_card, opts)
+      end
+    end
+  end
+
+  defp discard_current_defending_energy_on_heads(
+         game_id,
+         %CardInstance{zone: :active} = defender_card,
+         opts
+       ) do
+    with {:ok, energy_card} <- defending_energy_card(game_id, defender_card, opts),
+         {:ok, discarded_energy_card} <-
+           discard_defending_energy_card(game_id, defender_card, energy_card) do
+      discarded_energy_card_instance_ids =
+        if discarded_energy_card, do: [discarded_energy_card.id], else: []
+
+      {:ok,
+       %{
+         effect_type: "discard_defending_energy_on_coin_heads",
+         coin_result: "heads",
+         defender_card_instance_id: defender_card.id,
+         energy_discarded?: discarded_energy_card != nil,
+         discarded_energy_card_instance_ids: discarded_energy_card_instance_ids,
+         discarded_energy_count: length(discarded_energy_card_instance_ids)
+       }}
+    end
+  end
+
+  defp discard_current_defending_energy_on_heads(_game_id, %CardInstance{} = defender_card, _opts) do
+    {:ok,
+     %{
+       effect_type: "discard_defending_energy_on_coin_heads",
+       coin_result: "heads",
+       defender_card_instance_id: defender_card.id,
+       energy_discarded?: false,
+       discarded_energy_card_instance_ids: [],
+       discarded_energy_count: 0
+     }}
+  end
+
+  defp defending_energy_card(game_id, %CardInstance{} = defender_card, opts) do
+    with {:ok, energy_cards} <- attached_energy_cards(game_id, defender_card),
+         {:ok, energy_card_instance_ids} <- discarded_energy_card_instance_ids(opts) do
+      case energy_card_instance_ids do
+        [] -> implicit_defending_energy_card(energy_cards)
+        [_first | _rest] -> explicit_defending_energy_card(energy_cards, energy_card_instance_ids)
+      end
+    end
+  end
+
+  defp attached_energy_cards(game_id, %CardInstance{} = defender_card) do
+    with {:ok, attached_cards} <- attached_cards(game_id, defender_card.id) do
+      attached_cards
+      |> Enum.reduce_while({:ok, []}, fn attached_card, {:ok, energy_cards} ->
+        case require_card_zone(attached_card, :attached) do
+          :ok ->
+            case require_energy(attached_card.card_id) do
+              :ok -> {:cont, {:ok, [attached_card | energy_cards]}}
+              {:error, _not_energy} -> {:cont, {:ok, energy_cards}}
+            end
+
+          {:error, reason} ->
+            {:halt, {:error, reason}}
+        end
+      end)
+      |> case do
+        {:ok, energy_cards} -> {:ok, Enum.reverse(energy_cards)}
+        {:error, reason} -> {:error, reason}
+      end
+    end
+  end
+
+  defp implicit_defending_energy_card([]), do: {:ok, nil}
+  defp implicit_defending_energy_card([energy_card]), do: {:ok, energy_card}
+
+  defp implicit_defending_energy_card([_first | _rest]),
+    do: {:error, :discard_defending_energy_requires_target}
+
+  defp explicit_defending_energy_card(energy_cards, energy_card_instance_ids) do
+    with :ok <-
+           require_exact_count(energy_card_instance_ids, 1, :wrong_discard_defending_energy_count),
+         :ok <- require_unique_ids(energy_card_instance_ids) do
+      [energy_card_instance_id] = energy_card_instance_ids
+
+      case Enum.find(energy_cards, &(&1.id == energy_card_instance_id)) do
+        %CardInstance{} = energy_card -> {:ok, energy_card}
+        nil -> {:error, :invalid_discard_defending_energy_choice}
+      end
+    end
+  end
+
+  defp discard_defending_energy_card(_game_id, _defender_card, nil), do: {:ok, nil}
+
+  defp discard_defending_energy_card(
+         game_id,
+         %CardInstance{} = defender_card,
+         %CardInstance{} = energy_card
+       ) do
+    with {:ok, [discarded_energy_card]} <-
+           BattleActions.discard_retreat_energy(game_id, defender_card.owner_player_id, [
+             energy_card
+           ]) do
+      {:ok, discarded_energy_card}
     end
   end
 

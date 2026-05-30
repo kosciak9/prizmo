@@ -40,6 +40,7 @@ const GAME_ID_STORAGE_KEY = 'prizmo:tcg-playtest-game-id'
 const VIEWER_STORAGE_KEY = 'prizmo:tcg-playtest-viewer'
 const DISCARD_OWN_BASIC_ENERGY_FOR_DAMAGE_EFFECT = 'damage_per_discarded_own_basic_energy'
 const DISCARD_OWN_BENCH_ENERGY_FOR_BONUS_DAMAGE_EFFECT = 'discard_energy_from_own_bench_for_bonus_damage'
+const DISCARD_DEFENDING_ENERGY_ON_COIN_HEADS_EFFECT = 'discard_defending_energy_on_coin_heads'
 const SHUFFLE_ATTACHED_ENERGY_INTO_DECK_THEN_DAMAGE_OPPONENT_BENCH_EFFECT =
   'shuffle_attached_energy_into_deck_then_damage_opponent_bench'
 
@@ -2166,6 +2167,10 @@ function AttackProgressPanel({
     const sourceCards =
       turn.pendingAttackEffectType === DISCARD_OWN_BENCH_ENERGY_FOR_BONUS_DAMAGE_EFFECT
         ? activePlayer.bench
+        : turn.pendingAttackEffectType === DISCARD_DEFENDING_ENERGY_ON_COIN_HEADS_EFFECT
+          ? opponentPlayer?.active
+            ? [opponentPlayer.active]
+            : []
         : turn.pendingAttackEffectType === DISCARD_OWN_BASIC_ENERGY_FOR_DAMAGE_EFFECT
           ? [activePlayer.active, ...activePlayer.bench]
           : []
@@ -2177,7 +2182,7 @@ function AttackProgressPanel({
           .filter(isEnergyCard)
           .map(energyCard => ({ attachedTo: card, energyCard }))
       )
-  }, [activePlayer, turn?.pendingAttackEffectType, turn?.pendingAttackRequiresDiscardedEnergy])
+  }, [activePlayer, opponentPlayer?.active, turn?.pendingAttackEffectType, turn?.pendingAttackRequiresDiscardedEnergy])
   const discardedEnergyOptionIds = useMemo(
     () => new Set(discardedEnergyOptions.map(option => option.energyCard.id)),
     [discardedEnergyOptions]
@@ -2323,13 +2328,23 @@ function AttackProgressPanel({
   const commandPending = Boolean(resolveDeclaredAttackPendingPlayerId || finishAttackPendingPlayerId)
   const switchTargetRequired = turn.pendingAttackRequiresSwitchTarget && switchTargetOptions.length > 1
   const discardedEnergyMaxSelection =
-    turn.pendingAttackEffectType === DISCARD_OWN_BENCH_ENERGY_FOR_BONUS_DAMAGE_EFFECT ? 2 : null
+    turn.pendingAttackEffectType === DISCARD_OWN_BENCH_ENERGY_FOR_BONUS_DAMAGE_EFFECT
+      ? 2
+      : turn.pendingAttackEffectType === DISCARD_DEFENDING_ENERGY_ON_COIN_HEADS_EFFECT
+        ? 1
+        : null
   const discardedEnergyDescription =
     turn.pendingAttackEffectType === DISCARD_OWN_BENCH_ENERGY_FOR_BONUS_DAMAGE_EFFECT
       ? 'This attack does 60 more damage for each selected Energy attached to Benched Pokémon, then discards those Energy cards during resolution. Select up to 2, or select none for no bonus damage.'
+      : turn.pendingAttackEffectType === DISCARD_DEFENDING_ENERGY_ON_COIN_HEADS_EFFECT
+        ? "On Heads, this attack discards one Energy attached to the opponent's Active Pokémon after damage. If exactly one Energy is attached, resolution will discard it automatically. Tails discards none."
       : turn.pendingAttackEffectType === DISCARD_OWN_BASIC_ENERGY_FOR_DAMAGE_EFFECT
         ? 'This attack does damage for each selected own Basic Energy attached to Pokémon in play, then discards those Energy cards during resolution. Selecting none resolves it for zero bonus damage.'
         : 'This attack resolves with the selected discarded Energy cards.'
+  const discardedEnergyEmptyDescription =
+    turn.pendingAttackEffectType === DISCARD_DEFENDING_ENERGY_ON_COIN_HEADS_EFFECT
+      ? `No Energy cards are visible on the opponent's Active Pokémon, so Heads will discard none.`
+      : `No attached Energy cards are visible for ${formatPlayerId(turn.activePlayerId)}, so resolution will deal zero damage from this effect.`
   const returnedEnergyRequiresChoice = turn.pendingAttackRequiresReturnedEnergy && returnedEnergyOptions.length > 1
   const returnedEnergyUnavailable = turn.pendingAttackRequiresReturnedEnergy && returnedEnergyOptions.length === 0
   const shuffledEnergyRequiredCount = 3
@@ -2352,6 +2367,11 @@ function AttackProgressPanel({
   const benchDamageCounterAllocationIncomplete =
     benchDamageCounterAllocationRequired && selectedBenchDamageCounterTotal !== benchDamageCounterRequiredCount
   const coinResultRequired = turn.pendingAttackRequiresCoinResult && !coinResultForResolve
+  const defendingEnergyDiscardRequiresChoice =
+    turn.pendingAttackEffectType === DISCARD_DEFENDING_ENERGY_ON_COIN_HEADS_EFFECT &&
+    coinResultForResolve === 'heads' &&
+    discardedEnergyOptions.length > 1 &&
+    selectedDiscardedEnergyIdsForResolve.length !== 1
   const headsCountRequired = turn.pendingAttackRequiresHeadsCount && headsCountForResolve === null
   const missingActivePlayers = gameState.players.filter(player => !player.active)
   const viewerPromptBlocksFinish = viewerCanAdvanceAttack && gameState.prompts.length > 0
@@ -2367,6 +2387,7 @@ function AttackProgressPanel({
     (benchDamageTargetRequired && !selectedBenchDamageTargetIsValid) ||
     benchDamageCounterAllocationIncomplete ||
     coinResultRequired ||
+    defendingEnergyDiscardRequiresChoice ||
     headsCountRequired
   const resolveButtonLabel = resolveDeclaredAttackPendingPlayerId === turn.activePlayerId
     ? `Resolving ${attackLabel}...`
@@ -2386,9 +2407,11 @@ function AttackProgressPanel({
                   ? `Allocate exactly ${benchDamageCounterRequiredCount} Bench damage counters for ${attackLabel}`
                   : coinResultRequired
                     ? `Choose a coin result for ${attackLabel}`
-                    : headsCountRequired
-                      ? `Enter a heads count for ${attackLabel}`
-                      : `Resolve ${attackLabel}`
+                    : defendingEnergyDiscardRequiresChoice
+                      ? `Choose an Energy to discard for ${attackLabel}`
+                      : headsCountRequired
+                        ? `Enter a heads count for ${attackLabel}`
+                        : `Resolve ${attackLabel}`
   const toggleDiscardedEnergyCard = (energyCardInstanceId: string) => {
     setSelectedDiscardedEnergyCardInstanceIds(previousSelectedIds => {
       if (previousSelectedIds.includes(energyCardInstanceId)) {
@@ -2620,8 +2643,7 @@ function AttackProgressPanel({
               </div>
             ) : (
               <p className="mt-3 rounded-lg border border-orange-200 bg-stone-50 px-3 py-2 text-xs text-orange-900">
-                No attached Energy cards are visible for {formatPlayerId(turn.activePlayerId)}, so resolution will deal
-                zero damage from this effect.
+                {discardedEnergyEmptyDescription}
               </p>
             )}
           </div>

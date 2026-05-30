@@ -120,6 +120,7 @@ defmodule Prizmo.TcgEngine.GameView do
       pending_attack_requires_discarded_energy:
         pending_attack_effect_type in [
           :damage_per_discarded_own_basic_energy,
+          :discard_defending_energy_on_coin_heads,
           :discard_energy_from_own_bench_for_bonus_damage
         ],
       pending_attack_requires_returned_energy:
@@ -135,6 +136,7 @@ defmodule Prizmo.TcgEngine.GameView do
       pending_attack_requires_coin_result:
         pending_attack_effect_type in [
           :bonus_damage_on_coin_heads,
+          :discard_defending_energy_on_coin_heads,
           :prevent_damage_and_effects_from_attacks_next_turn_on_coin_heads
         ],
       pending_attack_requires_heads_count:

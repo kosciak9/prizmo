@@ -77,6 +77,18 @@ defmodule Prizmo.TcgEngine.AttackDamage do
          damage,
          _attacker_card,
          _defender_card,
+         %{type: :discard_defending_energy_on_coin_heads},
+         opts
+       ) do
+    with {:ok, _coin_result} <- AttackEffects.coin_result(opts) do
+      {:ok, damage}
+    end
+  end
+
+  defp apply_effect(
+         damage,
+         _attacker_card,
+         _defender_card,
          %{type: :damage_per_discarded_own_basic_energy, damage_per_energy: damage_per_energy},
          opts
        )
@@ -266,6 +278,11 @@ defmodule Prizmo.TcgEngine.AttackDamage do
 
   defp apply_effect(damage, _attacker_card, _defender_card, %{
          type: :defending_pokemon_cannot_retreat_next_turn
+       }),
+       do: {:ok, damage}
+
+  defp apply_effect(damage, _attacker_card, _defender_card, %{
+         type: :discard_defending_energy_on_coin_heads
        }),
        do: {:ok, damage}
 

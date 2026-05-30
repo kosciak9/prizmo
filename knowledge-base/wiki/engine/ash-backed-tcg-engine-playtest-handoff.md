@@ -266,11 +266,16 @@ Updated: 2026-05-30
 - Defender-targeted after-damage effects currently modeled as Confused status or next-turn retreat lock are prevented when the protected Pokémon is the target during the blocked turn.
 - The viewer read model now reuses `pending_attack_requires_coin_result` for `Dig`, and the React attack-resolution panel copy now describes generic coin-gated damage/effects instead of only bonus damage.
 - A Tidewave rollback smoke verified `Dig` fetches as executable, resolves heads with a marker, and prevents both damage and `Mind Bend` Confused status from opponent `TWM-095` `Mind Bend` on the next turn.
+- Iteration 76 continued the rejected authored attack-effect inventory and picked Goldeen `TWM-044` `Whirlpool` as a deterministic coin-gated defending-Energy discard slice.
+- `Prizmo.TcgEngine.AttackEffects` and `Prizmo.TcgEngine.AttackDamage` now support `:discard_defending_energy_on_coin_heads`: resolving the attack requires `:coin_result`, tails records no discard, and heads discards one Energy attached to the opponent's Active Pokémon. If exactly one defending Energy is attached it is selected implicitly; if multiple are attached, callers pass one selected `discarded_energy_card_instance_ids` value.
+- Defender-targeted attack-effect prevention from `Dig` now also prevents Whirlpool's defending-Energy discard when the protected Pokémon is the target during the blocked turn.
+- The viewer read model marks `pending_attack_requires_coin_result` and `pending_attack_requires_discarded_energy` for Whirlpool, and the React attack-resolution panel reuses the visible attached-Energy selector against the opponent Active with a one-card selection cap.
+- A Tidewave rollback smoke verified `Whirlpool` fetches as executable with 10 damage, exposes the coin/discard read-model flags, resolves tails while leaving the defending Energy attached, and resolves heads while discarding the defending Energy.
 
 ## Last commit
 
-- Baseline entering iteration 75: `31262ae feat(tcg-engine): resolve rapid-fire combo heads count`.
-- This handoff was written before committing iteration 75; expected commit message is `feat(tcg-engine): resolve dig attack prevention`.
+- Baseline entering iteration 76: `1f91bd2 feat(tcg-engine): resolve dig attack prevention`.
+- This handoff was written before committing iteration 76; expected commit message is `feat(tcg-engine): resolve whirlpool energy discard`.
 
 ## Remaining tasks
 
@@ -315,9 +320,10 @@ Updated: 2026-05-30
 - Applin `TWM-017` `Tumbling Attack` is now executable in the persisted engine and deals 10 base damage plus 20 more damage on a command-provided, engine-validated heads result. Tails resolves for 10 damage. The browser attack-resolution panel now prompts for Heads/Tails when the read model marks `pending_attack_requires_coin_result`.
 - Mega Kangaskhan ex `MEG-104` `Rapid-Fire Combo` is now executable in the persisted engine and deals 200 base damage plus 50 more damage for each command-provided, engine-validated heads count. The browser attack-resolution panel now prompts for a non-negative heads count when the read model marks `pending_attack_requires_heads_count`.
 - Dunsparce `TEF-128` `Dig` is now executable in the persisted engine and deals its printed 30 damage before applying a command-provided, engine-validated coin result. Heads marks the attacker so opponent attack damage/effects to that Pokémon are prevented during the opponent's next turn; tails records no protection. The browser attack-resolution panel now prompts for Heads/Tails when the read model marks `pending_attack_requires_coin_result` for coin-gated damage or effects.
+- Goldeen `TWM-044` `Whirlpool` is now executable in the persisted engine and deals its printed 10 damage before applying a command-provided, engine-validated coin result. Heads discards one selected or implicitly sole Energy attached to the opponent's Active Pokémon; tails records no discard. The browser attack-resolution panel now prompts for Heads/Tails and visible opponent-Active Energy selection when needed.
 - Damage-dealing attack effects that truly require a new pending prompt still need a sequencing design before implementation because the engine currently enforces one awaiting pending effect per game and KO Prize prompts also use that continuation slot. `SSP-056` `Icicle Loop` avoided that blocker by using a resolve-command input rather than a pending prompt.
 - Validation blocker: the available manual-tester subagents still appear to share/contend over one browser/session, so their reported viewer flips are not reliable proof of independent-browser behavior. The documented manual-tester milestone needs a harness that guarantees separate browser contexts before it can be marked formally complete.
 
 ## Recommended next atomic task
 
-- Continue the rejected authored attack-effect inventory. Remaining unsupported authored attack effects are now mostly coin-gated non-damage and copy semantics (`TWM-044` `Whirlpool` and `DRI-087` `Gemstone Mimicry`); the recommended next atomic task is `TWM-044` `Whirlpool` with a command-provided deterministic coin result for its defending-Energy discard effect.
+- Continue the rejected authored attack-effect inventory. Remaining unsupported authored attack effects are now mostly copy-attack semantics; the recommended next atomic task is a design/implementation slice for `DRI-087` `Gemstone Mimicry` that keeps attack copying explicit and engine-owned.
