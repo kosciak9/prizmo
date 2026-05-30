@@ -53,6 +53,7 @@ defmodule Prizmo.TcgEngine.Game do
     define :create_from_supported_decks, args: [:players]
     define :start_setup_command, args: [:game_id]
     define :draw_opening_hand_command, args: [:game_id]
+    define :choose_active_from_hand_command, args: [:game_id, :player_id, :card_instance_id]
     define :start_setup
     define :complete_setup
     define :finish
@@ -124,6 +125,32 @@ defmodule Prizmo.TcgEngine.Game do
 
       run fn input, _context ->
         Mechanics.draw_opening_hand(input.arguments.game_id)
+      end
+    end
+
+    action :choose_active_from_hand_command, :struct do
+      description "Choose a player's setup Active Pokémon from hand through the mechanics layer."
+
+      constraints instance_of: Game
+
+      argument :game_id, :uuid do
+        allow_nil? false
+      end
+
+      argument :player_id, :string do
+        allow_nil? false
+      end
+
+      argument :card_instance_id, :uuid do
+        allow_nil? false
+      end
+
+      run fn input, _context ->
+        Mechanics.choose_active_from_hand(
+          input.arguments.game_id,
+          input.arguments.player_id,
+          input.arguments.card_instance_id
+        )
       end
     end
 

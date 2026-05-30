@@ -1,5 +1,6 @@
 export {
   buildCSRFHeaders as buildAshRpcHeaders,
+  chooseTcgEngineActiveFromHand as runChooseTcgEngineActiveFromHand,
   createTcgEngineGame as runCreateTcgEngineGame,
   drawTcgEngineOpeningHand as runDrawTcgEngineOpeningHand,
   listSupportedTcgDecks as runListSupportedTcgDecks,
@@ -8,6 +9,8 @@ export {
 } from './generated/ash_rpc'
 
 export type {
+  ChooseTcgEngineActiveFromHandInput,
+  ChooseTcgEngineActiveFromHandResult,
   CreateTcgEngineGameInput,
   CreateTcgEngineGameResult,
   DrawTcgEngineOpeningHandInput,
