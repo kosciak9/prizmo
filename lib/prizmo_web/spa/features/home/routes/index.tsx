@@ -269,14 +269,14 @@ const ACTION_GROUPS: Array<Omit<ActionGroup, 'actions'>> = [
     description: 'Resolve forced choices before the game can advance.'
   },
   {
-    id: 'hand',
-    title: 'Hand and board',
-    description: 'Play cards from hand, evolve Pokémon, and attach Energy.'
-  },
-  {
     id: 'battle',
     title: 'Battle decisions',
     description: 'Retreat or declare a paid attack with the Active Pokémon.'
+  },
+  {
+    id: 'hand',
+    title: 'Hand and board',
+    description: 'Play cards from hand, evolve Pokémon, and attach Energy.'
   },
   {
     id: 'turn',
@@ -3276,6 +3276,8 @@ function ActionAffordancesPanel({
       retreatPendingKey
   )
   const actionGroups = useMemo(() => groupActionAffordances(actions), [actions])
+  const primaryActionGroup = actionGroups[0]
+  const primaryActionGroupId = primaryActionGroup?.id
 
   if (actionGroups.length === 0 && !commandError) {
     return null
@@ -3289,6 +3291,15 @@ function ActionAffordancesPanel({
       <div className="space-y-4">
         {commandError ? <InlineNotice tone="error" title={commandError.title}>{commandError.message}</InlineNotice> : null}
 
+        {primaryActionGroup ? (
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50/80 px-3 py-2 text-xs leading-5 text-emerald-950">
+            <span className="font-semibold uppercase tracking-[0.14em] text-emerald-800">Current priority</span>
+            <span className="mt-0.5 block">
+              {primaryActionGroup.title}: {primaryActionGroup.description}
+            </span>
+          </div>
+        ) : null}
+
         {actionGroups.length > 0 ? (
           actionGroups.map(group => (
             <section className="space-y-2" key={group.id}>
@@ -3299,7 +3310,16 @@ function ActionAffordancesPanel({
                   </h3>
                   <p className="mt-1 text-xs leading-5 text-stone-500">{group.description}</p>
                 </div>
-                <StatusBadge tone={group.id === 'required' ? 'warning' : 'neutral'}>{group.actions.length}</StatusBadge>
+                <div className="flex shrink-0 items-center gap-2">
+                  {group.id === primaryActionGroupId ? (
+                    <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800">
+                      next
+                    </span>
+                  ) : null}
+                  <StatusBadge tone={actionGroupBadgeTone(group.id, group.id === primaryActionGroupId)}>
+                    {group.actions.length}
+                  </StatusBadge>
+                </div>
               </div>
 
               <ul className="space-y-1.5">
@@ -3759,6 +3779,14 @@ function actionGroupId(action: ActionAffordance): ActionGroupId {
     default:
       return 'other'
   }
+}
+
+function actionGroupBadgeTone(groupId: ActionGroupId, isPrimaryGroup: boolean): 'active' | 'neutral' | 'warning' {
+  if (groupId === 'required') {
+    return 'warning'
+  }
+
+  return isPrimaryGroup ? 'active' : 'neutral'
 }
 
 function BattlefieldPanel({

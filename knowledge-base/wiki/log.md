@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-31] iteration 92 | Legal-action priority cue
+- Task attempted: continued the Web UI polish pass by refining active legal-action hierarchy in the player command rail, promoting Battle decisions above routine hand/board commands and adding a `Current priority` cue plus `next` marker for the first active action group.
+- Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.
+- Validation: `mix format && mix assets.build` passed; `mix check --no-test` passed; browser smoke on `http://localhost:4003` confirmed the active Player 2 command rail shows `Current priority`, marks the first action group as `next`, keeps legal actions usable, and reports no browser warnings or errors.
+- Remaining/blocking notes: no code blocker for this legal-action hierarchy slice. Further Web UI polish should refine attack-resolution copy/effect control density and product-quality error/empty states before rerunning the formal two-browser playtest milestone.
+
 ## [2026-05-31] iteration 91 | Inactive command rail panel density
 - Task attempted: continued the Web UI polish pass by hiding inactive `Viewer prompts` and `Available actions` rail panels when they have no prompts/actions and no command errors, keeping the next required flow decision visually dominant after setup.
 - Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.
