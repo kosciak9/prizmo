@@ -151,6 +151,9 @@ defmodule Prizmo.TcgEngine.AttackDamage do
   defp apply_effect(damage, _attacker_card, _defender_card, %{type: :discard_hand_then_draw}),
     do: {:ok, damage}
 
+  defp apply_effect(damage, _attacker_card, _defender_card, %{type: :search_pokemon_to_hand}),
+    do: {:ok, damage}
+
   defp apply_effect(damage, _attacker_card, _defender_card, %{
          type: :attacker_cannot_attack_next_turn
        }), do: {:ok, damage}

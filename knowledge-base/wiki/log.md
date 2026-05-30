@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-30] iteration 66 | Find a Friend attack prompt
+- Task attempted: continued the rejected authored attack-effect inventory and implemented the persisted `:search_pokemon_to_hand` attack-effect slice for Applin `TWM-126` `Find a Friend`, creating an attack-effect prompt that lets the attacking player choose a Pokémon from their deck, moves the chosen card to hand, shuffles the deck event-wise, completes the pending effect, and keeps attack finish blocked until the prompt resolves.
+- Files changed: updated `lib/prizmo/tcg_engine/attack_effects.ex`, `lib/prizmo/tcg_engine/attack_damage.ex`, `lib/prizmo/tcg_engine/mechanics.ex`, this log, and the TCG engine playtest handoff.
+- Validation: `mix format && mix compile --warnings-as-errors` passed; Tidewave rollback smoke passed for `TWM-126` `Find a Friend` fetching as executable, surfacing an attack-effect prompt with private legal Pokémon choices in the viewer read model, returning the selected `TWM-018` from deck to hand, completing the pending effect, and finishing the attack afterward; `mix test test/prizmo/tcg_engine/mechanics_test.exs` passed (4 tests); `mix prizmo.cards.coverage` passed; `mix check --no-test` passed.
+- Remaining/blocking notes: no code blocker for Applin's search-Pokémon attack prompt; additional rejected authored attack effects remain and should continue to be enabled one deterministic persisted effect at a time.
+
 ## [2026-05-30] iteration 65 | Defender next-turn retreat lock
 - Task attempted: continued the rejected authored attack-effect inventory and implemented the narrow persisted `:defending_pokemon_cannot_retreat_next_turn` slice for Wellspring Mask Ogerpon ex `TWM-064` `Sob`, marking the surviving Defending Pokémon so it cannot retreat during its controller's next turn.
 - Files changed: added `lib/prizmo/tcg_engine/retreat_locks.ex`; updated `lib/prizmo/tcg_engine/attack_effects.ex`, `lib/prizmo/tcg_engine/attack_damage.ex`, `lib/prizmo/tcg_engine/requirements.ex`, `lib/prizmo/tcg_engine/mechanics.ex`, `lib/prizmo/tcg_engine/game_view/action_affordances.ex`, this log, and the TCG engine playtest handoff.

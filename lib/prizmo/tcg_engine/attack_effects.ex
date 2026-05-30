@@ -2,6 +2,7 @@ defmodule Prizmo.TcgEngine.AttackEffects do
   @moduledoc false
 
   import Prizmo.TcgEngine.BoardState, only: [active_card: 2]
+  import Prizmo.TcgEngine.CardMetadataRequirements, only: [require_pokemon_card: 1]
 
   import Prizmo.TcgEngine.CardStore,
     only: [
@@ -9,18 +10,32 @@ defmodule Prizmo.TcgEngine.AttackEffects do
       deck_cards_for_player: 2,
       discard_cards_from_hand: 3,
       get_card: 2,
+      get_cards: 2,
+      move_deck_card_to_hand: 3,
       next_hand_position_result: 2
     ]
 
-  import Prizmo.TcgEngine.Operation, only: [update: 3]
+  import Prizmo.TcgEngine.EventLog, only: [write_event_and_snapshot: 4]
+  import Prizmo.TcgEngine.Operation, only: [create: 3, update: 3]
 
   import Prizmo.TcgEngine.Requirements,
-    only: [require_card_owned_by_player: 2, require_card_zone: 2]
+    only: [
+      require_all_owned_in_zone: 3,
+      require_card_owned_by_player: 2,
+      require_card_zone: 2,
+      require_exact_count: 3,
+      require_unique_ids: 1
+    ]
 
   alias Prizmo.TcgEngine.AttackLocks
   alias Prizmo.TcgEngine.BattleActions
   alias Prizmo.TcgEngine.CardInstance
+  alias Prizmo.TcgEngine.EventPayloads
+  alias Prizmo.TcgEngine.Game
+  alias Prizmo.TcgEngine.GameStore
+  alias Prizmo.TcgEngine.PendingEffect
   alias Prizmo.TcgEngine.PlayerStore
+  alias Prizmo.TcgEngine.Prompt
   alias Prizmo.TcgEngine.RetreatLocks
   alias Prizmo.TcgEngine.TurnStore
 
@@ -41,6 +56,7 @@ defmodule Prizmo.TcgEngine.AttackEffects do
     :damage_per_own_basic_pokemon_in_play,
     :damage_per_own_benched_pokemon,
     :damage_per_own_team_rocket_pokemon_in_play,
+    :search_pokemon_to_hand,
     :self_damage,
     :switch_self_with_bench
   ]
@@ -131,12 +147,193 @@ defmodule Prizmo.TcgEngine.AttackEffects do
       %{type: :self_damage, damage: damage} when is_integer(damage) and damage >= 0 ->
         self_damage(game_id, player_id, attacker_card, damage)
 
+      %{type: :search_pokemon_to_hand} ->
+        create_search_pokemon_prompt(game_id, player_id, attacker_card, attack)
+
       nil ->
         {:ok, %{}}
 
       effect ->
         {:error, {:unsupported_attack_effect, type(effect)}}
     end
+  end
+
+  @spec resume_pending_effect(Game.t(), Prompt.t(), PendingEffect.t(), String.t(), String.t(), [
+          String.t()
+        ]) ::
+          {:ok, Game.t()} | {:error, term()}
+  def resume_pending_effect(
+        %Game{} = game,
+        %Prompt{} = prompt,
+        %PendingEffect{source_type: :attack_effect, effect_key: :search_pokemon_to_hand} =
+          pending_effect,
+        player_id,
+        "search_pokemon_to_hand",
+        selected_card_instance_ids
+      )
+      when is_binary(player_id) and is_list(selected_card_instance_ids) do
+    with :ok <- require_exact_count(selected_card_instance_ids, 1, :wrong_search_pokemon_count),
+         :ok <- require_unique_ids(selected_card_instance_ids),
+         :ok <- require_prompt_legal_choices(prompt, selected_card_instance_ids),
+         {:ok, [target_card]} <- get_cards(game.id, selected_card_instance_ids),
+         :ok <- require_all_owned_in_zone([target_card], player_id, :deck),
+         :ok <- require_pokemon_card(target_card.card_id),
+         {:ok, moved_target} <- move_deck_card_to_hand(game.id, player_id, target_card),
+         {:ok, _event} <-
+           write_event_and_snapshot(game.id, :cards_moved, player_id, %{
+             reason: :attack_effect_resolution,
+             source: source_payload(pending_effect),
+             effect_key: pending_effect.effect_key,
+             cards: EventPayloads.moved_cards([moved_target], :deck, :hand)
+           }),
+         {:ok, _event} <-
+           write_event_and_snapshot(game.id, :deck_shuffled, player_id, %{
+             source: source_payload(pending_effect),
+             effect_key: pending_effect.effect_key
+           }),
+         {:ok, _pending_effect} <-
+           update(pending_effect, :complete, %{
+             current_player_id: nil,
+             state:
+               Map.put(pending_effect.state || %{}, "searched_card_instance_id", moved_target.id)
+           }),
+         {:ok, _event} <-
+           write_event_and_snapshot(game.id, :attack_effect_completed, player_id, %{
+             prompt_id: prompt.id,
+             pending_effect_id: pending_effect.id,
+             effect_key: pending_effect.effect_key,
+             selected_card_instance_id: moved_target.id
+           }) do
+      GameStore.get_game(game.id)
+    end
+  end
+
+  def resume_pending_effect(
+        %Game{},
+        %Prompt{},
+        %PendingEffect{source_type: :attack_effect, effect_key: effect_key},
+        _player_id,
+        choice_key,
+        _selected_card_instance_ids
+      ) do
+    {:error, {:unsupported_attack_effect_prompt, effect_key, choice_key}}
+  end
+
+  defp create_search_pokemon_prompt(game_id, player_id, %CardInstance{} = attacker_card, attack) do
+    with {:ok, legal_choice_ids} <- legal_search_pokemon_choice_ids(game_id, player_id) do
+      case legal_choice_ids do
+        [] ->
+          {:ok,
+           %{
+             effect_type: "search_pokemon_to_hand",
+             search_prompt_created?: false,
+             search_legal_choice_count: 0
+           }}
+
+        [_first | _rest] ->
+          create_search_pokemon_prompt(
+            game_id,
+            player_id,
+            attacker_card,
+            attack,
+            legal_choice_ids
+          )
+      end
+    end
+  end
+
+  defp create_search_pokemon_prompt(
+         game_id,
+         player_id,
+         %CardInstance{} = attacker_card,
+         attack,
+         legal_choice_ids
+       ) do
+    with {:ok, turn} <- TurnStore.current_turn(game_id),
+         {:ok, pending_effect} <-
+           create(PendingEffect, :create, %{
+             game_id: game_id,
+             source_type: :attack_effect,
+             source_card_instance_id: attacker_card.id,
+             source_card_id: attacker_card.card_id,
+             controller_player_id: player_id,
+             current_player_id: player_id,
+             effect_key: :search_pokemon_to_hand,
+             step: "awaiting_choice",
+             state: %{
+               "version" => 1,
+               "kind" => "attack_effect",
+               "effect_type" => "search_pokemon_to_hand",
+               "player_id" => player_id,
+               "source_card_instance_id" => attacker_card.id,
+               "source_card_id" => attacker_card.card_id,
+               "attack_id" => Atom.to_string(attack.id)
+             }
+           }),
+         {:ok, pending_effect} <-
+           update(pending_effect, :await_prompt, %{
+             current_player_id: player_id,
+             effect_key: :search_pokemon_to_hand,
+             step: "awaiting_choice",
+             state: pending_effect.state || %{}
+           }),
+         {:ok, prompt} <-
+           create(Prompt, :create, %{
+             game_id: game_id,
+             turn_id: turn.id,
+             pending_effect_id: pending_effect.id,
+             prompt_type: "select_cards",
+             player_id: player_id,
+             payload: %{
+               "choice_key" => "search_pokemon_to_hand",
+               "legal_choices" => legal_choice_ids,
+               "min" => 1,
+               "max" => 1,
+               "source_card_instance_id" => attacker_card.id,
+               "source_card_id" => attacker_card.card_id,
+               "attack_id" => Atom.to_string(attack.id)
+             }
+           }) do
+      {:ok,
+       %{
+         effect_type: "search_pokemon_to_hand",
+         pending_effect_id: pending_effect.id,
+         prompt_id: prompt.id,
+         search_prompt_created?: true,
+         search_legal_choice_count: length(legal_choice_ids)
+       }}
+    end
+  end
+
+  defp legal_search_pokemon_choice_ids(game_id, player_id) do
+    with {:ok, deck_cards} <- cards_in_zone(game_id, player_id, :deck) do
+      deck_cards
+      |> Enum.filter(fn card -> require_pokemon_card(card.card_id) == :ok end)
+      |> Enum.map(& &1.id)
+      |> then(&{:ok, &1})
+    end
+  end
+
+  defp require_prompt_legal_choices(%Prompt{payload: payload}, selected_card_instance_ids) do
+    legal_choice_ids =
+      case Map.get(payload, "legal_choices", []) do
+        ids when is_list(ids) -> ids
+        _other -> []
+      end
+
+    if Enum.all?(selected_card_instance_ids, &(&1 in legal_choice_ids)) do
+      :ok
+    else
+      {:error, :illegal_prompt_choice}
+    end
+  end
+
+  defp source_payload(%PendingEffect{} = pending_effect) do
+    %{
+      type: :card,
+      card_id: pending_effect.source_card_id,
+      card_instance_id: pending_effect.source_card_instance_id
+    }
   end
 
   defp switch_self_with_bench(game_id, player_id, %CardInstance{} = attacker_card, opts) do
