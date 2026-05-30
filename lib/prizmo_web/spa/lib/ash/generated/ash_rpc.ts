@@ -348,6 +348,52 @@ export async function chooseTcgEnginePrompt<Fields extends ChooseTcgEnginePrompt
 }
 
 
+export type ChooseTcgEngineReplacementActiveInput = {
+  gameId: UUID;
+  playerId: string;
+  benchCardInstanceId: UUID;
+};
+
+export type ChooseTcgEngineReplacementActiveFields = UnifiedFieldSelection<TcgEngineGameResourceSchema>[];
+
+export type InferChooseTcgEngineReplacementActiveResult<
+  Fields extends ChooseTcgEngineReplacementActiveFields | undefined,
+> = InferResult<TcgEngineGameResourceSchema, Fields>;
+
+export type ChooseTcgEngineReplacementActiveResult<Fields extends ChooseTcgEngineReplacementActiveFields | undefined = undefined> = | { success: true; data: InferChooseTcgEngineReplacementActiveResult<Fields>; }
+| { success: false; errors: AshRpcError[]; }
+
+;
+
+/**
+ * Execute generic action on Game
+ *
+ * @ashActionType :action
+ */
+export async function chooseTcgEngineReplacementActive<Fields extends ChooseTcgEngineReplacementActiveFields | undefined = undefined>(
+  config: {
+  tenant?: string;
+  input: ChooseTcgEngineReplacementActiveInput;
+  fields: Fields;
+  headers?: Record<string, string>;
+  fetchOptions?: RequestInit;
+  customFetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+}
+): Promise<ChooseTcgEngineReplacementActiveResult<Fields extends undefined ? [] : Fields>> {
+  const payload = {
+    action: "choose_tcg_engine_replacement_active",
+    ...(config.tenant !== undefined && { tenant: config.tenant }),
+    input: config.input,
+    ...(config.fields !== undefined && { fields: config.fields })
+  };
+
+  return executeActionRpcRequest<ChooseTcgEngineReplacementActiveResult<Fields extends undefined ? [] : Fields>>(
+    payload,
+    config
+  );
+}
+
+
 export type ChooseTcgEngineSetupBenchFromHandInput = {
   gameId: UUID;
   playerId: string;

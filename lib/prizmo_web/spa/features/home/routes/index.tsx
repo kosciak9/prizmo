@@ -6,6 +6,7 @@ import {
   buildAshRpcHeaders,
   runChooseTcgEngineActiveFromHand,
   runChooseTcgEnginePrompt,
+  runChooseTcgEngineReplacementActive,
   runChooseTcgEngineSetupBenchFromHand,
   runCompleteTcgEngineSetup,
   runCreateTcgEngineGame,
@@ -317,6 +318,17 @@ type FinishAttackCommand = {
   playerId: string
 }
 
+type ChooseReplacementActiveInput = {
+  gameId: string
+  playerId: PlayerId
+  benchCardInstanceId: string
+}
+
+type ChooseReplacementActiveCommand = {
+  playerId: string
+  benchCardInstanceId: string
+}
+
 type ChoosePromptInput = {
   gameId: string
   playerId: PlayerId
@@ -540,6 +552,13 @@ export function HomeRoute() {
 
   const finishAttackMutation = useMutation({
     mutationFn: (input: FinishAttackInput) => finishAttack(input),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['tcg-engine', 'game-state'] })
+    }
+  })
+
+  const chooseReplacementActiveMutation = useMutation({
+    mutationFn: (input: ChooseReplacementActiveInput) => chooseReplacementActive(input),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['tcg-engine', 'game-state'] })
     }
@@ -1148,6 +1167,12 @@ export function HomeRoute() {
                   </InlineNotice>
                 ) : null}
 
+                {chooseReplacementActiveMutation.error ? (
+                  <InlineNotice tone="error" title="Replacement Active command failed">
+                    {errorMessage(chooseReplacementActiveMutation.error)}
+                  </InlineNotice>
+                ) : null}
+
                 {choosePromptMutation.error ? (
                   <InlineNotice tone="error" title="Prompt choice command failed">
                     {errorMessage(choosePromptMutation.error)}
@@ -1202,6 +1227,15 @@ export function HomeRoute() {
                 deckNamesByKey={deckNamesByKey}
                 gameState={gameState}
                 viewerPlayerId={session.viewerPlayerId}
+                onChooseReplacementActive={({ playerId, benchCardInstanceId }) => {
+                  if (isPlayerId(playerId)) {
+                    chooseReplacementActiveMutation.mutate({
+                      gameId: normalisedGameId,
+                      playerId,
+                      benchCardInstanceId
+                    })
+                  }
+                }}
                 onChoosePrompt={({ playerId, promptId, selectedCardInstanceIds }) => {
                   if (isPlayerId(playerId)) {
                     choosePromptMutation.mutate({
@@ -1293,6 +1327,11 @@ export function HomeRoute() {
                         attachEnergyMutation.variables.energyCardInstanceId,
                         attachEnergyMutation.variables.targetCardInstanceId
                       )
+                    : null
+                }
+                chooseReplacementActivePendingCardId={
+                  chooseReplacementActiveMutation.isPending
+                    ? chooseReplacementActiveMutation.variables?.benchCardInstanceId ?? null
                     : null
                 }
                 promptPendingId={choosePromptMutation.isPending ? choosePromptMutation.variables?.promptId ?? null : null}
@@ -1638,6 +1677,20 @@ async function finishAttack(input: FinishAttackInput): Promise<CreatedGame> {
   return result.data as CreatedGame
 }
 
+async function chooseReplacementActive(input: ChooseReplacementActiveInput): Promise<CreatedGame> {
+  const result = await runChooseTcgEngineReplacementActive({
+    input,
+    fields: GAME_RESOURCE_FIELDS,
+    headers: buildAshRpcHeaders()
+  })
+
+  if (!result.success) {
+    throw new Error(rpcErrorMessage(result.errors))
+  }
+
+  return result.data as CreatedGame
+}
+
 async function choosePrompt(input: ChoosePromptInput): Promise<CreatedGame> {
   const result = await runChooseTcgEnginePrompt({
     input,
@@ -1657,6 +1710,7 @@ function GameStateWorkbench({
   viewerPlayerId,
   deckNamesByKey,
   onChoosePrompt,
+  onChooseReplacementActive,
   onAttachEnergy,
   onDeclareAttack,
   onEndTurn,
@@ -1666,6 +1720,7 @@ function GameStateWorkbench({
   onRetreat,
   onResolveDeclaredAttack,
   attachEnergyPendingKey,
+  chooseReplacementActivePendingCardId,
   declareAttackPendingKey,
   endTurnPendingPlayerId,
   finishAttackPendingPlayerId,
@@ -1679,6 +1734,7 @@ function GameStateWorkbench({
   viewerPlayerId: PlayerId
   deckNamesByKey: Map<string, string>
   onChoosePrompt: (input: ChoosePromptCommand) => void
+  onChooseReplacementActive: (input: ChooseReplacementActiveCommand) => void
   onAttachEnergy: (input: AttachEnergyCommand) => void
   onDeclareAttack: (input: DeclareAttackCommand) => void
   onEndTurn: (input: EndTurnCommand) => void
@@ -1688,6 +1744,7 @@ function GameStateWorkbench({
   onRetreat: (input: RetreatCommand) => void
   onResolveDeclaredAttack: (input: ResolveDeclaredAttackCommand) => void
   attachEnergyPendingKey: string | null
+  chooseReplacementActivePendingCardId: string | null
   declareAttackPendingKey: string | null
   endTurnPendingPlayerId: string | null
   finishAttackPendingPlayerId: string | null
@@ -1730,7 +1787,9 @@ function GameStateWorkbench({
       <ActionAffordancesPanel
         actions={gameState.actionAffordances}
         cardsById={cardsById}
+        chooseReplacementActivePendingCardId={chooseReplacementActivePendingCardId}
         onAttachEnergy={onAttachEnergy}
+        onChooseReplacementActive={onChooseReplacementActive}
         onDeclareAttack={onDeclareAttack}
         onEndTurn={onEndTurn}
         onPlayBasicToBench={onPlayBasicToBench}
@@ -1983,6 +2042,8 @@ function AttackProgressPanel({
   const viewerCanAdvanceAttack = viewerPlayerId === turn.activePlayerId && isPlayerId(turn.activePlayerId)
   const commandPending = Boolean(resolveDeclaredAttackPendingPlayerId || finishAttackPendingPlayerId)
   const switchTargetRequired = turn.pendingAttackRequiresSwitchTarget && switchTargetOptions.length > 1
+  const missingActivePlayers = gameState.players.filter(player => !player.active)
+  const attackCannotFinish = missingActivePlayers.length > 0
   const resolveDisabled =
     !viewerCanAdvanceAttack || commandPending || (switchTargetRequired && !selectedSwitchTargetIsValid)
   const resolveButtonLabel = resolveDeclaredAttackPendingPlayerId === turn.activePlayerId
@@ -2064,6 +2125,13 @@ function AttackProgressPanel({
           </p>
         ) : null}
 
+        {attackCannotFinish ? (
+          <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+            {missingActivePlayers.map(player => formatPlayerId(player.playerId)).join(', ')} must choose a replacement
+            Active Pokémon before this attack can finish.
+          </p>
+        ) : null}
+
         {turn.status === 'attack_declared' ? (
           <button
             className="w-full rounded-xl border border-emerald-700 px-3 py-2 text-left text-sm font-semibold text-emerald-800 transition hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:border-stone-300 disabled:text-stone-400 disabled:hover:bg-transparent"
@@ -2083,7 +2151,7 @@ function AttackProgressPanel({
         {turn.status === 'attack_resolving' ? (
           <button
             className="w-full rounded-xl border border-emerald-700 px-3 py-2 text-left text-sm font-semibold text-emerald-800 transition hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:border-stone-300 disabled:text-stone-400 disabled:hover:bg-transparent"
-            disabled={!viewerCanAdvanceAttack || commandPending}
+            disabled={!viewerCanAdvanceAttack || commandPending || attackCannotFinish}
             onClick={() => onFinishAttack({ playerId: turn.activePlayerId })}
             type="button"
           >
@@ -2098,7 +2166,9 @@ function AttackProgressPanel({
 function ActionAffordancesPanel({
   actions,
   cardsById,
+  chooseReplacementActivePendingCardId,
   onAttachEnergy,
+  onChooseReplacementActive,
   onDeclareAttack,
   onEndTurn,
   onPlayBasicToBench,
@@ -2113,7 +2183,9 @@ function ActionAffordancesPanel({
 }: {
   actions: ActionAffordance[]
   cardsById: Map<string, CardSummary>
+  chooseReplacementActivePendingCardId: string | null
   onAttachEnergy: (input: AttachEnergyCommand) => void
+  onChooseReplacementActive: (input: ChooseReplacementActiveCommand) => void
   onDeclareAttack: (input: DeclareAttackCommand) => void
   onEndTurn: (input: EndTurnCommand) => void
   onPlayBasicToBench: (input: PlayBasicToBenchCommand) => void
@@ -2130,6 +2202,7 @@ function ActionAffordancesPanel({
     playCardPendingCardId ||
       playBasicToBenchPendingCardId ||
       attachEnergyPendingKey ||
+      chooseReplacementActivePendingCardId ||
       declareAttackPendingKey ||
       endTurnPendingPlayerId ||
       retreatPendingKey
@@ -2292,6 +2365,34 @@ function ActionAffordancesPanel({
                 </div>
               ) : null}
 
+              {action.key === 'choose_replacement_active' && action.targetCardInstanceIds.length > 0 ? (
+                <div className="mt-3 space-y-2">
+                  {action.targetCardInstanceIds.map(benchCardInstanceId => {
+                    const benchCard = cardsById.get(benchCardInstanceId)
+                    const isPending = chooseReplacementActivePendingCardId === benchCardInstanceId
+
+                    return (
+                      <button
+                        className="w-full rounded-xl border border-emerald-700 px-3 py-2 text-left text-sm font-semibold text-emerald-800 transition hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:border-stone-300 disabled:text-stone-400 disabled:hover:bg-transparent"
+                        disabled={actionCommandPending || !isPlayerId(action.playerId)}
+                        key={benchCardInstanceId}
+                        onClick={() =>
+                          onChooseReplacementActive({
+                            playerId: action.playerId,
+                            benchCardInstanceId
+                          })
+                        }
+                        type="button"
+                      >
+                        {isPending
+                          ? `Promoting ${benchCard?.name ?? 'Bench'}...`
+                          : `Promote ${benchCard?.name ?? formatCardInstanceId(benchCardInstanceId)} to Active`}
+                      </button>
+                    )
+                  })}
+                </div>
+              ) : null}
+
               {action.key === 'declare_attack' && action.attackId ? (
                 <button
                   className="mt-3 w-full rounded-xl border border-emerald-700 px-3 py-2 text-left text-sm font-semibold text-emerald-800 transition hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:border-stone-300 disabled:text-stone-400 disabled:hover:bg-transparent"
@@ -2324,8 +2425,8 @@ function ActionAffordancesPanel({
         </ul>
       ) : (
         <EmptyState title="No viewer action available">
-          Action window commands appear for the active viewer. Prompt choices appear when pending effects ask
-          this player to choose.
+          Action window commands appear for the active viewer. Prompt choices and replacement Active choices
+          appear when pending effects or knockouts ask this player to choose.
         </EmptyState>
       )}
     </Panel>

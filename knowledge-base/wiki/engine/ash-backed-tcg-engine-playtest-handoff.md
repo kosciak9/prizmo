@@ -141,29 +141,33 @@ Updated: 2026-05-30
 - `Prizmo.TcgEngine.Mechanics.resolve_declared_attack/3` and the lower-level `resolve_attack_damage/4` now write the damage event/snapshot first, then write explicit follow-up events/snapshots for `take_knockout_prizes`, `auto_replacement_active`, `replacement_active_required`, or `empty_board_win` as applicable.
 - `Prizmo.TcgEngine.Mechanics.finish_attack/2` now requires all players to have an Active Pokémon, so an attack cannot be finished while a KO'd defender still needs to choose among multiple Bench replacements.
 - A Tidewave rollback smoke verified Moltres `Fighting Wings` can KO an already-damaged Abra, move one Prize to Player 1's hand, auto-promote Player 2's only Benched Pokémon to Active, emit the expected follow-up events, and finish the attack.
+- Iteration 45 exposed `Prizmo.TcgEngine.Mechanics.choose_replacement_active/3` through `Prizmo.TcgEngine.Game.ActionCommands.choose_replacement_active_command`, the domain helper `Prizmo.TcgEngine.choose_replacement_active_for_game/3`, and AshTypescript RPC `chooseTcgEngineReplacementActive`.
+- `Prizmo.TcgEngine.GameView.ActionAffordances` now emits a viewer-scoped `choose_replacement_active` command during `attack_resolving` when that viewer has no Active Pokémon and at least one Benched Pokémon, with Bench candidate IDs as targets.
+- The React playtest legal-actions panel now renders `Promote ... to Active` buttons for those targets, calls the new RPC command, tracks pending replacement choices, and disables attack finish while any player is missing an Active Pokémon.
+- A Tidewave rollback smoke verified a Player 2 no-Active/two-Bench state surfaces two replacement choices, choosing one through the domain helper promotes it to Active and clears the affordance, and Player 1 can then finish the attack.
 
 ## Last commit
 
-- Baseline entering iteration 44: `22dcfeb feat(spa): choose switch attack targets`.
-- This handoff was written before committing iteration 44; expected commit message is `feat(tcg-engine): resolve attack knockouts`.
+- Baseline entering iteration 45: `7afe117 feat(tcg-engine): resolve attack knockouts`.
+- This handoff was written before committing iteration 45; expected commit message is `feat(tcg-engine): choose replacement active`.
 
 ## Remaining tasks
 
 - Decide whether old `Prizmo.Tcg.Sim` tests are kept as historical reference, quarantined, or ported scenario-by-scenario.
-- Build the minimal playable React SPA loop beyond prompt resolution, Bench commands, Attach Energy, attached-card board visibility, Retreat, paid attack declaration, static/executable attack resolution/finish controls, switch-self target choice, one-Bench KO follow-up, End Turn, next-turn progression, deterministic playtest fixture order, hardened tab-scoped viewer identity, and reduced prompt/action debug noise: expose replacement Active selection for multi-Bench KOs, then rerun the full two-browser/manual-tester playtest milestone only after the validation harness can guarantee separate browser contexts.
+- Build the minimal playable React SPA loop beyond prompt resolution, Bench commands, Attach Energy, attached-card board visibility, Retreat, paid attack declaration, static/executable attack resolution/finish controls, switch-self target choice, one-Bench KO follow-up, multi-Bench replacement Active choice, End Turn, next-turn progression, deterministic playtest fixture order, hardened tab-scoped viewer identity, and reduced prompt/action debug noise: rerun the full two-browser/manual-tester playtest milestone only after the validation harness can guarantee separate browser contexts.
 - Expand persisted Ash engine mechanics: implement explicit support for one rejected authored attack effect at a time beyond Moltres's Pokémon ex bonus and switch-self effects, explicit player Prize selection/pending state beyond deterministic Prize-order taking, multi-KO/prize handling, evolution UI/RPC wiring, turn transitions, and snapshot-backed undo/debug support.
 - Continue migrating executable card behavior into engine-owned definitions with explicit unsupported-behavior tracking.
 - Spike Electric Streams only after the command/read loop has enough event shape to publish safely.
 
 ## Blockers
 
-- No known code blocker after the iteration 33 viewer hardening, isolated-context playtest pass, iteration 34 action/prompt clarity pass, iteration 35 retreat command pass, iteration 36 attached-card visibility pass, iteration 37 paid attack declaration pass, iteration 38 static/executable attack resolution/finish pass, iteration 39 Moltres `Fighting Wings` behavior pass, iteration 40 unsupported attack declaration guard, iteration 41 unsupported authored-effect guard, iteration 42 switch-self attack resolution, iteration 43 switch target chooser, and iteration 44 one-Bench KO follow-up.
+- No known code blocker after the iteration 33 viewer hardening, isolated-context playtest pass, iteration 34 action/prompt clarity pass, iteration 35 retreat command pass, iteration 36 attached-card visibility pass, iteration 37 paid attack declaration pass, iteration 38 static/executable attack resolution/finish pass, iteration 39 Moltres `Fighting Wings` behavior pass, iteration 40 unsupported attack declaration guard, iteration 41 unsupported authored-effect guard, iteration 42 switch-self attack resolution, iteration 43 switch target chooser, iteration 44 one-Bench KO follow-up, and iteration 45 multi-Bench replacement Active continuation.
 - Raw printed attacks with missing authored behavior and authored attacks with unsupported effect types are hidden/rejected before declaration; new attack-effect slices should opt into `Prizmo.TcgEngine.AttackEffects` only when persisted resolution semantics are implemented.
 - Switch-self attacks are executable from the browser, including the multiple-Bench case where the active viewer must choose a visible Bench target before resolving.
-- Multi-Bench KO replacement currently emits `replacement_active_required` and blocks `finish_attack`, but the existing `choose_replacement_active/3` mechanic is not yet exposed through Ash/RPC or the React SPA.
+- Multi-Bench KO replacement now exposes `choose_replacement_active/3` through Ash/RPC and the React SPA, and attack finish remains blocked until every player has an Active Pokémon.
 - Knockout Prize taking is server-side and deterministic from persisted Prize order for the minimal path; explicit player Prize selection should be modeled before broader rules-accuracy playtests.
 - Validation blocker: the available manual-tester subagents still appear to share/contend over one browser/session, so their reported viewer flips are not reliable proof of independent-browser behavior. The documented manual-tester milestone needs a harness that guarantees separate browser contexts before it can be marked formally complete.
 
 ## Recommended next atomic task
 
-- Expose `choose_replacement_active/3` through Ash/RPC and add a minimal React affordance/read-model path for `replacement_active_required` so multi-Bench KO resolution can continue through the browser without direct database or IEx intervention.
+- Model explicit knockout Prize selection as pending player choice instead of deterministic Prize-order taking, then expose the selection through Ash/RPC and the React playtest UI.

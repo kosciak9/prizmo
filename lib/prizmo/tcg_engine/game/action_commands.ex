@@ -214,6 +214,32 @@ defmodule Prizmo.TcgEngine.Game.ActionCommands do
       end
     end
 
+    action :choose_replacement_active_command, :struct do
+      description "Choose a replacement Active Pokémon after a knockout leaves this player without one."
+
+      constraints instance_of: Game
+
+      argument :game_id, :uuid do
+        allow_nil? false
+      end
+
+      argument :player_id, :string do
+        allow_nil? false
+      end
+
+      argument :bench_card_instance_id, :uuid do
+        allow_nil? false
+      end
+
+      run fn input, _context ->
+        Mechanics.choose_replacement_active(
+          input.arguments.game_id,
+          input.arguments.player_id,
+          input.arguments.bench_card_instance_id
+        )
+      end
+    end
+
     action :choose_prompt_command, :struct do
       description "Resolve a select-cards prompt through the generic mechanics layer."
 

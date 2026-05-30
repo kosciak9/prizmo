@@ -15,8 +15,14 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
       when is_list(players) and is_list(cards) and is_list(prompts) and
              is_binary(viewer_player_id) do
     case prompt_affordances(prompts) do
-      [] -> action_window_affordances(game, current_turn, players, cards, viewer_player_id)
-      prompt_actions -> prompt_actions
+      [] ->
+        case replacement_active_affordances(game, current_turn, cards, viewer_player_id) do
+          [] -> action_window_affordances(game, current_turn, players, cards, viewer_player_id)
+          replacement_actions -> replacement_actions
+        end
+
+      prompt_actions ->
+        prompt_actions
     end
   end
 
@@ -29,6 +35,41 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
       note: "Resolve this pending engine choice before taking another action."
     )
   end
+
+  defp replacement_active_affordances(
+         %Game{status: :in_progress},
+         %Turn{status: :attack_resolving},
+         cards,
+         viewer_player_id
+       ) do
+    viewer_cards = Enum.filter(cards, &(&1.owner_player_id == viewer_player_id))
+
+    case active_pokemon_card(viewer_cards) do
+      %CardInstance{} ->
+        []
+
+      nil ->
+        target_ids = viewer_cards |> bench_pokemon_cards() |> card_ids()
+
+        if Enum.empty?(target_ids) do
+          []
+        else
+          [
+            affordance(
+              :choose_replacement_active,
+              "Choose replacement Active",
+              :command,
+              viewer_player_id,
+              target_card_instance_ids: target_ids,
+              note:
+                "A knockout left this player without an Active Pokémon. Choose one Benched Pokémon before the attack can finish."
+            )
+          ]
+        end
+    end
+  end
+
+  defp replacement_active_affordances(_game, _current_turn, _cards, _viewer_player_id), do: []
 
   defp action_window_affordances(game, current_turn, players, cards, viewer_player_id) do
     if action_window_for_viewer?(game, current_turn, viewer_player_id) do

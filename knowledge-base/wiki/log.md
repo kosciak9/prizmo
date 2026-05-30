@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-30] iteration 45 | Replacement Active browser continuation
+- Task attempted: exposed the persisted `choose_replacement_active/3` mechanic through Ash/RPC and added a viewer-scoped React affordance so a player with multiple Benched Pokémon can choose a replacement Active after a knockout before the attack is finished.
+- Files changed: updated `lib/prizmo/tcg_engine.ex`, `lib/prizmo/tcg_engine/game/action_commands.ex`, `lib/prizmo/tcg_engine/game_view/action_affordances.ex`, `lib/prizmo_web/spa/features/home/routes/index.tsx`, `lib/prizmo_web/spa/lib/ash/client.ts`, generated `lib/prizmo_web/spa/lib/ash/generated/ash_rpc.ts`, this log, and the TCG engine playtest handoff.
+- Validation: `mix compile --warnings-as-errors && mix ash_typescript.codegen --check && mix assets.build && mix test test/prizmo/tcg_engine/mechanics_test.exs` passed (4 tests); corrected Tidewave rollback smoke passed for a no-Active Player 2 with two Bench candidates seeing `choose_replacement_active`, choosing one through `Prizmo.TcgEngine.choose_replacement_active_for_game/3`, clearing the affordance, and allowing Player 1 to finish the attack; `mix check --no-test` passed.
+- Remaining/blocking notes: no code blocker for continuing multi-Bench KO replacement through the browser; knockout Prize taking is still deterministic from persisted Prize order rather than explicit player choice, and the formal manual-tester milestone still needs guaranteed separate browser contexts.
+
 ## [2026-05-30] iteration 44 | Attack KO prize and replacement follow-up
 - Task attempted: added a minimal persisted attack knockout follow-up path so resolved attack damage can discard a KO'd Pokémon stack, take the attacking player's knockout Prize cards, auto-promote the defender's only Benched Pokémon as replacement Active, and block attack finish while a replacement Active is still missing.
 - Files changed: updated `lib/prizmo/tcg_engine/battle_actions.ex`, `lib/prizmo/tcg_engine/mechanics.ex`, this log, and the TCG engine playtest handoff.
