@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-30] iteration 36 | Attached-card read-model visibility
+- Task attempted: added public attached-card visibility to the persisted TCG engine game-state read model and React playtest board so Energy/Tool attachments render under visible Pokémon and retreat payment buttons can resolve attached Energy names.
+- Files changed: updated `lib/prizmo/tcg_engine/game_view.ex`, `lib/prizmo/tcg_engine/game_view/fields.ex`, `lib/prizmo_web/spa/features/home/routes/index.tsx`, generated `lib/prizmo_web/spa/lib/ash/generated/ash_rpc.ts`, this log, and the TCG engine playtest handoff.
+- Validation: initial Tidewave rollback smoke exposed an invalid direct deck-to-Active staging shortcut; corrected Tidewave rollback smoke passed by attaching Fire Energy to Moltres, verifying `active.attached_cards`, and confirming the retreat affordance source ID matched the visible attached Energy; `mix ash_typescript.codegen --check` passed; `mix assets.build` passed; `mix test test/prizmo/tcg_engine/mechanics_test.exs` passed (4 tests); `mix check --no-test` passed.
+- Remaining/blocking notes: no code blocker; attachment visibility is currently one level under visible card summaries, which covers Energy/Tool display and retreat labels, while deeper evolution-stack presentation can be handled in a future evolution/read-model pass if needed.
+
 ## [2026-05-30] iteration 35 | SPA retreat action command
 - Task attempted: exposed the persisted `retreat` mechanic through the Ash/RPC boundary and wired the React playtest legal-actions panel so the active viewer can retreat to a Benched Pokémon by paying the required attached Energy IDs.
 - Files changed: updated `lib/prizmo/tcg_engine.ex`, `lib/prizmo/tcg_engine/game/action_commands.ex`, `lib/prizmo/tcg_engine/game_view/action_affordances.ex`, `lib/prizmo/tcg_engine/game_view/fields.ex`, `lib/prizmo_web/spa/features/home/routes/index.tsx`, `lib/prizmo_web/spa/lib/ash/client.ts`, generated `lib/prizmo_web/spa/lib/ash/generated/ash_rpc.ts`, this log, and the TCG engine playtest handoff.

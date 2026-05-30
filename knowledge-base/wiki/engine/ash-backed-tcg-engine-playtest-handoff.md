@@ -104,25 +104,28 @@ Updated: 2026-05-30
 - Iteration 35 added `Prizmo.TcgEngine.Game.ActionCommands.retreat_command`, exposed through the domain as `Prizmo.TcgEngine.retreat_active_for_game/4` and through AshTypescript RPC as `retreatTcgEngineActive`.
 - Viewer action affordances now include `Retreat Active Pokémon` when the active viewer is in the action window, has not retreated this turn, has a Benched Pokémon target, and has enough attached Energy IDs to pay the Active Pokémon's catalog retreat cost.
 - The SPA legal-actions panel now renders retreat buttons for each legal Bench target and required Energy payment combination, calls the new RPC command, and invalidates the viewer-scoped game-state query. Attached Energy labels may fall back to card instance IDs until attached cards are included in the read model/UI.
+- Iteration 36 added public one-level `attached_cards`/`attachedCards` to top-level game-state card summaries, including Active, Bench, Stadium, viewer hand, discard, and prompt legal-choice card views.
+- The SPA now requests nested `attachedCards`, renders attached cards under each visible `CardPill`, and indexes those nested cards in `visibleCardsById`, so retreat payment buttons can show attached Energy names instead of fallback card instance IDs.
+- A rollback smoke verified Moltres with attached Fire Energy appears in `player_1.active.attached_cards` and that the retreat affordance's source ID matches the visible attached Energy.
 
 ## Last commit
 
-- Baseline entering iteration 35: `1c4e7dd fix(spa): reduce playtest debug noise`.
-- This handoff was written before committing iteration 35; expected commit message is `feat(tcg-engine): wire retreat command`.
+- Baseline entering iteration 36: `9718404 feat(tcg-engine): wire retreat command`.
+- This handoff was written before committing iteration 36; expected commit message is `feat(tcg-engine): show attached cards in playtest view`.
 
 ## Remaining tasks
 
 - Decide whether old `Prizmo.Tcg.Sim` tests are kept as historical reference, quarantined, or ported scenario-by-scenario.
-- Build the minimal playable React SPA loop beyond prompt resolution, Bench commands, Attach Energy, Retreat, End Turn, next-turn progression, deterministic playtest fixture order, hardened tab-scoped viewer identity, and reduced prompt/action debug noise: rerun the full two-browser/manual-tester playtest milestone only after the validation harness can guarantee separate browser contexts, then address any remaining command-loop gaps it exposes.
+- Build the minimal playable React SPA loop beyond prompt resolution, Bench commands, Attach Energy, attached-card board visibility, Retreat, End Turn, next-turn progression, deterministic playtest fixture order, hardened tab-scoped viewer identity, and reduced prompt/action debug noise: rerun the full two-browser/manual-tester playtest milestone only after the validation harness can guarantee separate browser contexts, then address any remaining command-loop gaps it exposes.
 - Expand persisted Ash engine mechanics: switch effects, attack declaration/cost validation/damage/KO/prizes/replacement Active, evolution UI/RPC wiring, turn transitions, and snapshot-backed undo/debug support.
 - Continue migrating executable card behavior into engine-owned definitions with explicit unsupported-behavior tracking.
 - Spike Electric Streams only after the command/read loop has enough event shape to publish safely.
 
 ## Blockers
 
-- No known code blocker after the iteration 33 viewer hardening, isolated-context playtest pass, iteration 34 action/prompt clarity pass, and iteration 35 retreat command pass.
+- No known code blocker after the iteration 33 viewer hardening, isolated-context playtest pass, iteration 34 action/prompt clarity pass, iteration 35 retreat command pass, and iteration 36 attached-card visibility pass.
 - Validation blocker: the available manual-tester subagents still appear to share/contend over one browser/session, so their reported viewer flips are not reliable proof of independent-browser behavior. The documented manual-tester milestone needs a harness that guarantees separate browser contexts before it can be marked formally complete.
 
 ## Recommended next atomic task
 
-- Add attached-card visibility to the viewer-scoped game-state read model and board UI so Energy/Tool attachments are visible under Active/Bench Pokémon and retreat payment buttons can show card names instead of fallback instance IDs. If choosing a mechanics slice instead, attack declaration with explicit cost validation is the next high-value atomic candidate.
+- Start the persisted attack-declaration slice with explicit attack/cost affordances for the active viewer's Active Pokémon, then expose a narrow command that validates attached Energy cost before any broader damage/KO/prize resolution. Keep damage resolution as a follow-up if the command boundary becomes too broad.

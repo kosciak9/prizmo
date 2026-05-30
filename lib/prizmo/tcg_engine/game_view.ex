@@ -27,6 +27,8 @@ defmodule Prizmo.TcgEngine.GameView do
          {:ok, setup} <- maybe_setup(game.id),
          {:ok, current_turn} <- maybe_current_turn(game.id),
          {:ok, prompts} <- list_viewer_prompts(game.id, viewer_player_id) do
+      attached_cards_by_target = attached_cards_by_target(cards)
+
       {:ok,
        %{
          game_id: game.id,
@@ -48,10 +50,10 @@ defmodule Prizmo.TcgEngine.GameView do
              prompts,
              viewer_player_id
            ),
-         stadium: stadium_view(cards),
-         players: player_views(players, cards, viewer_player_id),
+         stadium: stadium_view(cards, attached_cards_by_target),
+         players: player_views(players, cards, viewer_player_id, attached_cards_by_target),
          events: Enum.map(events, &event_view/1),
-         prompts: Enum.map(prompts, &prompt_view(&1, cards))
+         prompts: Enum.map(prompts, &prompt_view(&1, cards, attached_cards_by_target))
        }}
     end
   end
@@ -114,14 +116,14 @@ defmodule Prizmo.TcgEngine.GameView do
     }
   end
 
-  defp stadium_view(cards) do
+  defp stadium_view(cards, attached_cards_by_target) do
     cards
     |> cards_in_zone(:stadium)
     |> List.first()
-    |> card_view()
+    |> card_view(attached_cards_by_target)
   end
 
-  defp player_views(players, cards, viewer_player_id) do
+  defp player_views(players, cards, viewer_player_id, attached_cards_by_target) do
     cards_by_player = Enum.group_by(cards, & &1.owner_player_id)
 
     Enum.map(players, fn player ->
@@ -139,21 +141,44 @@ defmodule Prizmo.TcgEngine.GameView do
         hand_count: zone_count(player_cards, :hand),
         prize_count: zone_count(player_cards, :prize),
         discard_count: zone_count(player_cards, :discard),
-        active: player_cards |> cards_in_zone(:active) |> List.first() |> card_view(),
-        bench: player_cards |> cards_in_zone(:bench) |> Enum.map(&card_view/1),
-        hand: private_hand_view(player_cards, viewer?),
-        discard: player_cards |> cards_in_zone(:discard) |> Enum.map(&card_view/1)
+        active:
+          player_cards
+          |> cards_in_zone(:active)
+          |> List.first()
+          |> card_view(attached_cards_by_target),
+        bench:
+          player_cards
+          |> cards_in_zone(:bench)
+          |> Enum.map(&card_view(&1, attached_cards_by_target)),
+        hand: private_hand_view(player_cards, viewer?, attached_cards_by_target),
+        discard:
+          player_cards
+          |> cards_in_zone(:discard)
+          |> Enum.map(&card_view(&1, attached_cards_by_target))
       }
     end)
   end
 
-  defp private_hand_view(player_cards, true) do
+  defp private_hand_view(player_cards, true, attached_cards_by_target) do
     player_cards
     |> cards_in_zone(:hand)
-    |> Enum.map(&card_view/1)
+    |> Enum.map(&card_view(&1, attached_cards_by_target))
   end
 
-  defp private_hand_view(_player_cards, false), do: []
+  defp private_hand_view(_player_cards, false, _attached_cards_by_target), do: []
+
+  defp attached_cards_by_target(cards) do
+    cards
+    |> Enum.reject(&is_nil(&1.attached_to_card_instance_id))
+    |> Enum.group_by(& &1.attached_to_card_instance_id)
+    |> Map.new(fn {target_id, attached_cards} ->
+      {target_id, sort_attached_cards(attached_cards)}
+    end)
+  end
+
+  defp sort_attached_cards(cards) do
+    Enum.sort_by(cards, &{&1.position, &1.instance_id})
+  end
 
   defp cards_in_zone(cards, zone) do
     cards
@@ -163,9 +188,24 @@ defmodule Prizmo.TcgEngine.GameView do
 
   defp zone_count(cards, zone), do: Enum.count(cards, &(&1.zone == zone))
 
-  defp card_view(nil), do: nil
+  defp card_view(nil, _attached_cards_by_target), do: nil
 
-  defp card_view(%CardInstance{} = card) do
+  defp card_view(%CardInstance{} = card, attached_cards_by_target) do
+    card
+    |> card_summary()
+    |> Map.put(
+      :attached_cards,
+      attached_card_views(card.id, attached_cards_by_target)
+    )
+  end
+
+  defp attached_card_views(card_id, attached_cards_by_target) do
+    attached_cards_by_target
+    |> Map.get(card_id, [])
+    |> Enum.map(&card_summary/1)
+  end
+
+  defp card_summary(%CardInstance{} = card) do
     catalog = catalog_card(card.card_id)
 
     %{
@@ -197,18 +237,18 @@ defmodule Prizmo.TcgEngine.GameView do
     }
   end
 
-  defp prompt_view(%Prompt{} = prompt, cards) do
+  defp prompt_view(%Prompt{} = prompt, cards, attached_cards_by_target) do
     %{
       id: prompt.id,
       prompt_type: prompt.prompt_type,
       status: stringify(prompt.status),
       player_id: prompt.player_id,
-      payload: prompt_payload(prompt, cards)
+      payload: prompt_payload(prompt, cards, attached_cards_by_target)
     }
   end
 
-  defp prompt_payload(%Prompt{payload: payload} = prompt, cards) do
-    choice_cards = legal_choice_cards(prompt, cards)
+  defp prompt_payload(%Prompt{payload: payload} = prompt, cards, attached_cards_by_target) do
+    choice_cards = legal_choice_cards(prompt, cards, attached_cards_by_target)
 
     if Enum.empty?(choice_cards) do
       payload
@@ -217,7 +257,11 @@ defmodule Prizmo.TcgEngine.GameView do
     end
   end
 
-  defp legal_choice_cards(%Prompt{payload: payload, player_id: player_id}, cards) do
+  defp legal_choice_cards(
+         %Prompt{payload: payload, player_id: player_id},
+         cards,
+         attached_cards_by_target
+       ) do
     cards_by_id = Map.new(cards, &{&1.id, &1})
 
     payload
@@ -231,7 +275,7 @@ defmodule Prizmo.TcgEngine.GameView do
       %CardInstance{owner_player_id: ^player_id} -> true
       _other -> false
     end)
-    |> Enum.map(&card_view/1)
+    |> Enum.map(&card_view(&1, attached_cards_by_target))
   end
 
   defp catalog_card(card_id) do

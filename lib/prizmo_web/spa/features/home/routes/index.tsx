@@ -52,7 +52,7 @@ const GAME_RESOURCE_FIELDS: CreateTcgEngineGameFields = [
   'latestEventIndex'
 ]
 
-const CARD_SUMMARY_FIELDS = [
+const BASE_CARD_SUMMARY_FIELDS = [
   'id',
   'instanceId',
   'cardId',
@@ -68,6 +68,13 @@ const CARD_SUMMARY_FIELDS = [
   'attachedToCardInstanceId',
   'evolvesFromCardInstanceId',
   'turnEnteredPlay'
+] as const
+
+const ATTACHED_CARD_SUMMARY_FIELDS = [...BASE_CARD_SUMMARY_FIELDS] as const
+
+const CARD_SUMMARY_FIELDS = [
+  ...BASE_CARD_SUMMARY_FIELDS,
+  { attachedCards: [...ATTACHED_CARD_SUMMARY_FIELDS] }
 ] as const
 
 const ACTION_AFFORDANCE_FIELDS = [
@@ -176,6 +183,7 @@ type CardSummary = {
   attachedToCardInstanceId: string | null
   evolvesFromCardInstanceId: string | null
   turnEnteredPlay: number | null
+  attachedCards?: CardSummary[]
 }
 
 type PlayerView = {
@@ -2112,6 +2120,8 @@ function ZoneList({
 }
 
 function CardPill({ card }: { card: CardSummary }) {
+  const attachedCards = card.attachedCards ?? []
+
   return (
     <div className="rounded-xl border border-stone-200 bg-stone-50 p-3">
       <div className="flex items-start justify-between gap-3">
@@ -2126,6 +2136,23 @@ function CardPill({ card }: { card: CardSummary }) {
         {card.stage ? <span>{card.stage}</span> : null}
         {card.status ? <span>{card.status}</span> : null}
       </div>
+
+      {attachedCards.length > 0 ? (
+        <div className="mt-3 rounded-lg border border-stone-200 bg-stone-100 px-2.5 py-2">
+          <p className="text-xs font-medium uppercase tracking-[0.12em] text-stone-500">Attached</p>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {attachedCards.map(attachedCard => (
+              <span
+                className="rounded-full bg-stone-50 px-2 py-1 text-xs font-medium text-stone-700"
+                key={attachedCard.id}
+                title={`${attachedCard.cardId} · ${formatEventType(attachedCard.zone)}`}
+              >
+                {attachedCard.name}
+              </span>
+            ))}
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }
@@ -2441,19 +2468,27 @@ function visibleCardsById(gameState: GameState) {
 
   for (const player of gameState.players) {
     if (player.active) {
-      cards.set(player.active.id, player.active)
+      addVisibleCard(cards, player.active)
     }
 
     for (const card of [...player.bench, ...player.hand, ...player.discard]) {
-      cards.set(card.id, card)
+      addVisibleCard(cards, card)
     }
   }
 
   if (gameState.stadium) {
-    cards.set(gameState.stadium.id, gameState.stadium)
+    addVisibleCard(cards, gameState.stadium)
   }
 
   return cards
+}
+
+function addVisibleCard(cards: Map<string, CardSummary>, card: CardSummary) {
+  cards.set(card.id, card)
+
+  for (const attachedCard of card.attachedCards ?? []) {
+    cards.set(attachedCard.id, attachedCard)
+  }
 }
 
 function formatCardInstanceId(cardInstanceId: string) {

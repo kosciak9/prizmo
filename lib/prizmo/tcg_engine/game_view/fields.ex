@@ -1,7 +1,7 @@
 defmodule Prizmo.TcgEngine.GameView.Fields do
   @moduledoc false
 
-  @card_summary_fields [
+  @base_card_summary_fields [
     id: [type: :uuid, allow_nil?: false],
     instance_id: [type: :string, allow_nil?: false],
     card_id: [type: :string, allow_nil?: false],
@@ -18,6 +18,17 @@ defmodule Prizmo.TcgEngine.GameView.Fields do
     evolves_from_card_instance_id: [type: :uuid],
     turn_entered_play: [type: :integer]
   ]
+
+  @attached_card_summary_fields @base_card_summary_fields
+
+  @card_summary_fields @base_card_summary_fields ++
+                         [
+                           attached_cards: [
+                             type: {:array, :map},
+                             allow_nil?: false,
+                             constraints: [items: [fields: @attached_card_summary_fields]]
+                           ]
+                         ]
 
   @setup_view_fields [
     id: [type: :uuid, allow_nil?: false],
