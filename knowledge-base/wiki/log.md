@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-30] iteration 49 | Evolution damage and status semantics
+- Task attempted: hardened persisted evolution semantics so damage counters move onto the new evolved top Pokémon while special conditions are cleared from both the new top and evolved-under target, preserving existing attachment behavior.
+- Files changed: updated `lib/prizmo/tcg_engine/card_instance.ex`, `lib/prizmo/tcg_engine/mechanics.ex`, this log, and the TCG engine playtest handoff.
+- Validation: `mix format && mix compile --warnings-as-errors` passed; initial Tidewave rollback smoke confirmed damage/status/read-model/retreat behavior but used the wrong Energy pair for Drakloak's attack-cost check; corrected Tidewave rollback smoke with Fire/Psychic Energy passed for damaged/poisoned Dreepy evolving into Drakloak with 40 damage on Drakloak, nil Drakloak status, evolved-under Dreepy damage/status cleared, `preserved_damage`/`cleared_status` event payload, and Retreat plus `declare_attack` affordances still available; `mix test test/prizmo/tcg_engine/mechanics_test.exs` passed (4 tests); `mix check --no-test` passed.
+- Remaining/blocking notes: no code blocker for evolution damage/status preservation; broader evolution/playtest work should still cover multi-stage stack presentation, marker handling, and longer browser scenarios that exercise evolved attackers through KO/replacement/prize flows.
+
 ## [2026-05-30] iteration 48 | Evolution attachment preservation
 - Task attempted: hardened persisted evolution semantics so cards already attached to the evolving Pokémon are reparented to the new evolved Pokémon in the same transaction, preserving Energy/stack visibility for attack and retreat checks.
 - Files changed: updated `lib/prizmo/tcg_engine/card_instance.ex`, `lib/prizmo/tcg_engine/card_store.ex`, `lib/prizmo/tcg_engine/mechanics.ex`, this log, and the TCG engine playtest handoff.

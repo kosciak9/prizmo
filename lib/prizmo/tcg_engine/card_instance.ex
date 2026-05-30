@@ -136,17 +136,17 @@ defmodule Prizmo.TcgEngine.CardInstance do
     end
 
     update :evolve_to_active do
-      accept [:evolves_from_card_instance_id, :position, :turn_entered_play]
+      accept [:evolves_from_card_instance_id, :position, :turn_entered_play, :damage, :status]
       change transition_state(:active)
     end
 
     update :evolve_to_bench do
-      accept [:evolves_from_card_instance_id, :position, :turn_entered_play]
+      accept [:evolves_from_card_instance_id, :position, :turn_entered_play, :damage, :status]
       change transition_state(:bench)
     end
 
     update :evolve_under do
-      accept [:attached_to_card_instance_id, :position]
+      accept [:attached_to_card_instance_id, :position, :damage, :status]
       change transition_state(:attached)
     end
 

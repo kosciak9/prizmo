@@ -812,6 +812,8 @@ defmodule Prizmo.TcgEngine.Mechanics do
              update(evolution_card, evolve_action, %{
                evolves_from_card_instance_id: target_card.id,
                position: target_position,
+               damage: target_card.damage,
+               status: nil,
                turn_entered_play: turn.turn_number
              }),
            {:ok, reparented_attachments} <-
@@ -819,6 +821,8 @@ defmodule Prizmo.TcgEngine.Mechanics do
            {:ok, _target_card} <-
              update(target_card, :evolve_under, %{
                attached_to_card_instance_id: evolution_card.id,
+               damage: 0,
+               status: nil,
                position: 1
              }),
            {:ok, event} <-
@@ -826,6 +830,8 @@ defmodule Prizmo.TcgEngine.Mechanics do
                turn_id: turn.id,
                evolution_card_instance_id: evolution_card.id,
                target_card_instance_id: target_card.id,
+               preserved_damage: target_card.damage,
+               cleared_status: if(target_card.status, do: Atom.to_string(target_card.status)),
                preserved_attachment_card_instance_ids: Enum.map(reparented_attachments, & &1.id)
              }),
            {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do
