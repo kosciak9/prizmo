@@ -9,6 +9,8 @@ defmodule Prizmo.TcgEngine.Game do
     extensions: [AshStateMachine, AshTypescript.Resource]
 
   alias Prizmo.TcgEngine.Game
+  alias Prizmo.TcgEngine.GameView
+  alias Prizmo.TcgEngine.GameView.Fields, as: GameViewFields
   alias Prizmo.TcgEngine.Mechanics
   alias Prizmo.TcgEngine.SupportedDecks
 
@@ -104,6 +106,16 @@ defmodule Prizmo.TcgEngine.Game do
           end
 
         SupportedDecks.create_game(input.arguments.players, opts)
+      end
+    end
+
+    action :get_state, :map do
+      constraints fields: GameViewFields.game_state_fields()
+      argument :game_id, :uuid, allow_nil?: false
+      argument :viewer_player_id, :string, allow_nil?: false
+
+      run fn input, _context ->
+        GameView.for_player(input.arguments.game_id, input.arguments.viewer_player_id)
       end
     end
 

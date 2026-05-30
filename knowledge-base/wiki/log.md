@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-30] iteration 13 | Viewer-scoped game-state RPC
+- Task attempted: exposed a minimal viewer-scoped Ash/RPC read model for persisted TCG engine games so the SPA can read board state without direct database access or hidden-zone leaks.
+- Files changed: added `lib/prizmo/tcg_engine/game_view.ex` and `lib/prizmo/tcg_engine/game_view/fields.ex`; updated `lib/prizmo/tcg_engine/game.ex`, `lib/prizmo/tcg_engine.ex`, `lib/prizmo_web/spa/lib/ash/client.ts`, and regenerated `lib/prizmo_web/spa/lib/ash/generated/ash_rpc.ts`; updated this log and the TCG engine playtest handoff.
+- Validation: initial read-model smoke reached the intended invalid-viewer rejection but expected the raw module error instead of the Ash action boundary wrapper; rerun `MIX_ENV=test mix run -e ...` smoke passed after creating a supported game, reading initial deck counts, drawing opening hands, verifying viewer hand contents vs opponent hand count-only filtering, confirming event payloads are omitted, and rejecting a spectator viewer; `mix ash_typescript.codegen --check` passed; `mix test test/prizmo/tcg_engine/mechanics_test.exs` passed (4 tests); initial `mix check --no-test` failed on Credo module length after adding inline field constraints, then passed after moving the typed field schema out of `Prizmo.TcgEngine.Game`.
+- Remaining/blocking notes: no blocker; the SPA can now import `runGetTcgEngineGameState`, but the UI still needs to consume it, legal action affordances are still implicit, prompt resolution lacks an RPC wrapper, and persisted play actions beyond setup/turn opening remain missing.
+
 ## [2026-05-30] iteration 12 | Skip draw-for-turn RPC boundary
 - Task attempted: exposed the alternate turn-progress command through an engine-owned Ash/RPC action so SPA callers can skip the active player's draw step by `game_id` and `player_id` without bypassing `Prizmo.TcgEngine.Mechanics.skip_draw_for_turn/2`.
 - Files changed: updated `lib/prizmo/tcg_engine/game.ex`, `lib/prizmo/tcg_engine.ex`, `lib/prizmo_web/spa/lib/ash/client.ts`, and regenerated `lib/prizmo_web/spa/lib/ash/generated/ash_rpc.ts`; updated this log and the TCG engine playtest handoff.

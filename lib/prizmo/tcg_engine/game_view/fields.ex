@@ -1,0 +1,113 @@
+defmodule Prizmo.TcgEngine.GameView.Fields do
+  @moduledoc false
+
+  @card_summary_fields [
+    id: [type: :uuid, allow_nil?: false],
+    instance_id: [type: :string, allow_nil?: false],
+    card_id: [type: :string, allow_nil?: false],
+    name: [type: :string, allow_nil?: false],
+    image: [type: :string],
+    category: [type: :string],
+    stage: [type: :string],
+    owner_player_id: [type: :string, allow_nil?: false],
+    zone: [type: :string, allow_nil?: false],
+    position: [type: :integer, allow_nil?: false],
+    damage: [type: :integer, allow_nil?: false],
+    status: [type: :string],
+    attached_to_card_instance_id: [type: :uuid],
+    evolves_from_card_instance_id: [type: :uuid],
+    turn_entered_play: [type: :integer]
+  ]
+
+  @setup_view_fields [
+    id: [type: :uuid, allow_nil?: false],
+    status: [type: :string, allow_nil?: false]
+  ]
+
+  @turn_view_fields [
+    id: [type: :uuid, allow_nil?: false],
+    turn_number: [type: :integer, allow_nil?: false],
+    active_player_id: [type: :string, allow_nil?: false],
+    status: [type: :string, allow_nil?: false],
+    visible: [type: :boolean, allow_nil?: false],
+    pending_attack_id: [type: :string],
+    pending_attacker_card_instance_id: [type: :uuid],
+    pending_defender_card_instance_id: [type: :uuid]
+  ]
+
+  @player_view_fields [
+    player_id: [type: :string, allow_nil?: false],
+    deck_key: [type: :string, allow_nil?: false],
+    energy_attached_this_turn: [type: :boolean, allow_nil?: false],
+    supporter_played_this_turn: [type: :boolean, allow_nil?: false],
+    retreated_this_turn: [type: :boolean, allow_nil?: false],
+    ace_spec_played_this_game: [type: :boolean, allow_nil?: false],
+    deck_count: [type: :integer, allow_nil?: false],
+    hand_count: [type: :integer, allow_nil?: false],
+    prize_count: [type: :integer, allow_nil?: false],
+    discard_count: [type: :integer, allow_nil?: false],
+    active: [type: :map, constraints: [fields: @card_summary_fields]],
+    bench: [
+      type: {:array, :map},
+      allow_nil?: false,
+      constraints: [items: [fields: @card_summary_fields]]
+    ],
+    hand: [
+      type: {:array, :map},
+      allow_nil?: false,
+      constraints: [items: [fields: @card_summary_fields]]
+    ],
+    discard: [
+      type: {:array, :map},
+      allow_nil?: false,
+      constraints: [items: [fields: @card_summary_fields]]
+    ]
+  ]
+
+  @event_view_fields [
+    id: [type: :uuid, allow_nil?: false],
+    index: [type: :integer, allow_nil?: false],
+    type: [type: :string, allow_nil?: false],
+    player_id: [type: :string],
+    turn_id: [type: :uuid]
+  ]
+
+  @prompt_view_fields [
+    id: [type: :uuid, allow_nil?: false],
+    prompt_type: [type: :string, allow_nil?: false],
+    status: [type: :string, allow_nil?: false],
+    player_id: [type: :string, allow_nil?: false],
+    payload: [type: :map, allow_nil?: false]
+  ]
+
+  @game_state_fields [
+    game_id: [type: :uuid, allow_nil?: false],
+    viewer_player_id: [type: :string, allow_nil?: false],
+    status: [type: :string, allow_nil?: false],
+    active_player_id: [type: :string, allow_nil?: false],
+    first_player_id: [type: :string, allow_nil?: false],
+    winner_player_id: [type: :string],
+    cursor_index: [type: :integer, allow_nil?: false],
+    latest_event_index: [type: :integer, allow_nil?: false],
+    setup: [type: :map, constraints: [fields: @setup_view_fields]],
+    current_turn: [type: :map, constraints: [fields: @turn_view_fields]],
+    stadium: [type: :map, constraints: [fields: @card_summary_fields]],
+    players: [
+      type: {:array, :map},
+      allow_nil?: false,
+      constraints: [items: [fields: @player_view_fields]]
+    ],
+    events: [
+      type: {:array, :map},
+      allow_nil?: false,
+      constraints: [items: [fields: @event_view_fields]]
+    ],
+    prompts: [
+      type: {:array, :map},
+      allow_nil?: false,
+      constraints: [items: [fields: @prompt_view_fields]]
+    ]
+  ]
+
+  def game_state_fields, do: @game_state_fields
+end

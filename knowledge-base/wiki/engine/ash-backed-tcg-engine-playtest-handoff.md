@@ -41,16 +41,21 @@ Updated: 2026-05-30
 - Iteration 12 added `Prizmo.TcgEngine.Game.skip_draw_for_turn_command`, exposed through the domain as `Prizmo.TcgEngine.skip_draw_for_turn_for_game/2` and through AshTypescript RPC as `skipTcgEngineDrawForTurn`.
 - The SPA Ash client wrapper exports the generated skip-draw command as `runSkipTcgEngineDrawForTurn`, with `SkipTcgEngineDrawForTurnInput` and `SkipTcgEngineDrawForTurnResult` types.
 - The skip-draw command delegates to `Prizmo.TcgEngine.Mechanics.skip_draw_for_turn/2`, so it validates game/turn/player state, transitions the current turn from `:start` to `:action_window`, writes the `skip_draw_for_turn` event, snapshots it, and returns the refreshed `Game`.
+- Iteration 13 added `Prizmo.TcgEngine.GameView` plus `Prizmo.TcgEngine.GameView.Fields` as a viewer-scoped read model for persisted engine games.
+- `Prizmo.TcgEngine.Game.get_state` is exposed through the domain as `Prizmo.TcgEngine.get_game_state/2` and through AshTypescript RPC as `getTcgEngineGameState`.
+- The SPA Ash client wrapper exports the generated read action as `runGetTcgEngineGameState`, with `GetTcgEngineGameStateInput` and `GetTcgEngineGameStateResult` types.
+- The read model includes game status/cursors, setup status, current turn, public stadium, per-player deck/hand/prize/discard counts, public Active/Bench/discard card summaries, the viewer's private hand only, viewer awaiting prompts, and chronological event metadata without event payloads.
+- Hidden-zone behavior verified this iteration: a valid viewer sees their own hand cards, the opponent hand is represented by count plus an empty `hand` list, and non-player viewers are rejected at the Ash action boundary.
 
 ## Last commit
 
-- Baseline entering iteration 12: `32f8f63 feat(tcg): expose action window rpc`.
-- This handoff was written before committing iteration 12; expected commit message is `feat(tcg): expose skip draw rpc`.
+- Baseline entering iteration 13: `4cfe904 feat(tcg): expose skip draw rpc`.
+- This handoff was written before committing iteration 13; expected commit message is `feat(tcg): expose game state rpc`.
 
 ## Remaining tasks
 
 - Decide whether old `Prizmo.Tcg.Sim` tests are kept as historical reference, quarantined, or ported scenario-by-scenario.
-- Build the minimal playable React SPA loop: wire game creation, setup start, draw-opening-hand, active choice, setup Bench choice, prize placement, setup completion, turn start, draw for turn, skip draw, and open action window to the new RPCs; expose legal action affordances, prompt resolution, simple board/hand/discard/prize/turn/event rendering, and reconnect recovery.
+- Build the minimal playable React SPA loop: wire game creation, setup start, draw-opening-hand, active choice, setup Bench choice, prize placement, setup completion, turn start, draw for turn, skip draw, open action window, and the new viewer-scoped game-state read model to the UI; expose legal action affordances, prompt resolution, simple board/hand/discard/prize/turn/event rendering, and reconnect recovery.
 - Expand persisted Ash engine mechanics: bench Basic Pokémon, one Energy attachment per turn, evolution timing, retreat/switch, attacks/damage/KO/prizes/replacement Active, turn transitions, and snapshot-backed undo/debug support.
 - Continue migrating executable card behavior into engine-owned definitions with explicit unsupported-behavior tracking.
 - Spike Electric Streams only after the command/read loop has enough event shape to publish safely.
@@ -61,4 +66,4 @@ Updated: 2026-05-30
 
 ## Recommended next atomic task
 
-- Expose a minimal engine read-model or action-affordance RPC for the SPA, likely starting with a game-state query by `game_id` that returns public board zones, current turn state, event log cursor/latest indexes, and current-player hand data without leaking hidden information.
+- Wire the minimal React SPA playtest shell to `runListSupportedTcgDecks`, `runCreateTcgEngineGame`, and `runGetTcgEngineGameState` so a browser can create a supported fixture game and render viewer-scoped deck/hand/prize counts, public board zones, and event metadata before adding setup action buttons.
