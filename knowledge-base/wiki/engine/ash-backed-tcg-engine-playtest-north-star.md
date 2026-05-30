@@ -4,9 +4,9 @@ Updated: 2026-05-30
 
 ## Scope
 
-This is the current north star for Prizmo's Pokémon TCG work: an Ash-backed, server-authoritative rules engine plus a playable browser UI for two-human playtesting.
+This is the current north star for Prizmo's Pokémon TCG work: an Ash-backed, server-authoritative rules engine plus a Pokémon TCG Live (PTCGL)-adjacent browser UI for two-human playtesting.
 
-The goal is not yet a complete Standard simulator, AI opponent, polished renderer, or post-game coach. The near-term goal is a tight loop where supported card behavior can be implemented, played through the UI, observed as events, and corrected quickly.
+The goal is not yet a complete Standard simulator, AI opponent, exact PTCGL clone, or post-game coach. The near-term goal is a tight loop where supported card behavior can be implemented, played through a product-shaped browser UI that feels much closer to PTCGL than a test bench, observed as events, and corrected quickly.
 
 ## Current baseline
 
@@ -19,7 +19,7 @@ The goal is not yet a complete Standard simulator, AI opponent, polished rendere
 
 ## Product north star
 
-The first playable product surface should be a thin React SPA playtest client over the Ash-backed engine.
+The first playable product surface should be a PTCGL-adjacent React SPA game client over the Ash-backed engine, not a debug-first test harness.
 
 It should let two humans:
 
@@ -32,7 +32,7 @@ It should let two humans:
 7. watch a chronological event log;
 8. refresh or reconnect without losing the game state.
 
-This UI is for playtesting engine correctness first. Visual polish and advanced renderer choices are secondary until the command/event loop feels reliable.
+This UI is for playtesting engine correctness first, but handoff is blocked until the Web UI is substantially closer to a real digital card-game client than an internal test bench. Use PTCGL as the interaction-quality reference: spatial player sides, card-like battlefield objects, obvious Active/Bench/Prize/Deck/Discard zones, readable hand presentation, guided legal actions, styled prompt resolution, clear turn ownership, and product-quality errors and empty states. Raw payloads, debug counters, and diagnostic controls must be removed from or isolated outside the normal play path. Advanced animation, foil, tilt, and 3D renderer choices remain optional; product-grade layout, affordance clarity, and responsive desktop play are part of the milestone.
 
 Validation target: the playable loop should be testable by two independent manual-tester subagents, each controlling a separate Playwright browser instance as one player. A milestone is not considered playtest-ready until those two browser sessions can complete the target scenario through the UI without direct database, IEx, or test-helper intervention.
 
@@ -108,8 +108,9 @@ Important boundary: Electric should be a delivery and replay layer, not the rule
 - Expose setup commands through Ash/Phoenix endpoints.
 - Expose legal action affordances from engine state and prompt state.
 - Implement choose-prompt UI for pending effects.
-- Render a simple public board, active Pokémon, bench, hand, deck count, discard, prizes remaining, current turn, and event log.
-- Prioritize correctness and debuggability over animation.
+- Render a PTCGL-adjacent public board with spatial player sides, Active/Bench/Prize/Deck/Discard zones, hand presentation, current turn state, guided legal actions, and event history.
+- Prioritize correctness and debuggability over animation, while preserving a polished normal play path.
+- Run a substantial Web UI polish pass before handoff: move the experience away from a test bench and toward a real digital card-game client by refining board composition, card surfaces, layout rhythm, visual hierarchy, prompt/action copy, empty/error states, desktop responsiveness, and removal or containment of debug noise.
 
 ### 3. Expand core engine mechanics
 
@@ -151,6 +152,7 @@ The first milestone is complete when two humans can play a narrow supported scen
 - events and snapshots are persisted;
 - the UI can reconnect and recover current state;
 - validation can be run by two subagents playing as separate players in two Playwright browser instances;
+- the Web UI polish pass is complete enough that two humans experience the browser surface as a PTCGL-adjacent game client, not a test bench, and can understand state, legal actions, prompts, errors, and turn ownership without reading debug payloads;
 - `mix check` passes.
 
 ## Non-goals for the first milestone
@@ -158,14 +160,14 @@ The first milestone is complete when two humans can play a narrow supported scen
 - Full Standard support.
 - AI opponent.
 - Mobile-native renderer.
-- High-polish card animations.
+- Production-grade card animation, foil, tilt, or 3D renderer effects.
 - PTCGL log import/replay.
 - Replacing Ash/Postgres persistence with streams.
 
 ## Key decisions captured
 
 - Canonical rules engine: `lib/prizmo/tcg_engine/`.
-- Near-term product target: playable React SPA playtest UI.
+- Near-term product target: PTCGL-adjacent React SPA playtest UI, closer to a real digital card-game client than an internal test bench.
 - Stream direction: explore Electric Streams for durable event delivery/replay, with Ash/Postgres remaining authoritative.
 - Legacy simulator: reference only until useful scenarios are ported or deleted.
 - UI transport: do not revive the temporary Phoenix channel unless Electric or plain HTTP/SSE spikes fail.
