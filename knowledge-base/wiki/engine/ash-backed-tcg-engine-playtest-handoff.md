@@ -80,16 +80,19 @@ Updated: 2026-05-30
 - The SPA Ash client re-exports the generated prompt command as `runChooseTcgEnginePrompt`, with `ChooseTcgEnginePromptInput` and `ChooseTcgEnginePromptResult` types.
 - The viewer-scoped game-state read model now enriches awaiting prompt payloads with private `legal_choice_cards` summaries for the prompted player only, allowing prompt UIs to show card names for hand/deck choices without publishing them to the opponent's view.
 - The Viewer prompts panel now renders selectable legal card choices and submits selected IDs through the new prompt command. Ultra Ball's `discard_two_from_hand` cost prompt and `search_deck_for_pokemon` effect prompt can now complete from the browser after the generic play-card command starts the flow.
+- Iteration 28 added `Prizmo.TcgEngine.Game.ActionCommands.play_basic_to_bench_command`, exposed through the domain as `Prizmo.TcgEngine.play_basic_to_bench_for_game/3` and through AshTypescript RPC as `playTcgEngineBasicToBench`.
+- The SPA Ash client re-exports the generated Bench command as `runPlayTcgEngineBasicToBench`, with `PlayTcgEngineBasicToBenchInput` and `PlayTcgEngineBasicToBenchResult` types.
+- The Viewer legal actions panel now renders `Bench ...` buttons for visible `play_basic_to_bench` source cards, calls the new command, and invalidates the viewer-scoped game-state query. Basic Pokémon can now move from hand to the next Bench slot from the browser action window.
 
 ## Last commit
 
-- Baseline entering iteration 27: `7c32ef1 feat(spa): wire generic play-card command`.
-- This handoff was written before committing iteration 27; expected commit message is `feat(spa): wire prompt choice submission`.
+- Baseline entering iteration 28: `b099351 feat(spa): wire prompt choice submission`.
+- This handoff was written before committing iteration 28; expected commit message is `feat(spa): wire bench basic command`.
 
 ## Remaining tasks
 
 - Decide whether old `Prizmo.Tcg.Sim` tests are kept as historical reference, quarantined, or ported scenario-by-scenario.
-- Build the minimal playable React SPA loop beyond prompt resolution: continue execution controls for remaining visible legal action affordances and run two-browser refresh/reconnect validation.
+- Build the minimal playable React SPA loop beyond prompt resolution and Bench commands: continue execution controls for remaining visible legal action affordances and run two-browser refresh/reconnect validation.
 - Expand persisted Ash engine mechanics: bench Basic Pokémon, one Energy attachment per turn, evolution timing, retreat/switch, attacks/damage/KO/prizes/replacement Active, turn transitions, and snapshot-backed undo/debug support.
 - Continue migrating executable card behavior into engine-owned definitions with explicit unsupported-behavior tracking.
 - Spike Electric Streams only after the command/read loop has enough event shape to publish safely.
@@ -100,4 +103,4 @@ Updated: 2026-05-30
 
 ## Recommended next atomic task
 
-- Expose and wire the existing persisted `play_basic_to_bench` mechanic as an Ash/RPC command and SPA legal-action control so the active viewer can bench Basic Pokémon from hand during the action window.
+- Expose and wire the existing persisted `attach_energy` mechanic as an Ash/RPC command and SPA legal-action control so the active viewer can choose an Energy from hand and a Pokémon in play during the action window.

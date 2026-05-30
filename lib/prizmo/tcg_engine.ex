@@ -27,6 +27,7 @@ defmodule Prizmo.TcgEngine do
       rpc_action :skip_tcg_engine_draw_for_turn, :skip_draw_for_turn_command
       rpc_action :open_tcg_engine_action_window, :open_action_window_command
       rpc_action :play_tcg_engine_card, :play_card_command
+      rpc_action :play_tcg_engine_basic_to_bench, :play_basic_to_bench_command
       rpc_action :choose_tcg_engine_prompt, :choose_prompt_command
     end
   end
@@ -63,6 +64,10 @@ defmodule Prizmo.TcgEngine do
 
       define :play_card_for_game,
         action: :play_card_command,
+        args: [:game_id, :player_id, :card_instance_id]
+
+      define :play_basic_to_bench_for_game,
+        action: :play_basic_to_bench_command,
         args: [:game_id, :player_id, :card_instance_id]
 
       define :choose_prompt_for_game,

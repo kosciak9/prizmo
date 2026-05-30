@@ -696,6 +696,52 @@ export async function placeTcgEnginePrizes<Fields extends PlaceTcgEnginePrizesFi
 }
 
 
+export type PlayTcgEngineBasicToBenchInput = {
+  gameId: UUID;
+  playerId: string;
+  cardInstanceId: UUID;
+};
+
+export type PlayTcgEngineBasicToBenchFields = UnifiedFieldSelection<TcgEngineGameResourceSchema>[];
+
+export type InferPlayTcgEngineBasicToBenchResult<
+  Fields extends PlayTcgEngineBasicToBenchFields | undefined,
+> = InferResult<TcgEngineGameResourceSchema, Fields>;
+
+export type PlayTcgEngineBasicToBenchResult<Fields extends PlayTcgEngineBasicToBenchFields | undefined = undefined> = | { success: true; data: InferPlayTcgEngineBasicToBenchResult<Fields>; }
+| { success: false; errors: AshRpcError[]; }
+
+;
+
+/**
+ * Execute generic action on Game
+ *
+ * @ashActionType :action
+ */
+export async function playTcgEngineBasicToBench<Fields extends PlayTcgEngineBasicToBenchFields | undefined = undefined>(
+  config: {
+  tenant?: string;
+  input: PlayTcgEngineBasicToBenchInput;
+  fields: Fields;
+  headers?: Record<string, string>;
+  fetchOptions?: RequestInit;
+  customFetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+}
+): Promise<PlayTcgEngineBasicToBenchResult<Fields extends undefined ? [] : Fields>> {
+  const payload = {
+    action: "play_tcg_engine_basic_to_bench",
+    ...(config.tenant !== undefined && { tenant: config.tenant }),
+    input: config.input,
+    ...(config.fields !== undefined && { fields: config.fields })
+  };
+
+  return executeActionRpcRequest<PlayTcgEngineBasicToBenchResult<Fields extends undefined ? [] : Fields>>(
+    payload,
+    config
+  );
+}
+
+
 export type PlayTcgEngineCardInput = {
   gameId: UUID;
   playerId: string;

@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-30] iteration 28 | SPA Bench Basic action command
+- Task attempted: exposed the persisted engine's `play_basic_to_bench` mechanic as an Ash/RPC command and wired the React SPA Viewer legal actions panel to bench visible Basic Pokémon from hand during the active player's action window.
+- Files changed: updated `lib/prizmo/tcg_engine/game/action_commands.ex`, `lib/prizmo/tcg_engine.ex`, `lib/prizmo/tcg_engine/game.ex`, `lib/prizmo_web/spa/features/home/routes/index.tsx`, `lib/prizmo_web/spa/lib/ash/client.ts`, generated `lib/prizmo_web/spa/lib/ash/generated/ash_rpc.ts`, this log, and the TCG engine playtest handoff.
+- Validation: initial `MIX_ENV=test mix run -e ...` smoke failed because the smoke expected a zero-based Bench position; diagnostic rerun confirmed the engine uses position `1` for the first Bench slot; corrected `MIX_ENV=test mix run -e ...` boundary smoke passed by moving a Basic from hand to Bench through `Prizmo.TcgEngine.play_basic_to_bench_for_game/3` and verifying the persisted `play_basic_to_bench` event/cursor; `mix ash_typescript.codegen --check` passed; `mix assets.build` passed; `mix test test/prizmo/tcg_engine/mechanics_test.exs` passed (4 tests); `mix check --no-test` passed.
+- Remaining/blocking notes: no blocker; the active viewer can now bench Basic Pokémon from hand in the browser action window, while execution controls for attaching Energy, ending the turn, and broader persisted mechanics remain pending.
+
 ## [2026-05-30] iteration 27 | SPA prompt choice submission
 - Task attempted: exposed the persisted engine's generic prompt resolution mechanic as an Ash/RPC command and wired the React SPA Viewer prompts panel to select legal card choices and submit them, including Ultra Ball's `discard_two_from_hand` cost prompt and `search_deck_for_pokemon` effect prompt.
 - Files changed: updated `lib/prizmo/tcg_engine/game/action_commands.ex`, `lib/prizmo/tcg_engine.ex`, `lib/prizmo/tcg_engine/game_view.ex`, `lib/prizmo_web/spa/features/home/routes/index.tsx`, `lib/prizmo_web/spa/lib/ash/client.ts`, generated `lib/prizmo_web/spa/lib/ash/generated/ash_rpc.ts`, this log, and the TCG engine playtest handoff.

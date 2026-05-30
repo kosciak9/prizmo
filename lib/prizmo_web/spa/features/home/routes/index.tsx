@@ -14,6 +14,7 @@ import {
   runListSupportedTcgDecks,
   runOpenTcgEngineActionWindow,
   runPlaceTcgEnginePrizes,
+  runPlayTcgEngineBasicToBench,
   runPlayTcgEngineCard,
   runSkipTcgEngineDrawForTurn,
   runStartNextTcgEngineTurn,
@@ -211,6 +212,17 @@ type PlayCardCommand = {
   cardInstanceId: string
 }
 
+type PlayBasicToBenchInput = {
+  gameId: string
+  playerId: PlayerId
+  cardInstanceId: string
+}
+
+type PlayBasicToBenchCommand = {
+  playerId: string
+  cardInstanceId: string
+}
+
 type ChoosePromptInput = {
   gameId: string
   playerId: PlayerId
@@ -378,6 +390,13 @@ export function HomeRoute() {
 
   const playCardMutation = useMutation({
     mutationFn: (input: PlayCardInput) => playCard(input),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['tcg-engine', 'game-state'] })
+    }
+  })
+
+  const playBasicToBenchMutation = useMutation({
+    mutationFn: (input: PlayBasicToBenchInput) => playBasicToBench(input),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['tcg-engine', 'game-state'] })
     }
@@ -930,6 +949,12 @@ export function HomeRoute() {
                   </InlineNotice>
                 ) : null}
 
+                {playBasicToBenchMutation.error ? (
+                  <InlineNotice tone="error" title="Bench Basic command failed">
+                    {errorMessage(playBasicToBenchMutation.error)}
+                  </InlineNotice>
+                ) : null}
+
                 {choosePromptMutation.error ? (
                   <InlineNotice tone="error" title="Prompt choice command failed">
                     {errorMessage(choosePromptMutation.error)}
@@ -997,6 +1022,18 @@ export function HomeRoute() {
                     })
                   }
                 }}
+                onPlayBasicToBench={({ playerId, cardInstanceId }) => {
+                  if (isPlayerId(playerId)) {
+                    playBasicToBenchMutation.mutate({
+                      gameId: normalisedGameId,
+                      playerId,
+                      cardInstanceId
+                    })
+                  }
+                }}
+                playBasicToBenchPendingCardId={
+                  playBasicToBenchMutation.isPending ? playBasicToBenchMutation.variables?.cardInstanceId ?? null : null
+                }
                 promptPendingId={choosePromptMutation.isPending ? choosePromptMutation.variables?.promptId ?? null : null}
                 playCardPendingCardId={playCardMutation.isPending ? playCardMutation.variables?.cardInstanceId ?? null : null}
               />
@@ -1220,6 +1257,20 @@ async function playCard(input: PlayCardInput): Promise<CreatedGame> {
   return result.data as CreatedGame
 }
 
+async function playBasicToBench(input: PlayBasicToBenchInput): Promise<CreatedGame> {
+  const result = await runPlayTcgEngineBasicToBench({
+    input,
+    fields: GAME_RESOURCE_FIELDS,
+    headers: buildAshRpcHeaders()
+  })
+
+  if (!result.success) {
+    throw new Error(rpcErrorMessage(result.errors))
+  }
+
+  return result.data as CreatedGame
+}
+
 async function choosePrompt(input: ChoosePromptInput): Promise<CreatedGame> {
   const result = await runChooseTcgEnginePrompt({
     input,
@@ -1238,14 +1289,18 @@ function GameStateWorkbench({
   gameState,
   deckNamesByKey,
   onChoosePrompt,
+  onPlayBasicToBench,
   onPlayCard,
+  playBasicToBenchPendingCardId,
   promptPendingId,
   playCardPendingCardId
 }: {
   gameState: GameState
   deckNamesByKey: Map<string, string>
   onChoosePrompt: (input: ChoosePromptCommand) => void
+  onPlayBasicToBench: (input: PlayBasicToBenchCommand) => void
   onPlayCard: (input: PlayCardCommand) => void
+  playBasicToBenchPendingCardId: string | null
   promptPendingId: string | null
   playCardPendingCardId: string | null
 }) {
@@ -1282,7 +1337,9 @@ function GameStateWorkbench({
       <ActionAffordancesPanel
         actions={gameState.actionAffordances}
         cardsById={cardsById}
+        onPlayBasicToBench={onPlayBasicToBench}
         onPlayCard={onPlayCard}
+        playBasicToBenchPendingCardId={playBasicToBenchPendingCardId}
         playCardPendingCardId={playCardPendingCardId}
       />
 
@@ -1476,14 +1533,20 @@ function PromptChoiceCard({
 function ActionAffordancesPanel({
   actions,
   cardsById,
+  onPlayBasicToBench,
   onPlayCard,
+  playBasicToBenchPendingCardId,
   playCardPendingCardId
 }: {
   actions: ActionAffordance[]
   cardsById: Map<string, CardSummary>
+  onPlayBasicToBench: (input: PlayBasicToBenchCommand) => void
   onPlayCard: (input: PlayCardCommand) => void
+  playBasicToBenchPendingCardId: string | null
   playCardPendingCardId: string | null
 }) {
+  const actionCommandPending = Boolean(playCardPendingCardId || playBasicToBenchPendingCardId)
+
   return (
     <Panel
       title="Viewer legal actions"
@@ -1526,12 +1589,35 @@ function ActionAffordancesPanel({
                     return (
                       <button
                         className="w-full rounded-xl border border-emerald-700 px-3 py-2 text-left text-sm font-semibold text-emerald-800 transition hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:border-stone-300 disabled:text-stone-400 disabled:hover:bg-transparent"
-                        disabled={Boolean(playCardPendingCardId) || !isPlayerId(action.playerId)}
+                        disabled={actionCommandPending || !isPlayerId(action.playerId)}
                         key={cardInstanceId}
                         onClick={() => onPlayCard({ playerId: action.playerId, cardInstanceId })}
                         type="button"
                       >
                         {isPending ? `Playing ${card?.name ?? 'card'}...` : `Play ${card?.name ?? formatCardInstanceId(cardInstanceId)}`}
+                      </button>
+                    )
+                  })}
+                </div>
+              ) : null}
+
+              {action.key === 'play_basic_to_bench' && action.sourceCardInstanceIds.length > 0 ? (
+                <div className="mt-3 space-y-2">
+                  {action.sourceCardInstanceIds.map(cardInstanceId => {
+                    const card = cardsById.get(cardInstanceId)
+                    const isPending = playBasicToBenchPendingCardId === cardInstanceId
+
+                    return (
+                      <button
+                        className="w-full rounded-xl border border-emerald-700 px-3 py-2 text-left text-sm font-semibold text-emerald-800 transition hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:border-stone-300 disabled:text-stone-400 disabled:hover:bg-transparent"
+                        disabled={actionCommandPending || !isPlayerId(action.playerId)}
+                        key={cardInstanceId}
+                        onClick={() => onPlayBasicToBench({ playerId: action.playerId, cardInstanceId })}
+                        type="button"
+                      >
+                        {isPending
+                          ? `Benching ${card?.name ?? 'Pokémon'}...`
+                          : `Bench ${card?.name ?? formatCardInstanceId(cardInstanceId)}`}
                       </button>
                     )
                   })}
