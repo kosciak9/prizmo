@@ -11,6 +11,7 @@ import {
   runDrawTcgEngineOpeningHand,
   runGetTcgEngineGameState,
   runListSupportedTcgDecks,
+  runOpenTcgEngineActionWindow,
   runPlaceTcgEnginePrizes,
   runSkipTcgEngineDrawForTurn,
   runStartNextTcgEngineTurn,
@@ -316,6 +317,13 @@ export function HomeRoute() {
     }
   })
 
+  const openActionWindowMutation = useMutation({
+    mutationFn: (gameId: string) => openActionWindow(gameId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['tcg-engine', 'game-state'] })
+    }
+  })
+
   const gameState = gameStateQuery.data
   const viewerPlayer = gameState?.players.find(player => player.playerId === gameState.viewerPlayerId)
   const currentTurnActivePlayerId = gameState?.currentTurn?.activePlayerId
@@ -375,7 +383,8 @@ export function HomeRoute() {
         isPlayerId(currentTurnActivePlayerId)
     ) &&
     !drawForTurnMutation.isPending &&
-    !skipDrawForTurnMutation.isPending
+    !skipDrawForTurnMutation.isPending &&
+    !openActionWindowMutation.isPending
   const canSkipDrawForTurn =
     Boolean(
       normalisedGameId &&
@@ -385,7 +394,17 @@ export function HomeRoute() {
         isPlayerId(currentTurnActivePlayerId)
     ) &&
     !drawForTurnMutation.isPending &&
-    !skipDrawForTurnMutation.isPending
+    !skipDrawForTurnMutation.isPending &&
+    !openActionWindowMutation.isPending
+  const canOpenActionWindow =
+    Boolean(
+      normalisedGameId &&
+        gameState?.status === 'in_progress' &&
+        gameState.currentTurn?.status === 'drawn'
+    ) &&
+    !drawForTurnMutation.isPending &&
+    !skipDrawForTurnMutation.isPending &&
+    !openActionWindowMutation.isPending
 
   function updateSession(nextSession: PlaytestSession) {
     setStoredSession(nextSession)
@@ -727,7 +746,7 @@ export function HomeRoute() {
                     <div>
                       <p className="text-sm font-medium text-stone-950">Turn commands</p>
                       <p className="mt-1 text-xs leading-5 text-stone-500">
-                        Start the first persisted turn, then draw or skip draw for the active player.
+                        Start the first persisted turn, then draw, skip draw, or open the action window.
                       </p>
                     </div>
                     <StatusBadge tone={gameState?.currentTurn ? 'active' : 'neutral'}>
@@ -797,6 +816,22 @@ export function HomeRoute() {
                             ? 'Turn is not in draw step'
                             : 'Start first turn first'}
                   </button>
+                  <button
+                    className="mt-2 w-full rounded-xl border border-emerald-700 px-3 py-2 text-sm font-semibold text-emerald-800 transition hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:border-stone-300 disabled:text-stone-400 disabled:hover:bg-transparent"
+                    disabled={!canOpenActionWindow}
+                    onClick={() => openActionWindowMutation.mutate(normalisedGameId)}
+                    type="button"
+                  >
+                    {openActionWindowMutation.isPending
+                      ? 'Opening action window...'
+                      : gameState?.currentTurn?.status === 'drawn'
+                        ? 'Open action window'
+                        : gameState?.currentTurn?.status === 'action_window'
+                          ? 'Action window open'
+                          : gameState?.currentTurn
+                            ? 'Draw or skip draw first'
+                            : 'Start first turn first'}
+                  </button>
                 </div>
 
                 {startNextTurnMutation.error ? (
@@ -814,6 +849,12 @@ export function HomeRoute() {
                 {skipDrawForTurnMutation.error ? (
                   <InlineNotice tone="error" title="Skip draw command failed">
                     {errorMessage(skipDrawForTurnMutation.error)}
+                  </InlineNotice>
+                ) : null}
+
+                {openActionWindowMutation.error ? (
+                  <InlineNotice tone="error" title="Open action window command failed">
+                    {errorMessage(openActionWindowMutation.error)}
                   </InlineNotice>
                 ) : null}
               </div>
@@ -1038,6 +1079,20 @@ async function drawCardForTurn(input: { gameId: string; playerId: PlayerId }): P
 async function skipDrawForTurn(input: { gameId: string; playerId: PlayerId }): Promise<CreatedGame> {
   const result = await runSkipTcgEngineDrawForTurn({
     input,
+    fields: GAME_RESOURCE_FIELDS,
+    headers: buildAshRpcHeaders()
+  })
+
+  if (!result.success) {
+    throw new Error(rpcErrorMessage(result.errors))
+  }
+
+  return result.data as CreatedGame
+}
+
+async function openActionWindow(gameId: string): Promise<CreatedGame> {
+  const result = await runOpenTcgEngineActionWindow({
+    input: { gameId },
     fields: GAME_RESOURCE_FIELDS,
     headers: buildAshRpcHeaders()
   })

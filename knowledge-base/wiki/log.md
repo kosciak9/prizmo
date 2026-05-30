@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-30] iteration 24 | SPA open-action-window command
+- Task attempted: added the next turn-progress command to the React SPA playtest shell so a selected persisted game can open the action window through `runOpenTcgEngineActionWindow` after the active player has drawn for turn, then invalidate the viewer-scoped game-state query and show refreshed `action_window` turn status.
+- Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`; updated this log and the TCG engine playtest handoff.
+- Validation: `mix assets.build` passed; `mix check --no-test` passed.
+- Remaining/blocking notes: no blocker; setup start, opening-hand draw, setup Active choice, setup Bench choice, setup Prize placement, setup completion, first turn start, draw-for-turn, skip-draw, and open-action-window are now clickable from the shell, while legal action affordances and prompt resolution controls remain pending.
+
 ## [2026-05-30] iteration 23 | SPA skip-draw command
 - Task attempted: added the alternate draw-step command to the React SPA playtest shell so the active player can skip draw through `runSkipTcgEngineDrawForTurn` while the persisted current turn is in `start` status, then invalidate the viewer-scoped game-state query and show refreshed `action_window` turn status.
 - Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`; updated this log and the TCG engine playtest handoff.

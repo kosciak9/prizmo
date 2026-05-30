@@ -67,17 +67,19 @@ Updated: 2026-05-30
 - The shell now calls `runDrawTcgEngineCardForTurn` for the current turn's active player while the persisted current turn is in `start` status, invalidates the viewer-scoped game-state query, and surfaces pending/error state plus refreshed turn status/deck and hand counts.
 - Iteration 23 added the alternate draw-step write command to the SPA shell.
 - The shell now calls `runSkipTcgEngineDrawForTurn` for the current turn's active player while the persisted current turn is in `start` status, invalidates the viewer-scoped game-state query, and surfaces pending/error state plus refreshed `action_window` turn status.
-- Setup start, opening-hand draw, setup Active choice, setup Bench choice, setup Prize placement, setup completion, first turn start, draw-for-turn, and skip-draw are no longer read-only in the browser shell; open-action-window controls, legal action affordances, and prompt resolution controls still need UI wiring.
+- Iteration 24 added the open-action-window write command to the SPA shell.
+- The shell now calls `runOpenTcgEngineActionWindow` while the persisted current turn is in `drawn` status, invalidates the viewer-scoped game-state query, and surfaces pending/error state plus refreshed `action_window` turn status.
+- Setup start, opening-hand draw, setup Active choice, setup Bench choice, setup Prize placement, setup completion, first turn start, draw-for-turn, skip-draw, and open-action-window are no longer read-only in the browser shell; legal action affordances and prompt resolution controls still need UI wiring.
 
 ## Last commit
 
-- Baseline entering iteration 23: `60f5365 feat(spa): wire draw for turn`.
-- This handoff was written before committing iteration 23; expected commit message is `feat(spa): wire skip draw`.
+- Baseline entering iteration 24: `9df0747 feat(spa): wire skip draw`.
+- This handoff was written before committing iteration 24; expected commit message is `feat(spa): wire action window`.
 
 ## Remaining tasks
 
 - Decide whether old `Prizmo.Tcg.Sim` tests are kept as historical reference, quarantined, or ported scenario-by-scenario.
-- Build the minimal playable React SPA loop beyond skip-draw: wire open action window to a UI button; expose legal action affordances, prompt resolution controls, and two-browser refresh/reconnect validation.
+- Build the minimal playable React SPA loop beyond opening the action window: expose legal action affordances, prompt resolution controls, and two-browser refresh/reconnect validation.
 - Expand persisted Ash engine mechanics: bench Basic Pokémon, one Energy attachment per turn, evolution timing, retreat/switch, attacks/damage/KO/prizes/replacement Active, turn transitions, and snapshot-backed undo/debug support.
 - Continue migrating executable card behavior into engine-owned definitions with explicit unsupported-behavior tracking.
 - Spike Electric Streams only after the command/read loop has enough event shape to publish safely.
@@ -88,4 +90,4 @@ Updated: 2026-05-30
 
 ## Recommended next atomic task
 
-- Add the open-action-window control to the SPA shell by calling `runOpenTcgEngineActionWindow` while the current turn is in `drawn` status, invalidating the game-state query, and showing the refreshed `action_window` turn status. Keep broader legal action affordances and prompt resolution controls for later iterations.
+- Add minimal legal action affordances for the action-window state, starting with a read-model/UI shape that tells the current viewer which supported commands or prompt flows are available without exposing hidden information. Keep prompt resolution controls as a separate follow-up if the affordance boundary is not yet exposed.
