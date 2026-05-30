@@ -29,16 +29,19 @@ Updated: 2026-05-30
 - Iteration 8 added `Prizmo.TcgEngine.Game.complete_setup_command`, exposed through the domain as `Prizmo.TcgEngine.complete_setup_for_game/1` and through AshTypescript RPC as `completeTcgEngineSetup`.
 - The SPA Ash client wrapper exports the generated setup-completion command as `runCompleteTcgEngineSetup`, with `CompleteTcgEngineSetupInput` and `CompleteTcgEngineSetupResult` types.
 - The complete-setup command delegates to `Prizmo.TcgEngine.Mechanics.complete_setup/1`, so it validates setup status, Active Pokémon presence, and six Prize cards per player before writing the `complete_setup` event and snapshot and transitioning the game to `:in_progress`.
+- Iteration 9 added `Prizmo.TcgEngine.Game.start_next_turn_command`, exposed through the domain as `Prizmo.TcgEngine.start_next_turn_for_game/1` and through AshTypescript RPC as `startNextTcgEngineTurn`.
+- The SPA Ash client wrapper exports the generated turn-start command as `runStartNextTcgEngineTurn`, with `StartNextTcgEngineTurnInput` and `StartNextTcgEngineTurnResult` types.
+- The start-next-turn command delegates to `Prizmo.TcgEngine.Mechanics.start_next_turn/1`, so it validates the game is `:in_progress`, chooses the next player/turn number, resets that player's turn flags, creates the persisted `Turn`, writes the `start_next_turn` event, snapshots it, and returns the refreshed `Game`.
 
 ## Last commit
 
-- Baseline entering iteration 8: `a099b6b feat(tcg): expose prize placement rpc`.
-- This handoff was written before committing iteration 8; expected commit message is `feat(tcg): expose setup completion rpc`.
+- Baseline entering iteration 9: `34ecc8b feat(tcg): expose setup completion rpc`.
+- This handoff was written before committing iteration 9; expected commit message is `feat(tcg): expose start next turn rpc`.
 
 ## Remaining tasks
 
 - Decide whether old `Prizmo.Tcg.Sim` tests are kept as historical reference, quarantined, or ported scenario-by-scenario.
-- Build the minimal playable React SPA loop: wire game creation, setup start, draw-opening-hand, active choice, setup Bench choice, prize placement, and setup completion to the new RPCs; expose turn start/draw/action-window boundaries, legal action affordances, prompt resolution, simple board/hand/discard/prize/turn/event rendering, and reconnect recovery.
+- Build the minimal playable React SPA loop: wire game creation, setup start, draw-opening-hand, active choice, setup Bench choice, prize placement, setup completion, and turn start to the new RPCs; expose draw/skip draw/action-window boundaries, legal action affordances, prompt resolution, simple board/hand/discard/prize/turn/event rendering, and reconnect recovery.
 - Expand persisted Ash engine mechanics: draw for turn, bench Basic Pokémon, one Energy attachment per turn, evolution timing, retreat/switch, attacks/damage/KO/prizes/replacement Active, turn transitions, and snapshot-backed undo/debug support.
 - Continue migrating executable card behavior into engine-owned definitions with explicit unsupported-behavior tracking.
 - Spike Electric Streams only after the command/read loop has enough event shape to publish safely.
@@ -49,4 +52,4 @@ Updated: 2026-05-30
 
 ## Recommended next atomic task
 
-- Expose the first turn-start command through an engine-owned Ash/RPC action, likely `start_next_tcg_engine_turn(game_id)`, delegating to `Prizmo.TcgEngine.Mechanics.start_next_turn/1` and returning the persisted `Game` so the SPA can move from completed setup into the first turn without direct test-helper or IEx intervention.
+- Expose the next turn-progress command through an engine-owned Ash/RPC action, likely `draw_tcg_engine_card_for_turn(game_id, player_id)` or `draw_tcg_engine_for_turn(game_id, player_id)`, delegating to `Prizmo.TcgEngine.Mechanics.draw_for_turn/2` and returning the persisted `Game` so the SPA can move from a `:start` turn toward the action window without direct test-helper or IEx intervention.

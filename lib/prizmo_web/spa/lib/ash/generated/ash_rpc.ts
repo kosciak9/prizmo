@@ -515,6 +515,50 @@ export async function placeTcgEnginePrizes<Fields extends PlaceTcgEnginePrizesFi
 }
 
 
+export type StartNextTcgEngineTurnInput = {
+  gameId: UUID;
+};
+
+export type StartNextTcgEngineTurnFields = UnifiedFieldSelection<TcgEngineGameResourceSchema>[];
+
+export type InferStartNextTcgEngineTurnResult<
+  Fields extends StartNextTcgEngineTurnFields | undefined,
+> = InferResult<TcgEngineGameResourceSchema, Fields>;
+
+export type StartNextTcgEngineTurnResult<Fields extends StartNextTcgEngineTurnFields | undefined = undefined> = | { success: true; data: InferStartNextTcgEngineTurnResult<Fields>; }
+| { success: false; errors: AshRpcError[]; }
+
+;
+
+/**
+ * Execute generic action on Game
+ *
+ * @ashActionType :action
+ */
+export async function startNextTcgEngineTurn<Fields extends StartNextTcgEngineTurnFields | undefined = undefined>(
+  config: {
+  tenant?: string;
+  input: StartNextTcgEngineTurnInput;
+  fields: Fields;
+  headers?: Record<string, string>;
+  fetchOptions?: RequestInit;
+  customFetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+}
+): Promise<StartNextTcgEngineTurnResult<Fields extends undefined ? [] : Fields>> {
+  const payload = {
+    action: "start_next_tcg_engine_turn",
+    ...(config.tenant !== undefined && { tenant: config.tenant }),
+    input: config.input,
+    ...(config.fields !== undefined && { fields: config.fields })
+  };
+
+  return executeActionRpcRequest<StartNextTcgEngineTurnResult<Fields extends undefined ? [] : Fields>>(
+    payload,
+    config
+  );
+}
+
+
 export type StartTcgEngineSetupInput = {
   gameId: UUID;
 };

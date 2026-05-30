@@ -8,6 +8,7 @@ export {
   listSupportedTcgDecks as runListSupportedTcgDecks,
   listUsers as runListUsers,
   placeTcgEnginePrizes as runPlaceTcgEnginePrizes,
+  startNextTcgEngineTurn as runStartNextTcgEngineTurn,
   startTcgEngineSetup as runStartTcgEngineSetup,
 } from './generated/ash_rpc'
 
@@ -25,6 +26,8 @@ export type {
   ListSupportedTcgDecksResult,
   PlaceTcgEnginePrizesInput,
   PlaceTcgEnginePrizesResult,
+  StartNextTcgEngineTurnInput,
+  StartNextTcgEngineTurnResult,
   StartTcgEngineSetupInput,
   StartTcgEngineSetupResult,
 } from './generated/ash_rpc'

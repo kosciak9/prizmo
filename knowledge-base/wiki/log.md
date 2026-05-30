@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-30] iteration 9 | Start next turn RPC boundary
+- Task attempted: exposed the first turn-start command through an engine-owned Ash/RPC action so SPA callers can start the next persisted turn by `game_id` without bypassing `Prizmo.TcgEngine.Mechanics.start_next_turn/1`.
+- Files changed: updated `lib/prizmo/tcg_engine/game.ex`, `lib/prizmo/tcg_engine.ex`, `lib/prizmo_web/spa/lib/ash/client.ts`, and regenerated `lib/prizmo_web/spa/lib/ash/generated/ash_rpc.ts`; updated this log and the TCG engine playtest handoff.
+- Validation: initial `MIX_ENV=test mix run -e ...` boundary smoke reached event inspection but failed because the smoke normalized persisted string event types as atoms; rerun smoke passed after creating a supported game, completing setup, starting turn 1, and verifying `:in_progress`, turn status `:start`, `start_next_turn` event, and cursor/latest event index 7; `mix ash_typescript.codegen --check` passed; `mix test test/prizmo/tcg_engine/mechanics_test.exs` passed (4 tests); `mix check --no-test` passed.
+- Remaining/blocking notes: no blocker; the SPA can now import `runStartNextTcgEngineTurn`, but draw/skip draw, opening the action window, legal action affordances, game-state/read-model UI, and prompt resolution remain missing.
+
 ## [2026-05-30] iteration 8 | Setup completion RPC boundary
 - Task attempted: exposed the final setup command through an engine-owned Ash/RPC action so SPA callers can complete setup for a persisted game by `game_id` without bypassing `Prizmo.TcgEngine.Mechanics.complete_setup/1`.
 - Files changed: updated `lib/prizmo/tcg_engine/game.ex`, `lib/prizmo/tcg_engine.ex`, `lib/prizmo_web/spa/lib/ash/client.ts`, and regenerated `lib/prizmo_web/spa/lib/ash/generated/ash_rpc.ts`; updated this log and the TCG engine playtest handoff.
