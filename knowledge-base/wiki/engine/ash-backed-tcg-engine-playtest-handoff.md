@@ -63,17 +63,19 @@ Updated: 2026-05-30
 - The shell now calls `runCompleteTcgEngineSetup` once setup status is `prizes_placed`, invalidates the viewer-scoped game-state query, and surfaces pending/error state plus refreshed completed setup and game status.
 - Iteration 21 added the first turn-start write command to the SPA shell.
 - The shell now calls `runStartNextTcgEngineTurn` once setup is completed, the game is `in_progress`, and no current turn exists, invalidates the viewer-scoped game-state query, and surfaces pending/error state plus refreshed current-turn status.
-- Setup start, opening-hand draw, setup Active choice, setup Bench choice, setup Prize placement, setup completion, and first turn start are no longer read-only in the browser shell; draw-for-turn/skip-draw/open-action-window controls, legal action affordances, and prompt resolution controls still need UI wiring.
+- Iteration 22 added the draw-for-turn write command to the SPA shell.
+- The shell now calls `runDrawTcgEngineCardForTurn` for the current turn's active player while the persisted current turn is in `start` status, invalidates the viewer-scoped game-state query, and surfaces pending/error state plus refreshed turn status/deck and hand counts.
+- Setup start, opening-hand draw, setup Active choice, setup Bench choice, setup Prize placement, setup completion, first turn start, and draw-for-turn are no longer read-only in the browser shell; skip-draw/open-action-window controls, legal action affordances, and prompt resolution controls still need UI wiring.
 
 ## Last commit
 
-- Baseline entering iteration 21: `86cd265 feat(spa): wire setup completion`.
-- This handoff was written before committing iteration 21; expected commit message is `feat(spa): wire turn start`.
+- Baseline entering iteration 22: `f672169 feat(spa): wire turn start`.
+- This handoff was written before committing iteration 22; expected commit message is `feat(spa): wire draw for turn`.
 
 ## Remaining tasks
 
 - Decide whether old `Prizmo.Tcg.Sim` tests are kept as historical reference, quarantined, or ported scenario-by-scenario.
-- Build the minimal playable React SPA loop beyond first turn start: wire draw for turn, skip draw, and open action window to UI buttons; expose legal action affordances, prompt resolution controls, and two-browser refresh/reconnect validation.
+- Build the minimal playable React SPA loop beyond draw-for-turn: wire skip draw and open action window to UI buttons; expose legal action affordances, prompt resolution controls, and two-browser refresh/reconnect validation.
 - Expand persisted Ash engine mechanics: bench Basic Pokémon, one Energy attachment per turn, evolution timing, retreat/switch, attacks/damage/KO/prizes/replacement Active, turn transitions, and snapshot-backed undo/debug support.
 - Continue migrating executable card behavior into engine-owned definitions with explicit unsupported-behavior tracking.
 - Spike Electric Streams only after the command/read loop has enough event shape to publish safely.
@@ -84,4 +86,4 @@ Updated: 2026-05-30
 
 ## Recommended next atomic task
 
-- Add the draw-for-turn control to the SPA shell by calling `runDrawTcgEngineCardForTurn` for the active player while the current turn is in `start` status, invalidating the game-state query, and showing the refreshed turn status/deck and hand counts. Keep skip-draw and open-action-window controls for later iterations.
+- Add the skip-draw control to the SPA shell by calling `runSkipTcgEngineDrawForTurn` for the active player while the current turn is in `start` status, invalidating the game-state query, and showing the refreshed `action_window` turn status. Keep open-action-window and broader legal action affordances for later iterations.

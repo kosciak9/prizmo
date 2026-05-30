@@ -7,6 +7,7 @@ import {
   runChooseTcgEngineSetupBenchFromHand,
   runCompleteTcgEngineSetup,
   runCreateTcgEngineGame,
+  runDrawTcgEngineCardForTurn,
   runDrawTcgEngineOpeningHand,
   runGetTcgEngineGameState,
   runListSupportedTcgDecks,
@@ -300,8 +301,16 @@ export function HomeRoute() {
     }
   })
 
+  const drawForTurnMutation = useMutation({
+    mutationFn: (input: { gameId: string; playerId: PlayerId }) => drawCardForTurn(input),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['tcg-engine', 'game-state'] })
+    }
+  })
+
   const gameState = gameStateQuery.data
   const viewerPlayer = gameState?.players.find(player => player.playerId === gameState.viewerPlayerId)
+  const currentTurnActivePlayerId = gameState?.currentTurn?.activePlayerId
   const setupActiveCandidates = viewerPlayer?.hand.filter(isSetupActiveCandidate) ?? []
   const setupBenchCandidates = viewerPlayer?.hand.filter(isSetupBenchCandidate) ?? []
   const allPlayersHaveSetupActive = gameState?.players.every(player => player.active) ?? false
@@ -349,6 +358,14 @@ export function HomeRoute() {
         gameState.setup?.status === 'completed' &&
         !gameState.currentTurn
     ) && !startNextTurnMutation.isPending
+  const canDrawForTurn =
+    Boolean(
+      normalisedGameId &&
+        gameState?.status === 'in_progress' &&
+        gameState.currentTurn?.status === 'start' &&
+        currentTurnActivePlayerId &&
+        isPlayerId(currentTurnActivePlayerId)
+    ) && !drawForTurnMutation.isPending
 
   function updateSession(nextSession: PlaytestSession) {
     setStoredSession(nextSession)
@@ -690,7 +707,7 @@ export function HomeRoute() {
                     <div>
                       <p className="text-sm font-medium text-stone-950">Turn commands</p>
                       <p className="mt-1 text-xs leading-5 text-stone-500">
-                        Start the first persisted turn after setup completes.
+                        Start the first persisted turn and draw for the active player.
                       </p>
                     </div>
                     <StatusBadge tone={gameState?.currentTurn ? 'active' : 'neutral'}>
@@ -714,11 +731,40 @@ export function HomeRoute() {
                           ? 'Start first turn'
                           : 'Complete setup first'}
                   </button>
+                  <button
+                    className="mt-2 w-full rounded-xl border border-emerald-700 px-3 py-2 text-sm font-semibold text-emerald-800 transition hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:border-stone-300 disabled:text-stone-400 disabled:hover:bg-transparent"
+                    disabled={!canDrawForTurn}
+                    onClick={() => {
+                      if (currentTurnActivePlayerId && isPlayerId(currentTurnActivePlayerId)) {
+                        drawForTurnMutation.mutate({
+                          gameId: normalisedGameId,
+                          playerId: currentTurnActivePlayerId
+                        })
+                      }
+                    }}
+                    type="button"
+                  >
+                    {drawForTurnMutation.isPending
+                      ? 'Drawing for turn...'
+                      : gameState?.currentTurn?.status === 'start'
+                        ? `Draw for ${formatPlayerId(gameState.currentTurn.activePlayerId)}`
+                        : gameState?.currentTurn?.status === 'drawn'
+                          ? 'Draw for turn resolved'
+                          : gameState?.currentTurn
+                            ? 'Turn is not in draw step'
+                            : 'Start first turn first'}
+                  </button>
                 </div>
 
                 {startNextTurnMutation.error ? (
                   <InlineNotice tone="error" title="Turn start command failed">
                     {errorMessage(startNextTurnMutation.error)}
+                  </InlineNotice>
+                ) : null}
+
+                {drawForTurnMutation.error ? (
+                  <InlineNotice tone="error" title="Draw for turn command failed">
+                    {errorMessage(drawForTurnMutation.error)}
                   </InlineNotice>
                 ) : null}
               </div>
@@ -915,6 +961,20 @@ async function completeSetup(gameId: string): Promise<CreatedGame> {
 async function startNextTurn(gameId: string): Promise<CreatedGame> {
   const result = await runStartNextTcgEngineTurn({
     input: { gameId },
+    fields: GAME_RESOURCE_FIELDS,
+    headers: buildAshRpcHeaders()
+  })
+
+  if (!result.success) {
+    throw new Error(rpcErrorMessage(result.errors))
+  }
+
+  return result.data as CreatedGame
+}
+
+async function drawCardForTurn(input: { gameId: string; playerId: PlayerId }): Promise<CreatedGame> {
+  const result = await runDrawTcgEngineCardForTurn({
+    input,
     fields: GAME_RESOURCE_FIELDS,
     headers: buildAshRpcHeaders()
   })
