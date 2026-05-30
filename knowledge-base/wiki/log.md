@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-30] iteration 4 | Draw opening hand RPC boundary
+- Task attempted: exposed the next setup command through an engine-owned Ash/RPC action so SPA callers can draw opening hands for a persisted game by `game_id` without bypassing `Prizmo.TcgEngine.Mechanics.draw_opening_hand/1`.
+- Files changed: updated `lib/prizmo/tcg_engine/game.ex`, `lib/prizmo/tcg_engine.ex`, `lib/prizmo_web/spa/lib/ash/client.ts`, and regenerated `lib/prizmo_web/spa/lib/ash/generated/ash_rpc.ts`; updated this log and the TCG engine playtest handoff.
+- Validation: `MIX_ENV=test mix run -e ...` draw-opening-hand boundary smoke passed after creating a supported game, starting setup, and reaching `cursor_index == 2`; `mix ash_typescript.codegen --check` passed; `mix test test/prizmo/tcg_engine/mechanics_test.exs` passed (4 tests); `mix check --no-test` passed.
+- Remaining/blocking notes: no blocker; the SPA can now import `runDrawTcgEngineOpeningHand`, but active/bench setup choices, prize placement, setup completion, and a game-state/read-model UI are still missing.
+
 ## [2026-05-30] iteration 3 | Setup command RPC boundary
 - Task attempted: exposed the first setup command through an engine-owned Ash/RPC action so SPA callers can start setup for a persisted game by `game_id` without bypassing `Prizmo.TcgEngine.Mechanics.start_setup/1`.
 - Files changed: updated `lib/prizmo/tcg_engine/game.ex`, `lib/prizmo/tcg_engine.ex`, `lib/prizmo_web/spa/lib/ash/client.ts`, and regenerated `lib/prizmo_web/spa/lib/ash/generated/ash_rpc.ts`; updated this log and the TCG engine playtest handoff.

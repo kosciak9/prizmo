@@ -14,16 +14,19 @@ Updated: 2026-05-30
 - Iteration 3 added `Prizmo.TcgEngine.Game.start_setup_command`, exposed through the domain as `Prizmo.TcgEngine.start_setup_game/1` and through AshTypescript RPC as `startTcgEngineSetup`.
 - The SPA Ash client wrapper exports the generated setup command as `runStartTcgEngineSetup`, with `StartTcgEngineSetupInput` and `StartTcgEngineSetupResult` types.
 - The setup command delegates to `Prizmo.TcgEngine.Mechanics.start_setup/1`, so it writes the persisted setup record, `start_setup` event, and snapshot instead of using the bare state-machine update.
+- Iteration 4 added `Prizmo.TcgEngine.Game.draw_opening_hand_command`, exposed through the domain as `Prizmo.TcgEngine.draw_opening_hand_for_game/1` and through AshTypescript RPC as `drawTcgEngineOpeningHand`.
+- The SPA Ash client wrapper exports the generated draw command as `runDrawTcgEngineOpeningHand`, with `DrawTcgEngineOpeningHandInput` and `DrawTcgEngineOpeningHandResult` types.
+- The draw-opening-hand command delegates to `Prizmo.TcgEngine.Mechanics.draw_opening_hand/1`, so it writes the persisted setup transition, `draw_opening_hand` event, and snapshot instead of moving cards directly.
 
 ## Last commit
 
-- Baseline entering iteration 3: `7ffe8da feat(tcg): expose supported engine deck games`.
-- This handoff was written before committing iteration 3; expected commit message is `feat(tcg): expose setup command rpc`.
+- Baseline entering iteration 4: `313040c feat(tcg): expose setup command rpc`.
+- This handoff was written before committing iteration 4; expected commit message is `feat(tcg): expose draw opening hand rpc`.
 
 ## Remaining tasks
 
 - Decide whether old `Prizmo.Tcg.Sim` tests are kept as historical reference, quarantined, or ported scenario-by-scenario.
-- Build the minimal playable React SPA loop: wire game creation and setup start to the new RPCs, expose the remaining setup commands, expose legal action affordances, prompt resolution, simple board/hand/discard/prize/turn/event rendering, and reconnect recovery.
+- Build the minimal playable React SPA loop: wire game creation, setup start, and draw-opening-hand to the new RPCs; expose the remaining setup commands; expose legal action affordances, prompt resolution, simple board/hand/discard/prize/turn/event rendering, and reconnect recovery.
 - Expand persisted Ash engine mechanics: draw for turn, bench Basic Pokémon, one Energy attachment per turn, evolution timing, retreat/switch, attacks/damage/KO/prizes/replacement Active, turn transitions, and snapshot-backed undo/debug support.
 - Continue migrating executable card behavior into engine-owned definitions with explicit unsupported-behavior tracking.
 - Spike Electric Streams only after the command/read loop has enough event shape to publish safely.
@@ -34,4 +37,4 @@ Updated: 2026-05-30
 
 ## Recommended next atomic task
 
-- Expose the next setup command through an engine-owned Ash/RPC action, likely `draw_opening_hand`, delegating to `Prizmo.TcgEngine.Mechanics.draw_opening_hand/1` and returning the persisted `Game` so the SPA can advance from `setup`/`waiting_to_draw` into `hands_drawn` without direct test-helper or IEx intervention.
+- Expose the next setup choice command through an engine-owned Ash/RPC action, likely `choose_active_from_hand(game_id, player_id, card_instance_id)`, delegating to `Prizmo.TcgEngine.Mechanics.choose_active_from_hand/3` and returning the persisted `Game` so the SPA can move from drawn hands toward valid active Pokémon selection without direct test-helper or IEx intervention.

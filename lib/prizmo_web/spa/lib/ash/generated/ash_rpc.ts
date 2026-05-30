@@ -253,6 +253,50 @@ export async function createTcgEngineGame<Fields extends CreateTcgEngineGameFiel
 }
 
 
+export type DrawTcgEngineOpeningHandInput = {
+  gameId: UUID;
+};
+
+export type DrawTcgEngineOpeningHandFields = UnifiedFieldSelection<TcgEngineGameResourceSchema>[];
+
+export type InferDrawTcgEngineOpeningHandResult<
+  Fields extends DrawTcgEngineOpeningHandFields | undefined,
+> = InferResult<TcgEngineGameResourceSchema, Fields>;
+
+export type DrawTcgEngineOpeningHandResult<Fields extends DrawTcgEngineOpeningHandFields | undefined = undefined> = | { success: true; data: InferDrawTcgEngineOpeningHandResult<Fields>; }
+| { success: false; errors: AshRpcError[]; }
+
+;
+
+/**
+ * Execute generic action on Game
+ *
+ * @ashActionType :action
+ */
+export async function drawTcgEngineOpeningHand<Fields extends DrawTcgEngineOpeningHandFields | undefined = undefined>(
+  config: {
+  tenant?: string;
+  input: DrawTcgEngineOpeningHandInput;
+  fields: Fields;
+  headers?: Record<string, string>;
+  fetchOptions?: RequestInit;
+  customFetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+}
+): Promise<DrawTcgEngineOpeningHandResult<Fields extends undefined ? [] : Fields>> {
+  const payload = {
+    action: "draw_tcg_engine_opening_hand",
+    ...(config.tenant !== undefined && { tenant: config.tenant }),
+    input: config.input,
+    ...(config.fields !== undefined && { fields: config.fields })
+  };
+
+  return executeActionRpcRequest<DrawTcgEngineOpeningHandResult<Fields extends undefined ? [] : Fields>>(
+    payload,
+    config
+  );
+}
+
+
 export type ListSupportedTcgDecksFields = UnifiedFieldSelection<{deckKey: string, name: string, sourceUrl: string, cardCount: number, uniqueCardCount: number, __type: "TypedMap", __primitiveFields: "deckKey" | "name" | "sourceUrl" | "cardCount" | "uniqueCardCount"}>[];
 
 export type InferListSupportedTcgDecksResult<

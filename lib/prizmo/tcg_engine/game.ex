@@ -9,6 +9,7 @@ defmodule Prizmo.TcgEngine.Game do
     extensions: [AshStateMachine, AshTypescript.Resource]
 
   alias Prizmo.TcgEngine.Game
+  alias Prizmo.TcgEngine.Mechanics
   alias Prizmo.TcgEngine.SupportedDecks
 
   @supported_deck_fields [
@@ -51,6 +52,7 @@ defmodule Prizmo.TcgEngine.Game do
     define :list_supported_decks
     define :create_from_supported_decks, args: [:players]
     define :start_setup_command, args: [:game_id]
+    define :draw_opening_hand_command, args: [:game_id]
     define :start_setup
     define :complete_setup
     define :finish
@@ -107,7 +109,21 @@ defmodule Prizmo.TcgEngine.Game do
       end
 
       run fn input, _context ->
-        Prizmo.TcgEngine.Mechanics.start_setup(input.arguments.game_id)
+        Mechanics.start_setup(input.arguments.game_id)
+      end
+    end
+
+    action :draw_opening_hand_command, :struct do
+      description "Draw opening hands for a persisted TCG engine game through the mechanics layer."
+
+      constraints instance_of: Game
+
+      argument :game_id, :uuid do
+        allow_nil? false
+      end
+
+      run fn input, _context ->
+        Mechanics.draw_opening_hand(input.arguments.game_id)
       end
     end
 
