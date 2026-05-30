@@ -2138,6 +2138,10 @@ function ViewerPromptsPanel({
   promptPendingId: string | null
   prompts: GameState['prompts']
 }) {
+  if (prompts.length === 0 && !commandError) {
+    return null
+  }
+
   return (
     <Panel title="Viewer prompts">
       <div className="space-y-3">
@@ -3272,6 +3276,10 @@ function ActionAffordancesPanel({
       retreatPendingKey
   )
   const actionGroups = useMemo(() => groupActionAffordances(actions), [actions])
+
+  if (actionGroups.length === 0 && !commandError) {
+    return null
+  }
 
   return (
     <Panel

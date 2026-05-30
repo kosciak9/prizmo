@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-31] iteration 91 | Inactive command rail panel density
+- Task attempted: continued the Web UI polish pass by hiding inactive `Viewer prompts` and `Available actions` rail panels when they have no prompts/actions and no command errors, keeping the next required flow decision visually dominant after setup.
+- Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.
+- Validation: `mix format && mix assets.build` passed; `mix check --no-test` passed; browser smoke on `http://localhost:4003` confirmed the Player command rail only showed `Game flow` for a no-prompt/no-action viewer state, with `Viewer prompts` and `Available actions` absent and no browser warnings or errors.
+- Remaining/blocking notes: no code blocker for this inactive-panel density slice. Further Web UI polish should continue refining active legal-action hierarchy, attack-resolution copy density, and product-quality empty/error states before rerunning the formal two-browser playtest milestone.
+
 ## [2026-05-31] iteration 90 | Game flow setup summary
 - Task attempted: continued the Web UI polish pass by compressing completed setup controls in the command rail into a concise setup summary, keeping the current turn/action path prominent once setup is locked.
 - Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.
