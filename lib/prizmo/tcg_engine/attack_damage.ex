@@ -155,6 +155,11 @@ defmodule Prizmo.TcgEngine.AttackDamage do
     do: {:ok, damage}
 
   defp apply_effect(damage, _attacker_card, _defender_card, %{
+         type: :recover_trainer_from_discard_to_hand
+       }),
+       do: {:ok, damage}
+
+  defp apply_effect(damage, _attacker_card, _defender_card, %{
          type: :attacker_cannot_attack_next_turn
        }), do: {:ok, damage}
 

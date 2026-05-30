@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-30] iteration 67 | Dedenne trainer-recovery attack prompt
+- Task attempted: continued the rejected authored attack-effect inventory and implemented the no-damage persisted `:recover_trainer_from_discard_to_hand` slice for Dedenne `SSP-087` `Electromagnetic Sonar`, creating an attack-effect prompt that lets the attacking player choose a Trainer from their discard pile, moves it to hand, completes the pending effect, and then allows the attack to finish.
+- Files changed: updated `lib/prizmo/tcg_engine/attack_effects.ex`, `lib/prizmo/tcg_engine/attack_damage.ex`, this log, and the TCG engine playtest handoff.
+- Validation: `mix format && mix compile --warnings-as-errors` passed; Tidewave rollback smoke passed for `SSP-087` `Electromagnetic Sonar` fetching as executable, surfacing a browser `declare_attack` affordance, creating a viewer-enriched `recover_trainer_from_discard_to_hand` prompt with one legal discarded Trainer choice, moving the selected `PFL-087` from discard to hand, completing the pending effect, and finishing the attack; `mix test test/prizmo/tcg_engine/mechanics_test.exs` passed (4 tests); `mix prizmo.cards.coverage` passed; `mix check --no-test` passed.
+- Remaining/blocking notes: no code blocker for Dedenne's trainer-recovery prompt. The attempted `SSP-056` return-attached-Energy candidate was deferred because damage-dealing attack-effect prompts can collide with the current one-awaiting-pending-effect-per-game constraint when the same attack also needs a KO Prize prompt.
+
 ## [2026-05-30] iteration 66 | Find a Friend attack prompt
 - Task attempted: continued the rejected authored attack-effect inventory and implemented the persisted `:search_pokemon_to_hand` attack-effect slice for Applin `TWM-126` `Find a Friend`, creating an attack-effect prompt that lets the attacking player choose a Pokémon from their deck, moves the chosen card to hand, shuffles the deck event-wise, completes the pending effect, and keeps attack finish blocked until the prompt resolves.
 - Files changed: updated `lib/prizmo/tcg_engine/attack_effects.ex`, `lib/prizmo/tcg_engine/attack_damage.ex`, `lib/prizmo/tcg_engine/mechanics.ex`, this log, and the TCG engine playtest handoff.
