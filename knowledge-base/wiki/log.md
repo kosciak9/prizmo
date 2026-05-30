@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-30] iteration 12 | Skip draw-for-turn RPC boundary
+- Task attempted: exposed the alternate turn-progress command through an engine-owned Ash/RPC action so SPA callers can skip the active player's draw step by `game_id` and `player_id` without bypassing `Prizmo.TcgEngine.Mechanics.skip_draw_for_turn/2`.
+- Files changed: updated `lib/prizmo/tcg_engine/game.ex`, `lib/prizmo/tcg_engine.ex`, `lib/prizmo_web/spa/lib/ash/client.ts`, and regenerated `lib/prizmo_web/spa/lib/ash/generated/ash_rpc.ts`; updated this log and the TCG engine playtest handoff.
+- Validation: `MIX_ENV=test mix run -e ...` skip-draw boundary smoke passed after creating a supported game, completing setup, starting turn 1, skipping the active player's draw, and verifying `:in_progress`, turn status `:action_window`, `skip_draw_for_turn` event, and cursor/latest event index 8; `mix ash_typescript.codegen --check` passed; `mix test test/prizmo/tcg_engine/mechanics_test.exs` passed (4 tests); `mix check --no-test` passed.
+- Remaining/blocking notes: no blocker; the SPA can now import `runSkipTcgEngineDrawForTurn`, but legal action affordances, game-state/read-model UI, prompt resolution, end-turn/action commands, and persisted play actions beyond generic card play remain missing.
+
 ## [2026-05-30] iteration 11 | Open action window RPC boundary
 - Task attempted: exposed the next turn-progress command through an engine-owned Ash/RPC action so SPA callers can move a persisted turn from `:drawn` into `:action_window` by `game_id` without bypassing `Prizmo.TcgEngine.Mechanics.open_action_window/1`.
 - Files changed: updated `lib/prizmo/tcg_engine/game.ex`, `lib/prizmo/tcg_engine.ex`, `lib/prizmo_web/spa/lib/ash/client.ts`, and regenerated `lib/prizmo_web/spa/lib/ash/generated/ash_rpc.ts`; updated this log and the TCG engine playtest handoff.

@@ -604,6 +604,51 @@ export async function placeTcgEnginePrizes<Fields extends PlaceTcgEnginePrizesFi
 }
 
 
+export type SkipTcgEngineDrawForTurnInput = {
+  gameId: UUID;
+  playerId: string;
+};
+
+export type SkipTcgEngineDrawForTurnFields = UnifiedFieldSelection<TcgEngineGameResourceSchema>[];
+
+export type InferSkipTcgEngineDrawForTurnResult<
+  Fields extends SkipTcgEngineDrawForTurnFields | undefined,
+> = InferResult<TcgEngineGameResourceSchema, Fields>;
+
+export type SkipTcgEngineDrawForTurnResult<Fields extends SkipTcgEngineDrawForTurnFields | undefined = undefined> = | { success: true; data: InferSkipTcgEngineDrawForTurnResult<Fields>; }
+| { success: false; errors: AshRpcError[]; }
+
+;
+
+/**
+ * Execute generic action on Game
+ *
+ * @ashActionType :action
+ */
+export async function skipTcgEngineDrawForTurn<Fields extends SkipTcgEngineDrawForTurnFields | undefined = undefined>(
+  config: {
+  tenant?: string;
+  input: SkipTcgEngineDrawForTurnInput;
+  fields: Fields;
+  headers?: Record<string, string>;
+  fetchOptions?: RequestInit;
+  customFetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+}
+): Promise<SkipTcgEngineDrawForTurnResult<Fields extends undefined ? [] : Fields>> {
+  const payload = {
+    action: "skip_tcg_engine_draw_for_turn",
+    ...(config.tenant !== undefined && { tenant: config.tenant }),
+    input: config.input,
+    ...(config.fields !== undefined && { fields: config.fields })
+  };
+
+  return executeActionRpcRequest<SkipTcgEngineDrawForTurnResult<Fields extends undefined ? [] : Fields>>(
+    payload,
+    config
+  );
+}
+
+
 export type StartNextTcgEngineTurnInput = {
   gameId: UUID;
 };

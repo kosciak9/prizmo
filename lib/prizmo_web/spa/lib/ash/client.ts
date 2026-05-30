@@ -10,6 +10,7 @@ export {
   listUsers as runListUsers,
   openTcgEngineActionWindow as runOpenTcgEngineActionWindow,
   placeTcgEnginePrizes as runPlaceTcgEnginePrizes,
+  skipTcgEngineDrawForTurn as runSkipTcgEngineDrawForTurn,
   startNextTcgEngineTurn as runStartNextTcgEngineTurn,
   startTcgEngineSetup as runStartTcgEngineSetup,
 } from './generated/ash_rpc'
@@ -32,6 +33,8 @@ export type {
   OpenTcgEngineActionWindowResult,
   PlaceTcgEnginePrizesInput,
   PlaceTcgEnginePrizesResult,
+  SkipTcgEngineDrawForTurnInput,
+  SkipTcgEngineDrawForTurnResult,
   StartNextTcgEngineTurnInput,
   StartNextTcgEngineTurnResult,
   StartTcgEngineSetupInput,

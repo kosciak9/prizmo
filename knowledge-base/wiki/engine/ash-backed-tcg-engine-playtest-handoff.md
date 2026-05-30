@@ -38,16 +38,19 @@ Updated: 2026-05-30
 - Iteration 11 added `Prizmo.TcgEngine.Game.open_action_window_command`, exposed through the domain as `Prizmo.TcgEngine.open_action_window_for_game/1` and through AshTypescript RPC as `openTcgEngineActionWindow`.
 - The SPA Ash client wrapper exports the generated open-action-window command as `runOpenTcgEngineActionWindow`, with `OpenTcgEngineActionWindowInput` and `OpenTcgEngineActionWindowResult` types.
 - The open-action-window command delegates to `Prizmo.TcgEngine.Mechanics.open_action_window/1`, so it validates the game is `:in_progress`, transitions the current turn from `:drawn` to `:action_window`, writes the `open_action_window` event, snapshots it, and returns the refreshed `Game`.
+- Iteration 12 added `Prizmo.TcgEngine.Game.skip_draw_for_turn_command`, exposed through the domain as `Prizmo.TcgEngine.skip_draw_for_turn_for_game/2` and through AshTypescript RPC as `skipTcgEngineDrawForTurn`.
+- The SPA Ash client wrapper exports the generated skip-draw command as `runSkipTcgEngineDrawForTurn`, with `SkipTcgEngineDrawForTurnInput` and `SkipTcgEngineDrawForTurnResult` types.
+- The skip-draw command delegates to `Prizmo.TcgEngine.Mechanics.skip_draw_for_turn/2`, so it validates game/turn/player state, transitions the current turn from `:start` to `:action_window`, writes the `skip_draw_for_turn` event, snapshots it, and returns the refreshed `Game`.
 
 ## Last commit
 
-- Baseline entering iteration 11: `bd983e8 feat(tcg): expose draw for turn rpc`.
-- This handoff was written before committing iteration 11; expected commit message is `feat(tcg): expose action window rpc`.
+- Baseline entering iteration 12: `32f8f63 feat(tcg): expose action window rpc`.
+- This handoff was written before committing iteration 12; expected commit message is `feat(tcg): expose skip draw rpc`.
 
 ## Remaining tasks
 
 - Decide whether old `Prizmo.Tcg.Sim` tests are kept as historical reference, quarantined, or ported scenario-by-scenario.
-- Build the minimal playable React SPA loop: wire game creation, setup start, draw-opening-hand, active choice, setup Bench choice, prize placement, setup completion, turn start, draw for turn, and open action window to the new RPCs; expose skip-draw, legal action affordances, prompt resolution, simple board/hand/discard/prize/turn/event rendering, and reconnect recovery.
+- Build the minimal playable React SPA loop: wire game creation, setup start, draw-opening-hand, active choice, setup Bench choice, prize placement, setup completion, turn start, draw for turn, skip draw, and open action window to the new RPCs; expose legal action affordances, prompt resolution, simple board/hand/discard/prize/turn/event rendering, and reconnect recovery.
 - Expand persisted Ash engine mechanics: bench Basic Pokémon, one Energy attachment per turn, evolution timing, retreat/switch, attacks/damage/KO/prizes/replacement Active, turn transitions, and snapshot-backed undo/debug support.
 - Continue migrating executable card behavior into engine-owned definitions with explicit unsupported-behavior tracking.
 - Spike Electric Streams only after the command/read loop has enough event shape to publish safely.
@@ -58,4 +61,4 @@ Updated: 2026-05-30
 
 ## Recommended next atomic task
 
-- Expose the alternate turn-progress command through an engine-owned Ash/RPC action, likely `skip_tcg_engine_draw_for_turn(game_id, player_id)`, delegating to `Prizmo.TcgEngine.Mechanics.skip_draw_for_turn/2` and returning the persisted `Game` so first-turn or effect-specific no-draw paths can enter the action window without direct test-helper or IEx intervention.
+- Expose a minimal engine read-model or action-affordance RPC for the SPA, likely starting with a game-state query by `game_id` that returns public board zones, current turn state, event log cursor/latest indexes, and current-player hand data without leaking hidden information.

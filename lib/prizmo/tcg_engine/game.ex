@@ -59,6 +59,7 @@ defmodule Prizmo.TcgEngine.Game do
     define :complete_setup_command, args: [:game_id]
     define :start_next_turn_command, args: [:game_id]
     define :draw_for_turn_command, args: [:game_id, :player_id]
+    define :skip_draw_for_turn_command, args: [:game_id, :player_id]
     define :open_action_window_command, args: [:game_id]
     define :start_setup
     define :complete_setup
@@ -243,6 +244,24 @@ defmodule Prizmo.TcgEngine.Game do
 
       run fn input, _context ->
         Mechanics.draw_for_turn(input.arguments.game_id, input.arguments.player_id)
+      end
+    end
+
+    action :skip_draw_for_turn_command, :struct do
+      description "Skip drawing for the active player's current turn through the mechanics layer."
+
+      constraints instance_of: Game
+
+      argument :game_id, :uuid do
+        allow_nil? false
+      end
+
+      argument :player_id, :string do
+        allow_nil? false
+      end
+
+      run fn input, _context ->
+        Mechanics.skip_draw_for_turn(input.arguments.game_id, input.arguments.player_id)
       end
     end
 
