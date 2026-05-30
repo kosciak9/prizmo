@@ -12,6 +12,7 @@ import {
   runGetTcgEngineGameState,
   runListSupportedTcgDecks,
   runPlaceTcgEnginePrizes,
+  runSkipTcgEngineDrawForTurn,
   runStartNextTcgEngineTurn,
   runStartTcgEngineSetup,
   type CreateTcgEngineGameFields,
@@ -308,6 +309,13 @@ export function HomeRoute() {
     }
   })
 
+  const skipDrawForTurnMutation = useMutation({
+    mutationFn: (input: { gameId: string; playerId: PlayerId }) => skipDrawForTurn(input),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['tcg-engine', 'game-state'] })
+    }
+  })
+
   const gameState = gameStateQuery.data
   const viewerPlayer = gameState?.players.find(player => player.playerId === gameState.viewerPlayerId)
   const currentTurnActivePlayerId = gameState?.currentTurn?.activePlayerId
@@ -365,7 +373,19 @@ export function HomeRoute() {
         gameState.currentTurn?.status === 'start' &&
         currentTurnActivePlayerId &&
         isPlayerId(currentTurnActivePlayerId)
-    ) && !drawForTurnMutation.isPending
+    ) &&
+    !drawForTurnMutation.isPending &&
+    !skipDrawForTurnMutation.isPending
+  const canSkipDrawForTurn =
+    Boolean(
+      normalisedGameId &&
+        gameState?.status === 'in_progress' &&
+        gameState.currentTurn?.status === 'start' &&
+        currentTurnActivePlayerId &&
+        isPlayerId(currentTurnActivePlayerId)
+    ) &&
+    !drawForTurnMutation.isPending &&
+    !skipDrawForTurnMutation.isPending
 
   function updateSession(nextSession: PlaytestSession) {
     setStoredSession(nextSession)
@@ -707,7 +727,7 @@ export function HomeRoute() {
                     <div>
                       <p className="text-sm font-medium text-stone-950">Turn commands</p>
                       <p className="mt-1 text-xs leading-5 text-stone-500">
-                        Start the first persisted turn and draw for the active player.
+                        Start the first persisted turn, then draw or skip draw for the active player.
                       </p>
                     </div>
                     <StatusBadge tone={gameState?.currentTurn ? 'active' : 'neutral'}>
@@ -754,6 +774,29 @@ export function HomeRoute() {
                             ? 'Turn is not in draw step'
                             : 'Start first turn first'}
                   </button>
+                  <button
+                    className="mt-2 w-full rounded-xl border border-emerald-700 px-3 py-2 text-sm font-semibold text-emerald-800 transition hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:border-stone-300 disabled:text-stone-400 disabled:hover:bg-transparent"
+                    disabled={!canSkipDrawForTurn}
+                    onClick={() => {
+                      if (currentTurnActivePlayerId && isPlayerId(currentTurnActivePlayerId)) {
+                        skipDrawForTurnMutation.mutate({
+                          gameId: normalisedGameId,
+                          playerId: currentTurnActivePlayerId
+                        })
+                      }
+                    }}
+                    type="button"
+                  >
+                    {skipDrawForTurnMutation.isPending
+                      ? 'Skipping draw...'
+                      : gameState?.currentTurn?.status === 'start'
+                        ? `Skip draw for ${formatPlayerId(gameState.currentTurn.activePlayerId)}`
+                        : gameState?.currentTurn?.status === 'action_window'
+                          ? 'Draw step skipped'
+                          : gameState?.currentTurn
+                            ? 'Turn is not in draw step'
+                            : 'Start first turn first'}
+                  </button>
                 </div>
 
                 {startNextTurnMutation.error ? (
@@ -765,6 +808,12 @@ export function HomeRoute() {
                 {drawForTurnMutation.error ? (
                   <InlineNotice tone="error" title="Draw for turn command failed">
                     {errorMessage(drawForTurnMutation.error)}
+                  </InlineNotice>
+                ) : null}
+
+                {skipDrawForTurnMutation.error ? (
+                  <InlineNotice tone="error" title="Skip draw command failed">
+                    {errorMessage(skipDrawForTurnMutation.error)}
                   </InlineNotice>
                 ) : null}
               </div>
@@ -974,6 +1023,20 @@ async function startNextTurn(gameId: string): Promise<CreatedGame> {
 
 async function drawCardForTurn(input: { gameId: string; playerId: PlayerId }): Promise<CreatedGame> {
   const result = await runDrawTcgEngineCardForTurn({
+    input,
+    fields: GAME_RESOURCE_FIELDS,
+    headers: buildAshRpcHeaders()
+  })
+
+  if (!result.success) {
+    throw new Error(rpcErrorMessage(result.errors))
+  }
+
+  return result.data as CreatedGame
+}
+
+async function skipDrawForTurn(input: { gameId: string; playerId: PlayerId }): Promise<CreatedGame> {
+  const result = await runSkipTcgEngineDrawForTurn({
     input,
     fields: GAME_RESOURCE_FIELDS,
     headers: buildAshRpcHeaders()
