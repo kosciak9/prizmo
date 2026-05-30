@@ -127,6 +127,7 @@ const GAME_STATE_FIELDS = [
       'pendingAttackRequiresReturnedEnergy',
       'pendingAttackRequiresShuffledEnergy',
       'pendingAttackRequiresBenchDamageTarget',
+      'pendingAttackRequiresBenchDamageCounters',
       'pendingAttackerCardInstanceId',
       'pendingDefenderCardInstanceId'
     ]
@@ -328,6 +329,7 @@ type ResolveDeclaredAttackInput = {
   returnedEnergyCardInstanceId?: string | null
   shuffledEnergyCardInstanceIds?: string[]
   benchDamageTargetCardInstanceId?: string | null
+  benchDamageCounterAllocations?: Record<string, number>
 }
 
 type ResolveDeclaredAttackCommand = {
@@ -337,6 +339,7 @@ type ResolveDeclaredAttackCommand = {
   returnedEnergyCardInstanceId?: string | null
   shuffledEnergyCardInstanceIds?: string[]
   benchDamageTargetCardInstanceId?: string | null
+  benchDamageCounterAllocations?: Record<string, number>
 }
 
 type FinishAttackInput = {
@@ -395,6 +398,7 @@ type GameState = {
     pendingAttackRequiresReturnedEnergy: boolean
     pendingAttackRequiresShuffledEnergy: boolean
     pendingAttackRequiresBenchDamageTarget: boolean
+    pendingAttackRequiresBenchDamageCounters: boolean
     pendingAttackerCardInstanceId: string | null
     pendingDefenderCardInstanceId: string | null
   } | null
@@ -1336,7 +1340,8 @@ export function HomeRoute() {
                   discardedEnergyCardInstanceIds,
                   returnedEnergyCardInstanceId,
                   shuffledEnergyCardInstanceIds,
-                  benchDamageTargetCardInstanceId
+                  benchDamageTargetCardInstanceId,
+                  benchDamageCounterAllocations
                 }) => {
                   if (isPlayerId(playerId)) {
                     resolveDeclaredAttackMutation.mutate({
@@ -1346,7 +1351,8 @@ export function HomeRoute() {
                       discardedEnergyCardInstanceIds,
                       returnedEnergyCardInstanceId,
                       shuffledEnergyCardInstanceIds,
-                      benchDamageTargetCardInstanceId
+                      benchDamageTargetCardInstanceId,
+                      benchDamageCounterAllocations
                     })
                   }
                 }}
@@ -2129,6 +2135,9 @@ function AttackProgressPanel({
   const [selectedReturnedEnergyCardInstanceId, setSelectedReturnedEnergyCardInstanceId] = useState('')
   const [selectedShuffledEnergyCardInstanceIds, setSelectedShuffledEnergyCardInstanceIds] = useState<string[]>([])
   const [selectedBenchDamageTargetCardInstanceId, setSelectedBenchDamageTargetCardInstanceId] = useState('')
+  const [selectedBenchDamageCounterAllocations, setSelectedBenchDamageCounterAllocations] = useState<
+    Record<string, number>
+  >({})
   const turn = gameState.currentTurn
   const activePlayer = turn ? gameState.players.find(player => player.playerId === turn.activePlayerId) : undefined
   const opponentPlayer = turn ? gameState.players.find(player => player.playerId !== turn.activePlayerId) : undefined
@@ -2203,6 +2212,24 @@ function AttackProgressPanel({
     : benchDamageTargetOptions.length === 1
       ? (benchDamageTargetOptions[0]?.id ?? null)
       : null
+  const benchDamageCounterOptions = turn?.pendingAttackRequiresBenchDamageCounters ? (opponentPlayer?.bench ?? []) : []
+  const benchDamageCounterOptionIds = useMemo(
+    () => new Set(benchDamageCounterOptions.map(card => card.id)),
+    [benchDamageCounterOptions]
+  )
+  const selectedBenchDamageCounterAllocationsForResolve = useMemo(
+    () =>
+      Object.fromEntries(
+        Object.entries(selectedBenchDamageCounterAllocations).filter(
+          ([cardInstanceId, counters]) => benchDamageCounterOptionIds.has(cardInstanceId) && counters > 0
+        )
+      ),
+    [benchDamageCounterOptionIds, selectedBenchDamageCounterAllocations]
+  )
+  const selectedBenchDamageCounterTotal = Object.values(selectedBenchDamageCounterAllocationsForResolve).reduce(
+    (total, counters) => total + counters,
+    0
+  )
 
   useEffect(() => {
     if (selectedSwitchBenchCardInstanceId && !selectedSwitchTargetIsValid) {
@@ -2215,6 +2242,7 @@ function AttackProgressPanel({
     setSelectedReturnedEnergyCardInstanceId('')
     setSelectedShuffledEnergyCardInstanceIds([])
     setSelectedBenchDamageTargetCardInstanceId('')
+    setSelectedBenchDamageCounterAllocations({})
   }, [turn?.id, turn?.pendingAttackId])
 
   useEffect(() => {
@@ -2244,6 +2272,18 @@ function AttackProgressPanel({
       setSelectedBenchDamageTargetCardInstanceId('')
     }
   }, [selectedBenchDamageTargetCardInstanceId, selectedBenchDamageTargetIsValid])
+
+  useEffect(() => {
+    setSelectedBenchDamageCounterAllocations(previousAllocations => {
+      const nextAllocations = Object.fromEntries(
+        Object.entries(previousAllocations).filter(([cardInstanceId]) => benchDamageCounterOptionIds.has(cardInstanceId))
+      )
+
+      return Object.keys(nextAllocations).length === Object.keys(previousAllocations).length
+        ? previousAllocations
+        : nextAllocations
+    })
+  }, [benchDamageCounterOptionIds])
 
   if (!turn || (turn.status !== 'attack_declared' && turn.status !== 'attack_resolving')) {
     return null
@@ -2279,6 +2319,11 @@ function AttackProgressPanel({
     turn.pendingAttackRequiresBenchDamageTarget &&
     shuffledEnergySelectedCount === shuffledEnergyRequiredCount &&
     benchDamageTargetOptions.length === 0
+  const benchDamageCounterRequiredCount = 6
+  const benchDamageCounterAllocationRequired =
+    turn.pendingAttackRequiresBenchDamageCounters && benchDamageCounterOptions.length > 0
+  const benchDamageCounterAllocationIncomplete =
+    benchDamageCounterAllocationRequired && selectedBenchDamageCounterTotal !== benchDamageCounterRequiredCount
   const missingActivePlayers = gameState.players.filter(player => !player.active)
   const viewerPromptBlocksFinish = viewerCanAdvanceAttack && gameState.prompts.length > 0
   const attackCannotFinish = missingActivePlayers.length > 0 || viewerPromptBlocksFinish
@@ -2290,7 +2335,8 @@ function AttackProgressPanel({
     (returnedEnergyRequiresChoice && !selectedReturnedEnergyIsValid) ||
     shuffledEnergyPartialSelection ||
     benchDamageTargetUnavailable ||
-    (benchDamageTargetRequired && !selectedBenchDamageTargetIsValid)
+    (benchDamageTargetRequired && !selectedBenchDamageTargetIsValid) ||
+    benchDamageCounterAllocationIncomplete
   const resolveButtonLabel = resolveDeclaredAttackPendingPlayerId === turn.activePlayerId
     ? `Resolving ${attackLabel}...`
     : switchTargetRequired && !selectedSwitchTargetIsValid
@@ -2305,6 +2351,8 @@ function AttackProgressPanel({
               ? `No opponent Bench target for ${attackLabel}`
               : benchDamageTargetRequired && !selectedBenchDamageTargetIsValid
                 ? `Choose a Bench damage target for ${attackLabel}`
+                : benchDamageCounterAllocationIncomplete
+                  ? `Allocate exactly ${benchDamageCounterRequiredCount} Bench damage counters for ${attackLabel}`
       : `Resolve ${attackLabel}`
   const toggleDiscardedEnergyCard = (energyCardInstanceId: string) => {
     setSelectedDiscardedEnergyCardInstanceIds(previousSelectedIds => {
@@ -2331,6 +2379,23 @@ function AttackProgressPanel({
       }
 
       return [...previousSelectedIds, energyCardInstanceId]
+    })
+  }
+
+  const setBenchDamageCounterAllocation = (cardInstanceId: string, counters: number) => {
+    const normalizedCounters = Math.max(0, Math.min(benchDamageCounterRequiredCount, Math.floor(counters || 0)))
+
+    setSelectedBenchDamageCounterAllocations(previousAllocations => {
+      if (normalizedCounters === 0) {
+        const { [cardInstanceId]: _removed, ...remainingAllocations } = previousAllocations
+
+        return remainingAllocations
+      }
+
+      return {
+        ...previousAllocations,
+        [cardInstanceId]: normalizedCounters
+      }
     })
   }
 
@@ -2614,6 +2679,64 @@ function AttackProgressPanel({
           </div>
         ) : null}
 
+        {turn.pendingAttackRequiresBenchDamageCounters ? (
+          <div className="rounded-xl border border-fuchsia-200 bg-fuchsia-50/70 p-3">
+            <div className="space-y-1">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-fuchsia-900">
+                Opponent Bench damage counters
+              </p>
+              <p className="text-xs leading-5 text-fuchsia-900/80">
+                This attack puts exactly {benchDamageCounterRequiredCount} damage counters on the opponent's Benched
+                Pokémon in any allocation. Bench knockouts are currently blocked by the engine until multi-KO Prize
+                sequencing is implemented.
+              </p>
+            </div>
+
+            {benchDamageCounterOptions.length > 0 ? (
+              <div className="mt-3 space-y-3">
+                <div className="rounded-lg border border-fuchsia-200 bg-stone-50 px-3 py-2 text-xs text-fuchsia-900">
+                  Allocated {selectedBenchDamageCounterTotal} / {benchDamageCounterRequiredCount} counters.
+                </div>
+
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {benchDamageCounterOptions.map(card => {
+                    const counters = selectedBenchDamageCounterAllocations[card.id] ?? 0
+
+                    return (
+                      <label
+                        className="flex items-start justify-between gap-3 rounded-lg border border-fuchsia-200 bg-stone-50 px-3 py-2 text-xs text-stone-700"
+                        key={card.id}
+                      >
+                        <span className="min-w-0">
+                          <span className="block font-medium">{card.name}</span>
+                          <span className="mt-0.5 block font-mono text-[0.68rem] opacity-70">
+                            {card.damage} damage · {card.cardId}
+                          </span>
+                        </span>
+                        <input
+                          className="w-16 rounded-lg border border-fuchsia-200 bg-stone-50 px-2 py-1 text-right font-mono text-xs text-fuchsia-950 outline-none focus:border-fuchsia-600 focus:ring-2 focus:ring-fuchsia-100 disabled:cursor-not-allowed disabled:bg-stone-100 disabled:text-stone-400"
+                          disabled={!viewerCanAdvanceAttack || commandPending}
+                          max={benchDamageCounterRequiredCount}
+                          min={0}
+                          onChange={event =>
+                            setBenchDamageCounterAllocation(card.id, Number(event.currentTarget.value))
+                          }
+                          type="number"
+                          value={counters}
+                        />
+                      </label>
+                    )
+                  })}
+                </div>
+              </div>
+            ) : (
+              <p className="mt-3 rounded-lg border border-fuchsia-200 bg-stone-50 px-3 py-2 text-xs text-fuchsia-900">
+                No opponent Benched Pokémon are available, so resolution will apply only the Active damage.
+              </p>
+            )}
+          </div>
+        ) : null}
+
         {!viewerCanAdvanceAttack ? (
           <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
             Switch this tab to {formatPlayerId(turn.activePlayerId)} to advance the attack.
@@ -2639,7 +2762,8 @@ function AttackProgressPanel({
                 discardedEnergyCardInstanceIds: selectedDiscardedEnergyIdsForResolve,
                 returnedEnergyCardInstanceId: returnedEnergyIdForResolve,
                 shuffledEnergyCardInstanceIds: selectedShuffledEnergyIdsForResolve,
-                benchDamageTargetCardInstanceId: benchDamageTargetIdForResolve
+                benchDamageTargetCardInstanceId: benchDamageTargetIdForResolve,
+                benchDamageCounterAllocations: selectedBenchDamageCounterAllocationsForResolve
               })
             }
             type="button"

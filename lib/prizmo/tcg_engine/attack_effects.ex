@@ -74,6 +74,7 @@ defmodule Prizmo.TcgEngine.AttackEffects do
     :damage_per_own_team_rocket_pokemon_in_play,
     :recover_trainer_from_discard_to_hand,
     :return_attached_energy_to_hand,
+    :opponent_bench_damage_counters,
     :search_pokemon_to_hand,
     :self_damage,
     :shuffle_attached_energy_into_deck_then_damage_opponent_bench,
@@ -183,6 +184,10 @@ defmodule Prizmo.TcgEngine.AttackEffects do
 
       %{type: :return_attached_energy_to_hand} ->
         return_attached_energy_to_hand(game_id, player_id, attacker_card, opts)
+
+      %{type: :opponent_bench_damage_counters, total_counters: total_counters}
+      when is_integer(total_counters) and total_counters >= 0 ->
+        damage_opponent_bench_counters(game_id, player_id, opts, total_counters)
 
       %{
         type: :shuffle_attached_energy_into_deck_then_damage_opponent_bench,
@@ -775,6 +780,25 @@ defmodule Prizmo.TcgEngine.AttackEffects do
     end
   end
 
+  defp damage_opponent_bench_counters(game_id, player_id, opts, total_counters) do
+    with {:ok, opponent_player_id} <- opponent_player_id(game_id, player_id),
+         {:ok, opponent_bench_cards} <- cards_in_zone(game_id, opponent_player_id, :bench),
+         {:ok, allocations} <- bench_damage_counter_allocations(opts),
+         {:ok, allocations} <- normalize_bench_damage_counter_allocations(allocations),
+         :ok <- require_bench_counter_allocation_targets(allocations, opponent_bench_cards),
+         :ok <- require_bench_counter_total(allocations, opponent_bench_cards, total_counters),
+         {:ok, damage_results} <-
+           apply_bench_damage_counter_allocations(allocations, opponent_bench_cards) do
+      {:ok,
+       %{
+         effect_type: "opponent_bench_damage_counters",
+         bench_damage_counter_total: total_counters,
+         bench_damage_counter_allocations: damage_results,
+         bench_damage_applied?: damage_results != []
+       }}
+    end
+  end
+
   defp discarded_energy_card_instance_ids(opts) do
     case Map.get(opts, :discarded_energy_card_instance_ids) ||
            Map.get(opts, "discarded_energy_card_instance_ids") do
@@ -791,6 +815,96 @@ defmodule Prizmo.TcgEngine.AttackEffects do
       ids when is_list(ids) -> {:ok, ids}
       _invalid -> {:error, :invalid_shuffled_energy_card_instance_ids}
     end
+  end
+
+  defp bench_damage_counter_allocations(opts) do
+    case Map.get(opts, :bench_damage_counter_allocations) ||
+           Map.get(opts, "bench_damage_counter_allocations") do
+      nil -> {:ok, %{}}
+      allocations when is_map(allocations) -> {:ok, allocations}
+      _invalid -> {:error, :invalid_bench_damage_counter_allocations}
+    end
+  end
+
+  defp normalize_bench_damage_counter_allocations(allocations) do
+    allocations
+    |> Enum.reduce_while({:ok, []}, fn {card_instance_id, counters}, {:ok, normalized} ->
+      cond do
+        not is_binary(card_instance_id) ->
+          {:halt, {:error, :invalid_bench_damage_counter_target}}
+
+        is_integer(counters) and counters > 0 ->
+          {:cont, {:ok, [{card_instance_id, counters} | normalized]}}
+
+        counters == 0 ->
+          {:cont, {:ok, normalized}}
+
+        true ->
+          {:halt, {:error, :invalid_bench_damage_counter_count}}
+      end
+    end)
+    |> case do
+      {:ok, normalized} -> {:ok, Enum.reverse(normalized)}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp require_bench_counter_allocation_targets(allocations, opponent_bench_cards) do
+    bench_card_ids = MapSet.new(opponent_bench_cards, & &1.id)
+
+    if Enum.all?(allocations, fn {card_instance_id, _counters} ->
+         MapSet.member?(bench_card_ids, card_instance_id)
+       end) do
+      :ok
+    else
+      {:error, :invalid_bench_damage_counter_target}
+    end
+  end
+
+  defp require_bench_counter_total(allocations, [], _total_counters) do
+    allocated_counters = total_allocated_counters(allocations)
+
+    if allocated_counters == 0 do
+      :ok
+    else
+      {:error, :invalid_bench_damage_counter_target}
+    end
+  end
+
+  defp require_bench_counter_total(allocations, [_first | _rest], total_counters) do
+    if total_allocated_counters(allocations) == total_counters do
+      :ok
+    else
+      {:error, :wrong_bench_damage_counter_total}
+    end
+  end
+
+  defp total_allocated_counters(allocations) do
+    Enum.reduce(allocations, 0, fn {_card_instance_id, counters}, total -> total + counters end)
+  end
+
+  defp apply_bench_damage_counter_allocations([], _opponent_bench_cards), do: {:ok, []}
+
+  defp apply_bench_damage_counter_allocations(allocations, opponent_bench_cards) do
+    opponent_bench_cards_by_id = Map.new(opponent_bench_cards, &{&1.id, &1})
+
+    allocations
+    |> Enum.map(fn {card_instance_id, counters} ->
+      bench_card = Map.fetch!(opponent_bench_cards_by_id, card_instance_id)
+      damage = counters * 10
+
+      with {:ok, damage_result} <- apply_bench_attack_damage_without_knockout(bench_card, damage) do
+        {:ok,
+         %{
+           card_instance_id: bench_card.id,
+           counters: counters,
+           damage: damage_result.damage,
+           resulting_damage: damage_result.resulting_damage,
+           knocked_out?: damage_result.knocked_out?
+         }}
+      end
+    end)
+    |> collect_results()
   end
 
   defp bench_damage_target_card_instance_id(opts) do
