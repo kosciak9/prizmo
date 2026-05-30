@@ -13,6 +13,7 @@ import {
   runDrawTcgEngineCardForTurn,
   runDrawTcgEngineOpeningHand,
   runEndTcgEngineTurn,
+  runFinishTcgEngineAttack,
   runGetTcgEngineGameState,
   runListSupportedTcgDecks,
   runOpenTcgEngineActionWindow,
@@ -20,6 +21,7 @@ import {
   runPlayTcgEngineBasicToBench,
   runPlayTcgEngineCard,
   runRetreatTcgEngineActive,
+  runResolveTcgEngineDeclaredAttack,
   runSkipTcgEngineDrawForTurn,
   runStartNextTcgEngineTurn,
   runStartTcgEngineSetup,
@@ -293,6 +295,24 @@ type DeclareAttackCommand = {
   attackId: string
 }
 
+type ResolveDeclaredAttackInput = {
+  gameId: string
+  playerId: PlayerId
+}
+
+type ResolveDeclaredAttackCommand = {
+  playerId: string
+}
+
+type FinishAttackInput = {
+  gameId: string
+  playerId: PlayerId
+}
+
+type FinishAttackCommand = {
+  playerId: string
+}
+
 type ChoosePromptInput = {
   gameId: string
   playerId: PlayerId
@@ -500,6 +520,20 @@ export function HomeRoute() {
 
   const declareAttackMutation = useMutation({
     mutationFn: (input: DeclareAttackInput) => declareAttack(input),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['tcg-engine', 'game-state'] })
+    }
+  })
+
+  const resolveDeclaredAttackMutation = useMutation({
+    mutationFn: (input: ResolveDeclaredAttackInput) => resolveDeclaredAttack(input),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['tcg-engine', 'game-state'] })
+    }
+  })
+
+  const finishAttackMutation = useMutation({
+    mutationFn: (input: FinishAttackInput) => finishAttack(input),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['tcg-engine', 'game-state'] })
     }
@@ -1096,6 +1130,18 @@ export function HomeRoute() {
                   </InlineNotice>
                 ) : null}
 
+                {resolveDeclaredAttackMutation.error ? (
+                  <InlineNotice tone="error" title="Attack resolution command failed">
+                    {errorMessage(resolveDeclaredAttackMutation.error)}
+                  </InlineNotice>
+                ) : null}
+
+                {finishAttackMutation.error ? (
+                  <InlineNotice tone="error" title="Finish attack command failed">
+                    {errorMessage(finishAttackMutation.error)}
+                  </InlineNotice>
+                ) : null}
+
                 {choosePromptMutation.error ? (
                   <InlineNotice tone="error" title="Prompt choice command failed">
                     {errorMessage(choosePromptMutation.error)}
@@ -1197,6 +1243,22 @@ export function HomeRoute() {
                     })
                   }
                 }}
+                onResolveDeclaredAttack={({ playerId }) => {
+                  if (isPlayerId(playerId)) {
+                    resolveDeclaredAttackMutation.mutate({
+                      gameId: normalisedGameId,
+                      playerId
+                    })
+                  }
+                }}
+                onFinishAttack={({ playerId }) => {
+                  if (isPlayerId(playerId)) {
+                    finishAttackMutation.mutate({
+                      gameId: normalisedGameId,
+                      playerId
+                    })
+                  }
+                }}
                 onPlayCard={({ playerId, cardInstanceId }) => {
                   if (isPlayerId(playerId)) {
                     playCardMutation.mutate({
@@ -1241,6 +1303,14 @@ export function HomeRoute() {
                   declareAttackMutation.isPending && declareAttackMutation.variables
                     ? attackKey(declareAttackMutation.variables.playerId, declareAttackMutation.variables.attackId)
                     : null
+                }
+                resolveDeclaredAttackPendingPlayerId={
+                  resolveDeclaredAttackMutation.isPending
+                    ? resolveDeclaredAttackMutation.variables?.playerId ?? null
+                    : null
+                }
+                finishAttackPendingPlayerId={
+                  finishAttackMutation.isPending ? finishAttackMutation.variables?.playerId ?? null : null
                 }
               />
             ) : null}
@@ -1533,6 +1603,34 @@ async function declareAttack(input: DeclareAttackInput): Promise<CreatedGame> {
   return result.data as CreatedGame
 }
 
+async function resolveDeclaredAttack(input: ResolveDeclaredAttackInput): Promise<CreatedGame> {
+  const result = await runResolveTcgEngineDeclaredAttack({
+    input,
+    fields: GAME_RESOURCE_FIELDS,
+    headers: buildAshRpcHeaders()
+  })
+
+  if (!result.success) {
+    throw new Error(rpcErrorMessage(result.errors))
+  }
+
+  return result.data as CreatedGame
+}
+
+async function finishAttack(input: FinishAttackInput): Promise<CreatedGame> {
+  const result = await runFinishTcgEngineAttack({
+    input,
+    fields: GAME_RESOURCE_FIELDS,
+    headers: buildAshRpcHeaders()
+  })
+
+  if (!result.success) {
+    throw new Error(rpcErrorMessage(result.errors))
+  }
+
+  return result.data as CreatedGame
+}
+
 async function choosePrompt(input: ChoosePromptInput): Promise<CreatedGame> {
   const result = await runChooseTcgEnginePrompt({
     input,
@@ -1555,15 +1653,19 @@ function GameStateWorkbench({
   onAttachEnergy,
   onDeclareAttack,
   onEndTurn,
+  onFinishAttack,
   onPlayBasicToBench,
   onPlayCard,
   onRetreat,
+  onResolveDeclaredAttack,
   attachEnergyPendingKey,
   declareAttackPendingKey,
   endTurnPendingPlayerId,
+  finishAttackPendingPlayerId,
   playBasicToBenchPendingCardId,
   promptPendingId,
   playCardPendingCardId,
+  resolveDeclaredAttackPendingPlayerId,
   retreatPendingKey
 }: {
   gameState: GameState
@@ -1573,15 +1675,19 @@ function GameStateWorkbench({
   onAttachEnergy: (input: AttachEnergyCommand) => void
   onDeclareAttack: (input: DeclareAttackCommand) => void
   onEndTurn: (input: EndTurnCommand) => void
+  onFinishAttack: (input: FinishAttackCommand) => void
   onPlayBasicToBench: (input: PlayBasicToBenchCommand) => void
   onPlayCard: (input: PlayCardCommand) => void
   onRetreat: (input: RetreatCommand) => void
+  onResolveDeclaredAttack: (input: ResolveDeclaredAttackCommand) => void
   attachEnergyPendingKey: string | null
   declareAttackPendingKey: string | null
   endTurnPendingPlayerId: string | null
+  finishAttackPendingPlayerId: string | null
   playBasicToBenchPendingCardId: string | null
   promptPendingId: string | null
   playCardPendingCardId: string | null
+  resolveDeclaredAttackPendingPlayerId: string | null
   retreatPendingKey: string | null
 }) {
   const cardsById = useMemo(() => visibleCardsById(gameState), [gameState])
@@ -1629,6 +1735,16 @@ function GameStateWorkbench({
         playBasicToBenchPendingCardId={playBasicToBenchPendingCardId}
         playCardPendingCardId={playCardPendingCardId}
         retreatPendingKey={retreatPendingKey}
+      />
+
+      <AttackProgressPanel
+        cardsById={cardsById}
+        finishAttackPendingPlayerId={finishAttackPendingPlayerId}
+        gameState={gameState}
+        onFinishAttack={onFinishAttack}
+        onResolveDeclaredAttack={onResolveDeclaredAttack}
+        resolveDeclaredAttackPendingPlayerId={resolveDeclaredAttackPendingPlayerId}
+        viewerPlayerId={viewerPlayerId}
       />
 
       <div className="grid gap-5 xl:grid-cols-2">
@@ -1818,6 +1934,84 @@ function PromptChoiceCard({
         </pre>
       </details>
     </div>
+  )
+}
+
+function AttackProgressPanel({
+  cardsById,
+  finishAttackPendingPlayerId,
+  gameState,
+  onFinishAttack,
+  onResolveDeclaredAttack,
+  resolveDeclaredAttackPendingPlayerId,
+  viewerPlayerId
+}: {
+  cardsById: Map<string, CardSummary>
+  finishAttackPendingPlayerId: string | null
+  gameState: GameState
+  onFinishAttack: (input: FinishAttackCommand) => void
+  onResolveDeclaredAttack: (input: ResolveDeclaredAttackCommand) => void
+  resolveDeclaredAttackPendingPlayerId: string | null
+  viewerPlayerId: PlayerId
+}) {
+  const turn = gameState.currentTurn
+
+  if (!turn || (turn.status !== 'attack_declared' && turn.status !== 'attack_resolving')) {
+    return null
+  }
+
+  const attacker = turn.pendingAttackerCardInstanceId ? cardsById.get(turn.pendingAttackerCardInstanceId) : null
+  const defender = turn.pendingDefenderCardInstanceId ? cardsById.get(turn.pendingDefenderCardInstanceId) : null
+  const attackLabel = turn.pendingAttackId ? formatEventType(turn.pendingAttackId) : 'declared attack'
+  const viewerCanAdvanceAttack = viewerPlayerId === turn.activePlayerId && isPlayerId(turn.activePlayerId)
+  const commandPending = Boolean(resolveDeclaredAttackPendingPlayerId || finishAttackPendingPlayerId)
+
+  return (
+    <Panel title="Attack resolution" trailing={<StatusBadge tone="warning">{turn.status}</StatusBadge>}>
+      <div className="space-y-3 text-sm text-stone-700">
+        <div className="grid gap-2 sm:grid-cols-2">
+          <StateRow label="Attack" value={attackLabel} />
+          <StateRow label="Active player" value={formatPlayerId(turn.activePlayerId)} />
+          <StateRow label="Attacker" value={attacker?.name ?? formatNullableCardId(turn.pendingAttackerCardInstanceId)} />
+          <StateRow label="Defender" value={defender?.name ?? formatNullableCardId(turn.pendingDefenderCardInstanceId)} />
+        </div>
+
+        <p className="text-xs leading-5 text-stone-500">
+          Resolve applies the declared attack's currently executable damage/effect behavior. Finish closes the
+          attack and ends the turn after resolution.
+        </p>
+
+        {!viewerCanAdvanceAttack ? (
+          <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+            Switch this tab to {formatPlayerId(turn.activePlayerId)} to advance the attack.
+          </p>
+        ) : null}
+
+        {turn.status === 'attack_declared' ? (
+          <button
+            className="w-full rounded-xl border border-emerald-700 px-3 py-2 text-left text-sm font-semibold text-emerald-800 transition hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:border-stone-300 disabled:text-stone-400 disabled:hover:bg-transparent"
+            disabled={!viewerCanAdvanceAttack || commandPending}
+            onClick={() => onResolveDeclaredAttack({ playerId: turn.activePlayerId })}
+            type="button"
+          >
+            {resolveDeclaredAttackPendingPlayerId === turn.activePlayerId
+              ? `Resolving ${attackLabel}...`
+              : `Resolve ${attackLabel}`}
+          </button>
+        ) : null}
+
+        {turn.status === 'attack_resolving' ? (
+          <button
+            className="w-full rounded-xl border border-emerald-700 px-3 py-2 text-left text-sm font-semibold text-emerald-800 transition hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:border-stone-300 disabled:text-stone-400 disabled:hover:bg-transparent"
+            disabled={!viewerCanAdvanceAttack || commandPending}
+            onClick={() => onFinishAttack({ playerId: turn.activePlayerId })}
+            type="button"
+          >
+            {finishAttackPendingPlayerId === turn.activePlayerId ? 'Finishing attack...' : 'Finish attack and end turn'}
+          </button>
+        ) : null}
+      </div>
+    </Panel>
   )
 }
 
@@ -2524,6 +2718,10 @@ function attackCostLabel(cost: string[]) {
 
 function attackDamageLabel(damage: string | null) {
   return damage ? ` (${damage} damage)` : ''
+}
+
+function formatNullableCardId(cardInstanceId: string | null) {
+  return cardInstanceId ? formatCardInstanceId(cardInstanceId) : 'None'
 }
 
 function retreatPaymentOptions(sourceCardInstanceIds: string[], requiredSourceCount: number) {

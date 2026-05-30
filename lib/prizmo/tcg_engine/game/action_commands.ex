@@ -172,6 +172,42 @@ defmodule Prizmo.TcgEngine.Game.ActionCommands do
       end
     end
 
+    action :resolve_declared_attack_command, :struct do
+      description "Resolve the active player's declared attack through the mechanics layer."
+
+      constraints instance_of: Game
+
+      argument :game_id, :uuid do
+        allow_nil? false
+      end
+
+      argument :player_id, :string do
+        allow_nil? false
+      end
+
+      run fn input, _context ->
+        Mechanics.resolve_declared_attack(input.arguments.game_id, input.arguments.player_id)
+      end
+    end
+
+    action :finish_attack_command, :struct do
+      description "Finish an already-resolved attack and end the active player's turn."
+
+      constraints instance_of: Game
+
+      argument :game_id, :uuid do
+        allow_nil? false
+      end
+
+      argument :player_id, :string do
+        allow_nil? false
+      end
+
+      run fn input, _context ->
+        Mechanics.finish_attack(input.arguments.game_id, input.arguments.player_id)
+      end
+    end
+
     action :choose_prompt_command, :struct do
       description "Resolve a select-cards prompt through the generic mechanics layer."
 

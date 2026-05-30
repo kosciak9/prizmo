@@ -663,6 +663,51 @@ export async function endTcgEngineTurn<Fields extends EndTcgEngineTurnFields | u
 }
 
 
+export type FinishTcgEngineAttackInput = {
+  gameId: UUID;
+  playerId: string;
+};
+
+export type FinishTcgEngineAttackFields = UnifiedFieldSelection<TcgEngineGameResourceSchema>[];
+
+export type InferFinishTcgEngineAttackResult<
+  Fields extends FinishTcgEngineAttackFields | undefined,
+> = InferResult<TcgEngineGameResourceSchema, Fields>;
+
+export type FinishTcgEngineAttackResult<Fields extends FinishTcgEngineAttackFields | undefined = undefined> = | { success: true; data: InferFinishTcgEngineAttackResult<Fields>; }
+| { success: false; errors: AshRpcError[]; }
+
+;
+
+/**
+ * Execute generic action on Game
+ *
+ * @ashActionType :action
+ */
+export async function finishTcgEngineAttack<Fields extends FinishTcgEngineAttackFields | undefined = undefined>(
+  config: {
+  tenant?: string;
+  input: FinishTcgEngineAttackInput;
+  fields: Fields;
+  headers?: Record<string, string>;
+  fetchOptions?: RequestInit;
+  customFetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+}
+): Promise<FinishTcgEngineAttackResult<Fields extends undefined ? [] : Fields>> {
+  const payload = {
+    action: "finish_tcg_engine_attack",
+    ...(config.tenant !== undefined && { tenant: config.tenant }),
+    input: config.input,
+    ...(config.fields !== undefined && { fields: config.fields })
+  };
+
+  return executeActionRpcRequest<FinishTcgEngineAttackResult<Fields extends undefined ? [] : Fields>>(
+    payload,
+    config
+  );
+}
+
+
 export type GetTcgEngineGameStateInput = {
   gameId: UUID;
   viewerPlayerId: string;
@@ -921,6 +966,51 @@ export async function playTcgEngineCard<Fields extends PlayTcgEngineCardFields |
   };
 
   return executeActionRpcRequest<PlayTcgEngineCardResult<Fields extends undefined ? [] : Fields>>(
+    payload,
+    config
+  );
+}
+
+
+export type ResolveTcgEngineDeclaredAttackInput = {
+  gameId: UUID;
+  playerId: string;
+};
+
+export type ResolveTcgEngineDeclaredAttackFields = UnifiedFieldSelection<TcgEngineGameResourceSchema>[];
+
+export type InferResolveTcgEngineDeclaredAttackResult<
+  Fields extends ResolveTcgEngineDeclaredAttackFields | undefined,
+> = InferResult<TcgEngineGameResourceSchema, Fields>;
+
+export type ResolveTcgEngineDeclaredAttackResult<Fields extends ResolveTcgEngineDeclaredAttackFields | undefined = undefined> = | { success: true; data: InferResolveTcgEngineDeclaredAttackResult<Fields>; }
+| { success: false; errors: AshRpcError[]; }
+
+;
+
+/**
+ * Execute generic action on Game
+ *
+ * @ashActionType :action
+ */
+export async function resolveTcgEngineDeclaredAttack<Fields extends ResolveTcgEngineDeclaredAttackFields | undefined = undefined>(
+  config: {
+  tenant?: string;
+  input: ResolveTcgEngineDeclaredAttackInput;
+  fields: Fields;
+  headers?: Record<string, string>;
+  fetchOptions?: RequestInit;
+  customFetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+}
+): Promise<ResolveTcgEngineDeclaredAttackResult<Fields extends undefined ? [] : Fields>> {
+  const payload = {
+    action: "resolve_tcg_engine_declared_attack",
+    ...(config.tenant !== undefined && { tenant: config.tenant }),
+    input: config.input,
+    ...(config.fields !== undefined && { fields: config.fields })
+  };
+
+  return executeActionRpcRequest<ResolveTcgEngineDeclaredAttackResult<Fields extends undefined ? [] : Fields>>(
     payload,
     config
   );

@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-30] iteration 38 | Attack resolution and finish commands
+- Task attempted: exposed the persisted engine's existing `resolve_declared_attack` and `finish_attack` mechanics through Ash/RPC and added React SPA controls for turns in `attack_declared` or `attack_resolving` status.
+- Files changed: updated `lib/prizmo/tcg_engine/game/action_commands.ex`, `lib/prizmo/tcg_engine.ex`, `lib/prizmo_web/spa/features/home/routes/index.tsx`, `lib/prizmo_web/spa/lib/ash/client.ts`, generated `lib/prizmo_web/spa/lib/ash/generated/ash_rpc.ts`, this log, and the TCG engine playtest handoff.
+- Validation: Tidewave rollback smoke passed by staging Dreepy `Petty Grudge`, verifying declaration moved the turn to `:attack_declared`, `Prizmo.TcgEngine.resolve_declared_attack_for_game/2` moved it to `:attack_resolving` and applied 10 damage, and `Prizmo.TcgEngine.finish_attack_for_game/2` moved it to `:ended` with all expected events; `mix ash_typescript.codegen --check` passed; `mix assets.build` passed; `mix test test/prizmo/tcg_engine/mechanics_test.exs` passed (4 tests); `mix check --no-test` passed.
+- Remaining/blocking notes: no code blocker; attack resolution still uses `Prizmo.TcgEngine.CardCatalog.fetch_attack/2`, so paid attacks with missing executable behavior can be declared but will fail resolution until their behavior is migrated or unsupported declaration is made explicit.
+
 ## [2026-05-30] iteration 37 | Attack declaration affordance and command
 - Task attempted: started the persisted attack-declaration slice by adding Energy-cost validation for declared attacks, exposing `declare_attack` through the Ash/RPC boundary, and rendering paid attack buttons in the React playtest legal-actions panel.
 - Files changed: added `lib/prizmo/tcg_engine/attack_costs.ex`; updated `lib/prizmo/tcg_engine/card_catalog.ex`, `lib/prizmo/tcg_engine/mechanics.ex`, `lib/prizmo/tcg_engine/game/action_commands.ex`, `lib/prizmo/tcg_engine/game_view/action_affordances.ex`, `lib/prizmo/tcg_engine/game_view/fields.ex`, `lib/prizmo/tcg_engine.ex`, `lib/prizmo_web/spa/features/home/routes/index.tsx`, `lib/prizmo_web/spa/lib/ash/client.ts`, generated `lib/prizmo_web/spa/lib/ash/generated/ash_rpc.ts`, this log, and the TCG engine playtest handoff.
