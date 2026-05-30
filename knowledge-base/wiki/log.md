@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-30] iteration 30 | SPA End Turn action command
+- Task attempted: exposed the persisted engine's `end_turn` mechanic as an Ash/RPC command and wired the React SPA Viewer legal actions panel to end the active viewer's current action-window turn from the browser.
+- Files changed: updated `lib/prizmo/tcg_engine/game/action_commands.ex`, `lib/prizmo/tcg_engine.ex`, `lib/prizmo_web/spa/features/home/routes/index.tsx`, `lib/prizmo_web/spa/lib/ash/client.ts`, generated `lib/prizmo_web/spa/lib/ash/generated/ash_rpc.ts`, this log, and the TCG engine playtest handoff.
+- Validation: `MIX_ENV=test mix run -e ...` end-turn boundary smoke passed by moving a persisted current turn from `:action_window` to `:ended` through `Prizmo.TcgEngine.end_turn_for_game/2` and verifying the persisted `end_turn` event; `mix ash_typescript.codegen --check` passed; `mix assets.build` passed; `mix test test/prizmo/tcg_engine/mechanics_test.exs` passed (4 tests); `mix check --no-test` passed.
+- Remaining/blocking notes: no blocker; the active viewer can now end the action window from the browser, while starting the next turn after an ended current turn still needs SPA gating/label support before multi-turn play is comfortable.
+
 ## [2026-05-30] iteration 29 | SPA Attach Energy action command
 - Task attempted: exposed the persisted engine's `attach_energy` mechanic as an Ash/RPC command and wired the React SPA Viewer legal actions panel to attach a visible Energy from hand to one of the active viewer's Pokémon in play during the action window.
 - Files changed: updated `lib/prizmo/tcg_engine/game/action_commands.ex`, `lib/prizmo/tcg_engine.ex`, `lib/prizmo_web/spa/features/home/routes/index.tsx`, `lib/prizmo_web/spa/lib/ash/client.ts`, generated `lib/prizmo_web/spa/lib/ash/generated/ash_rpc.ts`, this log, and the TCG engine playtest handoff.

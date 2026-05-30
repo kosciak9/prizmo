@@ -11,6 +11,7 @@ import {
   runCreateTcgEngineGame,
   runDrawTcgEngineCardForTurn,
   runDrawTcgEngineOpeningHand,
+  runEndTcgEngineTurn,
   runGetTcgEngineGameState,
   runListSupportedTcgDecks,
   runOpenTcgEngineActionWindow,
@@ -237,6 +238,15 @@ type AttachEnergyCommand = {
   targetCardInstanceId: string
 }
 
+type EndTurnInput = {
+  gameId: string
+  playerId: PlayerId
+}
+
+type EndTurnCommand = {
+  playerId: string
+}
+
 type ChoosePromptInput = {
   gameId: string
   playerId: PlayerId
@@ -418,6 +428,13 @@ export function HomeRoute() {
 
   const attachEnergyMutation = useMutation({
     mutationFn: (input: AttachEnergyInput) => attachEnergy(input),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['tcg-engine', 'game-state'] })
+    }
+  })
+
+  const endTurnMutation = useMutation({
+    mutationFn: (input: EndTurnInput) => endTurn(input),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['tcg-engine', 'game-state'] })
     }
@@ -982,6 +999,12 @@ export function HomeRoute() {
                   </InlineNotice>
                 ) : null}
 
+                {endTurnMutation.error ? (
+                  <InlineNotice tone="error" title="End turn command failed">
+                    {errorMessage(endTurnMutation.error)}
+                  </InlineNotice>
+                ) : null}
+
                 {choosePromptMutation.error ? (
                   <InlineNotice tone="error" title="Prompt choice command failed">
                     {errorMessage(choosePromptMutation.error)}
@@ -1050,6 +1073,14 @@ export function HomeRoute() {
                     })
                   }
                 }}
+                onEndTurn={({ playerId }) => {
+                  if (isPlayerId(playerId)) {
+                    endTurnMutation.mutate({
+                      gameId: normalisedGameId,
+                      playerId
+                    })
+                  }
+                }}
                 onPlayCard={({ playerId, cardInstanceId }) => {
                   if (isPlayerId(playerId)) {
                     playCardMutation.mutate({
@@ -1080,6 +1111,7 @@ export function HomeRoute() {
                     : null
                 }
                 promptPendingId={choosePromptMutation.isPending ? choosePromptMutation.variables?.promptId ?? null : null}
+                endTurnPendingPlayerId={endTurnMutation.isPending ? endTurnMutation.variables?.playerId ?? null : null}
                 playCardPendingCardId={playCardMutation.isPending ? playCardMutation.variables?.cardInstanceId ?? null : null}
               />
             ) : null}
@@ -1330,6 +1362,20 @@ async function attachEnergy(input: AttachEnergyInput): Promise<CreatedGame> {
   return result.data as CreatedGame
 }
 
+async function endTurn(input: EndTurnInput): Promise<CreatedGame> {
+  const result = await runEndTcgEngineTurn({
+    input,
+    fields: GAME_RESOURCE_FIELDS,
+    headers: buildAshRpcHeaders()
+  })
+
+  if (!result.success) {
+    throw new Error(rpcErrorMessage(result.errors))
+  }
+
+  return result.data as CreatedGame
+}
+
 async function choosePrompt(input: ChoosePromptInput): Promise<CreatedGame> {
   const result = await runChooseTcgEnginePrompt({
     input,
@@ -1349,9 +1395,11 @@ function GameStateWorkbench({
   deckNamesByKey,
   onChoosePrompt,
   onAttachEnergy,
+  onEndTurn,
   onPlayBasicToBench,
   onPlayCard,
   attachEnergyPendingKey,
+  endTurnPendingPlayerId,
   playBasicToBenchPendingCardId,
   promptPendingId,
   playCardPendingCardId
@@ -1360,9 +1408,11 @@ function GameStateWorkbench({
   deckNamesByKey: Map<string, string>
   onChoosePrompt: (input: ChoosePromptCommand) => void
   onAttachEnergy: (input: AttachEnergyCommand) => void
+  onEndTurn: (input: EndTurnCommand) => void
   onPlayBasicToBench: (input: PlayBasicToBenchCommand) => void
   onPlayCard: (input: PlayCardCommand) => void
   attachEnergyPendingKey: string | null
+  endTurnPendingPlayerId: string | null
   playBasicToBenchPendingCardId: string | null
   promptPendingId: string | null
   playCardPendingCardId: string | null
@@ -1401,9 +1451,11 @@ function GameStateWorkbench({
         actions={gameState.actionAffordances}
         cardsById={cardsById}
         onAttachEnergy={onAttachEnergy}
+        onEndTurn={onEndTurn}
         onPlayBasicToBench={onPlayBasicToBench}
         onPlayCard={onPlayCard}
         attachEnergyPendingKey={attachEnergyPendingKey}
+        endTurnPendingPlayerId={endTurnPendingPlayerId}
         playBasicToBenchPendingCardId={playBasicToBenchPendingCardId}
         playCardPendingCardId={playCardPendingCardId}
       />
@@ -1599,22 +1651,28 @@ function ActionAffordancesPanel({
   actions,
   cardsById,
   onAttachEnergy,
+  onEndTurn,
   onPlayBasicToBench,
   onPlayCard,
   attachEnergyPendingKey,
+  endTurnPendingPlayerId,
   playBasicToBenchPendingCardId,
   playCardPendingCardId
 }: {
   actions: ActionAffordance[]
   cardsById: Map<string, CardSummary>
   onAttachEnergy: (input: AttachEnergyCommand) => void
+  onEndTurn: (input: EndTurnCommand) => void
   onPlayBasicToBench: (input: PlayBasicToBenchCommand) => void
   onPlayCard: (input: PlayCardCommand) => void
   attachEnergyPendingKey: string | null
+  endTurnPendingPlayerId: string | null
   playBasicToBenchPendingCardId: string | null
   playCardPendingCardId: string | null
 }) {
-  const actionCommandPending = Boolean(playCardPendingCardId || playBasicToBenchPendingCardId || attachEnergyPendingKey)
+  const actionCommandPending = Boolean(
+    playCardPendingCardId || playBasicToBenchPendingCardId || attachEnergyPendingKey || endTurnPendingPlayerId
+  )
 
   return (
     <Panel
@@ -1728,6 +1786,19 @@ function ActionAffordancesPanel({
                     })
                   )}
                 </div>
+              ) : null}
+
+              {action.key === 'end_turn' ? (
+                <button
+                  className="mt-3 w-full rounded-xl border border-emerald-700 px-3 py-2 text-left text-sm font-semibold text-emerald-800 transition hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:border-stone-300 disabled:text-stone-400 disabled:hover:bg-transparent"
+                  disabled={actionCommandPending || !isPlayerId(action.playerId)}
+                  onClick={() => onEndTurn({ playerId: action.playerId })}
+                  type="button"
+                >
+                  {endTurnPendingPlayerId === action.playerId
+                    ? `Ending ${formatPlayerId(action.playerId)}'s turn...`
+                    : `End ${formatPlayerId(action.playerId)}'s turn`}
+                </button>
               ) : null}
             </li>
           ))}

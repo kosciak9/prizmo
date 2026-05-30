@@ -96,6 +96,24 @@ defmodule Prizmo.TcgEngine.Game.ActionCommands do
       end
     end
 
+    action :end_turn_command, :struct do
+      description "End the active player's current turn through the mechanics layer."
+
+      constraints instance_of: Game
+
+      argument :game_id, :uuid do
+        allow_nil? false
+      end
+
+      argument :player_id, :string do
+        allow_nil? false
+      end
+
+      run fn input, _context ->
+        Mechanics.end_turn(input.arguments.game_id, input.arguments.player_id)
+      end
+    end
+
     action :choose_prompt_command, :struct do
       description "Resolve a select-cards prompt through the generic mechanics layer."
 
