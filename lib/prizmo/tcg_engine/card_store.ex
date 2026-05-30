@@ -88,6 +88,20 @@ defmodule Prizmo.TcgEngine.CardStore do
     end
   end
 
+  def reparent_attached_cards(game_id, from_target_card_instance_id, to_target_card_instance_id) do
+    with {:ok, attachments} <- attached_cards(game_id, from_target_card_instance_id) do
+      attachments
+      |> Enum.with_index(2)
+      |> Enum.map(fn {attachment, position} ->
+        update(attachment, :reparent_attachment, %{
+          attached_to_card_instance_id: to_target_card_instance_id,
+          position: position
+        })
+      end)
+      |> collect_results()
+    end
+  end
+
   def next_discard_position(game_id, player_id) do
     with {:ok, discard} <- cards_in_zone(game_id, player_id, :discard) do
       {:ok, length(discard) + 1}

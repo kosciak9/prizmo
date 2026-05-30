@@ -45,7 +45,8 @@ defmodule Prizmo.TcgEngine.Mechanics do
       next_attachment_position: 2,
       next_bench_position: 2,
       next_discard_position: 2,
-      next_hand_position_result: 2
+      next_hand_position_result: 2,
+      reparent_attached_cards: 3
     ]
 
   import Prizmo.TcgEngine.EventLog,
@@ -813,6 +814,8 @@ defmodule Prizmo.TcgEngine.Mechanics do
                position: target_position,
                turn_entered_play: turn.turn_number
              }),
+           {:ok, reparented_attachments} <-
+             reparent_attached_cards(game.id, target_card.id, evolution_card.id),
            {:ok, _target_card} <-
              update(target_card, :evolve_under, %{
                attached_to_card_instance_id: evolution_card.id,
@@ -822,7 +825,8 @@ defmodule Prizmo.TcgEngine.Mechanics do
              write_event(game, :evolve_from_hand, player_id, %{
                turn_id: turn.id,
                evolution_card_instance_id: evolution_card.id,
-               target_card_instance_id: target_card.id
+               target_card_instance_id: target_card.id,
+               preserved_attachment_card_instance_ids: Enum.map(reparented_attachments, & &1.id)
              }),
            {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do
         get_game(game.id)

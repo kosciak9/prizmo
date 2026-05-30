@@ -60,6 +60,7 @@ defmodule Prizmo.TcgEngine.CardInstance do
     define :evolve_to_active
     define :evolve_to_bench
     define :evolve_under
+    define :reparent_attachment
     define :play_stadium
     define :discard
     define :recover_to_hand
@@ -147,6 +148,10 @@ defmodule Prizmo.TcgEngine.CardInstance do
     update :evolve_under do
       accept [:attached_to_card_instance_id, :position]
       change transition_state(:attached)
+    end
+
+    update :reparent_attachment do
+      accept [:attached_to_card_instance_id, :position]
     end
 
     update :play_stadium do

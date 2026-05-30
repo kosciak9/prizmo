@@ -155,30 +155,34 @@ Updated: 2026-05-30
 - `Prizmo.TcgEngine.GameView.ActionAffordances` now emits one viewer-scoped `evolve_from_hand` command per valid evolution-card/target pair during the active viewer's action window, but only after turn 1, only for targets that entered play on an earlier turn, and only when the evolution card's catalog `evolves_from` metadata matches the target card.
 - The React playtest legal-actions panel now renders `Evolve ... into ...` buttons, calls the new RPC command, tracks pair-level pending state, and invalidates the viewer-scoped game-state query after success.
 - A Tidewave rollback smoke verified a turn-2 Dreepy/Drakloak state surfaces one legal evolution affordance, evolves Drakloak into Active through the domain helper, attaches Dreepy underneath it, and clears the affordance afterward.
+- Iteration 48 hardened `evolve_from_hand/4` so pre-existing cards attached to the evolving target are reparented to the new evolved Pokémon before the target is moved underneath it.
+- `Prizmo.TcgEngine.CardInstance` now has a `:reparent_attachment` update action/code interface, and `Prizmo.TcgEngine.CardStore.reparent_attached_cards/3` preserves existing attached cards at positions after the evolved-under target.
+- The `evolve_from_hand` event payload now includes `preserved_attachment_card_instance_ids` for the reparented cards.
+- A Tidewave rollback smoke verified Dreepy evolving into Drakloak with Fire/Psychic Energy leaves Dreepy with no lingering attachments, shows Dreepy plus both Energy cards under Drakloak in the read model, and keeps Retreat plus paid `dragon_headbutt` attack affordances available.
 
 ## Last commit
 
-- Baseline entering iteration 47: `7370756 feat(tcg-engine): choose knockout prizes`.
-- This handoff was written before committing iteration 47; expected commit message is `feat(tcg-engine): evolve from hand in playtest UI`.
+- Baseline entering iteration 48: `90c3336 feat(tcg-engine): evolve from hand in playtest UI`.
+- This handoff was written before committing iteration 48; expected commit message is `fix(tcg-engine): preserve attachments through evolution`.
 
 ## Remaining tasks
 
 - Decide whether old `Prizmo.Tcg.Sim` tests are kept as historical reference, quarantined, or ported scenario-by-scenario.
 - Build the minimal playable React SPA loop beyond prompt resolution, Bench commands, Attach Energy, attached-card board visibility, Retreat, paid attack declaration, static/executable attack resolution/finish controls, switch-self target choice, one-Bench KO follow-up, multi-Bench replacement Active choice, explicit KO Prize prompt choice, evolution from hand, End Turn, next-turn progression, deterministic playtest fixture order, hardened tab-scoped viewer identity, and reduced prompt/action debug noise: rerun the full two-browser/manual-tester playtest milestone only after the validation harness can guarantee separate browser contexts.
-- Expand persisted Ash engine mechanics: implement explicit support for one rejected authored attack effect at a time beyond Moltres's Pokémon ex bonus and switch-self effects, multi-KO/prize handling, fuller evolution semantics, turn transitions, and snapshot-backed undo/debug support.
+- Expand persisted Ash engine mechanics: implement explicit support for one rejected authored attack effect at a time beyond Moltres's Pokémon ex bonus and switch-self effects, multi-KO/prize handling, damage/status evolution semantics, turn transitions, and snapshot-backed undo/debug support.
 - Continue migrating executable card behavior into engine-owned definitions with explicit unsupported-behavior tracking.
 - Spike Electric Streams only after the command/read loop has enough event shape to publish safely.
 
 ## Blockers
 
-- No known code blocker after the iteration 33 viewer hardening, isolated-context playtest pass, iteration 34 action/prompt clarity pass, iteration 35 retreat command pass, iteration 36 attached-card visibility pass, iteration 37 paid attack declaration pass, iteration 38 static/executable attack resolution/finish pass, iteration 39 Moltres `Fighting Wings` behavior pass, iteration 40 unsupported attack declaration guard, iteration 41 unsupported authored-effect guard, iteration 42 switch-self attack resolution, iteration 43 switch target chooser, iteration 44 one-Bench KO follow-up, iteration 45 multi-Bench replacement Active continuation, iteration 46 explicit KO Prize prompt, and iteration 47 evolution command/browser affordance.
+- No known code blocker after the iteration 33 viewer hardening, isolated-context playtest pass, iteration 34 action/prompt clarity pass, iteration 35 retreat command pass, iteration 36 attached-card visibility pass, iteration 37 paid attack declaration pass, iteration 38 static/executable attack resolution/finish pass, iteration 39 Moltres `Fighting Wings` behavior pass, iteration 40 unsupported attack declaration guard, iteration 41 unsupported authored-effect guard, iteration 42 switch-self attack resolution, iteration 43 switch target chooser, iteration 44 one-Bench KO follow-up, iteration 45 multi-Bench replacement Active continuation, iteration 46 explicit KO Prize prompt, iteration 47 evolution command/browser affordance, and iteration 48 evolution attachment preservation.
 - Raw printed attacks with missing authored behavior and authored attacks with unsupported effect types are hidden/rejected before declaration; new attack-effect slices should opt into `Prizmo.TcgEngine.AttackEffects` only when persisted resolution semantics are implemented.
 - Switch-self attacks are executable from the browser, including the multiple-Bench case where the active viewer must choose a visible Bench target before resolving.
 - Multi-Bench KO replacement now exposes `choose_replacement_active/3` through Ash/RPC and the React SPA, and attack finish remains blocked until every player has an Active Pokémon.
 - Knockout Prize taking now uses an explicit face-down Prize prompt for the attacking player and blocks attack finish until resolved; broader KO work still needs multi-KO/prize handling and more browser playtest coverage.
-- Evolution from hand is now callable from the browser for valid turn-2+ evolution pairs; broader evolution work should verify/rework attachment preservation, evolved Pokémon state, and follow-up attack/retreat interactions before relying on evolved attackers in the playtest milestone.
+- Evolution from hand is now callable from the browser for valid turn-2+ evolution pairs, and pre-existing attached cards are reparented to the evolved Pokémon so attack/retreat cost checks still see them. Broader evolution work should still verify/rework damage-counter preservation and status clearing before relying on evolved attackers in longer playtests.
 - Validation blocker: the available manual-tester subagents still appear to share/contend over one browser/session, so their reported viewer flips are not reliable proof of independent-browser behavior. The documented manual-tester milestone needs a harness that guarantees separate browser contexts before it can be marked formally complete.
 
 ## Recommended next atomic task
 
-- Harden persisted evolution semantics by reparenting or otherwise preserving attached cards when a target evolves, then verify evolved Pokémon can still use attached Energy for attack/retreat costs.
+- Harden persisted evolution state semantics by preserving damage counters on the evolved Pokémon and clearing special conditions from the evolved-away target/new top as appropriate, then verify the read model and attack/retreat follow-up behavior with a rollback smoke.

@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-30] iteration 48 | Evolution attachment preservation
+- Task attempted: hardened persisted evolution semantics so cards already attached to the evolving Pokémon are reparented to the new evolved Pokémon in the same transaction, preserving Energy/stack visibility for attack and retreat checks.
+- Files changed: updated `lib/prizmo/tcg_engine/card_instance.ex`, `lib/prizmo/tcg_engine/card_store.ex`, `lib/prizmo/tcg_engine/mechanics.ex`, this log, and the TCG engine playtest handoff.
+- Validation: `mix format && mix compile --warnings-as-errors` passed; `mix test test/prizmo/tcg_engine/mechanics_test.exs` passed (4 tests); Tidewave rollback smoke passed for Dreepy evolving into Drakloak with Fire/Psychic Energy reparented to Drakloak, no lingering Dreepy attachments, read-model attached-card visibility, a Retreat affordance, and a paid `dragon_headbutt` attack affordance; initial `mix check --no-test` exposed the missing Ash code interface for `:reparent_attachment`, then rerun `mix format && mix compile --warnings-as-errors && mix test test/prizmo/tcg_engine/mechanics_test.exs && mix check --no-test` passed.
+- Remaining/blocking notes: no code blocker for attached-card preservation through evolution; broader evolution semantics still need damage-counter preservation/status clearing verification before relying on evolved attackers in longer playtests.
+
 ## [2026-05-30] iteration 47 | Evolution command and browser affordance
 - Task attempted: exposed the existing persisted `evolve_from_hand/4` mechanic through Ash/RPC and added viewer-scoped legal-action affordances plus React controls for valid evolution-card/target pairs that respect action-window state, turn number, target entered-play timing, and catalog evolution metadata.
 - Files changed: updated `lib/prizmo/tcg_engine.ex`, `lib/prizmo/tcg_engine/game/action_commands.ex`, `lib/prizmo/tcg_engine/game_view/action_affordances.ex`, `lib/prizmo_web/spa/features/home/routes/index.tsx`, `lib/prizmo_web/spa/lib/ash/client.ts`, generated `lib/prizmo_web/spa/lib/ash/generated/ash_rpc.ts`, this log, and the TCG engine playtest handoff.
