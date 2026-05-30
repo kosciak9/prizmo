@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-30] iteration 35 | SPA retreat action command
+- Task attempted: exposed the persisted `retreat` mechanic through the Ash/RPC boundary and wired the React playtest legal-actions panel so the active viewer can retreat to a Benched Pokémon by paying the required attached Energy IDs.
+- Files changed: updated `lib/prizmo/tcg_engine.ex`, `lib/prizmo/tcg_engine/game/action_commands.ex`, `lib/prizmo/tcg_engine/game_view/action_affordances.ex`, `lib/prizmo/tcg_engine/game_view/fields.ex`, `lib/prizmo_web/spa/features/home/routes/index.tsx`, `lib/prizmo_web/spa/lib/ash/client.ts`, generated `lib/prizmo_web/spa/lib/ash/generated/ash_rpc.ts`, this log, and the TCG engine playtest handoff.
+- Validation: Tidewave rollback smoke passed for `Prizmo.TcgEngine.retreat_active_for_game/4`, verifying Active/Bench swap, retreat Energy discard, retreated flag, and `retreat` event; `mix ash_typescript.codegen --check` passed; `mix assets.build` passed; `mix test test/prizmo/tcg_engine/mechanics_test.exs` passed (4 tests); `mix check --no-test` passed.
+- Remaining/blocking notes: no code blocker; retreat choices currently use attached Energy instance IDs from the affordance and may display fallback card IDs until attached cards are added to the viewer read model/UI.
+
 ## [2026-05-30] iteration 34 | Playtest action and prompt clarity
 - Task attempted: reduced debug noise in the minimal React playtest loop after manual playtesting noted noisy prompt JSON and duplicated action metadata.
 - Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.

@@ -101,25 +101,28 @@ Updated: 2026-05-30
 - Manual-tester subagents still reported viewer flips on post-fix games, but their behavior is inconsistent with the isolated-context diagnostic and appears to come from the validation harness sharing or contending over one browser/session. Treat the manual-tester milestone as not formally satisfied until the testers can be guaranteed separate browser contexts.
 - Iteration 34 reduced noise in the React playtest action/prompt panels: prompt cards now summarize the choice key, required selection count, and legal-choice count while keeping the raw prompt payload behind a collapsed debug disclosure.
 - Action affordance cards now show command/prompt status without repeating the internal action key, and source/target/prompt/choice-key counts are tucked behind a collapsed action metadata disclosure.
+- Iteration 35 added `Prizmo.TcgEngine.Game.ActionCommands.retreat_command`, exposed through the domain as `Prizmo.TcgEngine.retreat_active_for_game/4` and through AshTypescript RPC as `retreatTcgEngineActive`.
+- Viewer action affordances now include `Retreat Active Pokémon` when the active viewer is in the action window, has not retreated this turn, has a Benched Pokémon target, and has enough attached Energy IDs to pay the Active Pokémon's catalog retreat cost.
+- The SPA legal-actions panel now renders retreat buttons for each legal Bench target and required Energy payment combination, calls the new RPC command, and invalidates the viewer-scoped game-state query. Attached Energy labels may fall back to card instance IDs until attached cards are included in the read model/UI.
 
 ## Last commit
 
-- Baseline entering iteration 34: `9b17764 fix(spa): harden playtest viewer state`.
-- This handoff was written before committing iteration 34; expected commit message is `fix(spa): reduce playtest debug noise`.
+- Baseline entering iteration 35: `1c4e7dd fix(spa): reduce playtest debug noise`.
+- This handoff was written before committing iteration 35; expected commit message is `feat(tcg-engine): wire retreat command`.
 
 ## Remaining tasks
 
 - Decide whether old `Prizmo.Tcg.Sim` tests are kept as historical reference, quarantined, or ported scenario-by-scenario.
-- Build the minimal playable React SPA loop beyond prompt resolution, Bench commands, Attach Energy, End Turn, next-turn progression, deterministic playtest fixture order, hardened tab-scoped viewer identity, and reduced prompt/action debug noise: rerun the full two-browser/manual-tester playtest milestone only after the validation harness can guarantee separate browser contexts, then address any remaining command-loop gaps it exposes.
-- Expand persisted Ash engine mechanics: evolution timing, retreat/switch, attacks/damage/KO/prizes/replacement Active, turn transitions, and snapshot-backed undo/debug support.
+- Build the minimal playable React SPA loop beyond prompt resolution, Bench commands, Attach Energy, Retreat, End Turn, next-turn progression, deterministic playtest fixture order, hardened tab-scoped viewer identity, and reduced prompt/action debug noise: rerun the full two-browser/manual-tester playtest milestone only after the validation harness can guarantee separate browser contexts, then address any remaining command-loop gaps it exposes.
+- Expand persisted Ash engine mechanics: switch effects, attack declaration/cost validation/damage/KO/prizes/replacement Active, evolution UI/RPC wiring, turn transitions, and snapshot-backed undo/debug support.
 - Continue migrating executable card behavior into engine-owned definitions with explicit unsupported-behavior tracking.
 - Spike Electric Streams only after the command/read loop has enough event shape to publish safely.
 
 ## Blockers
 
-- No known code blocker after the iteration 33 viewer hardening, isolated-context playtest pass, and iteration 34 action/prompt clarity pass.
+- No known code blocker after the iteration 33 viewer hardening, isolated-context playtest pass, iteration 34 action/prompt clarity pass, and iteration 35 retreat command pass.
 - Validation blocker: the available manual-tester subagents still appear to share/contend over one browser/session, so their reported viewer flips are not reliable proof of independent-browser behavior. The documented manual-tester milestone needs a harness that guarantees separate browser contexts before it can be marked formally complete.
 
 ## Recommended next atomic task
 
-- Resolve or work around the manual-tester browser isolation issue, then rerun the documented two-browser Playwright playtest validation on a fresh Dragapult-vs-Alakazam fixture game using guaranteed separate browser contexts. If that harness remains unavailable, move to the next persisted mechanic slice, with retreat/switch or attack declaration and cost validation as good atomic candidates.
+- Add attached-card visibility to the viewer-scoped game-state read model and board UI so Energy/Tool attachments are visible under Active/Bench Pokémon and retreat payment buttons can show card names instead of fallback instance IDs. If choosing a mechanics slice instead, attack declaration with explicit cost validation is the next high-value atomic candidate.

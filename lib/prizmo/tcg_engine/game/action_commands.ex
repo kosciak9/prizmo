@@ -114,6 +114,38 @@ defmodule Prizmo.TcgEngine.Game.ActionCommands do
       end
     end
 
+    action :retreat_command, :struct do
+      description "Retreat the active player's Active Pokémon to the Bench through the mechanics layer."
+
+      constraints instance_of: Game
+
+      argument :game_id, :uuid do
+        allow_nil? false
+      end
+
+      argument :player_id, :string do
+        allow_nil? false
+      end
+
+      argument :bench_card_instance_id, :uuid do
+        allow_nil? false
+      end
+
+      argument :energy_card_instance_ids, {:array, :uuid} do
+        allow_nil? false
+        default []
+      end
+
+      run fn input, _context ->
+        Mechanics.retreat(
+          input.arguments.game_id,
+          input.arguments.player_id,
+          input.arguments.bench_card_instance_id,
+          input.arguments.energy_card_instance_ids
+        )
+      end
+    end
+
     action :choose_prompt_command, :struct do
       description "Resolve a select-cards prompt through the generic mechanics layer."
 

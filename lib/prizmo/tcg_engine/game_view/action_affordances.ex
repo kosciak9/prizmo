@@ -58,6 +58,7 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
       play_card_affordance(player, cards),
       play_basic_to_bench_affordance(player, cards),
       attach_energy_affordance(player, cards),
+      retreat_affordance(player, cards),
       end_turn_affordance(player)
     ]
   end
@@ -118,6 +119,27 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
     end
   end
 
+  defp retreat_affordance(%GamePlayer{retreated_this_turn?: true}, _cards), do: nil
+
+  defp retreat_affordance(%GamePlayer{} = player, cards) do
+    with %CardInstance{} = active_card <- active_pokemon_card(cards),
+         false <- blocked_retreat_status?(active_card),
+         target_ids when target_ids != [] <- cards |> bench_pokemon_cards() |> card_ids(),
+         {:ok, retreat_cost} <- retreat_cost(active_card),
+         source_ids = cards |> active_attached_energy_cards(active_card.id) |> card_ids(),
+         true <- length(source_ids) >= retreat_cost do
+      affordance(:retreat, "Retreat Active Pokémon", :command, player.player_id,
+        source_card_instance_ids: source_ids,
+        target_card_instance_ids: target_ids,
+        required_source_count: retreat_cost,
+        choice_keys: ["retreat_energy"],
+        note: retreat_note(retreat_cost)
+      )
+    else
+      _other -> nil
+    end
+  end
+
   defp end_turn_affordance(%GamePlayer{} = player) do
     affordance(:end_turn, "End turn", :command, player.player_id,
       note: "Pass the action to the next player after resolving optional actions."
@@ -132,6 +154,7 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
       player_id: player_id,
       source_card_instance_ids: Keyword.get(opts, :source_card_instance_ids, []),
       target_card_instance_ids: Keyword.get(opts, :target_card_instance_ids, []),
+      required_source_count: Keyword.get(opts, :required_source_count, 0),
       prompt_ids: Keyword.get(opts, :prompt_ids, []),
       choice_keys: Keyword.get(opts, :choice_keys, []),
       note: Keyword.get(opts, :note)
@@ -147,10 +170,27 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
 
   defp hand_cards(cards), do: Enum.filter(cards, &(&1.zone == :hand))
 
+  defp active_pokemon_card(cards) do
+    Enum.find(cards, &(&1.zone == :active))
+  end
+
   defp in_play_pokemon_cards(cards) do
     cards
     |> Enum.filter(&(&1.zone in [:active, :bench]))
     |> Enum.sort_by(&{zone_sort(&1.zone), &1.position, &1.instance_id})
+  end
+
+  defp bench_pokemon_cards(cards) do
+    cards
+    |> Enum.filter(&(&1.zone == :bench))
+    |> Enum.sort_by(&{&1.position, &1.instance_id})
+  end
+
+  defp active_attached_energy_cards(cards, active_card_id) do
+    cards
+    |> Enum.filter(&(&1.zone == :attached and &1.attached_to_card_instance_id == active_card_id))
+    |> Enum.filter(&energy_card?/1)
+    |> Enum.sort_by(&{&1.position, &1.instance_id})
   end
 
   defp bench_full?(cards), do: Enum.count(cards, &(&1.zone == :bench)) >= 5
@@ -160,6 +200,32 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
   defp energy_card?(%CardInstance{card_id: card_id}) do
     match?({:ok, %{supertype: :energy}}, CardCatalog.fetch(card_id))
   end
+
+  defp retreat_cost(%CardInstance{card_id: card_id}) do
+    case CardCatalog.fetch(card_id) do
+      {:ok, %{retreat_count: retreat_count}}
+      when is_integer(retreat_count) and retreat_count >= 0 ->
+        {:ok, retreat_count}
+
+      {:ok, _card} ->
+        {:ok, 0}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  defp blocked_retreat_status?(%CardInstance{status: status}), do: status in [:asleep, :paralyzed]
+
+  defp retreat_note(0),
+    do: "Switch the Active Pokémon with a Benched Pokémon without discarding Energy."
+
+  defp retreat_note(1),
+    do: "Discard 1 Energy attached to the Active Pokémon, then switch it with a Benched Pokémon."
+
+  defp retreat_note(retreat_cost),
+    do:
+      "Discard #{retreat_cost} Energy attached to the Active Pokémon, then switch it with a Benched Pokémon."
 
   defp engine_playable_card?(%CardInstance{card_id: card_id}) do
     case EngineCardRegistry.fetch(card_id) do

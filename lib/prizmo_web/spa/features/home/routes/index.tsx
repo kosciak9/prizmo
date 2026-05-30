@@ -18,6 +18,7 @@ import {
   runPlaceTcgEnginePrizes,
   runPlayTcgEngineBasicToBench,
   runPlayTcgEngineCard,
+  runRetreatTcgEngineActive,
   runSkipTcgEngineDrawForTurn,
   runStartNextTcgEngineTurn,
   runStartTcgEngineSetup,
@@ -76,6 +77,7 @@ const ACTION_AFFORDANCE_FIELDS = [
   'playerId',
   'sourceCardInstanceIds',
   'targetCardInstanceIds',
+  'requiredSourceCount',
   'promptIds',
   'choiceKeys',
   'note'
@@ -200,6 +202,7 @@ type ActionAffordance = {
   playerId: string
   sourceCardInstanceIds: string[]
   targetCardInstanceIds: string[]
+  requiredSourceCount: number
   promptIds: string[]
   choiceKeys: string[]
   note: string | null
@@ -247,6 +250,19 @@ type EndTurnInput = {
 
 type EndTurnCommand = {
   playerId: string
+}
+
+type RetreatInput = {
+  gameId: string
+  playerId: PlayerId
+  benchCardInstanceId: string
+  energyCardInstanceIds: string[]
+}
+
+type RetreatCommand = {
+  playerId: string
+  benchCardInstanceId: string
+  energyCardInstanceIds: string[]
 }
 
 type ChoosePromptInput = {
@@ -442,6 +458,13 @@ export function HomeRoute() {
 
   const endTurnMutation = useMutation({
     mutationFn: (input: EndTurnInput) => endTurn(input),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['tcg-engine', 'game-state'] })
+    }
+  })
+
+  const retreatMutation = useMutation({
+    mutationFn: (input: RetreatInput) => retreat(input),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['tcg-engine', 'game-state'] })
     }
@@ -1026,6 +1049,12 @@ export function HomeRoute() {
                   </InlineNotice>
                 ) : null}
 
+                {retreatMutation.error ? (
+                  <InlineNotice tone="error" title="Retreat command failed">
+                    {errorMessage(retreatMutation.error)}
+                  </InlineNotice>
+                ) : null}
+
                 {choosePromptMutation.error ? (
                   <InlineNotice tone="error" title="Prompt choice command failed">
                     {errorMessage(choosePromptMutation.error)}
@@ -1108,6 +1137,16 @@ export function HomeRoute() {
                     })
                   }
                 }}
+                onRetreat={({ playerId, benchCardInstanceId, energyCardInstanceIds }) => {
+                  if (isPlayerId(playerId)) {
+                    retreatMutation.mutate({
+                      gameId: normalisedGameId,
+                      playerId,
+                      benchCardInstanceId,
+                      energyCardInstanceIds
+                    })
+                  }
+                }}
                 onPlayCard={({ playerId, cardInstanceId }) => {
                   if (isPlayerId(playerId)) {
                     playCardMutation.mutate({
@@ -1140,6 +1179,14 @@ export function HomeRoute() {
                 promptPendingId={choosePromptMutation.isPending ? choosePromptMutation.variables?.promptId ?? null : null}
                 endTurnPendingPlayerId={endTurnMutation.isPending ? endTurnMutation.variables?.playerId ?? null : null}
                 playCardPendingCardId={playCardMutation.isPending ? playCardMutation.variables?.cardInstanceId ?? null : null}
+                retreatPendingKey={
+                  retreatMutation.isPending && retreatMutation.variables
+                    ? retreatKey(
+                        retreatMutation.variables.benchCardInstanceId,
+                        retreatMutation.variables.energyCardInstanceIds
+                      )
+                    : null
+                }
               />
             ) : null}
           </section>
@@ -1403,6 +1450,20 @@ async function endTurn(input: EndTurnInput): Promise<CreatedGame> {
   return result.data as CreatedGame
 }
 
+async function retreat(input: RetreatInput): Promise<CreatedGame> {
+  const result = await runRetreatTcgEngineActive({
+    input,
+    fields: GAME_RESOURCE_FIELDS,
+    headers: buildAshRpcHeaders()
+  })
+
+  if (!result.success) {
+    throw new Error(rpcErrorMessage(result.errors))
+  }
+
+  return result.data as CreatedGame
+}
+
 async function choosePrompt(input: ChoosePromptInput): Promise<CreatedGame> {
   const result = await runChooseTcgEnginePrompt({
     input,
@@ -1426,11 +1487,13 @@ function GameStateWorkbench({
   onEndTurn,
   onPlayBasicToBench,
   onPlayCard,
+  onRetreat,
   attachEnergyPendingKey,
   endTurnPendingPlayerId,
   playBasicToBenchPendingCardId,
   promptPendingId,
-  playCardPendingCardId
+  playCardPendingCardId,
+  retreatPendingKey
 }: {
   gameState: GameState
   viewerPlayerId: PlayerId
@@ -1440,11 +1503,13 @@ function GameStateWorkbench({
   onEndTurn: (input: EndTurnCommand) => void
   onPlayBasicToBench: (input: PlayBasicToBenchCommand) => void
   onPlayCard: (input: PlayCardCommand) => void
+  onRetreat: (input: RetreatCommand) => void
   attachEnergyPendingKey: string | null
   endTurnPendingPlayerId: string | null
   playBasicToBenchPendingCardId: string | null
   promptPendingId: string | null
   playCardPendingCardId: string | null
+  retreatPendingKey: string | null
 }) {
   const cardsById = useMemo(() => visibleCardsById(gameState), [gameState])
 
@@ -1483,10 +1548,12 @@ function GameStateWorkbench({
         onEndTurn={onEndTurn}
         onPlayBasicToBench={onPlayBasicToBench}
         onPlayCard={onPlayCard}
+        onRetreat={onRetreat}
         attachEnergyPendingKey={attachEnergyPendingKey}
         endTurnPendingPlayerId={endTurnPendingPlayerId}
         playBasicToBenchPendingCardId={playBasicToBenchPendingCardId}
         playCardPendingCardId={playCardPendingCardId}
+        retreatPendingKey={retreatPendingKey}
       />
 
       <div className="grid gap-5 xl:grid-cols-2">
@@ -1686,10 +1753,12 @@ function ActionAffordancesPanel({
   onEndTurn,
   onPlayBasicToBench,
   onPlayCard,
+  onRetreat,
   attachEnergyPendingKey,
   endTurnPendingPlayerId,
   playBasicToBenchPendingCardId,
-  playCardPendingCardId
+  playCardPendingCardId,
+  retreatPendingKey
 }: {
   actions: ActionAffordance[]
   cardsById: Map<string, CardSummary>
@@ -1697,13 +1766,19 @@ function ActionAffordancesPanel({
   onEndTurn: (input: EndTurnCommand) => void
   onPlayBasicToBench: (input: PlayBasicToBenchCommand) => void
   onPlayCard: (input: PlayCardCommand) => void
+  onRetreat: (input: RetreatCommand) => void
   attachEnergyPendingKey: string | null
   endTurnPendingPlayerId: string | null
   playBasicToBenchPendingCardId: string | null
   playCardPendingCardId: string | null
+  retreatPendingKey: string | null
 }) {
   const actionCommandPending = Boolean(
-    playCardPendingCardId || playBasicToBenchPendingCardId || attachEnergyPendingKey || endTurnPendingPlayerId
+    playCardPendingCardId ||
+      playBasicToBenchPendingCardId ||
+      attachEnergyPendingKey ||
+      endTurnPendingPlayerId ||
+      retreatPendingKey
   )
 
   return (
@@ -1738,6 +1813,7 @@ function ActionAffordancesPanel({
                   <div className="mt-2 flex flex-wrap gap-2">
                     <ActionCount count={action.sourceCardInstanceIds.length} label="source" />
                     <ActionCount count={action.targetCardInstanceIds.length} label="target" />
+                    <ActionCount count={action.requiredSourceCount} label="required source" />
                     <ActionCount count={action.promptIds.length} label="prompt" />
                     <ActionCount count={action.choiceKeys.length} label="choice key" />
                   </div>
@@ -1825,6 +1901,43 @@ function ActionAffordancesPanel({
                 </div>
               ) : null}
 
+              {action.key === 'retreat' && action.targetCardInstanceIds.length > 0 ? (
+                <div className="mt-3 space-y-2">
+                  {action.targetCardInstanceIds.flatMap(benchCardInstanceId =>
+                    retreatPaymentOptions(action.sourceCardInstanceIds, action.requiredSourceCount).map(
+                      energyCardInstanceIds => {
+                        const benchCard = cardsById.get(benchCardInstanceId)
+                        const paymentKey = retreatKey(benchCardInstanceId, energyCardInstanceIds)
+                        const isPending = retreatPendingKey === paymentKey
+
+                        return (
+                          <button
+                            className="w-full rounded-xl border border-emerald-700 px-3 py-2 text-left text-sm font-semibold text-emerald-800 transition hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:border-stone-300 disabled:text-stone-400 disabled:hover:bg-transparent"
+                            disabled={actionCommandPending || !isPlayerId(action.playerId)}
+                            key={paymentKey}
+                            onClick={() =>
+                              onRetreat({
+                                playerId: action.playerId,
+                                benchCardInstanceId,
+                                energyCardInstanceIds
+                              })
+                            }
+                            type="button"
+                          >
+                            {isPending
+                              ? `Retreating to ${benchCard?.name ?? 'Bench'}...`
+                              : `Retreat to ${benchCard?.name ?? formatCardInstanceId(benchCardInstanceId)}${retreatPaymentLabel(
+                                  energyCardInstanceIds,
+                                  cardsById
+                                )}`}
+                          </button>
+                        )
+                      }
+                    )
+                  )}
+                </div>
+              ) : null}
+
               {action.key === 'end_turn' ? (
                 <button
                   className="mt-3 w-full rounded-xl border border-emerald-700 px-3 py-2 text-left text-sm font-semibold text-emerald-800 transition hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:border-stone-300 disabled:text-stone-400 disabled:hover:bg-transparent"
@@ -1867,6 +1980,7 @@ function actionHasMetadata(action: ActionAffordance) {
   return (
     action.sourceCardInstanceIds.length > 0 ||
     action.targetCardInstanceIds.length > 0 ||
+    action.requiredSourceCount > 0 ||
     action.promptIds.length > 0 ||
     action.choiceKeys.length > 0
   )
@@ -2275,6 +2389,51 @@ function actionKey(action: ActionAffordance) {
 
 function attachEnergyPairKey(energyCardInstanceId: string, targetCardInstanceId: string) {
   return `${energyCardInstanceId}:${targetCardInstanceId}`
+}
+
+function retreatKey(benchCardInstanceId: string, energyCardInstanceIds: string[]) {
+  return `${benchCardInstanceId}:${energyCardInstanceIds.join(',')}`
+}
+
+function retreatPaymentOptions(sourceCardInstanceIds: string[], requiredSourceCount: number) {
+  if (requiredSourceCount === 0) {
+    return [[]]
+  }
+
+  if (requiredSourceCount < 0 || sourceCardInstanceIds.length < requiredSourceCount) {
+    return []
+  }
+
+  return cardCombinations(sourceCardInstanceIds, requiredSourceCount)
+}
+
+function cardCombinations(cardInstanceIds: string[], count: number): string[][] {
+  if (count === 0) {
+    return [[]]
+  }
+
+  if (cardInstanceIds.length < count) {
+    return []
+  }
+
+  const [firstCardInstanceId, ...remainingCardInstanceIds] = cardInstanceIds
+  const withFirst = cardCombinations(remainingCardInstanceIds, count - 1).map(combination => [
+    firstCardInstanceId,
+    ...combination
+  ])
+  const withoutFirst = cardCombinations(remainingCardInstanceIds, count)
+
+  return [...withFirst, ...withoutFirst]
+}
+
+function retreatPaymentLabel(energyCardInstanceIds: string[], cardsById: Map<string, CardSummary>) {
+  if (energyCardInstanceIds.length === 0) {
+    return ' for free'
+  }
+
+  const names = energyCardInstanceIds.map(cardInstanceId => cardsById.get(cardInstanceId)?.name ?? formatCardInstanceId(cardInstanceId))
+
+  return `, discarding ${names.join(' + ')}`
 }
 
 function visibleCardsById(gameState: GameState) {
