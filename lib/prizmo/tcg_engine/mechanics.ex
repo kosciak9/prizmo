@@ -1122,13 +1122,22 @@ defmodule Prizmo.TcgEngine.Mechanics do
                )
              ),
            {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do
-        resolve_knockout_after_attack_damage(
-          game.id,
-          player_id,
-          defender_card.owner_player_id,
-          defender_card,
-          damage_result
-        )
+        with {:ok, game} <-
+               resolve_knockout_after_attack_damage(
+                 game.id,
+                 player_id,
+                 defender_card.owner_player_id,
+                 defender_card,
+                 damage_result
+               ) do
+          resolve_self_knockout_after_attack_effect(
+            game,
+            player_id,
+            defender_card.owner_player_id,
+            attacker_card,
+            effect_payload
+          )
+        end
       end
     end)
   end
@@ -1181,6 +1190,42 @@ defmodule Prizmo.TcgEngine.Mechanics do
          _damage_result
        ) do
     get_game(game_id)
+  end
+
+  defp resolve_self_knockout_after_attack_effect(
+         %Game{status: :finished} = game,
+         _attacking_player_id,
+         _defender_player_id,
+         _attacker_card,
+         _effect_payload
+       ) do
+    {:ok, game}
+  end
+
+  defp resolve_self_knockout_after_attack_effect(
+         %Game{} = game,
+         attacking_player_id,
+         defender_player_id,
+         attacker_card,
+         %{self_knocked_out?: true}
+       ) do
+    resolve_knockout_after_attack_damage(
+      game.id,
+      defender_player_id,
+      attacking_player_id,
+      attacker_card,
+      %{knocked_out?: true}
+    )
+  end
+
+  defp resolve_self_knockout_after_attack_effect(
+         %Game{} = game,
+         _attacking_player_id,
+         _defender_player_id,
+         _attacker_card,
+         _effect_payload
+       ) do
+    {:ok, game}
   end
 
   defp create_knockout_prize_selection(

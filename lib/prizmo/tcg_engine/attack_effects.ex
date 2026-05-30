@@ -8,6 +8,7 @@ defmodule Prizmo.TcgEngine.AttackEffects do
   import Prizmo.TcgEngine.Requirements,
     only: [require_card_owned_by_player: 2, require_card_zone: 2]
 
+  alias Prizmo.TcgEngine.BattleActions
   alias Prizmo.TcgEngine.CardInstance
 
   @supported_effect_types [
@@ -22,6 +23,7 @@ defmodule Prizmo.TcgEngine.AttackEffects do
     :damage_per_own_basic_pokemon_in_play,
     :damage_per_own_benched_pokemon,
     :damage_per_own_team_rocket_pokemon_in_play,
+    :self_damage,
     :switch_self_with_bench
   ]
 
@@ -79,6 +81,9 @@ defmodule Prizmo.TcgEngine.AttackEffects do
       %{type: :damage_unaffected_by_effects_on_opponent_active} ->
         {:ok, %{}}
 
+      %{type: :self_damage, damage: damage} when is_integer(damage) and damage >= 0 ->
+        self_damage(game_id, player_id, attacker_card, damage)
+
       nil ->
         {:ok, %{}}
 
@@ -90,6 +95,20 @@ defmodule Prizmo.TcgEngine.AttackEffects do
   defp switch_self_with_bench(game_id, player_id, %CardInstance{} = attacker_card, opts) do
     with {:ok, bench_card} <- switch_target(game_id, player_id, opts) do
       switch_attacker_with_bench(game_id, player_id, attacker_card, bench_card)
+    end
+  end
+
+  defp self_damage(game_id, player_id, %CardInstance{} = attacker_card, damage) do
+    with {:ok, damage_result} <-
+           BattleActions.apply_attack_damage(game_id, player_id, attacker_card, damage) do
+      {:ok,
+       %{
+         effect_type: "self_damage",
+         self_damage_card_instance_id: attacker_card.id,
+         self_damage: damage_result.damage,
+         self_resulting_damage: damage_result.resulting_damage,
+         self_knocked_out?: damage_result.knocked_out?
+       }}
     end
   end
 

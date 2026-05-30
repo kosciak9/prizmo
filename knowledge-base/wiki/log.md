@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-30] iteration 60 | Tarountula self-damage attack effect
+- Task attempted: continued the rejected authored attack-effect inventory and implemented the narrow persisted `:self_damage` slice for Team Rocket's Tarountula `DRI-019` `Take Down`, preserving its 30 defender damage while applying the authored 10 damage to the attacking Pokémon and recording self-damage details in the attack event.
+- Files changed: updated `lib/prizmo/tcg_engine/attack_effects.ex`, `lib/prizmo/tcg_engine/attack_damage.ex`, `lib/prizmo/tcg_engine/mechanics.ex`, this log, and the TCG engine playtest handoff.
+- Validation: `mix format && mix compile --warnings-as-errors` passed; Tidewave rollback smokes passed for `DRI-019` `Take Down` fetching as executable, surfacing a browser declare-attack affordance, resolving for 30 damage against Moltres, applying 10 self-damage to Tarountula with `effect_type: "self_damage"`, and routing a pre-damaged self-KO through discard, auto-promotion, and a Player 2 Prize prompt; `mix test test/prizmo/tcg_engine/mechanics_test.exs` passed (4 tests); `mix prizmo.cards.coverage` passed; `mix check --no-test` passed.
+- Remaining/blocking notes: no code blocker for Tarountula's self-damage path; broader self-KO playtest coverage can build on the defensive prize/replacement follow-up routing added for self-damage KOs.
+
 ## [2026-05-30] iteration 59 | Lopunny unaffected attack damage
 - Task attempted: continued the rejected authored attack-effect inventory and implemented the narrow persisted `:damage_unaffected_by_effects_on_opponent_active` slice for Mega Lopunny ex `PFL-084` `Spiky Hopper`, preserving its authored damage while the persisted engine has no modeled opponent Active damage-prevention modifiers to bypass.
 - Files changed: updated `lib/prizmo/tcg_engine/attack_effects.ex`, `lib/prizmo/tcg_engine/attack_damage.ex`, this log, and the TCG engine playtest handoff.
