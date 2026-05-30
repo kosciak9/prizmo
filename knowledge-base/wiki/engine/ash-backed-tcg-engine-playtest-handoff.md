@@ -168,17 +168,20 @@ Updated: 2026-05-30
 - Iteration 51 continued the rejected authored attack-effect inventory and picked Lillie's Clefairy ex `JTG-056` `Full Moon Rondo` as another narrow deterministic persisted effect.
 - `Prizmo.TcgEngine.AttackEffects` and `Prizmo.TcgEngine.AttackDamage` now support `:bonus_damage_per_benched_pokemon`, adding the authored bonus once for each Benched Pokémon controlled by either the attacker or defender.
 - A Tidewave rollback smoke verified `Full Moon Rondo` fetches as executable, appears as a browser declare-attack affordance, and resolves for 100 damage against Fezandipiti ex with four total Benched Pokémon and no KO.
+- Iteration 52 continued the rejected authored attack-effect inventory and picked Teal Mask Ogerpon ex `TWM-025` `Myriad Leaf Shower` as another narrow deterministic persisted effect.
+- `Prizmo.TcgEngine.AttackEffects` and `Prizmo.TcgEngine.AttackDamage` now support `:bonus_damage_per_energy_attached_to_both_active`, adding the authored bonus once for each Energy card attached to either Active Pokémon.
+- A Tidewave rollback smoke verified `Myriad Leaf Shower` fetches as executable, appears as a browser declare-attack affordance, and resolves for 180 damage against Fezandipiti ex with three Energy attached to Ogerpon plus two Energy attached to the defender and no KO.
 
 ## Last commit
 
-- Baseline entering iteration 51: `e2da829 feat(tcg-engine): resolve defender energy bonus damage`.
-- This handoff was written before committing iteration 51; expected commit message is `feat(tcg-engine): resolve bench-count bonus damage`.
+- Baseline entering iteration 52: `5abbf22 feat(tcg-engine): resolve bench-count bonus damage`.
+- This handoff was written before committing iteration 52; expected commit message is `feat(tcg-engine): resolve both-active energy bonus damage`.
 
 ## Remaining tasks
 
 - Decide whether old `Prizmo.Tcg.Sim` tests are kept as historical reference, quarantined, or ported scenario-by-scenario.
 - Build the minimal playable React SPA loop beyond prompt resolution, Bench commands, Attach Energy, attached-card board visibility, Retreat, paid attack declaration, static/executable attack resolution/finish controls, switch-self target choice, one-Bench KO follow-up, multi-Bench replacement Active choice, explicit KO Prize prompt choice, evolution from hand, End Turn, next-turn progression, deterministic playtest fixture order, hardened tab-scoped viewer identity, and reduced prompt/action debug noise: rerun the full two-browser/manual-tester playtest milestone only after the validation harness can guarantee separate browser contexts.
-- Expand persisted Ash engine mechanics: implement explicit support for one rejected authored attack effect at a time beyond Moltres's Pokémon ex bonus, switch-self effects, Rabsca's defender-Energy bonus damage, and Clefairy's bench-count bonus damage; continue multi-KO/prize handling, richer status/marker lifecycle semantics, turn transitions, and snapshot-backed undo/debug support.
+- Expand persisted Ash engine mechanics: implement explicit support for one rejected authored attack effect at a time beyond Moltres's Pokémon ex bonus, switch-self effects, Rabsca's defender-Energy bonus damage, Clefairy's bench-count bonus damage, and Ogerpon's both-Active Energy bonus damage; continue multi-KO/prize handling, richer status/marker lifecycle semantics, turn transitions, and snapshot-backed undo/debug support.
 - Continue migrating executable card behavior into engine-owned definitions with explicit unsupported-behavior tracking.
 - Spike Electric Streams only after the command/read loop has enough event shape to publish safely.
 
@@ -192,6 +195,7 @@ Updated: 2026-05-30
 - Evolution from hand is now callable from the browser for valid turn-2+ evolution pairs; pre-existing attached cards are reparented to the evolved Pokémon, damage counters move to the new top, and special conditions are cleared so attack/retreat cost checks still work for evolved attackers. Broader evolution work should still verify multi-stage stack presentation, marker handling, and longer KO/replacement/prize browser flows.
 - Rabsca `TEF-024` `Psychic` is now executable in the persisted engine and deals 10 plus 30 more damage per Energy card attached to the opponent's Active Pokémon.
 - Lillie's Clefairy ex `JTG-056` `Full Moon Rondo` is now executable in the persisted engine and deals 20 plus 20 more damage for each Benched Pokémon controlled by either player.
+- Teal Mask Ogerpon ex `TWM-025` `Myriad Leaf Shower` is now executable in the persisted engine and deals 30 plus 30 more damage for each Energy card attached to either Active Pokémon.
 - Validation blocker: the available manual-tester subagents still appear to share/contend over one browser/session, so their reported viewer flips are not reliable proof of independent-browser behavior. The documented manual-tester milestone needs a harness that guarantees separate browser contexts before it can be marked formally complete.
 
 ## Recommended next atomic task

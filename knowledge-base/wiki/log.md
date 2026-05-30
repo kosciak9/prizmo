@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-30] iteration 52 | Ogerpon both-Active Energy bonus damage
+- Task attempted: continued the rejected authored attack-effect inventory and implemented the narrow persisted `:bonus_damage_per_energy_attached_to_both_active` slice for Teal Mask Ogerpon ex `TWM-025` `Myriad Leaf Shower`, counting Energy cards attached to both Active Pokémon for the authored bonus damage.
+- Files changed: updated `lib/prizmo/tcg_engine/attack_effects.ex`, `lib/prizmo/tcg_engine/attack_damage.ex`, this log, and the TCG engine playtest handoff.
+- Validation: `mix format && mix compile --warnings-as-errors` passed; `mix test test/prizmo/tcg_engine/mechanics_test.exs` passed (4 tests); Tidewave rollback smoke passed for `TWM-025` `Myriad Leaf Shower` fetching as executable, surfacing a browser declare-attack affordance, and resolving for 180 damage against Fezandipiti ex with three Energy attached to Ogerpon plus two Energy attached to the defender and no KO; `mix prizmo.cards.coverage` passed; `mix check --no-test` passed.
+- Remaining/blocking notes: no code blocker for Ogerpon's both-Active Energy bonus damage path; additional rejected authored attack effects remain and should continue to be enabled one deterministic persisted effect at a time.
+
 ## [2026-05-30] iteration 51 | Clefairy bench-count attack effect
 - Task attempted: continued the rejected authored attack-effect inventory and implemented the narrow persisted `:bonus_damage_per_benched_pokemon` slice for Lillie's Clefairy ex `JTG-056` `Full Moon Rondo`, counting both players' Benched Pokémon for the authored bonus damage.
 - Files changed: updated `lib/prizmo/tcg_engine/attack_effects.ex`, `lib/prizmo/tcg_engine/attack_damage.ex`, this log, and the TCG engine playtest handoff.

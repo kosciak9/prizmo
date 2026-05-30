@@ -44,6 +44,17 @@ defmodule Prizmo.TcgEngine.AttackDamage do
     end
   end
 
+  defp apply_effect(damage, %CardInstance{} = attacker_card, %CardInstance{} = defender_card, %{
+         type: :bonus_damage_per_energy_attached_to_both_active,
+         bonus_damage: bonus_damage
+       })
+       when is_integer(bonus_damage) and bonus_damage >= 0 do
+    with {:ok, energy_count} <-
+           attached_energy_count_for_both_active(attacker_card, defender_card) do
+      {:ok, damage + bonus_damage * energy_count}
+    end
+  end
+
   defp apply_effect(damage, _attacker_card, _defender_card, nil), do: {:ok, damage}
 
   defp apply_effect(damage, _attacker_card, %CardInstance{} = defender_card, %{
@@ -93,6 +104,13 @@ defmodule Prizmo.TcgEngine.AttackDamage do
       {:ok, false}, {:ok, count} -> {:cont, {:ok, count}}
       {:error, reason}, _acc -> {:halt, {:error, reason}}
     end)
+  end
+
+  defp attached_energy_count_for_both_active(attacker_card, defender_card) do
+    with {:ok, attacker_energy_count} <- attached_energy_count(attacker_card),
+         {:ok, defender_energy_count} <- attached_energy_count(defender_card) do
+      {:ok, attacker_energy_count + defender_energy_count}
+    end
   end
 
   defp benched_pokemon_count(%CardInstance{game_id: game_id} = attacker_card, defender_card) do
