@@ -11,6 +11,7 @@ import {
   runGetTcgEngineGameState,
   runListSupportedTcgDecks,
   runPlaceTcgEnginePrizes,
+  runStartNextTcgEngineTurn,
   runStartTcgEngineSetup,
   type CreateTcgEngineGameFields,
   type GetTcgEngineGameStateFields,
@@ -292,6 +293,13 @@ export function HomeRoute() {
     }
   })
 
+  const startNextTurnMutation = useMutation({
+    mutationFn: (gameId: string) => startNextTurn(gameId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['tcg-engine', 'game-state'] })
+    }
+  })
+
   const gameState = gameStateQuery.data
   const viewerPlayer = gameState?.players.find(player => player.playerId === gameState.viewerPlayerId)
   const setupActiveCandidates = viewerPlayer?.hand.filter(isSetupActiveCandidate) ?? []
@@ -334,6 +342,13 @@ export function HomeRoute() {
     ) && !placePrizesMutation.isPending
   const canCompleteSetup =
     Boolean(normalisedGameId && gameState?.setup?.status === 'prizes_placed') && !completeSetupMutation.isPending
+  const canStartNextTurn =
+    Boolean(
+      normalisedGameId &&
+        gameState?.status === 'in_progress' &&
+        gameState.setup?.status === 'completed' &&
+        !gameState.currentTurn
+    ) && !startNextTurnMutation.isPending
 
   function updateSession(nextSession: PlaytestSession) {
     setStoredSession(nextSession)
@@ -669,6 +684,43 @@ export function HomeRoute() {
                     {errorMessage(completeSetupMutation.error)}
                   </InlineNotice>
                 ) : null}
+
+                <div className="rounded-2xl border border-stone-200 bg-stone-50 p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-medium text-stone-950">Turn commands</p>
+                      <p className="mt-1 text-xs leading-5 text-stone-500">
+                        Start the first persisted turn after setup completes.
+                      </p>
+                    </div>
+                    <StatusBadge tone={gameState?.currentTurn ? 'active' : 'neutral'}>
+                      {gameState?.currentTurn
+                        ? `turn ${gameState.currentTurn.turnNumber}: ${gameState.currentTurn.status}`
+                        : 'no turn'}
+                    </StatusBadge>
+                  </div>
+
+                  <button
+                    className="mt-3 w-full rounded-xl border border-emerald-700 px-3 py-2 text-sm font-semibold text-emerald-800 transition hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:border-stone-300 disabled:text-stone-400 disabled:hover:bg-transparent"
+                    disabled={!canStartNextTurn}
+                    onClick={() => startNextTurnMutation.mutate(normalisedGameId)}
+                    type="button"
+                  >
+                    {startNextTurnMutation.isPending
+                      ? 'Starting turn...'
+                      : gameState?.currentTurn
+                        ? `Turn ${gameState.currentTurn.turnNumber} started`
+                        : gameState?.setup?.status === 'completed'
+                          ? 'Start first turn'
+                          : 'Complete setup first'}
+                  </button>
+                </div>
+
+                {startNextTurnMutation.error ? (
+                  <InlineNotice tone="error" title="Turn start command failed">
+                    {errorMessage(startNextTurnMutation.error)}
+                  </InlineNotice>
+                ) : null}
               </div>
             </Panel>
 
@@ -848,6 +900,20 @@ async function placePrizes(gameId: string): Promise<CreatedGame> {
 
 async function completeSetup(gameId: string): Promise<CreatedGame> {
   const result = await runCompleteTcgEngineSetup({
+    input: { gameId },
+    fields: GAME_RESOURCE_FIELDS,
+    headers: buildAshRpcHeaders()
+  })
+
+  if (!result.success) {
+    throw new Error(rpcErrorMessage(result.errors))
+  }
+
+  return result.data as CreatedGame
+}
+
+async function startNextTurn(gameId: string): Promise<CreatedGame> {
+  const result = await runStartNextTcgEngineTurn({
     input: { gameId },
     fields: GAME_RESOURCE_FIELDS,
     headers: buildAshRpcHeaders()

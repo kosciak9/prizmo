@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-30] iteration 21 | SPA first turn-start command
+- Task attempted: added the first turn command to the React SPA playtest shell so a selected persisted game can start turn 1 through `runStartNextTcgEngineTurn` after setup completes, then invalidate the viewer-scoped game-state query and show current-turn status updates.
+- Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`; updated this log and the TCG engine playtest handoff.
+- Validation: `mix assets.build` passed; `mix check --no-test` passed.
+- Remaining/blocking notes: no blocker; setup start, opening-hand draw, setup Active choice, setup Bench choice, setup Prize placement, setup completion, and first turn start are now clickable from the shell, while draw-for-turn/skip-draw/open-action-window controls, legal action affordances, and prompt resolution controls remain pending.
+
 ## [2026-05-30] iteration 20 | SPA setup completion command
 - Task attempted: added the final setup command to the React SPA playtest shell so a selected persisted game can complete setup through `runCompleteTcgEngineSetup` after Prize placement, then invalidate the viewer-scoped game-state query and show completed setup/game status updates.
 - Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`; updated this log and the TCG engine playtest handoff.
