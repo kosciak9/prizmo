@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-30] iteration 33 | Playtest viewer stale-read hardening
+- Task attempted: reran the documented two-browser playtest validation after the viewer-storage fix, then hardened the SPA against stale viewer/session updates when the manual-tester agents still reported viewer flips during Refresh/live-update flows.
+- Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.
+- Validation: initial full manual-tester rerun on game `e72ca86d-5369-4216-bc88-b186c9f22446` reproduced viewer flips; after functional session updates, focused same-origin two-tab validation passed for repeated Refresh/reload preserving independent viewers, but manual-tester reruns on games `ace0a61c-5f6f-4d95-9b3c-c89b463568d2` and `622d73b6-4ca4-4f4f-b448-a7bf2204a732` still reported flips consistent with the agents sharing/contending over one browser/session rather than independent browser instances; an explicit isolated Playwright two-context diagnostic created game `f23cfd94-744c-473e-9c1e-2be2ba747b2e` and passed the full setup → Moltres/Abra Active → prizes/setup complete → turn start/draw/open → Attach Fire Energy → Ultra Ball prompts → Bench Munkidori → End Turn → Player 2 next turn → reload recovery scenario with separate viewer identities and hidden hands; `mix assets.build` passed; `mix check --no-test` passed.
+- Remaining/blocking notes: the SPA now uses functional session updates, syncs storage from committed state, binds game-state RPC fetches to their query key, and refuses to render wrong-viewer read-model payloads; the documented manual-tester milestone still needs a validation harness with guaranteed separate browser contexts, because the available manual-tester agents appear to interfere with the shared viewer control.
+
 ## [2026-05-30] iteration 32 | Two-browser playtest fixture and viewer isolation
 - Task attempted: ran the documented two-browser playtest validation, made the default Dragapult fixture order deterministic for the narrow prompt/Bench/Attach/End Turn loop, and fixed the SPA session storage so viewer identity is tab-scoped instead of shared through localStorage.
 - Files changed: updated `lib/prizmo/tcg/decks/dragapult27431.ex`, `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.

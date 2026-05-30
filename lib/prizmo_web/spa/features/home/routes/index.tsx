@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import {
   runAttachTcgEngineEnergy,
@@ -307,6 +307,10 @@ export function HomeRoute() {
   const [playerOneDeckKey, setPlayerOneDeckKey] = useState('')
   const [playerTwoDeckKey, setPlayerTwoDeckKey] = useState('')
 
+  useEffect(() => {
+    setStoredSession(session)
+  }, [session])
+
   const decksQuery = useQuery({
     queryKey: ['tcg-engine', 'supported-decks'],
     queryFn: listSupportedDecks
@@ -318,8 +322,12 @@ export function HomeRoute() {
   const normalisedGameId = session.gameId.trim()
 
   const gameStateQuery = useQuery({
-    queryKey: ['tcg-engine', 'game-state', normalisedGameId, session.viewerPlayerId],
-    queryFn: () => getGameState(normalisedGameId, session.viewerPlayerId),
+    queryKey: ['tcg-engine', 'game-state', normalisedGameId, session.viewerPlayerId] as const,
+    queryFn: ({ queryKey }) => {
+      const [, , gameId, viewerPlayerId] = queryKey
+
+      return getGameState(gameId, viewerPlayerId)
+    },
     enabled: normalisedGameId.length > 0,
     refetchOnWindowFocus: false
   })
@@ -331,13 +339,10 @@ export function HomeRoute() {
         playerTwoDeckKey: selectedPlayerTwoDeckKey
       }),
     onSuccess: async game => {
-      const nextSession = {
-        gameId: game.id,
-        viewerPlayerId: session.viewerPlayerId
-      }
-
-      setStoredSession(nextSession)
-      setSession(nextSession)
+      updateSession(currentSession => ({
+        ...currentSession,
+        gameId: game.id
+      }))
 
       await queryClient.invalidateQueries({ queryKey: ['tcg-engine', 'game-state'] })
     }
@@ -449,8 +454,12 @@ export function HomeRoute() {
     }
   })
 
-  const gameState = gameStateQuery.data
-  const viewerPlayer = gameState?.players.find(player => player.playerId === gameState.viewerPlayerId)
+  const queriedGameState = gameStateQuery.data
+  const gameStateHasViewerMismatch = Boolean(
+    queriedGameState && queriedGameState.viewerPlayerId !== session.viewerPlayerId
+  )
+  const gameState = gameStateHasViewerMismatch ? undefined : queriedGameState
+  const viewerPlayer = gameState?.players.find(player => player.playerId === session.viewerPlayerId)
   const currentTurnActivePlayerId = gameState?.currentTurn?.activePlayerId
   const setupActiveCandidates = viewerPlayer?.hand.filter(isSetupActiveCandidate) ?? []
   const setupBenchCandidates = viewerPlayer?.hand.filter(isSetupBenchCandidate) ?? []
@@ -531,13 +540,12 @@ export function HomeRoute() {
     !skipDrawForTurnMutation.isPending &&
     !openActionWindowMutation.isPending
 
-  function updateSession(nextSession: PlaytestSession) {
-    setStoredSession(nextSession)
-    setSession(nextSession)
+  function updateSession(updater: (currentSession: PlaytestSession) => PlaytestSession) {
+    setSession(currentSession => updater(currentSession))
   }
 
   function clearGame() {
-    updateSession({ ...session, gameId: '' })
+    updateSession(currentSession => ({ ...currentSession, gameId: '' }))
     queryClient.removeQueries({ queryKey: ['tcg-engine', 'game-state'] })
   }
 
@@ -608,7 +616,12 @@ export function HomeRoute() {
                           checked={session.viewerPlayerId === playerId}
                           className="h-4 w-4 accent-emerald-600"
                           name="viewer-player"
-                          onChange={() => updateSession({ ...session, viewerPlayerId: playerId })}
+                          onChange={() =>
+                            updateSession(currentSession => ({
+                              ...currentSession,
+                              viewerPlayerId: playerId
+                            }))
+                          }
                           type="radio"
                         />
                       </label>
@@ -635,7 +648,11 @@ export function HomeRoute() {
                   <span className="text-sm font-medium text-stone-800">Reconnect to game ID</span>
                   <input
                     className="w-full rounded-xl border border-stone-300 bg-stone-50 px-3 py-2 font-mono text-sm text-stone-950 outline-none transition placeholder:text-stone-400 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
-                    onChange={event => updateSession({ ...session, gameId: event.currentTarget.value })}
+                    onChange={event => {
+                      const gameId = event.currentTarget.value
+
+                      updateSession(currentSession => ({ ...currentSession, gameId }))
+                    }}
                     placeholder="Paste a persisted game UUID"
                     type="text"
                     value={session.gameId}
@@ -1053,10 +1070,16 @@ export function HomeRoute() {
               <InlineNotice tone="error" title="Game state did not load">
                 {errorMessage(gameStateQuery.error)}
               </InlineNotice>
+            ) : gameStateHasViewerMismatch ? (
+              <InlineNotice tone="info" title="Viewer state is refreshing">
+                Ignoring a stale {formatPlayerId(queriedGameState?.viewerPlayerId ?? 'unknown')} read while this tab is
+                viewing {formatPlayerId(session.viewerPlayerId)}. Refresh state again if this persists.
+              </InlineNotice>
             ) : gameState ? (
               <GameStateWorkbench
                 deckNamesByKey={deckNamesByKey}
                 gameState={gameState}
+                viewerPlayerId={session.viewerPlayerId}
                 onChoosePrompt={({ playerId, promptId, selectedCardInstanceIds }) => {
                   if (isPlayerId(playerId)) {
                     choosePromptMutation.mutate({
@@ -1396,6 +1419,7 @@ async function choosePrompt(input: ChoosePromptInput): Promise<CreatedGame> {
 
 function GameStateWorkbench({
   gameState,
+  viewerPlayerId,
   deckNamesByKey,
   onChoosePrompt,
   onAttachEnergy,
@@ -1409,6 +1433,7 @@ function GameStateWorkbench({
   playCardPendingCardId
 }: {
   gameState: GameState
+  viewerPlayerId: PlayerId
   deckNamesByKey: Map<string, string>
   onChoosePrompt: (input: ChoosePromptCommand) => void
   onAttachEnergy: (input: AttachEnergyCommand) => void
@@ -1468,7 +1493,7 @@ function GameStateWorkbench({
         {gameState.players.map(player => (
           <PlayerPanel
             deckName={deckNamesByKey.get(player.deckKey)}
-            isViewer={player.playerId === gameState.viewerPlayerId}
+            isViewer={player.playerId === viewerPlayerId}
             key={player.playerId}
             player={player}
           />
