@@ -21,10 +21,11 @@ Research notes for possible future rules-engine, simulator, replay, and card-beh
 
 | Article | Summary | Updated |
 | --- | --- | --- |
+| [Ash-backed TCG Engine and Playtest UI North Star](engine/ash-backed-tcg-engine-playtest-north-star.md) | Current north-star plan for the persisted Ash TCG engine, a thin React playtest UI, and an Electric Streams game-data feed spike. | 2026-05-30 |
 | [Card Engine Authoring Models](engine/card-engine-authoring-models.md) | Comparison of code-first, generated-stub, Elixir macro DSL, hybrid metadata/behavior, and coverage-tooling patterns for exact Standard-only PTCG card behavior. | 2026-05-27 |
 | [Cross-Platform TCG Client Architecture](engine/cross-platform-tcg-client-architecture.md) | React web/RN app-shell architecture with embedded Godot as the shared gameplay renderer, including web, Android, and iOS integration risks. | 2026-05-28 |
 | [Full-Game Two-Deck Simulator Implementation](engine/full-game-two-deck-simulator-implementation.md) | Implementation notes for the ExUnit-first state-machine simulator slice, including undo/redo snapshots and fixed Dragapult vs Alakazam deck skeletons. | 2026-05-28 |
-| [Meta Deck, TCGdex, Card DSL, and LiveView Play North Star](engine/meta-deck-card-dsl-north-star.md) | North-star plan for moving the simulator from two fixed decklists to metadata-backed meta decks, authored behavior DSL overlays, pairwise smoke support, and a basic LiveView play UI. | 2026-05-29 |
+| [Meta Deck, TCGdex, Card DSL, and LiveView Play North Star](engine/meta-deck-card-dsl-north-star.md) | Historical north-star plan for the old simulator-era deck/card DSL migration; superseded by the Ash-backed engine and playtest UI plan. | 2026-05-30 |
 | [TCG Client Renderer Options](engine/tcg-client-renderer-options.md) | Renderer/client architecture options for a server-authoritative Pokémon-like TCG, with Godot 2D + GDScript as the strongest touch-first direction. | 2026-05-28 |
 
 ## meta

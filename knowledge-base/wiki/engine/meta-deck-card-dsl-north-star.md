@@ -1,10 +1,12 @@
 # Meta Deck, TCGdex, Card DSL, and LiveView Play North Star
 
-Updated: 2026-05-29
+Updated: 2026-05-30
+
+Status: historical. This note captured the simulator-era north star. The current north star is [Ash-backed TCG Engine and Playtest UI North Star](ash-backed-tcg-engine-playtest-north-star.md), which makes `lib/prizmo/tcg_engine/` canonical and targets a playable React SPA playtest UI with an Electric Streams data-feed spike.
 
 ## Scope
 
-This is the north-star implementation plan for moving the Pokémon TCG simulator from two fixed decklists to a maintainable meta-deck platform.
+This was the prior north-star implementation plan for moving the Pokémon TCG simulator from two fixed decklists to a maintainable meta-deck platform.
 
 Goals:
 

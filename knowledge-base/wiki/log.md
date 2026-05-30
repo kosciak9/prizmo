@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-30] planning | Ash-backed TCG Engine and Playtest UI North Star
+- Added: current north-star plan for the canonical Ash-backed TCG engine, a thin React SPA playtest UI, and an Electric Streams game-data feed spike in `knowledge-base/wiki/engine/ash-backed-tcg-engine-playtest-north-star.md`
+- Updated: the engine index now marks the old simulator-era LiveView north-star note as historical and points to the Ash-backed engine/playtest UI plan
+- Captured: Electric Streams research notes covering append-only durable streams, JSON mode, offset replay/resume, SSE live tailing, TypeScript client support, idempotent producers, and Durable State tradeoffs in `knowledge-base/raw/engine/2026-05-30-electric-streams-docs.md`
+- Recorded: current implementation baseline after the persisted engine migration, temporary channel/UI removal, and engine-owned `CardCatalog`; remaining gaps are legacy simulator coupling in tests, missing playable UI, incomplete engine mechanics parity, and the unvalidated stream bridge
+
 ## [2026-05-29] implementation | Raging Bolt ex Burst Roar Attack Behavior
 - Added: Raging Bolt ex `TEF-123` now has a TEF DSL manifest entry and registry overlay for `Burst Roar`, mapping the attack to discard the player's hand and draw 6 cards
 - Preserved: static Pokémon metadata, attack cost, and printed attack text continue to come from the committed TCGdex cache; the overlay declares only executable behavior for `Burst Roar`, while `Bellowing Thunder` remains intentionally behavior-missing
