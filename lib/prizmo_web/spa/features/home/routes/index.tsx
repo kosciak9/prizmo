@@ -14,6 +14,7 @@ import {
   runDrawTcgEngineCardForTurn,
   runDrawTcgEngineOpeningHand,
   runEndTcgEngineTurn,
+  runEvolveTcgEngineFromHand,
   runFinishTcgEngineAttack,
   runGetTcgEngineGameState,
   runListSupportedTcgDecks,
@@ -250,6 +251,19 @@ type PlayBasicToBenchInput = {
 type PlayBasicToBenchCommand = {
   playerId: string
   cardInstanceId: string
+}
+
+type EvolveFromHandInput = {
+  gameId: string
+  playerId: PlayerId
+  evolutionCardInstanceId: string
+  targetCardInstanceId: string
+}
+
+type EvolveFromHandCommand = {
+  playerId: string
+  evolutionCardInstanceId: string
+  targetCardInstanceId: string
 }
 
 type AttachEnergyInput = {
@@ -510,6 +524,13 @@ export function HomeRoute() {
 
   const playBasicToBenchMutation = useMutation({
     mutationFn: (input: PlayBasicToBenchInput) => playBasicToBench(input),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['tcg-engine', 'game-state'] })
+    }
+  })
+
+  const evolveFromHandMutation = useMutation({
+    mutationFn: (input: EvolveFromHandInput) => evolveFromHand(input),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['tcg-engine', 'game-state'] })
     }
@@ -1131,6 +1152,12 @@ export function HomeRoute() {
                   </InlineNotice>
                 ) : null}
 
+                {evolveFromHandMutation.error ? (
+                  <InlineNotice tone="error" title="Evolution command failed">
+                    {errorMessage(evolveFromHandMutation.error)}
+                  </InlineNotice>
+                ) : null}
+
                 {attachEnergyMutation.error ? (
                   <InlineNotice tone="error" title="Attach Energy command failed">
                     {errorMessage(attachEnergyMutation.error)}
@@ -1318,8 +1345,26 @@ export function HomeRoute() {
                     })
                   }
                 }}
+                onEvolveFromHand={({ playerId, evolutionCardInstanceId, targetCardInstanceId }) => {
+                  if (isPlayerId(playerId)) {
+                    evolveFromHandMutation.mutate({
+                      gameId: normalisedGameId,
+                      playerId,
+                      evolutionCardInstanceId,
+                      targetCardInstanceId
+                    })
+                  }
+                }}
                 playBasicToBenchPendingCardId={
                   playBasicToBenchMutation.isPending ? playBasicToBenchMutation.variables?.cardInstanceId ?? null : null
+                }
+                evolveFromHandPendingKey={
+                  evolveFromHandMutation.isPending && evolveFromHandMutation.variables
+                    ? evolveKey(
+                        evolveFromHandMutation.variables.evolutionCardInstanceId,
+                        evolveFromHandMutation.variables.targetCardInstanceId
+                      )
+                    : null
                 }
                 attachEnergyPendingKey={
                   attachEnergyMutation.isPending && attachEnergyMutation.variables
@@ -1593,6 +1638,20 @@ async function playBasicToBench(input: PlayBasicToBenchInput): Promise<CreatedGa
   return result.data as CreatedGame
 }
 
+async function evolveFromHand(input: EvolveFromHandInput): Promise<CreatedGame> {
+  const result = await runEvolveTcgEngineFromHand({
+    input,
+    fields: GAME_RESOURCE_FIELDS,
+    headers: buildAshRpcHeaders()
+  })
+
+  if (!result.success) {
+    throw new Error(rpcErrorMessage(result.errors))
+  }
+
+  return result.data as CreatedGame
+}
+
 async function attachEnergy(input: AttachEnergyInput): Promise<CreatedGame> {
   const result = await runAttachTcgEngineEnergy({
     input,
@@ -1714,6 +1773,7 @@ function GameStateWorkbench({
   onAttachEnergy,
   onDeclareAttack,
   onEndTurn,
+  onEvolveFromHand,
   onFinishAttack,
   onPlayBasicToBench,
   onPlayCard,
@@ -1723,6 +1783,7 @@ function GameStateWorkbench({
   chooseReplacementActivePendingCardId,
   declareAttackPendingKey,
   endTurnPendingPlayerId,
+  evolveFromHandPendingKey,
   finishAttackPendingPlayerId,
   playBasicToBenchPendingCardId,
   promptPendingId,
@@ -1738,6 +1799,7 @@ function GameStateWorkbench({
   onAttachEnergy: (input: AttachEnergyCommand) => void
   onDeclareAttack: (input: DeclareAttackCommand) => void
   onEndTurn: (input: EndTurnCommand) => void
+  onEvolveFromHand: (input: EvolveFromHandCommand) => void
   onFinishAttack: (input: FinishAttackCommand) => void
   onPlayBasicToBench: (input: PlayBasicToBenchCommand) => void
   onPlayCard: (input: PlayCardCommand) => void
@@ -1747,6 +1809,7 @@ function GameStateWorkbench({
   chooseReplacementActivePendingCardId: string | null
   declareAttackPendingKey: string | null
   endTurnPendingPlayerId: string | null
+  evolveFromHandPendingKey: string | null
   finishAttackPendingPlayerId: string | null
   playBasicToBenchPendingCardId: string | null
   promptPendingId: string | null
@@ -1792,12 +1855,14 @@ function GameStateWorkbench({
         onChooseReplacementActive={onChooseReplacementActive}
         onDeclareAttack={onDeclareAttack}
         onEndTurn={onEndTurn}
+        onEvolveFromHand={onEvolveFromHand}
         onPlayBasicToBench={onPlayBasicToBench}
         onPlayCard={onPlayCard}
         onRetreat={onRetreat}
         attachEnergyPendingKey={attachEnergyPendingKey}
         declareAttackPendingKey={declareAttackPendingKey}
         endTurnPendingPlayerId={endTurnPendingPlayerId}
+        evolveFromHandPendingKey={evolveFromHandPendingKey}
         playBasicToBenchPendingCardId={playBasicToBenchPendingCardId}
         playCardPendingCardId={playCardPendingCardId}
         retreatPendingKey={retreatPendingKey}
@@ -2181,12 +2246,14 @@ function ActionAffordancesPanel({
   onChooseReplacementActive,
   onDeclareAttack,
   onEndTurn,
+  onEvolveFromHand,
   onPlayBasicToBench,
   onPlayCard,
   onRetreat,
   attachEnergyPendingKey,
   declareAttackPendingKey,
   endTurnPendingPlayerId,
+  evolveFromHandPendingKey,
   playBasicToBenchPendingCardId,
   playCardPendingCardId,
   retreatPendingKey
@@ -2198,12 +2265,14 @@ function ActionAffordancesPanel({
   onChooseReplacementActive: (input: ChooseReplacementActiveCommand) => void
   onDeclareAttack: (input: DeclareAttackCommand) => void
   onEndTurn: (input: EndTurnCommand) => void
+  onEvolveFromHand: (input: EvolveFromHandCommand) => void
   onPlayBasicToBench: (input: PlayBasicToBenchCommand) => void
   onPlayCard: (input: PlayCardCommand) => void
   onRetreat: (input: RetreatCommand) => void
   attachEnergyPendingKey: string | null
   declareAttackPendingKey: string | null
   endTurnPendingPlayerId: string | null
+  evolveFromHandPendingKey: string | null
   playBasicToBenchPendingCardId: string | null
   playCardPendingCardId: string | null
   retreatPendingKey: string | null
@@ -2215,6 +2284,7 @@ function ActionAffordancesPanel({
       chooseReplacementActivePendingCardId ||
       declareAttackPendingKey ||
       endTurnPendingPlayerId ||
+      evolveFromHandPendingKey ||
       retreatPendingKey
   )
 
@@ -2298,6 +2368,43 @@ function ActionAffordancesPanel({
                       </button>
                     )
                   })}
+                </div>
+              ) : null}
+
+              {action.key === 'evolve_from_hand' &&
+              action.sourceCardInstanceIds.length > 0 &&
+              action.targetCardInstanceIds.length > 0 ? (
+                <div className="mt-3 space-y-2">
+                  {action.sourceCardInstanceIds.flatMap(evolutionCardInstanceId =>
+                    action.targetCardInstanceIds.map(targetCardInstanceId => {
+                      const evolutionCard = cardsById.get(evolutionCardInstanceId)
+                      const targetCard = cardsById.get(targetCardInstanceId)
+                      const evolutionActionKey = evolveKey(evolutionCardInstanceId, targetCardInstanceId)
+                      const isPending = evolveFromHandPendingKey === evolutionActionKey
+
+                      return (
+                        <button
+                          className="w-full rounded-xl border border-emerald-700 px-3 py-2 text-left text-sm font-semibold text-emerald-800 transition hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:border-stone-300 disabled:text-stone-400 disabled:hover:bg-transparent"
+                          disabled={actionCommandPending || !isPlayerId(action.playerId)}
+                          key={evolutionActionKey}
+                          onClick={() =>
+                            onEvolveFromHand({
+                              playerId: action.playerId,
+                              evolutionCardInstanceId,
+                              targetCardInstanceId
+                            })
+                          }
+                          type="button"
+                        >
+                          {isPending
+                            ? `Evolving ${targetCard?.name ?? 'Pokémon'}...`
+                            : `Evolve ${targetCard?.name ?? formatCardInstanceId(targetCardInstanceId)} into ${
+                                evolutionCard?.name ?? formatCardInstanceId(evolutionCardInstanceId)
+                              }`}
+                        </button>
+                      )
+                    })
+                  )}
                 </div>
               ) : null}
 
@@ -2913,6 +3020,10 @@ function actionKey(action: ActionAffordance) {
 
 function attachEnergyPairKey(energyCardInstanceId: string, targetCardInstanceId: string) {
   return `${energyCardInstanceId}:${targetCardInstanceId}`
+}
+
+function evolveKey(evolutionCardInstanceId: string, targetCardInstanceId: string) {
+  return `${evolutionCardInstanceId}:${targetCardInstanceId}`
 }
 
 function retreatKey(benchCardInstanceId: string, energyCardInstanceIds: string[]) {

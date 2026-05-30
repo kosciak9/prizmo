@@ -709,6 +709,53 @@ export async function endTcgEngineTurn<Fields extends EndTcgEngineTurnFields | u
 }
 
 
+export type EvolveTcgEngineFromHandInput = {
+  gameId: UUID;
+  playerId: string;
+  evolutionCardInstanceId: UUID;
+  targetCardInstanceId: UUID;
+};
+
+export type EvolveTcgEngineFromHandFields = UnifiedFieldSelection<TcgEngineGameResourceSchema>[];
+
+export type InferEvolveTcgEngineFromHandResult<
+  Fields extends EvolveTcgEngineFromHandFields | undefined,
+> = InferResult<TcgEngineGameResourceSchema, Fields>;
+
+export type EvolveTcgEngineFromHandResult<Fields extends EvolveTcgEngineFromHandFields | undefined = undefined> = | { success: true; data: InferEvolveTcgEngineFromHandResult<Fields>; }
+| { success: false; errors: AshRpcError[]; }
+
+;
+
+/**
+ * Execute generic action on Game
+ *
+ * @ashActionType :action
+ */
+export async function evolveTcgEngineFromHand<Fields extends EvolveTcgEngineFromHandFields | undefined = undefined>(
+  config: {
+  tenant?: string;
+  input: EvolveTcgEngineFromHandInput;
+  fields: Fields;
+  headers?: Record<string, string>;
+  fetchOptions?: RequestInit;
+  customFetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+}
+): Promise<EvolveTcgEngineFromHandResult<Fields extends undefined ? [] : Fields>> {
+  const payload = {
+    action: "evolve_tcg_engine_from_hand",
+    ...(config.tenant !== undefined && { tenant: config.tenant }),
+    input: config.input,
+    ...(config.fields !== undefined && { fields: config.fields })
+  };
+
+  return executeActionRpcRequest<EvolveTcgEngineFromHandResult<Fields extends undefined ? [] : Fields>>(
+    payload,
+    config
+  );
+}
+
+
 export type FinishTcgEngineAttackInput = {
   gameId: UUID;
   playerId: string;

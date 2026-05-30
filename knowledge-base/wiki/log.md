@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-30] iteration 47 | Evolution command and browser affordance
+- Task attempted: exposed the existing persisted `evolve_from_hand/4` mechanic through Ash/RPC and added viewer-scoped legal-action affordances plus React controls for valid evolution-card/target pairs that respect action-window state, turn number, target entered-play timing, and catalog evolution metadata.
+- Files changed: updated `lib/prizmo/tcg_engine.ex`, `lib/prizmo/tcg_engine/game/action_commands.ex`, `lib/prizmo/tcg_engine/game_view/action_affordances.ex`, `lib/prizmo_web/spa/features/home/routes/index.tsx`, `lib/prizmo_web/spa/lib/ash/client.ts`, generated `lib/prizmo_web/spa/lib/ash/generated/ash_rpc.ts`, this log, and the TCG engine playtest handoff.
+- Validation: `mix format && mix ash_typescript.codegen` passed; `mix compile --warnings-as-errors && mix ash_typescript.codegen --check && mix assets.build && mix test test/prizmo/tcg_engine/mechanics_test.exs` passed (4 tests); Tidewave rollback smoke passed for a turn-2 Dreepy/Drakloak state seeing one `evolve_from_hand` affordance, evolving through `Prizmo.TcgEngine.evolve_from_hand_for_game/4`, moving Drakloak to Active, attaching Dreepy underneath it, and clearing the evolution affordance; `mix check --no-test` passed.
+- Remaining/blocking notes: no code blocker for basic browser-driven evolution from hand; broader evolution correctness still needs focused handling/verification for attachments and other evolved Pokémon state before broad attack playtesting with evolved attackers.
+
 ## [2026-05-30] iteration 46 | Explicit knockout Prize prompt
 - Task attempted: replaced deterministic knockout Prize taking with an explicit persisted Prize-choice prompt for the attacking player, while keeping attack finish blocked until the prompt is resolved and rendering face-down Prize labels in the existing React prompt UI without leaking Prize identities.
 - Files changed: updated `lib/prizmo/tcg_engine/mechanics.ex`, `lib/prizmo/tcg_engine/game_view.ex`, `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.

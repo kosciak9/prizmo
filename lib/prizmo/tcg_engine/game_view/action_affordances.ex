@@ -77,7 +77,7 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
       viewer_cards = Enum.filter(cards, &(&1.owner_player_id == viewer_player_id))
 
       player
-      |> available_action_window_affordances(viewer_cards, cards)
+      |> available_action_window_affordances(current_turn, viewer_cards, cards)
       |> Enum.reject(&is_nil/1)
     else
       []
@@ -93,15 +93,16 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
 
   defp action_window_for_viewer?(_game, _current_turn, _viewer_player_id), do: false
 
-  defp available_action_window_affordances(nil, _cards, _all_cards), do: []
+  defp available_action_window_affordances(nil, _current_turn, _cards, _all_cards), do: []
 
-  defp available_action_window_affordances(%GamePlayer{} = player, cards, all_cards) do
+  defp available_action_window_affordances(%GamePlayer{} = player, current_turn, cards, all_cards) do
     [
       play_card_affordance(player, cards),
       play_basic_to_bench_affordance(player, cards),
       attach_energy_affordance(player, cards),
       retreat_affordance(player, cards)
     ] ++
+      evolve_from_hand_affordances(player, current_turn, cards) ++
       declare_attack_affordances(player, cards, all_cards) ++
       [
         end_turn_affordance(player)
@@ -163,6 +164,29 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
       )
     end
   end
+
+  defp evolve_from_hand_affordances(
+         %GamePlayer{} = player,
+         %Turn{turn_number: turn_number},
+         cards
+       )
+       when turn_number > 1 do
+    evolution_cards = cards |> hand_cards() |> Enum.filter(&evolution_pokemon?/1)
+    targets = Enum.filter(in_play_pokemon_cards(cards), &can_evolve_target?(&1, turn_number))
+
+    for evolution_card <- evolution_cards,
+        target_card <- targets,
+        evolves_from?(evolution_card, target_card) do
+      affordance(:evolve_from_hand, "Evolve Pokémon", :command, player.player_id,
+        source_card_instance_ids: [evolution_card.id],
+        target_card_instance_ids: [target_card.id],
+        note:
+          "Use a valid evolution card from hand on a Pokémon that entered play on an earlier turn."
+      )
+    end
+  end
+
+  defp evolve_from_hand_affordances(_player, _current_turn, _cards), do: []
 
   defp retreat_affordance(%GamePlayer{retreated_this_turn?: true}, _cards), do: nil
 
@@ -285,6 +309,31 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
 
   defp energy_card?(%CardInstance{card_id: card_id}) do
     match?({:ok, %{supertype: :energy}}, CardCatalog.fetch(card_id))
+  end
+
+  defp evolution_pokemon?(%CardInstance{card_id: card_id}) do
+    match?(
+      {:ok, %{supertype: :pokemon, evolves_from: evolves_from}} when not is_nil(evolves_from),
+      CardCatalog.fetch(card_id)
+    )
+  end
+
+  defp can_evolve_target?(%CardInstance{turn_entered_play: turn_entered_play}, turn_number)
+       when is_integer(turn_entered_play) do
+    turn_entered_play < turn_number
+  end
+
+  defp can_evolve_target?(_card, _turn_number), do: false
+
+  defp evolves_from?(%CardInstance{card_id: evolution_card_id}, %CardInstance{
+         card_id: target_card_id
+       }) do
+    with {:ok, evolution_card} <- CardCatalog.fetch(evolution_card_id),
+         {:ok, target_card} <- CardCatalog.fetch(target_card_id) do
+      evolution_card.evolves_from in [target_card.name, target_card.id]
+    else
+      _other -> false
+    end
   end
 
   defp retreat_cost(%CardInstance{card_id: card_id}) do
