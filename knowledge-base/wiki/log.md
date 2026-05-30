@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-30] iteration 80 | Single Bench KO Prize prompt
+- Task attempted: implemented the first Bench-damage KO continuation slice so exactly one Bench KO from supported attack-effect Bench damage/counter resolution discards the KO stack and routes into the existing face-down knockout Prize prompt, while active+Bench and multiple Bench KOs still reject instead of creating competing prompts.
+- Files changed: updated `lib/prizmo/tcg_engine/attack_effects.ex`, `lib/prizmo/tcg_engine/battle_actions.ex`, `lib/prizmo/tcg_engine/mechanics.ex`, this log, and the TCG engine playtest handoff.
+- Validation: `mix format` passed; `mix compile --warnings-as-errors` passed; `mix test test/prizmo/tcg_engine/mechanics_test.exs` passed; Tidewave rollback smokes passed for `TWM-064` `Torrential Pump` KOing one Benched `MEG-054`, creating `choose_knockout_prizes`, resolving the Prize prompt, and finishing the attack, for `finish_attack/2` rejecting before the Prize prompt resolves with `{:pending_effect_awaiting_prompt, _}`, and for `TWM-130` `Phantom Dive` rejecting two simultaneous Bench KOs with `{:multiple_bench_knockouts_not_supported, ids}`; `mix prizmo.cards.coverage` passed; `mix check --no-test` passed.
+- Remaining/blocking notes: no code blocker for the single Bench KO Prize-prompt path. Simultaneous active+Bench KOs and multiple Bench KOs remain intentionally unsupported until a queued/multi-KO Prize prompt sequencing design is implemented.
+
 ## [2026-05-30] iteration 79 | Tera Bench damage prevention
 - Task attempted: continued Tera hardening by modeling the authored Tera rule that Benched Tera Pokémon prevent attack damage, while preserving damage-counter placement semantics as attack effects rather than damage.
 - Files changed: added `lib/prizmo/tcg_engine/tera_bench_protection.ex`; updated `lib/prizmo/tcg_engine/battle_actions.ex`, `lib/prizmo/tcg_engine/attack_effects.ex`, this log, and the TCG engine playtest handoff.

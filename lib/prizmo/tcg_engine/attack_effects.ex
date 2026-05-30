@@ -1225,7 +1225,7 @@ defmodule Prizmo.TcgEngine.AttackEffects do
            ),
          {:ok, bench_target} <- bench_damage_target_card(game_id, player_id, opts),
          {:ok, damage_result} <-
-           apply_bench_attack_damage_without_knockout(
+           apply_bench_attack_damage(
              game_id,
              player_id,
              bench_target,
@@ -1376,7 +1376,7 @@ defmodule Prizmo.TcgEngine.AttackEffects do
       damage = counters * 10
 
       with {:ok, damage_result} <-
-             apply_bench_attack_damage_without_knockout(
+             apply_bench_attack_damage(
                game_id,
                player_id,
                bench_card,
@@ -1514,7 +1514,7 @@ defmodule Prizmo.TcgEngine.AttackEffects do
     end
   end
 
-  defp apply_bench_attack_damage_without_knockout(
+  defp apply_bench_attack_damage(
          game_id,
          attacking_player_id,
          %CardInstance{} = bench_target,
@@ -1534,16 +1534,24 @@ defmodule Prizmo.TcgEngine.AttackEffects do
       :not_prevented ->
         with {:ok, target_hp} <- pokemon_hp(bench_target.card_id),
              new_damage = bench_target.damage + damage,
-             :ok <- require_bench_damage_does_not_knock_out(new_damage, target_hp),
-             {:ok, _bench_target} <- update(bench_target, :set_damage, %{damage: new_damage}) do
+             knocked_out? = new_damage >= target_hp,
+             {:ok, _bench_target} <- update(bench_target, :set_damage, %{damage: new_damage}),
+             {:ok, _discarded_cards} <-
+               maybe_discard_knocked_out_bench_stack(game_id, bench_target, knocked_out?) do
           {:ok,
            %{
              damage: damage,
              resulting_damage: new_damage,
-             knocked_out?: false
+             knocked_out?: knocked_out?
            }}
         end
     end
+  end
+
+  defp maybe_discard_knocked_out_bench_stack(_game_id, _bench_target, false), do: {:ok, []}
+
+  defp maybe_discard_knocked_out_bench_stack(game_id, %CardInstance{} = bench_target, true) do
+    BattleActions.discard_knocked_out_stack(game_id, bench_target)
   end
 
   defp prevented_bench_attack_damage_result(
@@ -1608,12 +1616,6 @@ defmodule Prizmo.TcgEngine.AttackEffects do
       _not_prevented -> :not_prevented
     end
   end
-
-  defp require_bench_damage_does_not_knock_out(new_damage, target_hp) when new_damage < target_hp,
-    do: :ok
-
-  defp require_bench_damage_does_not_knock_out(_new_damage, _target_hp),
-    do: {:error, :bench_damage_knockout_not_supported}
 
   defp opponent_player_id(game_id, player_id) do
     with {:ok, players} <- PlayerStore.list_players(game_id) do

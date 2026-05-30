@@ -179,7 +179,9 @@ defmodule Prizmo.TcgEngine.BattleActions do
 
   defp prize_count_for_card(_card), do: 1
 
-  defp discard_knocked_out_stack(game_id, %CardInstance{} = target_card) do
+  @spec discard_knocked_out_stack(String.t(), CardInstance.t()) ::
+          {:ok, [CardInstance.t()]} | {:error, term()}
+  def discard_knocked_out_stack(game_id, %CardInstance{} = target_card) do
     with {:ok, stack_cards} <- CardStore.attached_cards(game_id, target_card.id) do
       [target_card | stack_cards]
       |> Enum.map(fn card ->
