@@ -3166,250 +3166,30 @@ function ActionAffordancesPanel({
                 <StatusBadge tone={group.id === 'required' ? 'warning' : 'neutral'}>{group.actions.length}</StatusBadge>
               </div>
 
-              <ul className="space-y-2">
+              <ul className="space-y-1.5">
                 {group.actions.map(action => (
-            <li
-              className="rounded-xl border border-stone-200 bg-stone-50 px-3 py-3 text-sm"
-              key={actionKey(action)}
-            >
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <p className="font-medium text-stone-950">{action.label}</p>
-                  <p className="mt-1 text-xs text-stone-500">
-                    Available for {formatPlayerId(action.playerId)}
-                  </p>
-                </div>
-                <StatusBadge tone={action.kind === 'prompt' ? 'warning' : 'active'}>
-                  {formatEventType(action.kind)}
-                </StatusBadge>
-              </div>
-
-              {action.note ? <p className="mt-2 text-xs leading-5 text-stone-600">{action.note}</p> : null}
-
-              {actionHasMetadata(action) ? (
-                <details className="mt-3 rounded-lg border border-stone-200 bg-stone-100 px-3 py-2 text-xs text-stone-600">
-                  <summary className="cursor-pointer font-medium text-stone-700">Action metadata</summary>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    <ActionCount count={action.sourceCardInstanceIds.length} label="source" />
-                    <ActionCount count={action.targetCardInstanceIds.length} label="target" />
-                    <ActionCount count={action.requiredSourceCount} label="required source" />
-                    <ActionCount count={action.promptIds.length} label="prompt" />
-                    <ActionCount count={action.choiceKeys.length} label="choice key" />
-                  </div>
-                </details>
-              ) : null}
-
-              {action.key === 'play_card' && action.sourceCardInstanceIds.length > 0 ? (
-                <div className="mt-3 space-y-2">
-                  {action.sourceCardInstanceIds.map(cardInstanceId => {
-                    const card = cardsById.get(cardInstanceId)
-                    const isPending = playCardPendingCardId === cardInstanceId
-
-                    return (
-                      <button
-                        className="w-full rounded-xl border border-emerald-700 px-3 py-2 text-left text-sm font-semibold text-emerald-800 transition hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:border-stone-300 disabled:text-stone-400 disabled:hover:bg-transparent"
-                        disabled={actionCommandPending || !isPlayerId(action.playerId)}
-                        key={cardInstanceId}
-                        onClick={() => onPlayCard({ playerId: action.playerId, cardInstanceId })}
-                        type="button"
-                      >
-                        {isPending ? `Playing ${card?.name ?? 'card'}...` : `Play ${card?.name ?? formatCardInstanceId(cardInstanceId)}`}
-                      </button>
-                    )
-                  })}
-                </div>
-              ) : null}
-
-              {action.key === 'play_basic_to_bench' && action.sourceCardInstanceIds.length > 0 ? (
-                <div className="mt-3 space-y-2">
-                  {action.sourceCardInstanceIds.map(cardInstanceId => {
-                    const card = cardsById.get(cardInstanceId)
-                    const isPending = playBasicToBenchPendingCardId === cardInstanceId
-
-                    return (
-                      <button
-                        className="w-full rounded-xl border border-emerald-700 px-3 py-2 text-left text-sm font-semibold text-emerald-800 transition hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:border-stone-300 disabled:text-stone-400 disabled:hover:bg-transparent"
-                        disabled={actionCommandPending || !isPlayerId(action.playerId)}
-                        key={cardInstanceId}
-                        onClick={() => onPlayBasicToBench({ playerId: action.playerId, cardInstanceId })}
-                        type="button"
-                      >
-                        {isPending
-                          ? `Benching ${card?.name ?? 'Pokémon'}...`
-                          : `Bench ${card?.name ?? formatCardInstanceId(cardInstanceId)}`}
-                      </button>
-                    )
-                  })}
-                </div>
-              ) : null}
-
-              {action.key === 'evolve_from_hand' &&
-              action.sourceCardInstanceIds.length > 0 &&
-              action.targetCardInstanceIds.length > 0 ? (
-                <div className="mt-3 space-y-2">
-                  {action.sourceCardInstanceIds.flatMap(evolutionCardInstanceId =>
-                    action.targetCardInstanceIds.map(targetCardInstanceId => {
-                      const evolutionCard = cardsById.get(evolutionCardInstanceId)
-                      const targetCard = cardsById.get(targetCardInstanceId)
-                      const evolutionActionKey = evolveKey(evolutionCardInstanceId, targetCardInstanceId)
-                      const isPending = evolveFromHandPendingKey === evolutionActionKey
-
-                      return (
-                        <button
-                          className="w-full rounded-xl border border-emerald-700 px-3 py-2 text-left text-sm font-semibold text-emerald-800 transition hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:border-stone-300 disabled:text-stone-400 disabled:hover:bg-transparent"
-                          disabled={actionCommandPending || !isPlayerId(action.playerId)}
-                          key={evolutionActionKey}
-                          onClick={() =>
-                            onEvolveFromHand({
-                              playerId: action.playerId,
-                              evolutionCardInstanceId,
-                              targetCardInstanceId
-                            })
-                          }
-                          type="button"
-                        >
-                          {isPending
-                            ? `Evolving ${targetCard?.name ?? 'Pokémon'}...`
-                            : `Evolve ${targetCard?.name ?? formatCardInstanceId(targetCardInstanceId)} into ${
-                                evolutionCard?.name ?? formatCardInstanceId(evolutionCardInstanceId)
-                              }`}
-                        </button>
-                      )
-                    })
-                  )}
-                </div>
-              ) : null}
-
-              {action.key === 'attach_energy' &&
-              action.sourceCardInstanceIds.length > 0 &&
-              action.targetCardInstanceIds.length > 0 ? (
-                <div className="mt-3 space-y-2">
-                  {action.sourceCardInstanceIds.flatMap(energyCardInstanceId =>
-                    action.targetCardInstanceIds.map(targetCardInstanceId => {
-                      const energyCard = cardsById.get(energyCardInstanceId)
-                      const targetCard = cardsById.get(targetCardInstanceId)
-                      const pairKey = attachEnergyPairKey(energyCardInstanceId, targetCardInstanceId)
-                      const isPending = attachEnergyPendingKey === pairKey
-
-                      return (
-                        <button
-                          className="w-full rounded-xl border border-emerald-700 px-3 py-2 text-left text-sm font-semibold text-emerald-800 transition hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:border-stone-300 disabled:text-stone-400 disabled:hover:bg-transparent"
-                          disabled={actionCommandPending || !isPlayerId(action.playerId)}
-                          key={pairKey}
-                          onClick={() =>
-                            onAttachEnergy({
-                              playerId: action.playerId,
-                              energyCardInstanceId,
-                              targetCardInstanceId
-                            })
-                          }
-                          type="button"
-                        >
-                          {isPending
-                            ? `Attaching ${energyCard?.name ?? 'Energy'}...`
-                            : `Attach ${energyCard?.name ?? formatCardInstanceId(energyCardInstanceId)} to ${
-                                targetCard?.name ?? formatCardInstanceId(targetCardInstanceId)
-                              }`}
-                        </button>
-                      )
-                    })
-                  )}
-                </div>
-              ) : null}
-
-              {action.key === 'retreat' && action.targetCardInstanceIds.length > 0 ? (
-                <div className="mt-3 space-y-2">
-                  {action.targetCardInstanceIds.flatMap(benchCardInstanceId =>
-                    retreatPaymentOptions(action.sourceCardInstanceIds, action.requiredSourceCount).map(
-                      energyCardInstanceIds => {
-                        const benchCard = cardsById.get(benchCardInstanceId)
-                        const paymentKey = retreatKey(benchCardInstanceId, energyCardInstanceIds)
-                        const isPending = retreatPendingKey === paymentKey
-
-                        return (
-                          <button
-                            className="w-full rounded-xl border border-emerald-700 px-3 py-2 text-left text-sm font-semibold text-emerald-800 transition hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:border-stone-300 disabled:text-stone-400 disabled:hover:bg-transparent"
-                            disabled={actionCommandPending || !isPlayerId(action.playerId)}
-                            key={paymentKey}
-                            onClick={() =>
-                              onRetreat({
-                                playerId: action.playerId,
-                                benchCardInstanceId,
-                                energyCardInstanceIds
-                              })
-                            }
-                            type="button"
-                          >
-                            {isPending
-                              ? `Retreating to ${benchCard?.name ?? 'Bench'}...`
-                              : `Retreat to ${benchCard?.name ?? formatCardInstanceId(benchCardInstanceId)}${retreatPaymentLabel(
-                                  energyCardInstanceIds,
-                                  cardsById
-                                )}`}
-                          </button>
-                        )
-                      }
-                    )
-                  )}
-                </div>
-              ) : null}
-
-              {action.key === 'choose_replacement_active' && action.targetCardInstanceIds.length > 0 ? (
-                <div className="mt-3 space-y-2">
-                  {action.targetCardInstanceIds.map(benchCardInstanceId => {
-                    const benchCard = cardsById.get(benchCardInstanceId)
-                    const isPending = chooseReplacementActivePendingCardId === benchCardInstanceId
-
-                    return (
-                      <button
-                        className="w-full rounded-xl border border-emerald-700 px-3 py-2 text-left text-sm font-semibold text-emerald-800 transition hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:border-stone-300 disabled:text-stone-400 disabled:hover:bg-transparent"
-                        disabled={actionCommandPending || !isPlayerId(action.playerId)}
-                        key={benchCardInstanceId}
-                        onClick={() =>
-                          onChooseReplacementActive({
-                            playerId: action.playerId,
-                            benchCardInstanceId
-                          })
-                        }
-                        type="button"
-                      >
-                        {isPending
-                          ? `Promoting ${benchCard?.name ?? 'Bench'}...`
-                          : `Promote ${benchCard?.name ?? formatCardInstanceId(benchCardInstanceId)} to Active`}
-                      </button>
-                    )
-                  })}
-                </div>
-              ) : null}
-
-              {action.key === 'declare_attack' && action.attackId ? (
-                <button
-                  className="mt-3 w-full rounded-xl border border-emerald-700 px-3 py-2 text-left text-sm font-semibold text-emerald-800 transition hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:border-stone-300 disabled:text-stone-400 disabled:hover:bg-transparent"
-                  disabled={actionCommandPending || !isPlayerId(action.playerId)}
-                  onClick={() => onDeclareAttack({ playerId: action.playerId, attackId: action.attackId! })}
-                  type="button"
-                >
-                  {declareAttackPendingKey === attackKey(action.playerId, action.attackId)
-                    ? `Declaring ${action.attackName ?? 'attack'}...`
-                    : `Declare ${action.attackName ?? formatEventType(action.attackId)}${attackCostLabel(
-                        action.attackCost
-                      )}${attackDamageLabel(action.attackDamage)}`}
-                </button>
-              ) : null}
-
-              {action.key === 'end_turn' ? (
-                <button
-                  className="mt-3 w-full rounded-xl border border-emerald-700 px-3 py-2 text-left text-sm font-semibold text-emerald-800 transition hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:border-stone-300 disabled:text-stone-400 disabled:hover:bg-transparent"
-                  disabled={actionCommandPending || !isPlayerId(action.playerId)}
-                  onClick={() => onEndTurn({ playerId: action.playerId })}
-                  type="button"
-                >
-                  {endTurnPendingPlayerId === action.playerId
-                    ? `Ending ${formatPlayerId(action.playerId)}'s turn...`
-                    : `End ${formatPlayerId(action.playerId)}'s turn`}
-                </button>
-              ) : null}
-            </li>
+                  <ActionAffordanceCard
+                    action={action}
+                    actionCommandPending={actionCommandPending}
+                    attachEnergyPendingKey={attachEnergyPendingKey}
+                    cardsById={cardsById}
+                    chooseReplacementActivePendingCardId={chooseReplacementActivePendingCardId}
+                    declareAttackPendingKey={declareAttackPendingKey}
+                    endTurnPendingPlayerId={endTurnPendingPlayerId}
+                    evolveFromHandPendingKey={evolveFromHandPendingKey}
+                    key={actionKey(action)}
+                    onAttachEnergy={onAttachEnergy}
+                    onChooseReplacementActive={onChooseReplacementActive}
+                    onDeclareAttack={onDeclareAttack}
+                    onEndTurn={onEndTurn}
+                    onEvolveFromHand={onEvolveFromHand}
+                    onPlayBasicToBench={onPlayBasicToBench}
+                    onPlayCard={onPlayCard}
+                    onRetreat={onRetreat}
+                    playBasicToBenchPendingCardId={playBasicToBenchPendingCardId}
+                    playCardPendingCardId={playCardPendingCardId}
+                    retreatPendingKey={retreatPendingKey}
+                  />
                 ))}
               </ul>
             </section>
@@ -3423,6 +3203,366 @@ function ActionAffordancesPanel({
       </div>
     </Panel>
   )
+}
+
+function ActionAffordanceCard({
+  action,
+  actionCommandPending,
+  attachEnergyPendingKey,
+  cardsById,
+  chooseReplacementActivePendingCardId,
+  declareAttackPendingKey,
+  endTurnPendingPlayerId,
+  evolveFromHandPendingKey,
+  onAttachEnergy,
+  onChooseReplacementActive,
+  onDeclareAttack,
+  onEndTurn,
+  onEvolveFromHand,
+  onPlayBasicToBench,
+  onPlayCard,
+  onRetreat,
+  playBasicToBenchPendingCardId,
+  playCardPendingCardId,
+  retreatPendingKey
+}: {
+  action: ActionAffordance
+  actionCommandPending: boolean
+  attachEnergyPendingKey: string | null
+  cardsById: Map<string, CardSummary>
+  chooseReplacementActivePendingCardId: string | null
+  declareAttackPendingKey: string | null
+  endTurnPendingPlayerId: string | null
+  evolveFromHandPendingKey: string | null
+  onAttachEnergy: (input: AttachEnergyCommand) => void
+  onChooseReplacementActive: (input: ChooseReplacementActiveCommand) => void
+  onDeclareAttack: (input: DeclareAttackCommand) => void
+  onEndTurn: (input: EndTurnCommand) => void
+  onEvolveFromHand: (input: EvolveFromHandCommand) => void
+  onPlayBasicToBench: (input: PlayBasicToBenchCommand) => void
+  onPlayCard: (input: PlayCardCommand) => void
+  onRetreat: (input: RetreatCommand) => void
+  playBasicToBenchPendingCardId: string | null
+  playCardPendingCardId: string | null
+  retreatPendingKey: string | null
+}) {
+  const canRunAction = !actionCommandPending && isPlayerId(action.playerId)
+
+  return (
+    <li className={`rounded-xl border px-3 py-2.5 text-sm ${actionSurfaceClassName(action)}`}>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="font-medium leading-5 text-stone-950">{action.label}</p>
+            <span className="rounded-full bg-stone-200 px-2 py-0.5 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-stone-600">
+              {formatEventType(action.kind)}
+            </span>
+          </div>
+          <p className="mt-1 text-xs leading-5 text-stone-500">{actionSummary(action)}</p>
+        </div>
+        <StatusBadge tone={action.key === 'choose_replacement_active' ? 'warning' : 'neutral'}>
+          {formatPlayerId(action.playerId)}
+        </StatusBadge>
+      </div>
+
+      {action.note ? <p className="mt-2 text-xs leading-5 text-stone-600">{action.note}</p> : null}
+
+      {actionHasMetadata(action) ? (
+        <details className="mt-2 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-xs text-stone-600">
+          <summary className="cursor-pointer font-medium text-stone-700">Engine details</summary>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <ActionCount count={action.sourceCardInstanceIds.length} label="source" />
+            <ActionCount count={action.targetCardInstanceIds.length} label="target" />
+            <ActionCount count={action.requiredSourceCount} label="required source" />
+            <ActionCount count={action.promptIds.length} label="prompt" />
+            <ActionCount count={action.choiceKeys.length} label="choice key" />
+          </div>
+        </details>
+      ) : null}
+
+      {action.key === 'play_card' && action.sourceCardInstanceIds.length > 0 ? (
+        <div className="mt-2 space-y-1.5">
+          {action.sourceCardInstanceIds.map(cardInstanceId => {
+            const card = cardsById.get(cardInstanceId)
+            const isPending = playCardPendingCardId === cardInstanceId
+
+            return (
+              <ActionCommandButton
+                disabled={!canRunAction}
+                key={cardInstanceId}
+                onClick={() => onPlayCard({ playerId: action.playerId, cardInstanceId })}
+              >
+                {isPending ? `Playing ${card?.name ?? 'card'}...` : `Play ${card?.name ?? formatCardInstanceId(cardInstanceId)}`}
+              </ActionCommandButton>
+            )
+          })}
+        </div>
+      ) : null}
+
+      {action.key === 'play_basic_to_bench' && action.sourceCardInstanceIds.length > 0 ? (
+        <div className="mt-2 space-y-1.5">
+          {action.sourceCardInstanceIds.map(cardInstanceId => {
+            const card = cardsById.get(cardInstanceId)
+            const isPending = playBasicToBenchPendingCardId === cardInstanceId
+
+            return (
+              <ActionCommandButton
+                disabled={!canRunAction}
+                key={cardInstanceId}
+                onClick={() => onPlayBasicToBench({ playerId: action.playerId, cardInstanceId })}
+              >
+                {isPending
+                  ? `Benching ${card?.name ?? 'Pokémon'}...`
+                  : `Bench ${card?.name ?? formatCardInstanceId(cardInstanceId)}`}
+              </ActionCommandButton>
+            )
+          })}
+        </div>
+      ) : null}
+
+      {action.key === 'evolve_from_hand' && action.sourceCardInstanceIds.length > 0 && action.targetCardInstanceIds.length > 0 ? (
+        <div className="mt-2 space-y-1.5">
+          {action.sourceCardInstanceIds.flatMap(evolutionCardInstanceId =>
+            action.targetCardInstanceIds.map(targetCardInstanceId => {
+              const evolutionCard = cardsById.get(evolutionCardInstanceId)
+              const targetCard = cardsById.get(targetCardInstanceId)
+              const evolutionActionKey = evolveKey(evolutionCardInstanceId, targetCardInstanceId)
+              const isPending = evolveFromHandPendingKey === evolutionActionKey
+
+              return (
+                <ActionCommandButton
+                  disabled={!canRunAction}
+                  key={evolutionActionKey}
+                  onClick={() =>
+                    onEvolveFromHand({
+                      playerId: action.playerId,
+                      evolutionCardInstanceId,
+                      targetCardInstanceId
+                    })
+                  }
+                >
+                  {isPending
+                    ? `Evolving ${targetCard?.name ?? 'Pokémon'}...`
+                    : `Evolve ${targetCard?.name ?? formatCardInstanceId(targetCardInstanceId)} into ${
+                        evolutionCard?.name ?? formatCardInstanceId(evolutionCardInstanceId)
+                      }`}
+                </ActionCommandButton>
+              )
+            })
+          )}
+        </div>
+      ) : null}
+
+      {action.key === 'attach_energy' && action.sourceCardInstanceIds.length > 0 && action.targetCardInstanceIds.length > 0 ? (
+        <div className="mt-2 space-y-1.5">
+          {action.sourceCardInstanceIds.flatMap(energyCardInstanceId =>
+            action.targetCardInstanceIds.map(targetCardInstanceId => {
+              const energyCard = cardsById.get(energyCardInstanceId)
+              const targetCard = cardsById.get(targetCardInstanceId)
+              const pairKey = attachEnergyPairKey(energyCardInstanceId, targetCardInstanceId)
+              const isPending = attachEnergyPendingKey === pairKey
+
+              return (
+                <ActionCommandButton
+                  disabled={!canRunAction}
+                  key={pairKey}
+                  onClick={() =>
+                    onAttachEnergy({
+                      playerId: action.playerId,
+                      energyCardInstanceId,
+                      targetCardInstanceId
+                    })
+                  }
+                >
+                  {isPending
+                    ? `Attaching ${energyCard?.name ?? 'Energy'}...`
+                    : `Attach ${energyCard?.name ?? formatCardInstanceId(energyCardInstanceId)} to ${
+                        targetCard?.name ?? formatCardInstanceId(targetCardInstanceId)
+                      }`}
+                </ActionCommandButton>
+              )
+            })
+          )}
+        </div>
+      ) : null}
+
+      {action.key === 'retreat' && action.targetCardInstanceIds.length > 0 ? (
+        <div className="mt-2 space-y-1.5">
+          {action.targetCardInstanceIds.flatMap(benchCardInstanceId =>
+            retreatPaymentOptions(action.sourceCardInstanceIds, action.requiredSourceCount).map(energyCardInstanceIds => {
+              const benchCard = cardsById.get(benchCardInstanceId)
+              const paymentKey = retreatKey(benchCardInstanceId, energyCardInstanceIds)
+              const isPending = retreatPendingKey === paymentKey
+
+              return (
+                <ActionCommandButton
+                  disabled={!canRunAction}
+                  key={paymentKey}
+                  onClick={() =>
+                    onRetreat({
+                      playerId: action.playerId,
+                      benchCardInstanceId,
+                      energyCardInstanceIds
+                    })
+                  }
+                >
+                  {isPending
+                    ? `Retreating to ${benchCard?.name ?? 'Bench'}...`
+                    : `Retreat to ${benchCard?.name ?? formatCardInstanceId(benchCardInstanceId)}${retreatPaymentLabel(
+                        energyCardInstanceIds,
+                        cardsById
+                      )}`}
+                </ActionCommandButton>
+              )
+            })
+          )}
+        </div>
+      ) : null}
+
+      {action.key === 'choose_replacement_active' && action.targetCardInstanceIds.length > 0 ? (
+        <div className="mt-2 space-y-1.5">
+          {action.targetCardInstanceIds.map(benchCardInstanceId => {
+            const benchCard = cardsById.get(benchCardInstanceId)
+            const isPending = chooseReplacementActivePendingCardId === benchCardInstanceId
+
+            return (
+              <ActionCommandButton
+                disabled={!canRunAction}
+                key={benchCardInstanceId}
+                onClick={() => onChooseReplacementActive({ playerId: action.playerId, benchCardInstanceId })}
+                tone="primary"
+              >
+                {isPending
+                  ? `Promoting ${benchCard?.name ?? 'Bench'}...`
+                  : `Promote ${benchCard?.name ?? formatCardInstanceId(benchCardInstanceId)} to Active`}
+              </ActionCommandButton>
+            )
+          })}
+        </div>
+      ) : null}
+
+      {action.key === 'declare_attack' && action.attackId ? (
+        <ActionCommandButton
+          className="mt-2"
+          disabled={!canRunAction}
+          onClick={() => onDeclareAttack({ playerId: action.playerId, attackId: action.attackId! })}
+          tone="primary"
+        >
+          {declareAttackPendingKey === attackKey(action.playerId, action.attackId)
+            ? `Declaring ${action.attackName ?? 'attack'}...`
+            : `Declare ${action.attackName ?? formatEventType(action.attackId)}${attackCostLabel(
+                action.attackCost
+              )}${attackDamageLabel(action.attackDamage)}`}
+        </ActionCommandButton>
+      ) : null}
+
+      {action.key === 'end_turn' ? (
+        <ActionCommandButton
+          className="mt-2"
+          disabled={!canRunAction}
+          onClick={() => onEndTurn({ playerId: action.playerId })}
+          tone="primary"
+        >
+          {endTurnPendingPlayerId === action.playerId
+            ? `Ending ${formatPlayerId(action.playerId)}'s turn...`
+            : `End ${formatPlayerId(action.playerId)}'s turn`}
+        </ActionCommandButton>
+      ) : null}
+    </li>
+  )
+}
+
+function ActionCommandButton({
+  children,
+  className = '',
+  disabled,
+  onClick,
+  tone = 'secondary'
+}: {
+  children: string
+  className?: string
+  disabled: boolean
+  onClick: () => void
+  tone?: 'primary' | 'secondary'
+}) {
+  const baseClassName =
+    'w-full rounded-lg px-3 py-2 text-left text-sm transition focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:cursor-not-allowed disabled:border-stone-300 disabled:bg-stone-100 disabled:text-stone-400 disabled:shadow-none'
+  const toneClassName =
+    tone === 'primary'
+      ? 'border border-emerald-700 bg-emerald-700 font-semibold text-stone-50 shadow-sm shadow-emerald-900/10 hover:border-emerald-800 hover:bg-emerald-800 focus:ring-emerald-600'
+      : 'border border-stone-300 bg-white font-medium text-stone-800 hover:border-emerald-500 hover:bg-emerald-50 hover:text-emerald-900 focus:ring-emerald-500'
+
+  return (
+    <button className={[className, baseClassName, toneClassName].filter(Boolean).join(' ')} disabled={disabled} onClick={onClick} type="button">
+      {children}
+    </button>
+  )
+}
+
+function actionSurfaceClassName(action: ActionAffordance) {
+  switch (action.key) {
+    case 'choose_replacement_active':
+      return 'border-amber-200 bg-amber-50/80'
+    case 'declare_attack':
+      return 'border-emerald-200 bg-emerald-50/70'
+    default:
+      return 'border-stone-200 bg-white'
+  }
+}
+
+function actionSummary(action: ActionAffordance) {
+  switch (action.key) {
+    case 'choose_prompt':
+      return 'Resolve the engine prompt before this game can advance.'
+    case 'choose_replacement_active':
+      return `${actionCountLabel(action.targetCardInstanceIds.length, 'Bench candidate')} can become Active.`
+    case 'play_card':
+      return `${actionCountLabel(action.sourceCardInstanceIds.length, 'card')} from hand can be played.`
+    case 'play_basic_to_bench':
+      return `${actionCountLabel(action.sourceCardInstanceIds.length, 'Basic Pokémon', 'Basic Pokémon')} can move to Bench.`
+    case 'evolve_from_hand':
+      return `${actionCountLabel(action.sourceCardInstanceIds.length, 'evolution card')} can evolve ${actionCountLabel(
+        action.targetCardInstanceIds.length,
+        'target'
+      )}.`
+    case 'attach_energy':
+      return `${actionCountLabel(action.sourceCardInstanceIds.length, 'Energy card')} can attach to ${actionCountLabel(
+        action.targetCardInstanceIds.length,
+        'target'
+      )}.`
+    case 'retreat':
+      return `${actionCountLabel(action.targetCardInstanceIds.length, 'Bench target')} with ${retreatCostSummary(
+        action.requiredSourceCount
+      )}.`
+    case 'declare_attack':
+      return `${action.attackName ?? 'Attack'}: ${attackCostSummary(action.attackCost)}, ${attackDamageSummary(
+        action.attackDamage
+      )}.`
+    case 'end_turn':
+      return `End the action window for ${formatPlayerId(action.playerId)}.`
+    default:
+      return `${formatEventType(action.kind)} command exposed by the current engine state.`
+  }
+}
+
+function actionCountLabel(count: number, singular: string, plural = `${singular}s`) {
+  return `${count} ${count === 1 ? singular : plural}`
+}
+
+function retreatCostSummary(requiredSourceCount: number) {
+  if (requiredSourceCount === 0) {
+    return 'free Retreat Cost'
+  }
+
+  return `${requiredSourceCount} Energy payment${requiredSourceCount === 1 ? '' : 's'}`
+}
+
+function attackCostSummary(attackCost: string[]) {
+  return attackCost.length > 0 ? `${attackCost.length} Energy cost` : 'no Energy cost'
+}
+
+function attackDamageSummary(attackDamage: string | null) {
+  return attackDamage ? `${attackDamage} damage` : 'effect damage'
 }
 
 function ActionCount({ count, label }: { count: number; label: string }) {

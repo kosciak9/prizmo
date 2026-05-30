@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-31] iteration 88 | Command rail action surface density
+- Task attempted: continued the Web UI polish pass by tightening grouped command-rail action rows, moving command kind/player/engine detail metadata into denser surfaces, and distinguishing primary action buttons from secondary hand/board commands.
+- Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.
+- Validation: `mix format` passed; `mix assets.build` passed; `mix check --no-test` passed; browser smoke on `http://localhost:4003` refreshed an existing local game as Player 2, confirmed denser `Hand and board` rows with collapsed `Engine details`, secondary Bench/Evolve buttons, a primary `End player 2's turn` button, and no browser warnings or errors.
+- Remaining/blocking notes: no code blocker for this action-surface density slice. Further Web UI polish should integrate setup/turn commands more directly with the product-shaped play area, refine card/action affordance copy and row grouping, and continue removing or containing debug-only details before the formal two-browser playtest milestone.
+
 ## [2026-05-31] iteration 87 | Command rail action grouping
 - Task attempted: continued the Web UI polish pass by grouping legal actions inside the player command rail by intent, moving prompt/attack/action command errors next to their rail controls, tightening prompt/action empty copy, and preserving the copied-attack selection when resolving Gemstone Mimicry-style attacks from the browser.
 - Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.
