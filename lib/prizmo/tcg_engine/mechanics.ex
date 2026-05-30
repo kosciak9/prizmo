@@ -15,8 +15,7 @@ defmodule Prizmo.TcgEngine.Mechanics do
       attached_energy_cards_for_retreat: 3,
       discard_retreat_energy: 3,
       knockout_prize_count: 1,
-      resolve_replacement_active_after_knockout: 2,
-      take_knockout_prizes: 3
+      resolve_replacement_active_after_knockout: 2
     ]
 
   import Prizmo.TcgEngine.BoardState,
@@ -37,6 +36,7 @@ defmodule Prizmo.TcgEngine.Mechanics do
     only: [
       discard_cards_from_hand: 3,
       discard_existing_stadiums: 1,
+      cards_in_zone: 3,
       get_card: 2,
       get_cards: 2,
       move_deck_card_to_hand: 3,
@@ -79,7 +79,9 @@ defmodule Prizmo.TcgEngine.Mechanics do
   alias Prizmo.TcgEngine.ChoiceValidator
   alias Prizmo.TcgEngine.Game
   alias Prizmo.TcgEngine.GameSetup
+  alias Prizmo.TcgEngine.PendingEffect
   alias Prizmo.TcgEngine.PendingEffects
+  alias Prizmo.TcgEngine.Prompt
   alias Prizmo.TcgEngine.Setup
   alias Prizmo.TcgEngine.SnapshotRestorer
   alias Prizmo.TcgEngine.Turn
@@ -402,26 +404,134 @@ defmodule Prizmo.TcgEngine.Mechanics do
            {:ok, pending_effect} <- PendingEffects.get(game.id, prompt.pending_effect_id),
            :ok <- require_pending_effect_status(pending_effect, :awaiting_prompt),
            choice_key = prompt_choice_key(prompt),
-           {:ok, normalized_choice} <- ChoiceValidator.normalize_choice(choice),
-           {:ok, prompt} <-
-             update(prompt, :resolve, %{
-               payload: Map.put(prompt.payload, "resolved_choice", normalized_choice)
-             }),
-           {:ok, _event} <-
-             write_event_and_snapshot(game.id, :prompt_resolved, player_id, %{
-               prompt_id: prompt.id,
-               pending_effect_id: pending_effect.id,
-               choice_key: choice_key,
-               choice: normalized_choice
-             }),
-           {:ok, pending_effect} <-
-             update(pending_effect, :resume, %{
-               current_player_id: nil,
-               state: Map.put(pending_effect.state || %{}, "last_choice", normalized_choice)
-             }) do
-        CardPlay.resume_pending_effect(game, pending_effect, choice_key, normalized_choice)
+           {:ok, normalized_choice} <- ChoiceValidator.normalize_choice(choice) do
+        resolve_prompt_choice(
+          game,
+          prompt,
+          pending_effect,
+          player_id,
+          choice_key,
+          normalized_choice
+        )
       end
     end)
+  end
+
+  defp resolve_prompt_choice(
+         %Game{} = game,
+         %Prompt{} = prompt,
+         %PendingEffect{source_type: :knockout_prize} = pending_effect,
+         player_id,
+         choice_key,
+         selected_card_instance_ids
+       ) do
+    with {:ok, prize_count} <- prompt_exact_choice_count(prompt),
+         :ok <- require_exact_count(selected_card_instance_ids, prize_count, :wrong_prize_count),
+         :ok <- require_unique_ids(selected_card_instance_ids),
+         :ok <- require_prompt_legal_choices(prompt, selected_card_instance_ids),
+         {:ok, prize_cards} <- get_cards(game.id, selected_card_instance_ids),
+         :ok <- require_all_owned_in_zone(prize_cards, player_id, :prize),
+         {:ok, prompt} <- resolve_prompt(prompt, selected_card_instance_ids),
+         {:ok, _event} <-
+           write_prompt_resolved_event(game.id, prompt, pending_effect, player_id, choice_key),
+         {:ok, pending_effect} <-
+           update(pending_effect, :resume, %{
+             current_player_id: nil,
+             state:
+               Map.put(pending_effect.state || %{}, "last_choice", selected_card_instance_ids)
+           }),
+         {:ok, taken_prize_cards} <- take_prize_cards(game.id, player_id, prize_cards),
+         {:ok, _pending_effect} <-
+           update(pending_effect, :complete, %{
+             current_player_id: nil,
+             state:
+               Map.put(
+                 pending_effect.state || %{},
+                 "taken_prize_card_instance_ids",
+                 Enum.map(taken_prize_cards, & &1.id)
+               )
+           }),
+         {:ok, game} <- maybe_finish_for_last_prize(game, player_id),
+         {:ok, event} <-
+           write_event(game, :take_knockout_prizes, player_id, %{
+             prompt_id: prompt.id,
+             pending_effect_id: pending_effect.id,
+             prize_count: prize_count,
+             taken_prize_card_instance_ids: Enum.map(taken_prize_cards, & &1.id),
+             knocked_out_card_instance_id:
+               Map.get(pending_effect.state || %{}, "knocked_out_card_instance_id"),
+             knocked_out_player_id: Map.get(pending_effect.state || %{}, "knocked_out_player_id"),
+             winner_player_id: game.winner_player_id
+           }),
+         {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do
+      get_game(game.id)
+    end
+  end
+
+  defp resolve_prompt_choice(
+         %Game{} = game,
+         %Prompt{} = prompt,
+         %PendingEffect{} = pending_effect,
+         player_id,
+         choice_key,
+         normalized_choice
+       ) do
+    with {:ok, prompt} <- resolve_prompt(prompt, normalized_choice),
+         {:ok, _event} <-
+           write_prompt_resolved_event(game.id, prompt, pending_effect, player_id, choice_key),
+         {:ok, pending_effect} <-
+           update(pending_effect, :resume, %{
+             current_player_id: nil,
+             state: Map.put(pending_effect.state || %{}, "last_choice", normalized_choice)
+           }) do
+      CardPlay.resume_pending_effect(game, pending_effect, choice_key, normalized_choice)
+    end
+  end
+
+  defp resolve_prompt(%Prompt{} = prompt, normalized_choice) do
+    update(prompt, :resolve, %{
+      payload: Map.put(prompt.payload, "resolved_choice", normalized_choice)
+    })
+  end
+
+  defp write_prompt_resolved_event(game_id, prompt, pending_effect, player_id, choice_key) do
+    write_event_and_snapshot(game_id, :prompt_resolved, player_id, %{
+      prompt_id: prompt.id,
+      pending_effect_id: pending_effect.id,
+      choice_key: choice_key,
+      choice: Map.get(prompt.payload, "resolved_choice", [])
+    })
+  end
+
+  defp prompt_exact_choice_count(%Prompt{payload: payload}) do
+    case {Map.get(payload, "min"), Map.get(payload, "max")} do
+      {count, count} when is_integer(count) and count >= 0 -> {:ok, count}
+      {min, max} -> {:error, {:unsupported_prompt_choice_count, min, max}}
+    end
+  end
+
+  defp require_prompt_legal_choices(%Prompt{payload: payload}, selected_card_instance_ids) do
+    legal_choice_ids =
+      case Map.get(payload, "legal_choices", []) do
+        ids when is_list(ids) -> ids
+        _other -> []
+      end
+
+    if Enum.all?(selected_card_instance_ids, &(&1 in legal_choice_ids)) do
+      :ok
+    else
+      {:error, :illegal_prompt_choice}
+    end
+  end
+
+  defp take_prize_cards(game_id, player_id, prize_cards) do
+    prize_cards
+    |> Enum.map(fn prize_card ->
+      with {:ok, position} <- next_hand_position_result(game_id, player_id) do
+        update(prize_card, :take_prize, %{position: position})
+      end
+    end)
+    |> collect_results()
   end
 
   @spec ultra_ball(Game.t() | String.t(), String.t(), String.t(), [String.t()], String.t()) ::
@@ -1021,6 +1131,7 @@ defmodule Prizmo.TcgEngine.Mechanics do
            :ok <- require_active_player(game, player_id),
            {:ok, turn} <- require_current_turn_status(game.id, :attack_resolving),
            :ok <- require_turn_player(turn, player_id),
+           :ok <- CardPlay.require_no_awaiting_pending_effect(game.id),
            :ok <- require_all_players_have_active(game.id),
            {:ok, turn} <- update(turn, :finish_attack, %{}),
            {:ok, event} <- write_event(game, :finish_attack, player_id, %{turn_id: turn.id}),
@@ -1040,19 +1151,14 @@ defmodule Prizmo.TcgEngine.Mechanics do
          }
        ) do
     with {:ok, prize_count} <- knockout_prize_count(target_card),
-         {:ok, prize_cards} <- take_knockout_prizes(game_id, attacking_player_id, prize_count),
-         {:ok, game} <- get_game(game_id),
-         {:ok, game} <- maybe_finish_for_last_prize(game, attacking_player_id),
-         {:ok, event} <-
-           write_event(game, :take_knockout_prizes, attacking_player_id, %{
-             prize_count: prize_count,
-             taken_prize_card_instance_ids: Enum.map(prize_cards, & &1.id),
-             knocked_out_card_instance_id: target_card.id,
-             knocked_out_player_id: knocked_out_player_id,
-             winner_player_id: game.winner_player_id
-           }),
-         {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index),
-         {:ok, game} <- get_game(game_id) do
+         {:ok, game} <-
+           create_knockout_prize_selection(
+             game_id,
+             attacking_player_id,
+             knocked_out_player_id,
+             target_card,
+             prize_count
+           ) do
       resolve_replacement_after_knockout(game, attacking_player_id, knocked_out_player_id)
     end
   end
@@ -1065,6 +1171,90 @@ defmodule Prizmo.TcgEngine.Mechanics do
          _damage_result
        ) do
     get_game(game_id)
+  end
+
+  defp create_knockout_prize_selection(
+         game_id,
+         attacking_player_id,
+         knocked_out_player_id,
+         target_card,
+         prize_count
+       ) do
+    with {:ok, game} <- get_game(game_id),
+         {:ok, prize_cards} <- cards_in_zone(game.id, attacking_player_id, :prize),
+         required_prize_count = min(prize_count, length(prize_cards)),
+         {:ok, pending_effect} <-
+           create(PendingEffect, :create, %{
+             game_id: game.id,
+             source_type: :knockout_prize,
+             controller_player_id: attacking_player_id,
+             current_player_id: attacking_player_id,
+             effect_key: :choose_knockout_prizes,
+             step: "awaiting_choice",
+             state: %{
+               "version" => 1,
+               "kind" => "knockout_prize",
+               "player_id" => attacking_player_id,
+               "knocked_out_card_instance_id" => target_card.id,
+               "knocked_out_player_id" => knocked_out_player_id,
+               "prize_count" => prize_count,
+               "required_prize_count" => required_prize_count
+             }
+           }),
+         {:ok, pending_effect} <-
+           update(pending_effect, :await_prompt, %{
+             current_player_id: attacking_player_id,
+             effect_key: :choose_knockout_prizes,
+             step: "awaiting_choice",
+             state: pending_effect.state || %{}
+           }),
+         {:ok, prompt} <-
+           create(Prompt, :create, %{
+             game_id: game.id,
+             turn_id: current_turn_id(game.id),
+             pending_effect_id: pending_effect.id,
+             prompt_type: "choose_knockout_prizes",
+             player_id: attacking_player_id,
+             payload: %{
+               "choice_key" => "knockout_prize_cards",
+               "legal_choices" => Enum.map(prize_cards, & &1.id),
+               "legal_choice_labels" => prize_choice_labels(prize_cards),
+               "min" => required_prize_count,
+               "max" => required_prize_count,
+               "knocked_out_card_instance_id" => target_card.id,
+               "knocked_out_player_id" => knocked_out_player_id,
+               "prize_count" => prize_count
+             }
+           }),
+         {:ok, event} <-
+           write_event(game, :knockout_prize_selection_required, attacking_player_id, %{
+             prompt_id: prompt.id,
+             pending_effect_id: pending_effect.id,
+             prize_count: prize_count,
+             required_prize_count: required_prize_count,
+             knocked_out_card_instance_id: target_card.id,
+             knocked_out_player_id: knocked_out_player_id
+           }),
+         {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do
+      get_game(game.id)
+    end
+  end
+
+  defp current_turn_id(game_id) do
+    case current_turn(game_id) do
+      {:ok, %Turn{id: turn_id}} -> turn_id
+      _other -> nil
+    end
+  end
+
+  defp prize_choice_labels(prize_cards) do
+    Enum.map(prize_cards, fn prize_card ->
+      %{
+        "id" => prize_card.id,
+        "label" => "Prize #{prize_card.position}",
+        "detail" => "Face-down Prize card"
+      }
+    end)
   end
 
   defp resolve_replacement_after_knockout(
@@ -1129,6 +1319,18 @@ defmodule Prizmo.TcgEngine.Mechanics do
            }),
          {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do
       get_game(game.id)
+    end
+  end
+
+  defp collect_results(results) do
+    results
+    |> Enum.reduce_while({:ok, []}, fn
+      {:ok, value}, {:ok, acc} -> {:cont, {:ok, [value | acc]}}
+      {:error, reason}, _acc -> {:halt, {:error, reason}}
+    end)
+    |> case do
+      {:ok, values} -> {:ok, Enum.reverse(values)}
+      {:error, reason} -> {:error, reason}
     end
   end
 

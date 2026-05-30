@@ -1910,6 +1910,11 @@ function PromptChoiceCard({
   const legalChoiceIds = promptLegalChoiceIds(prompt.payload)
   const legalChoiceCards = promptLegalChoiceCards(prompt.payload)
   const legalChoiceCardsById = useMemo(() => new Map(legalChoiceCards.map(card => [card.id, card])), [legalChoiceCards])
+  const legalChoiceLabels = promptLegalChoiceLabels(prompt.payload)
+  const legalChoiceLabelsById = useMemo(
+    () => new Map(legalChoiceLabels.map(choice => [choice.id, choice])),
+    [legalChoiceLabels]
+  )
   const [selectedCardInstanceIds, setSelectedCardInstanceIds] = useState<string[]>([])
   const min = promptChoiceCount(prompt.payload, 'min', 1)
   const max = promptChoiceCount(prompt.payload, 'max', min)
@@ -1950,6 +1955,7 @@ function PromptChoiceCard({
         <div className="mt-3 space-y-2">
           {legalChoiceIds.map(cardInstanceId => {
             const card = legalChoiceCardsById.get(cardInstanceId) ?? cardsById.get(cardInstanceId)
+            const choiceLabel = legalChoiceLabelsById.get(cardInstanceId)
             const selected = selectedCardInstanceIds.includes(cardInstanceId)
 
             return (
@@ -1964,9 +1970,11 @@ function PromptChoiceCard({
                 onClick={() => toggleChoice(cardInstanceId)}
                 type="button"
               >
-                <span className="block font-semibold">{card?.name ?? formatCardInstanceId(cardInstanceId)}</span>
+                <span className="block font-semibold">
+                  {card?.name ?? choiceLabel?.label ?? formatCardInstanceId(cardInstanceId)}
+                </span>
                 <span className="mt-0.5 block text-xs text-stone-500">
-                  {promptChoiceCardDetail(card, cardInstanceId)}
+                  {promptChoiceCardDetail(card, cardInstanceId, choiceLabel)}
                 </span>
               </button>
             )
@@ -2043,7 +2051,8 @@ function AttackProgressPanel({
   const commandPending = Boolean(resolveDeclaredAttackPendingPlayerId || finishAttackPendingPlayerId)
   const switchTargetRequired = turn.pendingAttackRequiresSwitchTarget && switchTargetOptions.length > 1
   const missingActivePlayers = gameState.players.filter(player => !player.active)
-  const attackCannotFinish = missingActivePlayers.length > 0
+  const viewerPromptBlocksFinish = viewerCanAdvanceAttack && gameState.prompts.length > 0
+  const attackCannotFinish = missingActivePlayers.length > 0 || viewerPromptBlocksFinish
   const resolveDisabled =
     !viewerCanAdvanceAttack || commandPending || (switchTargetRequired && !selectedSwitchTargetIsValid)
   const resolveButtonLabel = resolveDeclaredAttackPendingPlayerId === turn.activePlayerId
@@ -2127,8 +2136,9 @@ function AttackProgressPanel({
 
         {attackCannotFinish ? (
           <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-            {missingActivePlayers.map(player => formatPlayerId(player.playerId)).join(', ')} must choose a replacement
-            Active Pokémon before this attack can finish.
+            {missingActivePlayers.length > 0
+              ? `${missingActivePlayers.map(player => formatPlayerId(player.playerId)).join(', ')} must choose a replacement Active Pokémon before this attack can finish.`
+              : 'Resolve the pending viewer prompt before this attack can finish.'}
           </p>
         ) : null}
 
@@ -2826,6 +2836,26 @@ function promptLegalChoiceCards(payload: Record<string, unknown>) {
   return value.filter(isCardSummary)
 }
 
+function promptLegalChoiceLabels(payload: Record<string, unknown>) {
+  const value = payload.legal_choice_labels
+
+  if (!Array.isArray(value)) {
+    return []
+  }
+
+  return value.filter(isPromptChoiceLabel)
+}
+
+function isPromptChoiceLabel(value: unknown): value is { id: string; label: string; detail?: string | null } {
+  if (!value || typeof value !== 'object') {
+    return false
+  }
+
+  const choice = value as { id?: unknown; label?: unknown }
+
+  return typeof choice.id === 'string' && typeof choice.label === 'string'
+}
+
 function isCardSummary(value: unknown): value is CardSummary {
   if (!value || typeof value !== 'object') {
     return false
@@ -2856,9 +2886,13 @@ function promptChoiceKey(payload: Record<string, unknown>) {
   return typeof value === 'string' ? value : 'prompt_choice'
 }
 
-function promptChoiceCardDetail(card: CardSummary | undefined, cardInstanceId: string) {
+function promptChoiceCardDetail(
+  card: CardSummary | undefined,
+  cardInstanceId: string,
+  choiceLabel?: { detail?: string | null }
+) {
   if (!card) {
-    return formatCardInstanceId(cardInstanceId)
+    return choiceLabel?.detail ?? formatCardInstanceId(cardInstanceId)
   }
 
   return [card.cardId, card.category ? formatEventType(card.category) : null, formatEventType(card.zone)]

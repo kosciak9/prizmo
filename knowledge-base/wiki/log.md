@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-30] iteration 46 | Explicit knockout Prize prompt
+- Task attempted: replaced deterministic knockout Prize taking with an explicit persisted Prize-choice prompt for the attacking player, while keeping attack finish blocked until the prompt is resolved and rendering face-down Prize labels in the existing React prompt UI without leaking Prize identities.
+- Files changed: updated `lib/prizmo/tcg_engine/mechanics.ex`, `lib/prizmo/tcg_engine/game_view.ex`, `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.
+- Validation: initial `mix compile --warnings-as-errors` caught separated `resolve_knockout_after_attack_damage/5` clauses, then `mix format && mix compile --warnings-as-errors` passed; Tidewave rollback smokes passed for Moltres KO creating a `choose_knockout_prizes` prompt, keeping an unselected Prize in `:prize`, moving the selected Prize to hand, hiding `legal_choice_cards`, completing the pending effect, finishing the attack after prompt resolution, and rejecting `finish_attack` before Prize choice with `{:pending_effect_awaiting_prompt, _}`; `mix ash_typescript.codegen --check && mix assets.build && mix test test/prizmo/tcg_engine/mechanics_test.exs` passed (4 tests); `mix check --no-test` passed.
+- Remaining/blocking notes: no code blocker for the single-KO explicit Prize path; broader rules work still needs multi-KO handling, richer Prize-choice playtests, and the formal two-browser manual-tester milestone with guaranteed isolated browser contexts.
+
 ## [2026-05-30] iteration 45 | Replacement Active browser continuation
 - Task attempted: exposed the persisted `choose_replacement_active/3` mechanic through Ash/RPC and added a viewer-scoped React affordance so a player with multiple Benched Pokémon can choose a replacement Active after a knockout before the attack is finished.
 - Files changed: updated `lib/prizmo/tcg_engine.ex`, `lib/prizmo/tcg_engine/game/action_commands.ex`, `lib/prizmo/tcg_engine/game_view/action_affordances.ex`, `lib/prizmo_web/spa/features/home/routes/index.tsx`, `lib/prizmo_web/spa/lib/ash/client.ts`, generated `lib/prizmo_web/spa/lib/ash/generated/ash_rpc.ts`, this log, and the TCG engine playtest handoff.

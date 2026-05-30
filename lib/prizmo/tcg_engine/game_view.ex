@@ -280,6 +280,12 @@ defmodule Prizmo.TcgEngine.GameView do
   end
 
   defp legal_choice_cards(
+         %Prompt{prompt_type: "choose_knockout_prizes"},
+         _cards,
+         _attached_cards_by_target
+       ), do: []
+
+  defp legal_choice_cards(
          %Prompt{payload: payload, player_id: player_id},
          cards,
          attached_cards_by_target
