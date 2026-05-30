@@ -15,12 +15,12 @@ defmodule Prizmo.Tcg.Data.TCGdex do
   @cache_root Path.join(["priv", "tcg", "cards", "tcgdex"])
 
   @known_deck_modules [
-    Prizmo.Tcg.Sim.Decks.Dragapult27431,
-    Prizmo.Tcg.Sim.Decks.Alakazam27147,
-    Prizmo.Tcg.Sim.Decks.RagingBoltOgerpon27599,
-    Prizmo.Tcg.Sim.Decks.FestivalLead27445,
-    Prizmo.Tcg.Sim.Decks.LopunnyDudunsparce27514,
-    Prizmo.Tcg.Sim.Decks.RocketMewtwo27459
+    Prizmo.Tcg.Decks.Dragapult27431,
+    Prizmo.Tcg.Decks.Alakazam27147,
+    Prizmo.Tcg.Decks.RagingBoltOgerpon27599,
+    Prizmo.Tcg.Decks.FestivalLead27445,
+    Prizmo.Tcg.Decks.LopunnyDudunsparce27514,
+    Prizmo.Tcg.Decks.RocketMewtwo27459
   ]
 
   @tcgdex_set_id_by_prizmo_abbreviation %{

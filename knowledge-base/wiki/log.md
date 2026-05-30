@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-30] iteration 1 | Shared TCG deck fixtures
+- Task attempted: removed remaining TcgEngine test coupling to legacy `Prizmo.Tcg.Sim.Decks` by moving supported deck fixtures into shared `Prizmo.Tcg.Decks.*` modules and leaving simulator compatibility shims.
+- Files changed: added `lib/prizmo/tcg/decklist.ex` and shared deck files under `lib/prizmo/tcg/decks/`; updated legacy shim modules under `lib/prizmo/tcg/sim/decks/`, `lib/prizmo/tcg/data/tcgdex.ex`, and `test/prizmo/tcg_engine/mechanics_test.exs`; created `knowledge-base/wiki/engine/ash-backed-tcg-engine-playtest-handoff.md`.
+- Validation: `mix test test/prizmo/tcg_engine/mechanics_test.exs` passed (4 tests); `mix test test/prizmo/tcg/sim` passed (119 tests); `mix prizmo.cards.coverage` passed with all 101 known deck cards implemented; `mix check --no-test` passed.
+- Remaining/blocking notes: no blocker; `test/prizmo/tcg_engine/mechanics_test.exs` no longer aliases `Prizmo.Tcg.Sim.Decks.*`, while legacy simulator tests can continue using compatibility shims until their long-term status is decided.
+
 ## [2026-05-30] planning | Ash-backed TCG Engine and Playtest UI North Star
 - Added: current north-star plan for the canonical Ash-backed TCG engine, a thin React SPA playtest UI, and an Electric Streams game-data feed spike in `knowledge-base/wiki/engine/ash-backed-tcg-engine-playtest-north-star.md`
 - Updated: the engine index now marks the old simulator-era LiveView north-star note as historical and points to the Ash-backed engine/playtest UI plan

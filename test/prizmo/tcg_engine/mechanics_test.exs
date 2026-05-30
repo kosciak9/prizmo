@@ -1,8 +1,8 @@
 defmodule Prizmo.TcgEngine.MechanicsTest do
   use Prizmo.DataCase, async: true
 
-  alias Prizmo.Tcg.Sim.Decks.Alakazam27147
-  alias Prizmo.Tcg.Sim.Decks.Dragapult27431
+  alias Prizmo.Tcg.Decks.Alakazam27147
+  alias Prizmo.Tcg.Decks.Dragapult27431
   alias Prizmo.TcgEngine.CardInstance
   alias Prizmo.TcgEngine.GameEvent
   alias Prizmo.TcgEngine.GameSnapshot
