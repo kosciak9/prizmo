@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-30] iteration 2 | Supported TCG engine deck RPC boundary
+- Task attempted: added an engine/UI-facing supported deck boundary so callers can list committed deck fixtures and create persisted Ash-backed games from stable `deck_key` strings instead of deck modules.
+- Files changed: added `lib/prizmo/tcg/decks.ex` and `lib/prizmo/tcg_engine/supported_decks.ex`; updated `lib/prizmo/tcg/data/tcgdex.ex`, `lib/prizmo/tcg_engine.ex`, `lib/prizmo/tcg_engine/game.ex`, `lib/prizmo_web/spa/lib/ash/client.ts`, and regenerated `lib/prizmo_web/spa/lib/ash/generated/{ash_rpc.ts,ash_types.ts}`; updated this log and the TCG engine playtest handoff.
+- Validation: `mix run --no-start -e ...` catalog/resolver and generic list-action smokes passed; `MIX_ENV=test mix run -e ...` supported game creation smoke passed; `mix test test/prizmo/tcg_engine/mechanics_test.exs` passed (4 tests); `mix prizmo.cards.coverage` passed; `mix ash_typescript.codegen --check` passed; `mix check --no-test` passed.
+- Remaining/blocking notes: no blocker; the SPA can now import `runListSupportedTcgDecks` and `runCreateTcgEngineGame`, but setup commands and a game-state/read-model UI are still missing.
+
 ## [2026-05-30] iteration 1 | Shared TCG deck fixtures
 - Task attempted: removed remaining TcgEngine test coupling to legacy `Prizmo.Tcg.Sim.Decks` by moving supported deck fixtures into shared `Prizmo.Tcg.Decks.*` modules and leaving simulator compatibility shims.
 - Files changed: added `lib/prizmo/tcg/decklist.ex` and shared deck files under `lib/prizmo/tcg/decks/`; updated legacy shim modules under `lib/prizmo/tcg/sim/decks/`, `lib/prizmo/tcg/data/tcgdex.ex`, and `test/prizmo/tcg_engine/mechanics_test.exs`; created `knowledge-base/wiki/engine/ash-backed-tcg-engine-playtest-handoff.md`.

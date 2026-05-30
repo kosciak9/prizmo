@@ -6,7 +6,22 @@ defmodule Prizmo.TcgEngine.Game do
     domain: Prizmo.TcgEngine,
     data_layer: AshPostgres.DataLayer,
     authorizers: [Ash.Policy.Authorizer],
-    extensions: [AshStateMachine]
+    extensions: [AshStateMachine, AshTypescript.Resource]
+
+  alias Prizmo.TcgEngine.SupportedDecks
+
+  @supported_deck_fields [
+    deck_key: [type: :string, allow_nil?: false],
+    name: [type: :string, allow_nil?: false],
+    source_url: [type: :string, allow_nil?: false],
+    card_count: [type: :integer, allow_nil?: false],
+    unique_card_count: [type: :integer, allow_nil?: false]
+  ]
+
+  @player_deck_selection_fields [
+    player_id: [type: :string, allow_nil?: false],
+    deck_key: [type: :string, allow_nil?: false]
+  ]
 
   postgres do
     table "tcg_engine_games"
@@ -25,9 +40,15 @@ defmodule Prizmo.TcgEngine.Game do
     end
   end
 
+  typescript do
+    type_name "TcgEngineGame"
+  end
+
   code_interface do
     define :create
     define :read
+    define :list_supported_decks
+    define :create_from_supported_decks, args: [:players]
     define :start_setup
     define :complete_setup
     define :finish
@@ -40,6 +61,39 @@ defmodule Prizmo.TcgEngine.Game do
 
   actions do
     defaults [:read]
+
+    action :list_supported_decks, {:array, :map} do
+      description "List supported deck fixtures that can create TCG engine games."
+
+      constraints items: [fields: @supported_deck_fields]
+
+      run fn _input, _context ->
+        {:ok, SupportedDecks.list()}
+      end
+    end
+
+    action :create_from_supported_decks, :struct do
+      description "Create a TCG engine game from supported deck fixture keys."
+
+      constraints instance_of: Prizmo.TcgEngine.Game
+
+      argument :players, {:array, :map} do
+        allow_nil? false
+        constraints items: [fields: @player_deck_selection_fields]
+      end
+
+      argument :active_player_id, :string
+
+      run fn input, _context ->
+        opts =
+          case Map.get(input.arguments, :active_player_id) do
+            nil -> []
+            active_player_id -> [active_player_id: active_player_id]
+          end
+
+        SupportedDecks.create_game(input.arguments.players, opts)
+      end
+    end
 
     create :create do
       primary? true
@@ -89,6 +143,10 @@ defmodule Prizmo.TcgEngine.Game do
 
   policies do
     policy action_type(:read) do
+      authorize_if always()
+    end
+
+    policy action_type(:action) do
       authorize_if always()
     end
 

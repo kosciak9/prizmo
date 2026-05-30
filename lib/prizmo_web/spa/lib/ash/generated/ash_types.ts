@@ -23,6 +23,34 @@ export type UserAttributesOnlySchema = {
 };
 
 
+// TcgEngineGame Schema
+export type TcgEngineGameResourceSchema = {
+  __type: "Resource";
+  __primitiveFields: "id" | "activePlayerId" | "firstPlayerId" | "winnerPlayerId" | "cursorIndex" | "latestEventIndex" | "status";
+  id: UUID;
+  activePlayerId: string;
+  firstPlayerId: string;
+  winnerPlayerId: string | null;
+  cursorIndex: number;
+  latestEventIndex: number;
+  status: "created" | "finished" | "in_progress" | "setup";
+};
+
+
+
+export type TcgEngineGameAttributesOnlySchema = {
+  __type: "Resource";
+  __primitiveFields: "id" | "activePlayerId" | "firstPlayerId" | "winnerPlayerId" | "cursorIndex" | "latestEventIndex" | "status";
+  id: UUID;
+  activePlayerId: string;
+  firstPlayerId: string;
+  winnerPlayerId: string | null;
+  cursorIndex: number;
+  latestEventIndex: number;
+  status: "created" | "finished" | "in_progress" | "setup";
+};
+
+
 export type UserFilterInput = {
   and?: Array<UserFilterInput>;
   or?: Array<UserFilterInput>;
@@ -43,14 +71,79 @@ export type UserFilterInput = {
 
 
 };
+export type TcgEngineGameFilterInput = {
+  and?: Array<TcgEngineGameFilterInput>;
+  or?: Array<TcgEngineGameFilterInput>;
+  not?: Array<TcgEngineGameFilterInput>;
+
+  id?: {
+    eq?: UUID;
+    notEq?: UUID;
+    in?: Array<UUID>;
+  };
+
+  activePlayerId?: {
+    eq?: string;
+    notEq?: string;
+    in?: Array<string>;
+  };
+
+  firstPlayerId?: {
+    eq?: string;
+    notEq?: string;
+    in?: Array<string>;
+  };
+
+  winnerPlayerId?: {
+    eq?: string;
+    notEq?: string;
+    in?: Array<string>;
+    isNil?: boolean;
+  };
+
+  cursorIndex?: {
+    eq?: number;
+    notEq?: number;
+    greaterThan?: number;
+    greaterThanOrEqual?: number;
+    lessThan?: number;
+    lessThanOrEqual?: number;
+    in?: Array<number>;
+  };
+
+  latestEventIndex?: {
+    eq?: number;
+    notEq?: number;
+    greaterThan?: number;
+    greaterThanOrEqual?: number;
+    lessThan?: number;
+    lessThanOrEqual?: number;
+    in?: Array<number>;
+  };
+
+  status?: {
+    eq?: "created" | "finished" | "in_progress" | "setup";
+    notEq?: "created" | "finished" | "in_progress" | "setup";
+    in?: Array<"created" | "finished" | "in_progress" | "setup">;
+  };
+
+
+
+};
 
 
 export const userFilterFields = ["id", "email"] as const;
 export type UserFilterField = (typeof userFilterFields)[number];
 
+export const tcgEngineGameFilterFields = ["id", "activePlayerId", "firstPlayerId", "winnerPlayerId", "cursorIndex", "latestEventIndex", "status"] as const;
+export type TcgEngineGameFilterField = (typeof tcgEngineGameFilterFields)[number];
+
 
 export const userSortFields = ["id", "email"] as const;
 export type UserSortField = (typeof userSortFields)[number];
+
+export const tcgEngineGameSortFields = ["id", "activePlayerId", "firstPlayerId", "winnerPlayerId", "cursorIndex", "latestEventIndex", "status"] as const;
+export type TcgEngineGameSortField = (typeof tcgEngineGameSortFields)[number];
 
 
 // Utility Types

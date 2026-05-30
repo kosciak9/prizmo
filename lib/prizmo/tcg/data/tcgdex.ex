@@ -11,17 +11,10 @@ defmodule Prizmo.Tcg.Data.TCGdex do
   offline metadata files.
   """
 
+  alias Prizmo.Tcg.Decks
+
   @api_base_url "https://api.tcgdex.net/v2/en"
   @cache_root Path.join(["priv", "tcg", "cards", "tcgdex"])
-
-  @known_deck_modules [
-    Prizmo.Tcg.Decks.Dragapult27431,
-    Prizmo.Tcg.Decks.Alakazam27147,
-    Prizmo.Tcg.Decks.RagingBoltOgerpon27599,
-    Prizmo.Tcg.Decks.FestivalLead27445,
-    Prizmo.Tcg.Decks.LopunnyDudunsparce27514,
-    Prizmo.Tcg.Decks.RocketMewtwo27459
-  ]
 
   @tcgdex_set_id_by_prizmo_abbreviation %{
     "ASC" => "me02.5",
@@ -49,11 +42,11 @@ defmodule Prizmo.Tcg.Data.TCGdex do
   end
 
   @doc "Returns known deck modules whose metadata should be cached."
-  def known_deck_modules, do: @known_deck_modules
+  def known_deck_modules, do: Decks.modules()
 
   @doc "Returns unique Prizmo card IDs across all known deck modules."
   def known_card_ids do
-    @known_deck_modules
+    known_deck_modules()
     |> Enum.flat_map(& &1.counts())
     |> Enum.map(&elem(&1, 0))
     |> Enum.uniq()
