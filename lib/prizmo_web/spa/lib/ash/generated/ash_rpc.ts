@@ -300,6 +300,50 @@ export async function chooseTcgEngineSetupBenchFromHand<Fields extends ChooseTcg
 }
 
 
+export type CompleteTcgEngineSetupInput = {
+  gameId: UUID;
+};
+
+export type CompleteTcgEngineSetupFields = UnifiedFieldSelection<TcgEngineGameResourceSchema>[];
+
+export type InferCompleteTcgEngineSetupResult<
+  Fields extends CompleteTcgEngineSetupFields | undefined,
+> = InferResult<TcgEngineGameResourceSchema, Fields>;
+
+export type CompleteTcgEngineSetupResult<Fields extends CompleteTcgEngineSetupFields | undefined = undefined> = | { success: true; data: InferCompleteTcgEngineSetupResult<Fields>; }
+| { success: false; errors: AshRpcError[]; }
+
+;
+
+/**
+ * Execute generic action on Game
+ *
+ * @ashActionType :action
+ */
+export async function completeTcgEngineSetup<Fields extends CompleteTcgEngineSetupFields | undefined = undefined>(
+  config: {
+  tenant?: string;
+  input: CompleteTcgEngineSetupInput;
+  fields: Fields;
+  headers?: Record<string, string>;
+  fetchOptions?: RequestInit;
+  customFetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+}
+): Promise<CompleteTcgEngineSetupResult<Fields extends undefined ? [] : Fields>> {
+  const payload = {
+    action: "complete_tcg_engine_setup",
+    ...(config.tenant !== undefined && { tenant: config.tenant }),
+    input: config.input,
+    ...(config.fields !== undefined && { fields: config.fields })
+  };
+
+  return executeActionRpcRequest<CompleteTcgEngineSetupResult<Fields extends undefined ? [] : Fields>>(
+    payload,
+    config
+  );
+}
+
+
 export type CreateTcgEngineGameInput = {
   players: Array<{playerId: string, deckKey: string}>;
   activePlayerId?: string | null;

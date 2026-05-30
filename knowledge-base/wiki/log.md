@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-30] iteration 8 | Setup completion RPC boundary
+- Task attempted: exposed the final setup command through an engine-owned Ash/RPC action so SPA callers can complete setup for a persisted game by `game_id` without bypassing `Prizmo.TcgEngine.Mechanics.complete_setup/1`.
+- Files changed: updated `lib/prizmo/tcg_engine/game.ex`, `lib/prizmo/tcg_engine.ex`, `lib/prizmo_web/spa/lib/ash/client.ts`, and regenerated `lib/prizmo_web/spa/lib/ash/generated/ash_rpc.ts`; updated this log and the TCG engine playtest handoff.
+- Validation: `MIX_ENV=test mix run -e ...` complete-setup boundary smoke passed after creating a supported game, starting setup, drawing opening hands, choosing Active Basic Pokémon for both players, placing prizes, completing setup, and verifying `:in_progress`, `:completed`, 12 Prize cards, and the final `complete_setup` event; `mix ash_typescript.codegen --check` passed; `mix test test/prizmo/tcg_engine/mechanics_test.exs` passed (4 tests); `mix check --no-test` passed.
+- Remaining/blocking notes: no blocker; the SPA can now import `runCompleteTcgEngineSetup`, but turn start/draw/action-window boundaries, game-state/read-model UI, and legal action affordances are still missing.
+
 ## [2026-05-30] iteration 7 | Setup Prize placement RPC boundary
 - Task attempted: exposed the next setup command through an engine-owned Ash/RPC action so SPA callers can place setup Prize cards for a persisted game by `game_id` without bypassing `Prizmo.TcgEngine.Mechanics.place_prizes/1`.
 - Files changed: updated `lib/prizmo/tcg_engine/game.ex`, `lib/prizmo/tcg_engine.ex`, `lib/prizmo_web/spa/lib/ash/client.ts`, and regenerated `lib/prizmo_web/spa/lib/ash/generated/ash_rpc.ts`; updated this log and the TCG engine playtest handoff.

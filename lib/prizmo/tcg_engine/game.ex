@@ -56,6 +56,7 @@ defmodule Prizmo.TcgEngine.Game do
     define :choose_active_from_hand_command, args: [:game_id, :player_id, :card_instance_id]
     define :choose_setup_bench_from_hand_command, args: [:game_id, :player_id, :card_instance_id]
     define :place_prizes_command, args: [:game_id]
+    define :complete_setup_command, args: [:game_id]
     define :start_setup
     define :complete_setup
     define :finish
@@ -193,6 +194,20 @@ defmodule Prizmo.TcgEngine.Game do
 
       run fn input, _context ->
         Mechanics.place_prizes(input.arguments.game_id)
+      end
+    end
+
+    action :complete_setup_command, :struct do
+      description "Complete setup for a persisted TCG engine game through the mechanics layer."
+
+      constraints instance_of: Game
+
+      argument :game_id, :uuid do
+        allow_nil? false
+      end
+
+      run fn input, _context ->
+        Mechanics.complete_setup(input.arguments.game_id)
       end
     end
 

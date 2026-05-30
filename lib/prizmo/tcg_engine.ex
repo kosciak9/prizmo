@@ -20,6 +20,7 @@ defmodule Prizmo.TcgEngine do
       rpc_action :choose_tcg_engine_active_from_hand, :choose_active_from_hand_command
       rpc_action :choose_tcg_engine_setup_bench_from_hand, :choose_setup_bench_from_hand_command
       rpc_action :place_tcg_engine_prizes, :place_prizes_command
+      rpc_action :complete_tcg_engine_setup, :complete_setup_command
     end
   end
 
@@ -42,6 +43,7 @@ defmodule Prizmo.TcgEngine do
         args: [:game_id, :player_id, :card_instance_id]
 
       define :place_prizes_for_game, action: :place_prizes_command, args: [:game_id]
+      define :complete_setup_for_game, action: :complete_setup_command, args: [:game_id]
     end
 
     resource Prizmo.TcgEngine.GameEvent
