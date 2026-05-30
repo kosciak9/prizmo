@@ -152,6 +152,12 @@ defmodule Prizmo.TcgEngine.CardStore do
     end
   end
 
+  def move_attached_card_to_hand(game_id, player_id, %CardInstance{} = card) do
+    with {:ok, position} <- next_hand_position_result(game_id, player_id) do
+      update(card, :return_to_hand, %{position: position, attached_to_card_instance_id: nil})
+    end
+  end
+
   def move_card_to_hand(%CardInstance{} = card, :deck, position) do
     update(card, :draw_to_hand, %{position: position})
   end

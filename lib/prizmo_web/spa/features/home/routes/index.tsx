@@ -122,6 +122,7 @@ const GAME_STATE_FIELDS = [
       'pendingAttackEffectType',
       'pendingAttackRequiresSwitchTarget',
       'pendingAttackRequiresDiscardedEnergy',
+      'pendingAttackRequiresReturnedEnergy',
       'pendingAttackerCardInstanceId',
       'pendingDefenderCardInstanceId'
     ]
@@ -320,12 +321,14 @@ type ResolveDeclaredAttackInput = {
   playerId: PlayerId
   switchBenchCardInstanceId?: string | null
   discardedEnergyCardInstanceIds?: string[]
+  returnedEnergyCardInstanceId?: string | null
 }
 
 type ResolveDeclaredAttackCommand = {
   playerId: string
   switchBenchCardInstanceId?: string | null
   discardedEnergyCardInstanceIds?: string[]
+  returnedEnergyCardInstanceId?: string | null
 }
 
 type FinishAttackInput = {
@@ -381,6 +384,7 @@ type GameState = {
     pendingAttackEffectType: string | null
     pendingAttackRequiresSwitchTarget: boolean
     pendingAttackRequiresDiscardedEnergy: boolean
+    pendingAttackRequiresReturnedEnergy: boolean
     pendingAttackerCardInstanceId: string | null
     pendingDefenderCardInstanceId: string | null
   } | null
@@ -1319,14 +1323,16 @@ export function HomeRoute() {
                 onResolveDeclaredAttack={({
                   playerId,
                   switchBenchCardInstanceId,
-                  discardedEnergyCardInstanceIds
+                  discardedEnergyCardInstanceIds,
+                  returnedEnergyCardInstanceId
                 }) => {
                   if (isPlayerId(playerId)) {
                     resolveDeclaredAttackMutation.mutate({
                       gameId: normalisedGameId,
                       playerId,
                       switchBenchCardInstanceId,
-                      discardedEnergyCardInstanceIds
+                      discardedEnergyCardInstanceIds,
+                      returnedEnergyCardInstanceId
                     })
                   }
                 }}
@@ -2106,6 +2112,7 @@ function AttackProgressPanel({
 }) {
   const [selectedSwitchBenchCardInstanceId, setSelectedSwitchBenchCardInstanceId] = useState('')
   const [selectedDiscardedEnergyCardInstanceIds, setSelectedDiscardedEnergyCardInstanceIds] = useState<string[]>([])
+  const [selectedReturnedEnergyCardInstanceId, setSelectedReturnedEnergyCardInstanceId] = useState('')
   const turn = gameState.currentTurn
   const activePlayer = turn ? gameState.players.find(player => player.playerId === turn.activePlayerId) : undefined
   const switchTargetOptions = turn?.pendingAttackRequiresSwitchTarget ? (activePlayer?.bench ?? []) : []
@@ -2137,6 +2144,25 @@ function AttackProgressPanel({
   const selectedDiscardedEnergyIdsForResolve = turn?.pendingAttackRequiresDiscardedEnergy
     ? selectedDiscardedEnergyCardInstanceIds.filter(id => discardedEnergyOptionIds.has(id))
     : []
+  const returnedEnergyOptions = useMemo(() => {
+    if (!turn?.pendingAttackRequiresReturnedEnergy || !activePlayer?.active) {
+      return []
+    }
+
+    return (activePlayer.active.attachedCards ?? []).filter(isEnergyCard)
+  }, [activePlayer?.active, turn?.pendingAttackRequiresReturnedEnergy])
+  const returnedEnergyOptionIds = useMemo(
+    () => new Set(returnedEnergyOptions.map(energyCard => energyCard.id)),
+    [returnedEnergyOptions]
+  )
+  const selectedReturnedEnergyIsValid = returnedEnergyOptionIds.has(selectedReturnedEnergyCardInstanceId)
+  const returnedEnergyIdForResolve = turn?.pendingAttackRequiresReturnedEnergy
+    ? selectedReturnedEnergyIsValid
+      ? selectedReturnedEnergyCardInstanceId
+      : returnedEnergyOptions.length === 1
+        ? (returnedEnergyOptions[0]?.id ?? null)
+        : null
+    : null
 
   useEffect(() => {
     if (selectedSwitchBenchCardInstanceId && !selectedSwitchTargetIsValid) {
@@ -2146,6 +2172,7 @@ function AttackProgressPanel({
 
   useEffect(() => {
     setSelectedDiscardedEnergyCardInstanceIds([])
+    setSelectedReturnedEnergyCardInstanceId('')
   }, [turn?.id, turn?.pendingAttackId])
 
   useEffect(() => {
@@ -2155,6 +2182,12 @@ function AttackProgressPanel({
       return filteredSelectedIds.length === previousSelectedIds.length ? previousSelectedIds : filteredSelectedIds
     })
   }, [discardedEnergyOptionIds])
+
+  useEffect(() => {
+    if (selectedReturnedEnergyCardInstanceId && !selectedReturnedEnergyIsValid) {
+      setSelectedReturnedEnergyCardInstanceId('')
+    }
+  }, [selectedReturnedEnergyCardInstanceId, selectedReturnedEnergyIsValid])
 
   if (!turn || (turn.status !== 'attack_declared' && turn.status !== 'attack_resolving')) {
     return null
@@ -2174,15 +2207,25 @@ function AttackProgressPanel({
       : turn.pendingAttackEffectType === DISCARD_OWN_BASIC_ENERGY_FOR_DAMAGE_EFFECT
         ? 'This attack does damage for each selected own Basic Energy attached to Pokémon in play, then discards those Energy cards during resolution. Selecting none resolves it for zero bonus damage.'
         : 'This attack resolves with the selected discarded Energy cards.'
+  const returnedEnergyRequiresChoice = turn.pendingAttackRequiresReturnedEnergy && returnedEnergyOptions.length > 1
+  const returnedEnergyUnavailable = turn.pendingAttackRequiresReturnedEnergy && returnedEnergyOptions.length === 0
   const missingActivePlayers = gameState.players.filter(player => !player.active)
   const viewerPromptBlocksFinish = viewerCanAdvanceAttack && gameState.prompts.length > 0
   const attackCannotFinish = missingActivePlayers.length > 0 || viewerPromptBlocksFinish
   const resolveDisabled =
-    !viewerCanAdvanceAttack || commandPending || (switchTargetRequired && !selectedSwitchTargetIsValid)
+    !viewerCanAdvanceAttack ||
+    commandPending ||
+    (switchTargetRequired && !selectedSwitchTargetIsValid) ||
+    returnedEnergyUnavailable ||
+    (returnedEnergyRequiresChoice && !selectedReturnedEnergyIsValid)
   const resolveButtonLabel = resolveDeclaredAttackPendingPlayerId === turn.activePlayerId
     ? `Resolving ${attackLabel}...`
     : switchTargetRequired && !selectedSwitchTargetIsValid
       ? `Choose a switch target for ${attackLabel}`
+      : returnedEnergyUnavailable
+        ? `No Energy available to return for ${attackLabel}`
+        : returnedEnergyRequiresChoice && !selectedReturnedEnergyIsValid
+          ? `Choose returned Energy for ${attackLabel}`
       : `Resolve ${attackLabel}`
   const toggleDiscardedEnergyCard = (energyCardInstanceId: string) => {
     setSelectedDiscardedEnergyCardInstanceIds(previousSelectedIds => {
@@ -2318,6 +2361,61 @@ function AttackProgressPanel({
           </div>
         ) : null}
 
+        {turn.pendingAttackRequiresReturnedEnergy ? (
+          <div className="rounded-xl border border-sky-200 bg-sky-50/70 p-3">
+            <div className="space-y-1">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-sky-900">Returned Energy</p>
+              <p className="text-xs leading-5 text-sky-900/80">
+                This attack returns one Energy attached to the attacking Active Pokémon to that player's hand after
+                damage. If exactly one Energy is attached, resolution will return it automatically.
+              </p>
+            </div>
+
+            {returnedEnergyOptions.length > 1 ? (
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                {returnedEnergyOptions.map(energyCard => {
+                  const selected = energyCard.id === selectedReturnedEnergyCardInstanceId
+
+                  return (
+                    <label
+                      className={`flex cursor-pointer items-start gap-2 rounded-lg border px-3 py-2 text-xs transition ${
+                        selected
+                          ? 'border-sky-700 bg-sky-100 text-sky-950'
+                          : 'border-sky-200 bg-stone-50 text-stone-700 hover:border-sky-400'
+                      }`}
+                      key={energyCard.id}
+                    >
+                      <input
+                        checked={selected}
+                        className="mt-0.5"
+                        disabled={!viewerCanAdvanceAttack || commandPending}
+                        name="returned-energy-card-instance-id"
+                        onChange={() => setSelectedReturnedEnergyCardInstanceId(energyCard.id)}
+                        type="radio"
+                      />
+                      <span className="min-w-0">
+                        <span className="block font-medium">{energyCard.name}</span>
+                        <span className="mt-0.5 block font-mono text-[0.68rem] opacity-70">
+                          attached to {attacker?.name ?? formatPlayerId(turn.activePlayerId)}
+                        </span>
+                      </span>
+                    </label>
+                  )
+                })}
+              </div>
+            ) : returnedEnergyOptions.length === 1 ? (
+              <p className="mt-3 rounded-lg border border-sky-200 bg-stone-50 px-3 py-2 text-xs text-sky-900">
+                Only {returnedEnergyOptions[0]?.name} is attached, so resolution will return it automatically.
+              </p>
+            ) : (
+              <p className="mt-3 rounded-lg border border-sky-200 bg-stone-50 px-3 py-2 text-xs text-sky-900">
+                No attached Energy cards are visible for the attacking Active Pokémon, so this attack cannot resolve
+                through the browser.
+              </p>
+            )}
+          </div>
+        ) : null}
+
         {!viewerCanAdvanceAttack ? (
           <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
             Switch this tab to {formatPlayerId(turn.activePlayerId)} to advance the attack.
@@ -2340,7 +2438,8 @@ function AttackProgressPanel({
               onResolveDeclaredAttack({
                 playerId: turn.activePlayerId,
                 switchBenchCardInstanceId: selectedSwitchTargetIsValid ? selectedSwitchBenchCardInstanceId : null,
-                discardedEnergyCardInstanceIds: selectedDiscardedEnergyIdsForResolve
+                discardedEnergyCardInstanceIds: selectedDiscardedEnergyIdsForResolve,
+                returnedEnergyCardInstanceId: returnedEnergyIdForResolve
               })
             }
             type="button"

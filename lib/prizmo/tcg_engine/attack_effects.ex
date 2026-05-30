@@ -13,11 +13,13 @@ defmodule Prizmo.TcgEngine.AttackEffects do
 
   import Prizmo.TcgEngine.CardStore,
     only: [
+      attached_cards: 2,
       cards_in_zone: 3,
       deck_cards_for_player: 2,
       discard_cards_from_hand: 3,
       get_card: 2,
       get_cards: 2,
+      move_attached_card_to_hand: 3,
       move_deck_card_to_hand: 3,
       move_discard_card_to_hand: 3,
       next_hand_position_result: 2
@@ -69,6 +71,7 @@ defmodule Prizmo.TcgEngine.AttackEffects do
     :damage_per_own_benched_pokemon,
     :damage_per_own_team_rocket_pokemon_in_play,
     :recover_trainer_from_discard_to_hand,
+    :return_attached_energy_to_hand,
     :search_pokemon_to_hand,
     :self_damage,
     :switch_self_with_bench
@@ -174,6 +177,9 @@ defmodule Prizmo.TcgEngine.AttackEffects do
 
       %{type: :recover_trainer_from_discard_to_hand} ->
         create_recover_trainer_prompt(game_id, player_id, attacker_card, attack)
+
+      %{type: :return_attached_energy_to_hand} ->
+        return_attached_energy_to_hand(game_id, player_id, attacker_card, opts)
 
       nil ->
         {:ok, %{}}
@@ -662,12 +668,82 @@ defmodule Prizmo.TcgEngine.AttackEffects do
     end
   end
 
+  defp return_attached_energy_to_hand(game_id, player_id, %CardInstance{} = attacker_card, opts) do
+    with {:ok, energy_card} <-
+           returned_attached_energy_card(game_id, player_id, attacker_card, opts),
+         {:ok, returned_energy_card} <-
+           move_attached_card_to_hand(game_id, player_id, energy_card) do
+      {:ok,
+       %{
+         effect_type: "return_attached_energy_to_hand",
+         returned_energy_card_instance_id: returned_energy_card.id
+       }}
+    end
+  end
+
   defp discarded_energy_card_instance_ids(opts) do
     case Map.get(opts, :discarded_energy_card_instance_ids) ||
            Map.get(opts, "discarded_energy_card_instance_ids") do
       nil -> {:ok, []}
       ids when is_list(ids) -> {:ok, ids}
       _invalid -> {:error, :invalid_discarded_energy_card_instance_ids}
+    end
+  end
+
+  defp returned_attached_energy_card(game_id, player_id, %CardInstance{} = attacker_card, opts) do
+    with {:ok, energy_cards} <-
+           returnable_attached_energy_cards(game_id, player_id, attacker_card) do
+      case returned_energy_card_instance_id(opts) do
+        nil ->
+          implicit_returned_attached_energy_card(energy_cards)
+
+        card_instance_id when is_binary(card_instance_id) ->
+          explicit_returned_attached_energy_card(energy_cards, card_instance_id)
+
+        _invalid ->
+          {:error, :invalid_returned_energy_card_instance_id}
+      end
+    end
+  end
+
+  defp returned_energy_card_instance_id(opts) do
+    Map.get(opts, :returned_energy_card_instance_id) ||
+      Map.get(opts, "returned_energy_card_instance_id")
+  end
+
+  defp implicit_returned_attached_energy_card([]), do: {:error, :no_attached_energy_to_return}
+  defp implicit_returned_attached_energy_card([energy_card]), do: {:ok, energy_card}
+
+  defp implicit_returned_attached_energy_card([_first | _rest]),
+    do: {:error, :return_attached_energy_requires_target}
+
+  defp explicit_returned_attached_energy_card(energy_cards, card_instance_id) do
+    case Enum.find(energy_cards, &(&1.id == card_instance_id)) do
+      %CardInstance{} = energy_card -> {:ok, energy_card}
+      nil -> {:error, :invalid_returned_energy_choice}
+    end
+  end
+
+  defp returnable_attached_energy_cards(game_id, player_id, %CardInstance{} = attacker_card) do
+    with {:ok, active_card} <- active_card(game_id, player_id),
+         :ok <- require_same_card(active_card, attacker_card),
+         {:ok, attached_cards} <- attached_cards(game_id, attacker_card.id) do
+      attached_cards
+      |> Enum.reduce_while({:ok, []}, fn attached_card, {:ok, energy_cards} ->
+        with :ok <- require_card_owned_by_player(attached_card, player_id),
+             :ok <- require_card_zone(attached_card, :attached) do
+          case require_energy(attached_card.card_id) do
+            :ok -> {:cont, {:ok, [attached_card | energy_cards]}}
+            {:error, _not_energy} -> {:cont, {:ok, energy_cards}}
+          end
+        else
+          {:error, reason} -> {:halt, {:error, reason}}
+        end
+      end)
+      |> case do
+        {:ok, energy_cards} -> {:ok, Enum.reverse(energy_cards)}
+        {:error, reason} -> {:error, reason}
+      end
     end
   end
 

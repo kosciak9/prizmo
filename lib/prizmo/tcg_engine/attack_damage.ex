@@ -203,6 +203,10 @@ defmodule Prizmo.TcgEngine.AttackDamage do
        do: {:ok, damage}
 
   defp apply_effect(damage, _attacker_card, _defender_card, %{
+         type: :return_attached_energy_to_hand
+       }), do: {:ok, damage}
+
+  defp apply_effect(damage, _attacker_card, _defender_card, %{
          type: :attacker_cannot_attack_next_turn
        }), do: {:ok, damage}
 

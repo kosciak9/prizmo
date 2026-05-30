@@ -30,6 +30,7 @@ defmodule Prizmo.TcgEngine.CardInstance do
       transition(:put_basic_from_deck_to_bench, from: :deck, to: :bench)
       transition(:place_prize, from: :deck, to: :prize)
       transition(:attach, from: :hand, to: :attached)
+      transition(:return_to_hand, from: :attached, to: :hand)
       transition(:evolve_to_active, from: :hand, to: :active)
       transition(:evolve_to_bench, from: :hand, to: :bench)
       transition(:evolve_under, from: [:active, :bench], to: :attached)
@@ -57,6 +58,7 @@ defmodule Prizmo.TcgEngine.CardInstance do
     define :put_basic_from_deck_to_bench
     define :place_prize
     define :attach
+    define :return_to_hand
     define :evolve_to_active
     define :evolve_to_bench
     define :evolve_under
@@ -134,6 +136,11 @@ defmodule Prizmo.TcgEngine.CardInstance do
     update :attach do
       accept [:attached_to_card_instance_id, :position]
       change transition_state(:attached)
+    end
+
+    update :return_to_hand do
+      accept [:attached_to_card_instance_id, :position]
+      change transition_state(:hand)
     end
 
     update :evolve_to_active do
