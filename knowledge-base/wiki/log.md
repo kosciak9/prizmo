@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-31] iteration 84 | Queued Prize prompt browser validation
+- Task attempted: ran an isolated two-browser-context Playwright validation of the queued cross-player KO Prize prompt path for `DRI-019` `Take Down`, covering Player 1's first face-down Prize prompt, Player 2's queued prompt, active-player finish blocking, and final attack finish after both prompts resolve.
+- Files changed: updated this log and the TCG engine playtest handoff.
+- Validation: Tidewave staging created game `03c60ed4-9e3f-422b-94a3-f84546650ae7` after verifying `DRI-019` and `MEG-054` both have 50 HP; isolated Playwright contexts for `player_1` and `player_2` passed, confirming Player 2 initially saw no private Player 1 prompt, Player 1 saw queued-prompt guidance plus waiting-for-Player-2 finish blocking, Player 2 refreshed into and resolved the queued face-down Prize prompt, and Player 1 then finished the attack with turn 1 ending.
+- Remaining/blocking notes: no code blocker found in the queued Prize prompt browser path. This was an isolated diagnostic with project-code staging, not the formal two-manual-tester milestone; that milestone still needs a harness that guarantees independent browser contexts and an end-to-end no-staging play path.
+
 ## [2026-05-31] iteration 83 | Queued Prize prompt read-model polish
 - Task attempted: polished the queued cross-player KO Prize prompt browser path by exposing non-sensitive awaiting prompt player IDs in the viewer read model, using that field to block/explain attack finish while another player has a queued prompt, and adding product-facing face-down Prize prompt guidance in the SPA.
 - Files changed: updated `lib/prizmo/tcg_engine/game_view.ex`, `lib/prizmo/tcg_engine/game_view/fields.ex`, `lib/prizmo_web/spa/features/home/routes/index.tsx`, generated `lib/prizmo_web/spa/lib/ash/generated/ash_rpc.ts`, this log, and the TCG engine playtest handoff.
