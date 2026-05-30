@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-30] iteration 50 | Rabsca Psychic attack effect
+- Task attempted: inventoried currently rejected authored attack effects in supported deck fixtures and implemented the narrow persisted `:bonus_damage_per_energy_attached_to_defender` slice for Rabsca `TEF-024` `Psychic`, including executable base damage from the authored overlay.
+- Files changed: updated `lib/prizmo/tcg/cards/behaviors/tef.ex`, `lib/prizmo/tcg_engine/attack_damage.ex`, `lib/prizmo/tcg_engine/attack_effects.ex`, this log, and the TCG engine playtest handoff.
+- Validation: `mix compile --warnings-as-errors` passed; Tidewave rollback smoke passed for Festival Rabsca `Psychic` fetching as executable and resolving for 70 damage against a Moltres defender with two attached Energy and no KO; `mix test test/prizmo/tcg_engine/mechanics_test.exs` passed (4 tests); `mix prizmo.cards.coverage` passed; `mix check --no-test` passed.
+- Remaining/blocking notes: no code blocker for Rabsca's defender-Energy bonus damage path; additional rejected authored attack effects remain and should continue to be enabled one deterministic persisted effect at a time.
+
 ## [2026-05-30] iteration 49 | Evolution damage and status semantics
 - Task attempted: hardened persisted evolution semantics so damage counters move onto the new evolved top Pokémon while special conditions are cleared from both the new top and evolved-under target, preserving existing attachment behavior.
 - Files changed: updated `lib/prizmo/tcg_engine/card_instance.ex`, `lib/prizmo/tcg_engine/mechanics.ex`, this log, and the TCG engine playtest handoff.

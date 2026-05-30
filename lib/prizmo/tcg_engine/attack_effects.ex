@@ -12,6 +12,7 @@ defmodule Prizmo.TcgEngine.AttackEffects do
 
   @supported_effect_types [
     :bonus_damage_if_defender_pokemon_ex,
+    :bonus_damage_per_energy_attached_to_defender,
     :switch_self_with_bench
   ]
 
@@ -37,6 +38,9 @@ defmodule Prizmo.TcgEngine.AttackEffects do
         switch_self_with_bench(game_id, player_id, attacker_card, opts)
 
       %{type: :bonus_damage_if_defender_pokemon_ex} ->
+        {:ok, %{}}
+
+      %{type: :bonus_damage_per_energy_attached_to_defender} ->
         {:ok, %{}}
 
       nil ->

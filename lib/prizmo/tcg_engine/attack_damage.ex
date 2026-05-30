@@ -4,6 +4,7 @@ defmodule Prizmo.TcgEngine.AttackDamage do
   alias Prizmo.TcgEngine.AttackEffects
   alias Prizmo.TcgEngine.CardCatalog
   alias Prizmo.TcgEngine.CardInstance
+  alias Prizmo.TcgEngine.CardStore
 
   @spec damage_for(CardInstance.t(), CardInstance.t(), map()) ::
           {:ok, non_neg_integer()} | {:error, term()}
@@ -35,6 +36,16 @@ defmodule Prizmo.TcgEngine.AttackDamage do
 
   defp apply_effect(damage, _attacker_card, _defender_card, nil), do: {:ok, damage}
 
+  defp apply_effect(damage, _attacker_card, %CardInstance{} = defender_card, %{
+         type: :bonus_damage_per_energy_attached_to_defender,
+         bonus_damage: bonus_damage
+       })
+       when is_integer(bonus_damage) and bonus_damage >= 0 do
+    with {:ok, energy_count} <- attached_energy_count(defender_card) do
+      {:ok, damage + bonus_damage * energy_count}
+    end
+  end
+
   defp apply_effect(damage, _attacker_card, _defender_card, %{type: :switch_self_with_bench}),
     do: {:ok, damage}
 
@@ -49,4 +60,28 @@ defmodule Prizmo.TcgEngine.AttackDamage do
   end
 
   defp pokemon_ex?(_metadata), do: false
+
+  defp attached_energy_count(%CardInstance{game_id: game_id, id: card_instance_id}) do
+    with {:ok, attached_cards} <- CardStore.attached_cards(game_id, card_instance_id) do
+      attached_cards
+      |> Enum.map(&energy_card?/1)
+      |> collect_energy_count()
+    end
+  end
+
+  defp energy_card?(%CardInstance{card_id: card_id}) do
+    case CardCatalog.fetch(card_id) do
+      {:ok, %{supertype: :energy}} -> {:ok, true}
+      {:ok, _card} -> {:ok, false}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp collect_energy_count(results) do
+    Enum.reduce_while(results, {:ok, 0}, fn
+      {:ok, true}, {:ok, count} -> {:cont, {:ok, count + 1}}
+      {:ok, false}, {:ok, count} -> {:cont, {:ok, count}}
+      {:error, reason}, _acc -> {:halt, {:error, reason}}
+    end)
+  end
 end

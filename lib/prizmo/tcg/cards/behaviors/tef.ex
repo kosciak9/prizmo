@@ -9,6 +9,7 @@ defmodule Prizmo.Tcg.Cards.Behaviors.TEF do
     )
 
     attack(:psychic,
+      damage: 10,
       effect: %{type: :bonus_damage_per_energy_attached_to_defender, bonus_damage: 30}
     )
   end
