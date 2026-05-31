@@ -30,6 +30,7 @@ import {
   runSkipTcgEngineDrawForTurn,
   runStartNextTcgEngineTurn,
   runStartTcgEngineSetup,
+  runUndoTcgEngineGame,
   type CreateTcgEngineGameFields,
   type GetTcgEngineGameStateFields,
   type ListSupportedTcgDecksFields
@@ -49,6 +50,7 @@ const SHUFFLE_ATTACHED_ENERGY_INTO_DECK_THEN_DAMAGE_OPPONENT_BENCH_EFFECT =
   'shuffle_attached_energy_into_deck_then_damage_opponent_bench'
 const COPY_OPPONENT_ACTIVE_TERA_POKEMON_ATTACK_EFFECT = 'copy_opponent_active_tera_pokemon_attack'
 const ULTRA_BALL_CARD_ID = 'MEG-131'
+const BENCH_SLOT_COUNT = 5
 
 const SUPPORTED_DECK_FIELDS: ListSupportedTcgDecksFields = [
   'deckKey',
@@ -837,6 +839,14 @@ export function HomeRoute() {
     }
   })
 
+  const undoMutation = useMutation({
+    mutationFn: (gameId: string) => undoGame(gameId),
+    onSuccess: async () => {
+      setUltraBallPostSearchHandoff(null)
+      await queryClient.invalidateQueries({ queryKey: ['tcg-engine', 'game-state'] })
+    }
+  })
+
   const retreatMutation = useMutation({
     mutationFn: (input: RetreatInput) => retreat(input),
     onSuccess: async (_game, input) => {
@@ -1033,6 +1043,11 @@ export function HomeRoute() {
       'Pass failed',
       'The turn stayed open. Refresh state and confirm no required prompt, attack, or replacement choice is blocking.'
     )
+  const undoCommandError = commandErrorNotice(
+    undoMutation.error,
+    'Undo failed',
+    'No prior snapshot was restored. Refresh state and retry only when the event history shows a previous step.'
+  )
 
   function updateSession(updater: (currentSession: PlaytestSession) => PlaytestSession) {
     setSession(currentSession => updater(currentSession))
@@ -1268,6 +1283,7 @@ export function HomeRoute() {
                 flowCommandError={flowCommandError}
                 gameState={gameState}
                 promptCommandError={promptCommandError}
+                undoCommandError={undoCommandError}
                 ultraBallPostSearchHandoff={ultraBallPostSearchHandoff}
                 viewerPlayerId={session.viewerPlayerId}
                 onCallCoinToss={({ playerId, call }) => {
@@ -1340,6 +1356,9 @@ export function HomeRoute() {
                       playerId
                     })
                   }
+                }}
+                onUndo={() => {
+                  undoMutation.mutate(normalisedGameId)
                 }}
                 onRetreat={({ playerId, benchCardInstanceId, energyCardInstanceIds }) => {
                   if (isPlayerId(playerId)) {
@@ -1481,6 +1500,7 @@ export function HomeRoute() {
                   finishAttackMutation.isPending ? finishAttackMutation.variables?.playerId ?? null : null
                 }
                 finishSetupChoicesPending={finishSetupChoicesMutation.isPending}
+                undoPending={undoMutation.isPending}
               />
             ) : null}
           </section>
@@ -1804,6 +1824,20 @@ async function endTurn(input: EndTurnInput): Promise<CreatedGame> {
   return result.data as CreatedGame
 }
 
+async function undoGame(gameId: string): Promise<CreatedGame> {
+  const result = await runUndoTcgEngineGame({
+    input: { gameId },
+    fields: GAME_RESOURCE_FIELDS,
+    headers: buildAshRpcHeaders()
+  })
+
+  if (!result.success) {
+    throw new Error(rpcErrorMessage(result.errors))
+  }
+
+  return result.data as CreatedGame
+}
+
 async function retreat(input: RetreatInput): Promise<CreatedGame> {
   const result = await runRetreatTcgEngineActive({
     input,
@@ -1896,6 +1930,7 @@ function GameStateWorkbench({
   viewerPlayerId,
   deckNamesByKey,
   promptCommandError,
+  undoCommandError,
   ultraBallPostSearchHandoff,
   onCallCoinToss,
   onChooseSetupActive,
@@ -1913,6 +1948,7 @@ function GameStateWorkbench({
   onPlayCard,
   onRetreat,
   onResolveDeclaredAttack,
+  onUndo,
   attachEnergyPendingKey,
   callCoinTossPending,
   chooseSetupActivePendingCardId,
@@ -1924,6 +1960,7 @@ function GameStateWorkbench({
   evolveFromHandPendingKey,
   finishAttackPendingPlayerId,
   finishSetupChoicesPending,
+  undoPending,
   playBasicToBenchPendingCardId,
   promptPendingId,
   playCardPendingCardId,
@@ -1937,6 +1974,7 @@ function GameStateWorkbench({
   viewerPlayerId: PlayerId
   deckNamesByKey: Map<string, string>
   promptCommandError: CommandErrorNotice | null
+  undoCommandError: CommandErrorNotice | null
   ultraBallPostSearchHandoff: UltraBallPostSearchHandoff | null
   onCallCoinToss: (input: CoinTossCommand) => void
   onChooseSetupActive: (input: SetupCardCommand) => void
@@ -1954,6 +1992,7 @@ function GameStateWorkbench({
   onPlayCard: (input: PlayCardCommand) => void
   onRetreat: (input: RetreatCommand) => void
   onResolveDeclaredAttack: (input: ResolveDeclaredAttackCommand) => void
+  onUndo: () => void
   attachEnergyPendingKey: string | null
   callCoinTossPending: boolean
   chooseSetupActivePendingCardId: string | null
@@ -1965,6 +2004,7 @@ function GameStateWorkbench({
   evolveFromHandPendingKey: string | null
   finishAttackPendingPlayerId: string | null
   finishSetupChoicesPending: boolean
+  undoPending: boolean
   playBasicToBenchPendingCardId: string | null
   promptPendingId: string | null
   playCardPendingCardId: string | null
@@ -2012,10 +2052,14 @@ function GameStateWorkbench({
       <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(16rem,20rem)]">
         <BattlefieldPanel
           activePlayerId={gameState.activePlayerId}
+          actionCount={gameState.actionAffordances.length}
+          awaitingPromptPlayerIds={gameState.awaitingPromptPlayerIds}
           cardIntentsById={cardInteractions.cardIntentsById}
           currentTurn={gameState.currentTurn}
           deckNamesByKey={deckNamesByKey}
+          flowState={gameState.flowState}
           players={gameState.players}
+          status={gameState.status}
           stadium={gameState.stadium}
           viewerPlayerId={viewerPlayerId}
         />
@@ -2035,6 +2079,13 @@ function GameStateWorkbench({
             onChooseStartingPlayer={onChooseStartingPlayer}
             onFinishSetupChoices={onFinishSetupChoices}
             viewerPlayerId={viewerPlayerId}
+          />
+
+          <UndoPanel
+            commandError={undoCommandError}
+            gameState={gameState}
+            onUndo={onUndo}
+            undoPending={undoPending}
           />
 
           <ViewerPromptsPanel
@@ -2082,6 +2133,8 @@ function GameStateWorkbench({
           />
         </aside>
       </div>
+
+      <EventHistoryPanel events={gameState.events} />
 
       <DiagnosticsDisclosure gameState={gameState} />
     </div>
@@ -2401,17 +2454,10 @@ function DiagnosticsDisclosure({ gameState }: { gameState: GameState }) {
         <StateRow label="Stadium" value={gameState.stadium?.name ?? 'None'} />
       </div>
 
-      {gameState.events.length > 0 ? (
-        <ol className="mt-4 space-y-2">
-          {gameState.events.map(event => (
-            <li className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl bg-secondary/65 px-3 py-2" key={event.id}>
-              <span className="font-mono text-xs text-muted-foreground">#{event.index}</span>
-              <span className="font-medium text-foreground">{formatEventType(event.type)}</span>
-              {event.playerId ? <span className="text-xs text-muted-foreground">{formatPlayerId(event.playerId)}</span> : null}
-            </li>
-          ))}
-        </ol>
-      ) : null}
+      <p className="mt-4 rounded-xl bg-secondary/65 px-3 py-2 text-xs leading-5 text-muted-foreground">
+        Event history is part of the normal play surface below. This drawer keeps IDs, cursor state, and other engine
+        diagnostics out of the table path.
+      </p>
     </details>
   )
 }
@@ -2600,6 +2646,46 @@ function GameFlowPanel({
             </RailDetailsSummary>
           </>
         )}
+      </div>
+    </Panel>
+  )
+}
+
+function UndoPanel({
+  commandError,
+  gameState,
+  onUndo,
+  undoPending
+}: {
+  commandError: CommandErrorNotice | null
+  gameState: GameState
+  onUndo: () => void
+  undoPending: boolean
+}) {
+  const canUndo = gameState.cursorIndex > 0
+  const latestEvent = gameState.events[gameState.events.length - 1]
+
+  if (!canUndo && !commandError) {
+    return null
+  }
+
+  return (
+    <Panel
+      title="Undo"
+      trailing={<StatusBadge tone={canUndo ? 'warning' : 'neutral'}>{canUndo ? `step ${gameState.cursorIndex}` : 'locked'}</StatusBadge>}
+    >
+      <div className="space-y-3">
+        {commandError ? <CommandErrorCard notice={commandError} /> : null}
+
+        <p className="text-sm text-muted-foreground">
+          {latestEvent
+            ? `Rewind the last persisted step, ${formatEventType(latestEvent.type)}.`
+            : 'No persisted event is available to rewind yet.'}
+        </p>
+
+        <ActionCommandButton disabled={!canUndo || undoPending} onClick={onUndo} tone="secondary">
+          {undoPending ? 'Undoing...' : 'Undo last step'}
+        </ActionCommandButton>
       </div>
     </Panel>
   )
@@ -5577,11 +5663,11 @@ function cardLocationLabel(card: CardSummary | undefined, fallback: string) {
   }
 
   if (card.zone === 'bench') {
-    return Number.isFinite(card.position) ? `Bench ${card.position + 1}` : 'Bench'
+    return Number.isFinite(card.position) ? `Bench ${card.position}` : 'Bench'
   }
 
   if (card.zone === 'hand') {
-    return Number.isFinite(card.position) ? `hand slot ${card.position + 1}` : 'hand'
+    return Number.isFinite(card.position) ? `hand slot ${card.position}` : 'hand'
   }
 
   return formatEventType(card.zone)
@@ -5811,18 +5897,26 @@ function actionGroupBadgeTone(groupId: ActionGroupId, isPrimaryGroup: boolean): 
 
 function BattlefieldPanel({
   activePlayerId,
+  actionCount,
+  awaitingPromptPlayerIds,
   cardIntentsById,
   currentTurn,
   deckNamesByKey,
+  flowState,
   players,
+  status,
   stadium,
   viewerPlayerId
 }: {
   activePlayerId: string
+  actionCount: number
+  awaitingPromptPlayerIds: string[]
   cardIntentsById: CardIntentMap
   currentTurn: GameState['currentTurn']
   deckNamesByKey: Map<string, string>
+  flowState: string
   players: PlayerView[]
+  status: string
   stadium: CardSummary | null
   viewerPlayerId: PlayerId
 }) {
@@ -5837,6 +5931,16 @@ function BattlefieldPanel({
       title="Table"
       trailing={<StatusBadge tone={currentTurn ? 'active' : 'neutral'}>{turnLabel}</StatusBadge>}
     >
+      <TurnPriorityStrip
+        actionCount={actionCount}
+        activePlayerId={activePlayerId}
+        awaitingPromptPlayerIds={awaitingPromptPlayerIds}
+        currentTurn={currentTurn}
+        flowState={flowState}
+        status={status}
+        viewerPlayerId={viewerPlayerId}
+      />
+
       <div className="prizmo-felt rounded-[2rem] p-2.5 sm:p-3">
         {topPlayer ? (
           <PlayerBattleSide
@@ -5869,6 +5973,83 @@ function BattlefieldPanel({
         ) : null}
       </div>
     </Panel>
+  )
+}
+
+function TurnPriorityStrip({
+  actionCount,
+  activePlayerId,
+  awaitingPromptPlayerIds,
+  currentTurn,
+  flowState,
+  status,
+  viewerPlayerId
+}: {
+  actionCount: number
+  activePlayerId: string
+  awaitingPromptPlayerIds: string[]
+  currentTurn: GameState['currentTurn']
+  flowState: string
+  status: string
+  viewerPlayerId: PlayerId
+}) {
+  const activePlayerLabel = isPlayerId(activePlayerId) ? formatPlayerId(activePlayerId) : 'No active player'
+  const viewerLabel = formatPlayerId(viewerPlayerId)
+  const viewerHasPriority = activePlayerId === viewerPlayerId
+  const promptLabel = awaitingPromptPlayerIds.length
+    ? awaitingPromptPlayerIds.map(playerId => (isPlayerId(playerId) ? formatPlayerId(playerId) : playerId)).join(', ')
+    : 'None'
+  const priorityDetail = viewerHasPriority
+    ? `${viewerLabel} can act from this tab when a legal action is listed.`
+    : `${activePlayerLabel} owns priority. Switch seats before sending commands for that player.`
+
+  return (
+    <div className="mb-3 grid gap-2 rounded-[1.5rem] bg-background/45 p-3 md:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
+      <div className="min-w-0 rounded-2xl bg-surface-control/70 px-3 py-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <StatusBadge tone={viewerHasPriority ? 'active' : 'warning'}>
+            {viewerHasPriority ? 'your priority' : 'other seat priority'}
+          </StatusBadge>
+          <span className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+            {currentTurn ? `Turn ${currentTurn.turnNumber}` : formatEventType(status)}
+          </span>
+        </div>
+        <p className="mt-2 truncate text-sm font-semibold text-foreground">
+          {activePlayerLabel} active, {formatEventType(flowState)}
+        </p>
+        <p className="mt-1 text-xs leading-5 text-muted-foreground">{priorityDetail}</p>
+      </div>
+
+      <div className="grid gap-2 sm:grid-cols-3 md:grid-cols-1 lg:grid-cols-3">
+        <TurnSignal label="Legal actions" value={String(actionCount)} tone={actionCount > 0 ? 'active' : 'neutral'} />
+        <TurnSignal label="Prompts" value={promptLabel} tone={awaitingPromptPlayerIds.length > 0 ? 'warning' : 'neutral'} />
+        <TurnSignal label="Turn state" value={currentTurn ? formatEventType(currentTurn.status) : formatEventType(status)} tone="neutral" />
+      </div>
+    </div>
+  )
+}
+
+function TurnSignal({
+  label,
+  tone,
+  value
+}: {
+  label: string
+  tone: 'active' | 'neutral' | 'warning'
+  value: string
+}) {
+  const toneClassName =
+    tone === 'active'
+      ? 'bg-accent-mint/10 text-accent-mint'
+      : tone === 'warning'
+        ? 'bg-attention/10 text-attention'
+        : 'bg-surface-control/70 text-muted-foreground'
+
+  return (
+    <div className={`min-w-0 rounded-2xl px-3 py-2 ${toneClassName}`}>
+      <p className="text-[0.68rem] font-semibold uppercase tracking-[0.14em] opacity-75">{label}</p>
+      <p className="mt-1 truncate text-sm font-semibold text-foreground">{value}</p>
+    </div>
   )
 }
 
@@ -5966,17 +6147,20 @@ function BattleZone({
   variant: 'active' | 'bench'
 }) {
   const cardVariant = variant === 'active' ? 'active' : 'compact'
+  const countLabel = variant === 'bench' ? `${cards.length}/${BENCH_SLOT_COUNT}` : String(cards.length)
 
   return (
     <div className="rounded-2xl bg-background/45 p-2.5">
       <div className="mb-2 flex items-center justify-between gap-2">
         <h4 className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">{title}</h4>
         <span className="rounded-full bg-muted/80 px-2 py-0.5 text-xs font-medium text-muted-foreground">
-          {cards.length}
+          {countLabel}
         </span>
       </div>
 
-      {cards.length > 0 ? (
+      {variant === 'bench' ? (
+        <BenchSlots cards={cards} cardIntentsById={cardIntentsById} />
+      ) : cards.length > 0 ? (
         <div
           className={
             variant === 'active'
@@ -5994,6 +6178,66 @@ function BattleZone({
         </p>
       )}
     </div>
+  )
+}
+
+function BenchSlots({ cards, cardIntentsById }: { cards: CardSummary[]; cardIntentsById: CardIntentMap }) {
+  const cardsByPosition = new Map(cards.map(card => [card.position, card]))
+
+  return (
+    <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
+      {Array.from({ length: BENCH_SLOT_COUNT }, (_, index) => {
+        const slotNumber = index + 1
+        const card = cardsByPosition.get(slotNumber)
+
+        return (
+          <div className="rounded-xl bg-background/35 p-1.5 ring-1 ring-border/45" key={slotNumber}>
+            <div className="mb-1 flex items-center justify-between gap-2 px-1 text-[0.62rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+              <span>Bench {slotNumber}</span>
+              {card ? <span className="text-accent-mint">occupied</span> : <span>open</span>}
+            </div>
+            {card ? (
+              <CardPill card={card} intent={cardIntentsById.get(card.id)} variant="compact" />
+            ) : (
+              <div className="flex min-h-32 items-center justify-center rounded-xl border border-dashed border-border/60 bg-secondary/35 px-2 py-6 text-center text-xs font-medium text-muted-foreground">
+                Open slot
+              </div>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function EventHistoryPanel({ events }: { events: GameState['events'] }) {
+  const latestEvents = events.slice(-24)
+
+  return (
+    <Panel title="Event history" trailing={<StatusBadge tone={events.length > 0 ? 'active' : 'neutral'}>{events.length} events</StatusBadge>}>
+      <div className="space-y-3">
+        <p className="text-sm leading-6 text-muted-foreground">
+          Persisted domain facts from the engine. New events appear at the bottom so the table reads like a played turn.
+        </p>
+
+        {latestEvents.length > 0 ? (
+          <ol className="max-h-80 space-y-2 overflow-auto pr-1" aria-label="Recent persisted game events">
+            {latestEvents.map(event => (
+              <li
+                className="grid gap-2 rounded-xl bg-secondary/65 px-3 py-2 text-sm sm:grid-cols-[4.5rem_minmax(0,1fr)_auto] sm:items-center"
+                key={event.id}
+              >
+                <span className="font-mono text-xs text-muted-foreground">#{event.index}</span>
+                <span className="min-w-0 truncate font-medium text-foreground">{formatEventType(event.type)}</span>
+                {event.playerId ? <StatusBadge>{formatPlayerId(event.playerId)}</StatusBadge> : <span className="text-xs text-muted-foreground">engine</span>}
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <RailEmptyState title="No events yet">Create or reconnect to a game, then engine facts will appear here.</RailEmptyState>
+        )}
+      </div>
+    </Panel>
   )
 }
 

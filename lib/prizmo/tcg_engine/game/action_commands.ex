@@ -267,6 +267,20 @@ defmodule Prizmo.TcgEngine.Game.ActionCommands do
       end
     end
 
+    action :undo_command, :struct do
+      description "Restore the previous persisted game snapshot through the mechanics layer."
+
+      constraints instance_of: Game
+
+      argument :game_id, :uuid do
+        allow_nil? false
+      end
+
+      run fn input, _context ->
+        Mechanics.undo(input.arguments.game_id)
+      end
+    end
+
     action :play_card_command, :struct do
       description "Play an engine-defined card from hand through the generic mechanics layer."
 

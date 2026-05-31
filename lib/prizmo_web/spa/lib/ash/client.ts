@@ -29,6 +29,7 @@ export {
   skipTcgEngineDrawForTurn as runSkipTcgEngineDrawForTurn,
   startNextTcgEngineTurn as runStartNextTcgEngineTurn,
   startTcgEngineSetup as runStartTcgEngineSetup,
+  undoTcgEngineGame as runUndoTcgEngineGame,
 } from './generated/ash_rpc'
 
 export type {
@@ -90,5 +91,7 @@ export type {
   StartNextTcgEngineTurnResult,
   StartTcgEngineSetupInput,
   StartTcgEngineSetupResult,
+  UndoTcgEngineGameInput,
+  UndoTcgEngineGameResult,
 } from './generated/ash_rpc'
 export type { TcgEngineGameResourceSchema, UserResourceSchema } from './generated/ash_types'
