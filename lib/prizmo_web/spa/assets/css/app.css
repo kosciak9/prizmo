@@ -101,7 +101,7 @@
   --accent-foreground: var(--text-primary);
   --destructive: var(--danger);
   --destructive-foreground: var(--surface-root);
-  --border: oklch(0.4313 0 89.88 / 45%);
+  --border: oklch(0.4313 0 89.88 / 26%);
   --input: var(--surface-control);
   --ring: var(--accent-primary);
   --chart-1: var(--accent-primary);
@@ -116,7 +116,7 @@
   --sidebar-primary-foreground: var(--surface-root);
   --sidebar-accent: var(--surface-selected);
   --sidebar-accent-foreground: var(--text-primary);
-  --sidebar-border: oklch(0.4313 0 89.88 / 45%);
+  --sidebar-border: oklch(0.4313 0 89.88 / 26%);
   --sidebar-ring: var(--accent-primary);
 }
 
@@ -137,7 +137,7 @@
   --accent-foreground: var(--text-primary);
   --destructive: var(--danger);
   --destructive-foreground: var(--surface-root);
-  --border: oklch(0.4313 0 89.88 / 45%);
+  --border: oklch(0.4313 0 89.88 / 26%);
   --input: var(--surface-control);
   --ring: var(--accent-primary);
   --chart-1: var(--accent-primary);
@@ -151,8 +151,90 @@
   --sidebar-primary-foreground: var(--surface-root);
   --sidebar-accent: var(--surface-selected);
   --sidebar-accent-foreground: var(--text-primary);
-  --sidebar-border: oklch(0.4313 0 89.88 / 45%);
+  --sidebar-border: oklch(0.4313 0 89.88 / 26%);
   --sidebar-ring: var(--accent-primary);
+}
+
+@layer components {
+  .prizmo-workbench-bg {
+    background:
+      radial-gradient(
+        circle at 12% 0%,
+        color-mix(in oklch, var(--primary) 9%, transparent),
+        transparent 28rem
+      ),
+      radial-gradient(
+        circle at 78% 6%,
+        color-mix(in oklch, var(--accent-mint) 5%, transparent),
+        transparent 24rem
+      ),
+      var(--background);
+  }
+
+  .prizmo-panel {
+    background: color-mix(in oklch, var(--card) 72%, transparent);
+    box-shadow: inset 0 1px 0 color-mix(in oklch, var(--foreground) 5%, transparent);
+  }
+
+  .prizmo-soft-surface {
+    background: color-mix(in oklch, var(--secondary) 70%, transparent);
+    box-shadow: inset 0 1px 0 color-mix(in oklch, var(--foreground) 4%, transparent);
+  }
+
+  .prizmo-felt {
+    background:
+      radial-gradient(
+        circle at 50% 0%,
+        color-mix(in oklch, var(--accent-mint) 8%, transparent),
+        transparent 34rem
+      ),
+      linear-gradient(
+        180deg,
+        color-mix(in oklch, var(--surface-selected) 64%, transparent),
+        color-mix(in oklch, var(--surface-control) 78%, transparent)
+      );
+    box-shadow: inset 0 1px 0 color-mix(in oklch, var(--foreground) 5%, transparent);
+  }
+
+  .prizmo-workbench-bg :where([class*="bg-stone-50"], [class*="bg-stone-100"], .bg-white, [class*="bg-white/"]) {
+    background-color: color-mix(in oklch, var(--surface-control) 74%, transparent) !important;
+  }
+
+  .prizmo-workbench-bg :where([class*="bg-emerald-50"], [class*="bg-emerald-100"], [class*="bg-cyan-50"], [class*="bg-cyan-100"], [class*="bg-sky-50"], [class*="bg-sky-100"]) {
+    background-color: color-mix(in oklch, var(--accent-mint) 10%, transparent) !important;
+  }
+
+  .prizmo-workbench-bg :where([class*="bg-amber-50"], [class*="bg-amber-100"], [class*="bg-yellow-50"], [class*="bg-yellow-100"], [class*="bg-orange-50"], [class*="bg-orange-100"]) {
+    background-color: color-mix(in oklch, var(--attention) 10%, transparent) !important;
+  }
+
+  .prizmo-workbench-bg :where([class*="bg-violet-50"], [class*="bg-violet-100"], [class*="bg-fuchsia-50"], [class*="bg-fuchsia-100"]) {
+    background-color: color-mix(in oklch, var(--primary) 10%, transparent) !important;
+  }
+
+  .prizmo-workbench-bg :where([class*="border-stone-"], [class*="border-emerald-"], [class*="border-cyan-"], [class*="border-sky-"], [class*="border-amber-"], [class*="border-yellow-"], [class*="border-orange-"], [class*="border-violet-"], [class*="border-fuchsia-"]) {
+    border-color: color-mix(in oklch, var(--foreground) 9%, transparent) !important;
+  }
+
+  .prizmo-workbench-bg :where([class*="text-stone-950"], [class*="text-stone-900"], [class*="text-emerald-950"], [class*="text-yellow-950"], [class*="text-cyan-950"], [class*="text-sky-950"], [class*="text-violet-950"], [class*="text-fuchsia-950"]) {
+    color: var(--foreground) !important;
+  }
+
+  .prizmo-workbench-bg :where([class*="text-stone-700"], [class*="text-stone-600"], [class*="text-stone-500"]) {
+    color: var(--muted-foreground) !important;
+  }
+
+  .prizmo-workbench-bg :where([class*="text-emerald-"], [class*="text-cyan-"], [class*="text-sky-"]) {
+    color: var(--accent-mint) !important;
+  }
+
+  .prizmo-workbench-bg :where([class*="text-amber-"], [class*="text-yellow-"], [class*="text-orange-"]) {
+    color: var(--attention) !important;
+  }
+
+  .prizmo-workbench-bg :where([class*="text-violet-"], [class*="text-fuchsia-"]) {
+    color: var(--primary) !important;
+  }
 }
 
 @layer base {

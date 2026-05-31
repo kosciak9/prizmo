@@ -4,18 +4,20 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   runAttachTcgEngineEnergy,
   buildAshRpcHeaders,
+  runCallTcgEngineCoinToss,
   runChooseTcgEngineActiveFromHand,
   runChooseTcgEnginePrompt,
   runChooseTcgEngineReplacementActive,
   runChooseTcgEngineSetupBenchFromHand,
+  runChooseTcgEngineStartingPlayer,
   runCompleteTcgEngineSetup,
   runCreateTcgEngineGame,
   runDeclareTcgEngineAttack,
   runDrawTcgEngineCardForTurn,
   runDrawTcgEngineOpeningHand,
-  runEndTcgEngineTurn,
   runEvolveTcgEngineFromHand,
   runFinishTcgEngineAttack,
+  runFinishTcgEngineSetupChoices,
   runGetTcgEngineGameState,
   runListSupportedTcgDecks,
   runOpenTcgEngineActionWindow,
@@ -542,6 +544,18 @@ type SetupCardCommand = {
   cardInstanceId: string
 }
 
+type CoinTossCall = 'heads' | 'tails'
+
+type CoinTossCommand = {
+  playerId: PlayerId
+  call: CoinTossCall
+}
+
+type ChooseStartingPlayerCommand = {
+  chooserPlayerId: PlayerId
+  startingPlayerId: PlayerId
+}
+
 type TurnPlayerCommand = {
   playerId: string
 }
@@ -677,6 +691,21 @@ export function HomeRoute() {
     }
   })
 
+  const callCoinTossMutation = useMutation({
+    mutationFn: (input: { gameId: string; playerId: PlayerId; call: CoinTossCall }) => callCoinToss(input),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['tcg-engine', 'game-state'] })
+    }
+  })
+
+  const chooseStartingPlayerMutation = useMutation({
+    mutationFn: (input: { gameId: string; chooserPlayerId: PlayerId; startingPlayerId: PlayerId }) =>
+      chooseStartingPlayer(input),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['tcg-engine', 'game-state'] })
+    }
+  })
+
   const drawOpeningHandMutation = useMutation({
     mutationFn: (gameId: string) => drawOpeningHand(gameId),
     onSuccess: async () => {
@@ -694,6 +723,13 @@ export function HomeRoute() {
   const chooseSetupBenchMutation = useMutation({
     mutationFn: (input: { gameId: string; playerId: PlayerId; cardInstanceId: string }) =>
       chooseSetupBenchFromHand(input),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['tcg-engine', 'game-state'] })
+    }
+  })
+
+  const finishSetupChoicesMutation = useMutation({
+    mutationFn: (input: { gameId: string; playerId: PlayerId }) => finishSetupChoices(input),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['tcg-engine', 'game-state'] })
     }
@@ -872,6 +908,16 @@ export function HomeRoute() {
     )
   const flowCommandError =
     commandErrorNotice(
+      callCoinTossMutation.error,
+      'Coin toss failed',
+      'No coin toss was recorded. Refresh state and retry only while the game is waiting for a call.'
+    ) ??
+    commandErrorNotice(
+      chooseStartingPlayerMutation.error,
+      'Starting player choice failed',
+      'No starting player was chosen. Confirm this tab is viewing the coin toss winner, refresh state, then choose again.'
+    ) ??
+    commandErrorNotice(
       startSetupMutation.error,
       'Setup start failed',
       'Setup was not started. Refresh state and retry only if the table still has no setup record.'
@@ -890,6 +936,11 @@ export function HomeRoute() {
       chooseSetupBenchMutation.error,
       'Setup Bench choice failed',
       'No setup Bench Pokémon was added. Confirm this viewer has an Active Pokémon and an open Bench slot, then retry.'
+    ) ??
+    commandErrorNotice(
+      finishSetupChoicesMutation.error,
+      'Setup ready failed',
+      'This player was not marked ready. Confirm the player has an Active Pokémon and setup choices are still open.'
     ) ??
     commandErrorNotice(
       placePrizesMutation.error,
@@ -979,34 +1030,37 @@ export function HomeRoute() {
   }
 
   return (
-    <main className="min-h-screen bg-stone-50 text-stone-950">
-      <div className="mx-auto flex w-full max-w-[96rem] flex-col gap-8 px-5 py-6 sm:px-8 lg:px-10">
-        <header className="flex flex-col gap-5 border-b border-stone-200 pb-6 lg:flex-row lg:items-end lg:justify-between">
-          <div className="max-w-3xl">
-            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-stone-500">
-              Prizmo TCG engine
+    <main className="prizmo-workbench-bg min-h-screen text-foreground">
+      <div className="mx-auto flex w-full max-w-[96rem] flex-col gap-6 px-5 py-6 sm:px-8 lg:px-10">
+        <header className="flex flex-col gap-4 pb-2 lg:flex-row lg:items-center lg:justify-between">
+          <div className="max-w-2xl">
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary">
+              Prizmo table
             </p>
-            <h1 className="mt-3 text-3xl font-semibold tracking-tight text-stone-950 sm:text-4xl">
-              Ash-backed playtest console
+            <h1 className="mt-3 text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
+              Playtest board
             </h1>
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-stone-600">
-              Create a supported fixture game, reconnect by game ID, and play from a tab-scoped
-              player seat backed by the persisted engine.
+            <p className="mt-3 max-w-xl text-sm leading-6 text-muted-foreground">
+              Create or reconnect to a persisted Pokémon TCG fixture. Keep the table primary; use the rail only when the engine needs a choice.
             </p>
           </div>
 
-          <div className="min-w-56 rounded-2xl border border-stone-200 bg-stone-100 px-4 py-3 text-sm text-stone-700">
-            <p className="font-medium text-stone-950">Current seat</p>
-            <p className="mt-1 text-sm font-semibold text-stone-950">{formatPlayerId(session.viewerPlayerId)}</p>
-            <p className="mt-1 font-mono text-xs text-stone-500">
+          <div className="prizmo-soft-surface flex min-w-0 items-center gap-3 rounded-full px-4 py-2 text-sm text-muted-foreground">
+            <span className="font-medium text-foreground">{formatPlayerId(session.viewerPlayerId)}</span>
+            <span className="h-1 w-1 rounded-full bg-muted-foreground/45" />
+            <span className="truncate font-mono text-xs">
               {normalisedGameId ? formatGameId(normalisedGameId) : 'No game selected'}
-            </p>
+            </span>
           </div>
         </header>
 
-        <section className="grid gap-5 lg:grid-cols-[minmax(18rem,24rem)_1fr]">
+        <section
+          className={`grid gap-6 ${
+            normalisedGameId ? 'lg:grid-cols-[minmax(14rem,16rem)_1fr]' : 'lg:grid-cols-[minmax(18rem,22rem)_1fr]'
+          }`}
+        >
           <aside className="flex flex-col gap-5">
-            <Panel title="Create or reconnect">
+            <Panel title={normalisedGameId ? 'Session' : 'Create or reconnect'}>
               <div className="space-y-4">
                 <SessionConnectionSummary
                   gameId={normalisedGameId}
@@ -1015,48 +1069,52 @@ export function HomeRoute() {
                   viewerPlayerId={session.viewerPlayerId}
                 />
 
-                {decksQuery.isPending ? <SkeletonLines count={3} /> : null}
+                {!normalisedGameId ? (
+                  <>
+                    {decksQuery.isPending ? <SkeletonLines count={3} /> : null}
 
-                {decksQuery.error ? (
-                  <InlineNotice tone="error" title="Deck fixtures did not load">
-                    {errorMessage(decksQuery.error)} Refresh before creating a table so both fixture
-                    selectors use the engine-owned deck catalog.
-                  </InlineNotice>
+                    {decksQuery.error ? (
+                      <InlineNotice tone="error" title="Deck fixtures did not load">
+                        {errorMessage(decksQuery.error)} Refresh before creating a table so both fixture
+                        selectors use the engine-owned deck catalog.
+                      </InlineNotice>
+                    ) : null}
+
+                    {!decksQuery.isPending && decks.length === 0 ? (
+                      <InlineNotice tone="info" title="No supported decks exposed yet">
+                        The engine RPC returned an empty fixture list.
+                      </InlineNotice>
+                    ) : null}
+
+                    <DeckSelect
+                      label="Player 1 loadout"
+                      playerId={PLAYER_ONE_ID}
+                      value={selectedPlayerOneDeckKey}
+                      decks={decks}
+                      onChange={setPlayerOneDeckKey}
+                    />
+                    <DeckSelect
+                      label="Player 2 loadout"
+                      playerId={PLAYER_TWO_ID}
+                      value={selectedPlayerTwoDeckKey}
+                      decks={decks}
+                      onChange={setPlayerTwoDeckKey}
+                    />
+                  </>
                 ) : null}
-
-                {!decksQuery.isPending && decks.length === 0 ? (
-                  <InlineNotice tone="info" title="No supported decks exposed yet">
-                    The engine RPC returned an empty fixture list.
-                  </InlineNotice>
-                ) : null}
-
-                <DeckSelect
-                  label="Player 1 loadout"
-                  playerId={PLAYER_ONE_ID}
-                  value={selectedPlayerOneDeckKey}
-                  decks={decks}
-                  onChange={setPlayerOneDeckKey}
-                />
-                <DeckSelect
-                  label="Player 2 loadout"
-                  playerId={PLAYER_TWO_ID}
-                  value={selectedPlayerTwoDeckKey}
-                  decks={decks}
-                  onChange={setPlayerTwoDeckKey}
-                />
 
                 <fieldset className="space-y-2">
-                  <legend className="text-sm font-medium text-stone-800">View as</legend>
+                  <legend className="text-sm font-medium text-foreground">View as</legend>
                   <div className="grid grid-cols-2 gap-2">
                     {PLAYER_IDS.map(playerId => (
                       <label
-                        className="flex cursor-pointer items-center justify-between rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-700 has-[:checked]:border-emerald-500 has-[:checked]:bg-emerald-50 has-[:checked]:text-emerald-950"
+                        className="flex cursor-pointer items-center justify-between rounded-xl bg-secondary/75 px-3 py-2 text-sm text-muted-foreground transition hover:bg-accent hover:text-accent-foreground has-[:checked]:bg-primary/12 has-[:checked]:text-primary"
                         key={playerId}
                       >
                         <span>{formatPlayerId(playerId)}</span>
                         <input
                           checked={session.viewerPlayerId === playerId}
-                          className="h-4 w-4 accent-emerald-600"
+                          className="h-4 w-4 accent-primary"
                           name="viewer-player"
                           onChange={() =>
                             updateSession(currentSession => ({
@@ -1071,22 +1129,26 @@ export function HomeRoute() {
                   </div>
                 </fieldset>
 
-                <button
-                  className="w-full rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-stone-50 shadow-sm transition hover:bg-emerald-800 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:bg-stone-300 disabled:text-stone-600"
-                  disabled={!canCreateGame}
-                  onClick={() => createGameMutation.mutate()}
-                  type="button"
-                >
-                  {createGameMutation.isPending ? 'Creating table...' : 'Create game board'}
-                </button>
+                {!normalisedGameId ? (
+                  <button
+                    className="w-full rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm shadow-black/20 transition hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground disabled:shadow-none"
+                    disabled={!canCreateGame}
+                    onClick={() => createGameMutation.mutate()}
+                    type="button"
+                  >
+                    {createGameMutation.isPending ? 'Creating table...' : 'Create game board'}
+                  </button>
+                ) : null}
 
-                <FirstRunSetupGuide
-                  deckCount={decks.length}
-                  hasGame={Boolean(normalisedGameId)}
-                  selectedPlayerOneDeck={selectedPlayerOneDeck}
-                  selectedPlayerTwoDeck={selectedPlayerTwoDeck}
-                  viewerPlayerId={session.viewerPlayerId}
-                />
+                {!normalisedGameId ? (
+                  <FirstRunSetupGuide
+                    deckCount={decks.length}
+                    hasGame={Boolean(normalisedGameId)}
+                    selectedPlayerOneDeck={selectedPlayerOneDeck}
+                    selectedPlayerTwoDeck={selectedPlayerTwoDeck}
+                    viewerPlayerId={session.viewerPlayerId}
+                  />
+                ) : null}
 
                 {createGameMutation.error ? (
                   <InlineNotice tone="error" title="Game creation failed">
@@ -1096,13 +1158,13 @@ export function HomeRoute() {
                 ) : null}
 
                 <label className="block space-y-2">
-                  <span className="text-sm font-medium text-stone-800">Game ID</span>
-                  <span className="block text-xs leading-5 text-stone-500">
+                  <span className="text-sm font-medium text-foreground">Game ID</span>
+                  <span className="block text-xs leading-5 text-muted-foreground">
                     Paste a persisted game UUID. This tab will request {formatPlayerId(session.viewerPlayerId)}'s
                     private view after the ID changes.
                   </span>
                   <input
-                    className="w-full rounded-xl border border-stone-300 bg-stone-50 px-3 py-2 font-mono text-sm text-stone-950 outline-none transition placeholder:text-stone-400 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
+                    className="w-full rounded-xl border border-input bg-input/40 px-3 py-2 font-mono text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring/30"
                     onChange={event => {
                       const gameId = event.currentTarget.value
 
@@ -1116,7 +1178,7 @@ export function HomeRoute() {
 
                 <div className="flex gap-2">
                   <button
-                    className="flex-1 rounded-xl border border-stone-300 px-3 py-2 text-sm font-medium text-stone-700 transition hover:bg-stone-100 focus:outline-none focus:ring-2 focus:ring-stone-300 disabled:cursor-not-allowed disabled:text-stone-400"
+                    className="flex-1 rounded-xl bg-secondary/70 px-3 py-2 text-sm font-medium text-muted-foreground transition hover:bg-accent hover:text-accent-foreground focus:outline-none focus:ring-2 focus:ring-ring/50 disabled:cursor-not-allowed disabled:text-text-dim"
                     disabled={!normalisedGameId || gameStateQuery.isFetching}
                     onClick={() => void gameStateQuery.refetch()}
                     type="button"
@@ -1124,7 +1186,7 @@ export function HomeRoute() {
                     {gameStateQuery.isFetching ? 'Refreshing board...' : 'Refresh board'}
                   </button>
                   <button
-                    className="rounded-xl border border-stone-300 px-3 py-2 text-sm font-medium text-stone-700 transition hover:bg-stone-100 focus:outline-none focus:ring-2 focus:ring-stone-300 disabled:cursor-not-allowed disabled:text-stone-400"
+                    className="rounded-xl bg-secondary/70 px-3 py-2 text-sm font-medium text-muted-foreground transition hover:bg-accent hover:text-accent-foreground focus:outline-none focus:ring-2 focus:ring-ring/50 disabled:cursor-not-allowed disabled:text-text-dim"
                     disabled={!session.gameId}
                     onClick={clearGame}
                     type="button"
@@ -1136,16 +1198,18 @@ export function HomeRoute() {
               </div>
             </Panel>
 
-            <Panel
-              title="Fixture catalog"
-              trailing={<StatusBadge tone={decks.length > 0 ? 'active' : 'neutral'}>{decks.length} decks</StatusBadge>}
-            >
-              <SupportedDeckCatalog
-                decks={decks}
-                playerOneDeckKey={selectedPlayerOneDeckKey}
-                playerTwoDeckKey={selectedPlayerTwoDeckKey}
-              />
-            </Panel>
+            {!normalisedGameId ? (
+              <Panel
+                title="Fixture catalog"
+                trailing={<StatusBadge tone={decks.length > 0 ? 'active' : 'neutral'}>{decks.length} decks</StatusBadge>}
+              >
+                <SupportedDeckCatalog
+                  decks={decks}
+                  playerOneDeckKey={selectedPlayerOneDeckKey}
+                  playerTwoDeckKey={selectedPlayerTwoDeckKey}
+                />
+              </Panel>
+            ) : null}
           </aside>
 
           <section className="min-w-0">
@@ -1179,8 +1243,16 @@ export function HomeRoute() {
                 promptCommandError={promptCommandError}
                 ultraBallPostSearchHandoff={ultraBallPostSearchHandoff}
                 viewerPlayerId={session.viewerPlayerId}
-                onStartSetup={() => startSetupMutation.mutate(normalisedGameId)}
-                onDrawOpeningHand={() => drawOpeningHandMutation.mutate(normalisedGameId)}
+                onCallCoinToss={({ playerId, call }) => {
+                  callCoinTossMutation.mutate({ gameId: normalisedGameId, playerId, call })
+                }}
+                onChooseStartingPlayer={({ chooserPlayerId, startingPlayerId }) => {
+                  chooseStartingPlayerMutation.mutate({
+                    gameId: normalisedGameId,
+                    chooserPlayerId,
+                    startingPlayerId
+                  })
+                }}
                 onChooseSetupActive={({ playerId, cardInstanceId }) => {
                   if (isPlayerId(playerId)) {
                     chooseActiveMutation.mutate({
@@ -1199,20 +1271,11 @@ export function HomeRoute() {
                     })
                   }
                 }}
-                onPlacePrizes={() => placePrizesMutation.mutate(normalisedGameId)}
-                onCompleteSetup={() => completeSetupMutation.mutate(normalisedGameId)}
-                onStartNextTurn={() => startNextTurnMutation.mutate(normalisedGameId)}
-                onDrawForTurn={({ playerId }) => {
+                onFinishSetupChoices={({ playerId }) => {
                   if (isPlayerId(playerId)) {
-                    drawForTurnMutation.mutate({ gameId: normalisedGameId, playerId })
+                    finishSetupChoicesMutation.mutate({ gameId: normalisedGameId, playerId })
                   }
                 }}
-                onSkipDrawForTurn={({ playerId }) => {
-                  if (isPlayerId(playerId)) {
-                    skipDrawForTurnMutation.mutate({ gameId: normalisedGameId, playerId })
-                  }
-                }}
-                onOpenActionWindow={() => openActionWindowMutation.mutate(normalisedGameId)}
                 onChooseReplacementActive={({ playerId, benchCardInstanceId }) => {
                   if (isPlayerId(playerId)) {
                     chooseReplacementActiveMutation.mutate({
@@ -1364,13 +1427,10 @@ export function HomeRoute() {
                     ? chooseReplacementActiveMutation.variables?.benchCardInstanceId ?? null
                     : null
                 }
-                completeSetupPending={completeSetupMutation.isPending}
-                drawForTurnPending={drawForTurnMutation.isPending}
-                drawOpeningHandPending={drawOpeningHandMutation.isPending}
+                callCoinTossPending={callCoinTossMutation.isPending}
+                chooseStartingPlayerPending={chooseStartingPlayerMutation.isPending}
                 promptPendingId={choosePromptMutation.isPending ? choosePromptMutation.variables?.promptId ?? null : null}
                 endTurnPendingPlayerId={endTurnMutation.isPending ? endTurnMutation.variables?.playerId ?? null : null}
-                openActionWindowPending={openActionWindowMutation.isPending}
-                placePrizesPending={placePrizesMutation.isPending}
                 playCardPendingCardId={playCardMutation.isPending ? playCardMutation.variables?.cardInstanceId ?? null : null}
                 retreatPendingKey={
                   retreatMutation.isPending && retreatMutation.variables
@@ -1393,9 +1453,7 @@ export function HomeRoute() {
                 finishAttackPendingPlayerId={
                   finishAttackMutation.isPending ? finishAttackMutation.variables?.playerId ?? null : null
                 }
-                skipDrawForTurnPending={skipDrawForTurnMutation.isPending}
-                startNextTurnPending={startNextTurnMutation.isPending}
-                startSetupPending={startSetupMutation.isPending}
+                finishSetupChoicesPending={finishSetupChoicesMutation.isPending}
               />
             ) : null}
           </section>
@@ -1469,6 +1527,38 @@ async function startSetup(gameId: string): Promise<CreatedGame> {
   return result.data as CreatedGame
 }
 
+async function callCoinToss(input: { gameId: string; playerId: PlayerId; call: CoinTossCall }): Promise<CreatedGame> {
+  const result = await runCallTcgEngineCoinToss({
+    input,
+    fields: GAME_RESOURCE_FIELDS,
+    headers: buildAshRpcHeaders()
+  })
+
+  if (!result.success) {
+    throw new Error(rpcErrorMessage(result.errors))
+  }
+
+  return result.data as CreatedGame
+}
+
+async function chooseStartingPlayer(input: {
+  gameId: string
+  chooserPlayerId: PlayerId
+  startingPlayerId: PlayerId
+}): Promise<CreatedGame> {
+  const result = await runChooseTcgEngineStartingPlayer({
+    input,
+    fields: GAME_RESOURCE_FIELDS,
+    headers: buildAshRpcHeaders()
+  })
+
+  if (!result.success) {
+    throw new Error(rpcErrorMessage(result.errors))
+  }
+
+  return result.data as CreatedGame
+}
+
 async function drawOpeningHand(gameId: string): Promise<CreatedGame> {
   const result = await runDrawTcgEngineOpeningHand({
     input: { gameId },
@@ -1507,6 +1597,20 @@ async function chooseSetupBenchFromHand(input: {
   cardInstanceId: string
 }): Promise<CreatedGame> {
   const result = await runChooseTcgEngineSetupBenchFromHand({
+    input,
+    fields: GAME_RESOURCE_FIELDS,
+    headers: buildAshRpcHeaders()
+  })
+
+  if (!result.success) {
+    throw new Error(rpcErrorMessage(result.errors))
+  }
+
+  return result.data as CreatedGame
+}
+
+async function finishSetupChoices(input: { gameId: string; playerId: PlayerId }): Promise<CreatedGame> {
+  const result = await runFinishTcgEngineSetupChoices({
     input,
     fields: GAME_RESOURCE_FIELDS,
     headers: buildAshRpcHeaders()
@@ -1766,48 +1870,38 @@ function GameStateWorkbench({
   deckNamesByKey,
   promptCommandError,
   ultraBallPostSearchHandoff,
+  onCallCoinToss,
   onChooseSetupActive,
   onChooseSetupBench,
+  onChooseStartingPlayer,
   onChoosePrompt,
   onChooseReplacementActive,
   onAttachEnergy,
   onDeclareAttack,
-  onCompleteSetup,
-  onDrawForTurn,
-  onDrawOpeningHand,
   onEndTurn,
   onEvolveFromHand,
-  onOpenActionWindow,
-  onPlacePrizes,
+  onFinishSetupChoices,
   onFinishAttack,
   onPlayBasicToBench,
   onPlayCard,
   onRetreat,
   onResolveDeclaredAttack,
-  onSkipDrawForTurn,
-  onStartNextTurn,
-  onStartSetup,
   attachEnergyPendingKey,
+  callCoinTossPending,
   chooseSetupActivePendingCardId,
   chooseSetupBenchPendingCardId,
+  chooseStartingPlayerPending,
   chooseReplacementActivePendingCardId,
-  completeSetupPending,
   declareAttackPendingKey,
-  drawForTurnPending,
-  drawOpeningHandPending,
   endTurnPendingPlayerId,
   evolveFromHandPendingKey,
   finishAttackPendingPlayerId,
-  openActionWindowPending,
-  placePrizesPending,
+  finishSetupChoicesPending,
   playBasicToBenchPendingCardId,
   promptPendingId,
   playCardPendingCardId,
   resolveDeclaredAttackPendingPlayerId,
-  retreatPendingKey,
-  skipDrawForTurnPending,
-  startNextTurnPending,
-  startSetupPending
+  retreatPendingKey
 }: {
   actionCommandError: CommandErrorNotice | null
   attackCommandError: CommandErrorNotice | null
@@ -1817,79 +1911,43 @@ function GameStateWorkbench({
   deckNamesByKey: Map<string, string>
   promptCommandError: CommandErrorNotice | null
   ultraBallPostSearchHandoff: UltraBallPostSearchHandoff | null
+  onCallCoinToss: (input: CoinTossCommand) => void
   onChooseSetupActive: (input: SetupCardCommand) => void
   onChooseSetupBench: (input: SetupCardCommand) => void
+  onChooseStartingPlayer: (input: ChooseStartingPlayerCommand) => void
   onChoosePrompt: (input: ChoosePromptCommand) => void
   onChooseReplacementActive: (input: ChooseReplacementActiveCommand) => void
   onAttachEnergy: (input: AttachEnergyCommand) => void
   onDeclareAttack: (input: DeclareAttackCommand) => void
-  onCompleteSetup: () => void
-  onDrawForTurn: (input: TurnPlayerCommand) => void
-  onDrawOpeningHand: () => void
   onEndTurn: (input: EndTurnCommand) => void
   onEvolveFromHand: (input: EvolveFromHandCommand) => void
-  onOpenActionWindow: () => void
-  onPlacePrizes: () => void
+  onFinishSetupChoices: (input: TurnPlayerCommand) => void
   onFinishAttack: (input: FinishAttackCommand) => void
   onPlayBasicToBench: (input: PlayBasicToBenchCommand) => void
   onPlayCard: (input: PlayCardCommand) => void
   onRetreat: (input: RetreatCommand) => void
   onResolveDeclaredAttack: (input: ResolveDeclaredAttackCommand) => void
-  onSkipDrawForTurn: (input: TurnPlayerCommand) => void
-  onStartNextTurn: () => void
-  onStartSetup: () => void
   attachEnergyPendingKey: string | null
+  callCoinTossPending: boolean
   chooseSetupActivePendingCardId: string | null
   chooseSetupBenchPendingCardId: string | null
+  chooseStartingPlayerPending: boolean
   chooseReplacementActivePendingCardId: string | null
-  completeSetupPending: boolean
   declareAttackPendingKey: string | null
-  drawForTurnPending: boolean
-  drawOpeningHandPending: boolean
   endTurnPendingPlayerId: string | null
   evolveFromHandPendingKey: string | null
   finishAttackPendingPlayerId: string | null
-  openActionWindowPending: boolean
-  placePrizesPending: boolean
+  finishSetupChoicesPending: boolean
   playBasicToBenchPendingCardId: string | null
   promptPendingId: string | null
   playCardPendingCardId: string | null
   resolveDeclaredAttackPendingPlayerId: string | null
   retreatPendingKey: string | null
-  skipDrawForTurnPending: boolean
-  startNextTurnPending: boolean
-  startSetupPending: boolean
 }) {
   const cardsById = useMemo(() => visibleCardsById(gameState), [gameState])
 
   return (
     <div className="space-y-5">
-      <Panel
-        title="Game state"
-        trailing={<StatusBadge tone={gameState.status === 'finished' ? 'neutral' : 'active'}>{gameState.status}</StatusBadge>}
-      >
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <Metric label="Game ID" value={gameState.gameId} mono />
-          <Metric label="Active player" value={formatPlayerId(gameState.activePlayerId)} />
-          <Metric label="Cursor" value={`${gameState.cursorIndex} of ${gameState.latestEventIndex}`} />
-          <Metric label="Setup" value={gameState.setup?.status ?? 'not started'} />
-        </div>
-
-        <div className="mt-5 grid gap-3 md:grid-cols-2">
-          <StateRow label="First player" value={formatPlayerId(gameState.firstPlayerId)} />
-          <StateRow label="Winner" value={gameState.winnerPlayerId ? formatPlayerId(gameState.winnerPlayerId) : 'None'} />
-          <StateRow
-            label="Current turn"
-            value={
-              gameState.currentTurn
-                ? `Turn ${gameState.currentTurn.turnNumber}, ${gameState.currentTurn.status}`
-                : 'None'
-            }
-          />
-          <StateRow label="Stadium" value={gameState.stadium?.name ?? 'None'} />
-        </div>
-      </Panel>
-
       <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(19rem,24rem)]">
         <BattlefieldPanel
           activePlayerId={gameState.activePlayerId}
@@ -1902,28 +1960,18 @@ function GameStateWorkbench({
 
         <aside className="space-y-5 xl:sticky xl:top-6" aria-label="Player command rail">
           <GameFlowPanel
+            callCoinTossPending={callCoinTossPending}
             commandError={flowCommandError}
-            completeSetupPending={completeSetupPending}
             chooseSetupActivePendingCardId={chooseSetupActivePendingCardId}
             chooseSetupBenchPendingCardId={chooseSetupBenchPendingCardId}
-            drawForTurnPending={drawForTurnPending}
-            drawOpeningHandPending={drawOpeningHandPending}
+            chooseStartingPlayerPending={chooseStartingPlayerPending}
+            finishSetupChoicesPending={finishSetupChoicesPending}
             gameState={gameState}
+            onCallCoinToss={onCallCoinToss}
             onChooseSetupActive={onChooseSetupActive}
             onChooseSetupBench={onChooseSetupBench}
-            onCompleteSetup={onCompleteSetup}
-            onDrawForTurn={onDrawForTurn}
-            onDrawOpeningHand={onDrawOpeningHand}
-            onOpenActionWindow={onOpenActionWindow}
-            onPlacePrizes={onPlacePrizes}
-            onSkipDrawForTurn={onSkipDrawForTurn}
-            onStartNextTurn={onStartNextTurn}
-            onStartSetup={onStartSetup}
-            openActionWindowPending={openActionWindowPending}
-            placePrizesPending={placePrizesPending}
-            skipDrawForTurnPending={skipDrawForTurnPending}
-            startNextTurnPending={startNextTurnPending}
-            startSetupPending={startSetupPending}
+            onChooseStartingPlayer={onChooseStartingPlayer}
+            onFinishSetupChoices={onFinishSetupChoices}
             viewerPlayerId={viewerPlayerId}
           />
 
@@ -1973,19 +2021,45 @@ function GameStateWorkbench({
         </aside>
       </div>
 
+      <Panel
+        title="State summary"
+        trailing={<StatusBadge tone={gameState.status === 'finished' ? 'neutral' : 'active'}>{gameState.status}</StatusBadge>}
+      >
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <Metric label="Game ID" value={gameState.gameId} mono />
+          <Metric label="Active player" value={formatPlayerId(gameState.activePlayerId)} />
+          <Metric label="Cursor" value={`${gameState.cursorIndex} of ${gameState.latestEventIndex}`} />
+          <Metric label="Setup" value={gameState.setup?.status ?? 'not started'} />
+        </div>
+
+        <div className="mt-5 grid gap-3 md:grid-cols-2">
+          <StateRow label="First player" value={formatPlayerId(gameState.firstPlayerId)} />
+          <StateRow label="Winner" value={gameState.winnerPlayerId ? formatPlayerId(gameState.winnerPlayerId) : 'None'} />
+          <StateRow
+            label="Current turn"
+            value={
+              gameState.currentTurn
+                ? `Turn ${gameState.currentTurn.turnNumber}, ${gameState.currentTurn.status}`
+                : 'None'
+            }
+          />
+          <StateRow label="Stadium" value={gameState.stadium?.name ?? 'None'} />
+        </div>
+      </Panel>
+
       <div className="grid gap-5">
         <Panel title="Event log">
           {gameState.events.length > 0 ? (
             <ol className="space-y-2">
               {gameState.events.map(event => (
                 <li
-                  className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-sm"
+                  className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl bg-secondary/65 px-3 py-2 text-sm"
                   key={event.id}
                 >
-                  <span className="font-mono text-xs text-stone-500">#{event.index}</span>
-                  <span className="font-medium text-stone-950">{formatEventType(event.type)}</span>
+                  <span className="font-mono text-xs text-muted-foreground">#{event.index}</span>
+                  <span className="font-medium text-foreground">{formatEventType(event.type)}</span>
                   {event.playerId ? (
-                    <span className="text-xs text-stone-500">{formatPlayerId(event.playerId)}</span>
+                    <span className="text-xs text-muted-foreground">{formatPlayerId(event.playerId)}</span>
                   ) : null}
                 </li>
               ))}
@@ -2003,76 +2077,54 @@ function GameStateWorkbench({
 }
 
 function GameFlowPanel({
+  callCoinTossPending,
   commandError,
-  completeSetupPending,
   chooseSetupActivePendingCardId,
   chooseSetupBenchPendingCardId,
-  drawForTurnPending,
-  drawOpeningHandPending,
+  chooseStartingPlayerPending,
+  finishSetupChoicesPending,
   gameState,
+  onCallCoinToss,
   onChooseSetupActive,
   onChooseSetupBench,
-  onCompleteSetup,
-  onDrawForTurn,
-  onDrawOpeningHand,
-  onOpenActionWindow,
-  onPlacePrizes,
-  onSkipDrawForTurn,
-  onStartNextTurn,
-  onStartSetup,
-  openActionWindowPending,
-  placePrizesPending,
-  skipDrawForTurnPending,
-  startNextTurnPending,
-  startSetupPending,
+  onChooseStartingPlayer,
+  onFinishSetupChoices,
   viewerPlayerId
 }: {
+  callCoinTossPending: boolean
   commandError: CommandErrorNotice | null
-  completeSetupPending: boolean
   chooseSetupActivePendingCardId: string | null
   chooseSetupBenchPendingCardId: string | null
-  drawForTurnPending: boolean
-  drawOpeningHandPending: boolean
+  chooseStartingPlayerPending: boolean
+  finishSetupChoicesPending: boolean
   gameState: GameState
+  onCallCoinToss: (input: CoinTossCommand) => void
   onChooseSetupActive: (input: SetupCardCommand) => void
   onChooseSetupBench: (input: SetupCardCommand) => void
-  onCompleteSetup: () => void
-  onDrawForTurn: (input: TurnPlayerCommand) => void
-  onDrawOpeningHand: () => void
-  onOpenActionWindow: () => void
-  onPlacePrizes: () => void
-  onSkipDrawForTurn: (input: TurnPlayerCommand) => void
-  onStartNextTurn: () => void
-  onStartSetup: () => void
-  openActionWindowPending: boolean
-  placePrizesPending: boolean
-  skipDrawForTurnPending: boolean
-  startNextTurnPending: boolean
-  startSetupPending: boolean
+  onChooseStartingPlayer: (input: ChooseStartingPlayerCommand) => void
+  onFinishSetupChoices: (input: TurnPlayerCommand) => void
   viewerPlayerId: PlayerId
 }) {
   const viewerPlayer = gameState.players.find(player => player.playerId === viewerPlayerId)
-  const currentTurnActivePlayerId = gameState.currentTurn?.activePlayerId
-  const currentTurnActivePlayerIsViewer = currentTurnActivePlayerId === viewerPlayerId
-  const currentTurnActivePlayerLabel = currentTurnActivePlayerId
-    ? formatPlayerId(currentTurnActivePlayerId)
-    : 'the turn owner'
+  const flowState = gameState.flowState
+  const flowStateLabel = formatEventType(flowState)
+  const awaitingCoinToss = flowState === 'pregame_awaiting_coin_toss'
+  const awaitingStartingPlayerChoice = flowState === 'pregame_awaiting_starting_player_choice'
+  const choosingSetupActive = flowState === 'setup_choosing_opening_active'
+  const choosingSetupBench = flowState === 'setup_choosing_opening_bench'
+  const automaticFlowState = isAutomaticFlowState(flowState)
   const setupActiveCandidates = viewerPlayer?.hand.filter(isSetupActiveCandidate) ?? []
   const setupBenchCandidates = viewerPlayer?.hand.filter(isSetupBenchCandidate) ?? []
-  const allPlayersHaveSetupActive = gameState.players.every(player => player.active)
-  const setupPrizesAreUnplaced = gameState.players.every(player => player.prizeCount === 0)
-  const turnStepPending = drawForTurnPending || skipDrawForTurnPending || openActionWindowPending
   const setupStatus = gameState.setup?.status ?? 'not started'
-  const setupCompleted = gameState.setup?.status === 'completed'
-  const setupChoicesClosed = gameState.setup?.status === 'prizes_placed' || setupCompleted
+  const setupCompleted = gameState.setup?.status === 'completed' || gameState.status === 'in_progress'
+  const setupChoicesClosed = Boolean(viewerPlayer?.setupReady || setupCompleted)
+  const coinTossWinnerPlayerId = isPlayerId(gameState.coinTossWinnerPlayerId) ? gameState.coinTossWinnerPlayerId : null
+  const viewerCanChooseStartingPlayer = awaitingStartingPlayerChoice && coinTossWinnerPlayerId === viewerPlayerId
+  const allPlayersSetupReady = gameState.players.every(player => player.setupReady)
   const turnStatus = gameState.currentTurn
     ? `turn ${gameState.currentTurn.turnNumber}: ${formatEventType(gameState.currentTurn.status)}`
     : 'no turn'
-  const flowStatus = setupCompleted ? turnStatus : setupStatus
-  const nextTurnOwnerId = gameState.currentTurn?.status === 'ended'
-    ? (gameState.players.find(player => player.playerId !== gameState.currentTurn?.activePlayerId)?.playerId ?? gameState.activePlayerId)
-    : null
-  const nextTurnOwnerLabel = nextTurnOwnerId ? formatPlayerId(nextTurnOwnerId) : null
+  const flowStatus = gameState.status === 'finished' ? 'finished' : setupCompleted ? turnStatus : flowStateLabel
   const tableSetupDetail = setupCompleted
     ? completedSetupTurnDetail({
         currentTurn: gameState.currentTurn,
@@ -2080,69 +2132,39 @@ function GameFlowPanel({
         players: gameState.players,
         viewerPlayerId
       })
-    : 'Build the opening board from the viewer hand, then move into the first turn.'
-  const canStartSetup = !gameState.setup && !startSetupPending
-  const canDrawOpeningHand = gameState.setup?.status === 'waiting_to_draw' && !drawOpeningHandPending
+    : 'Call the coin toss, choose who starts, then make only player-owned setup choices. The engine handles forced steps.'
   const canChooseSetupActive = Boolean(
-    gameState.setup?.status === 'hands_drawn' &&
+    choosingSetupActive &&
       viewerPlayer &&
+      !viewerPlayer.setupReady &&
       !viewerPlayer.active &&
       setupActiveCandidates.length > 0 &&
       !chooseSetupActivePendingCardId
   )
   const canChooseSetupBench = Boolean(
-    gameState.setup?.status === 'hands_drawn' &&
+    choosingSetupBench &&
       viewerPlayer &&
+      !viewerPlayer.setupReady &&
       viewerPlayer.active &&
       viewerPlayer.bench.length < 5 &&
       setupBenchCandidates.length > 0 &&
       !chooseSetupBenchPendingCardId
   )
-  const canPlacePrizes = Boolean(
-    gameState.setup?.status === 'hands_drawn' &&
-      allPlayersHaveSetupActive &&
-      setupPrizesAreUnplaced &&
-      !placePrizesPending
-  )
-  const canCompleteSetup = gameState.setup?.status === 'prizes_placed' && !completeSetupPending
-  const canStartNextTurn = Boolean(
-    gameState.status === 'in_progress' &&
-      gameState.setup?.status === 'completed' &&
-      (!gameState.currentTurn || gameState.currentTurn.status === 'ended') &&
-      !startNextTurnPending
-  )
-  const canDrawForTurn = Boolean(
-    gameState.status === 'in_progress' &&
-      gameState.currentTurn?.status === 'start' &&
-      currentTurnActivePlayerId &&
-      isPlayerId(currentTurnActivePlayerId) &&
-      currentTurnActivePlayerIsViewer &&
-      !turnStepPending
-  )
-  const canSkipDrawForTurn = canDrawForTurn
-  const canOpenActionWindow = Boolean(
-    gameState.status === 'in_progress' &&
-      gameState.currentTurn?.status === 'drawn' &&
-      currentTurnActivePlayerIsViewer &&
-      !turnStepPending
+  const canFinishSetupChoices = Boolean(
+    choosingSetupBench && viewerPlayer?.active && !viewerPlayer.setupReady && !finishSetupChoicesPending
   )
   const openingActiveStatusMessage = viewerPlayer?.active
     ? `${viewerPlayer.active.name} is this viewer's setup Active.`
     : setupChoicesClosed
       ? 'Setup Active choices are locked after Prize placement.'
-      : 'Draw opening hands, then view a player without an Active Pokémon to choose one.'
+      : choosingSetupActive
+        ? 'View a player without an Active Pokémon to choose one.'
+        : 'The engine will deal opening hands before Active choices open.'
   const openingBenchUnavailableMessage = setupChoicesClosed
     ? 'Setup Bench choices are locked after Prize placement.'
-    : 'Draw opening hands and choose this viewer\'s Active Pokémon before benching setup Pokémon.'
-  const placePrizesButtonLabel = placePrizesPending
-    ? 'Placing prizes...'
-    : setupChoicesClosed
-      ? 'Prizes placed'
-      : gameState.setup?.status === 'hands_drawn'
-        ? allPlayersHaveSetupActive
-          ? 'Place setup prizes'
-          : 'Choose both Active Pokémon first'
-        : 'Choose Active Pokémon first'
+    : choosingSetupBench
+      ? 'Choose this viewer\'s Active Pokémon before benching setup Pokémon.'
+      : 'Opening Bench choices open after both players have an Active Pokémon.'
 
   return (
     <Panel title="Game flow" trailing={<StatusBadge tone={gameState.setup ? 'active' : 'neutral'}>{flowStatus}</StatusBadge>}>
@@ -2173,21 +2195,86 @@ function GameFlowPanel({
             <>
               <SetupPathGuide gameState={gameState} viewerPlayerId={viewerPlayerId} />
 
-              <div className="mt-3 space-y-2">
-                <ActionCommandButton disabled={!canStartSetup} onClick={onStartSetup} tone={gameState.setup ? 'secondary' : 'primary'}>
-                  {startSetupPending ? 'Starting setup...' : gameState.setup ? 'Setup already started' : 'Start setup'}
-                </ActionCommandButton>
+              {awaitingCoinToss ? (
+                <div className="mt-3 rounded-xl border border-stone-200 bg-stone-50 p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h4 className="text-xs font-semibold uppercase tracking-[0.14em] text-stone-500">Coin toss</h4>
+                      <p className="mt-1 text-xs leading-5 text-stone-500">
+                        Call heads or tails as {formatPlayerId(viewerPlayerId)}. The winner chooses who starts.
+                      </p>
+                    </div>
+                    <StatusBadge tone="warning">call needed</StatusBadge>
+                  </div>
 
-                <ActionCommandButton disabled={!canDrawOpeningHand} onClick={onDrawOpeningHand} tone="primary">
-                  {drawOpeningHandPending
-                    ? 'Drawing opening hands...'
-                    : gameState.setup?.status === 'waiting_to_draw'
-                      ? 'Draw opening hands'
-                      : gameState.setup
-                        ? 'Opening hands resolved'
-                        : 'Start setup first'}
-                </ActionCommandButton>
-              </div>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
+                    <ActionCommandButton
+                      disabled={callCoinTossPending}
+                      onClick={() => onCallCoinToss({ playerId: viewerPlayerId, call: 'heads' })}
+                      tone="primary"
+                    >
+                      {callCoinTossPending ? 'Calling heads...' : 'Call heads'}
+                    </ActionCommandButton>
+
+                    <ActionCommandButton
+                      disabled={callCoinTossPending}
+                      onClick={() => onCallCoinToss({ playerId: viewerPlayerId, call: 'tails' })}
+                    >
+                      {callCoinTossPending ? 'Calling tails...' : 'Call tails'}
+                    </ActionCommandButton>
+                  </div>
+                </div>
+              ) : null}
+
+              {awaitingStartingPlayerChoice ? (
+                <div className="mt-3 rounded-xl border border-stone-200 bg-stone-50 p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h4 className="text-xs font-semibold uppercase tracking-[0.14em] text-stone-500">Starting player</h4>
+                      <p className="mt-1 text-xs leading-5 text-stone-500">
+                        {coinTossWinnerPlayerId
+                          ? `${formatPlayerId(coinTossWinnerPlayerId)} won the toss and chooses who takes turn one.`
+                          : 'The coin toss winner chooses who takes turn one.'}
+                      </p>
+                    </div>
+                    <StatusBadge tone={viewerCanChooseStartingPlayer ? 'warning' : 'neutral'}>
+                      {viewerCanChooseStartingPlayer ? 'your choice' : 'waiting'}
+                    </StatusBadge>
+                  </div>
+
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
+                    {PLAYER_IDS.map(playerId => (
+                      <ActionCommandButton
+                        disabled={!viewerCanChooseStartingPlayer || chooseStartingPlayerPending}
+                        key={playerId}
+                        onClick={() => onChooseStartingPlayer({ chooserPlayerId: viewerPlayerId, startingPlayerId: playerId })}
+                        tone={playerId === viewerPlayerId ? 'primary' : 'secondary'}
+                      >
+                        {chooseStartingPlayerPending
+                          ? `Choosing ${formatPlayerId(playerId)}...`
+                          : viewerCanChooseStartingPlayer
+                            ? `Choose ${formatPlayerId(playerId)} to start`
+                            : coinTossWinnerPlayerId
+                              ? `Use ${formatPlayerId(coinTossWinnerPlayerId)} tab to choose`
+                              : 'Waiting for coin toss result'}
+                      </ActionCommandButton>
+                    ))}
+                  </div>
+
+                  {gameState.coinTossCall && gameState.coinTossResult ? (
+                    <p className="mt-3 rounded-lg border border-dashed border-stone-300 px-3 py-2 text-xs leading-5 text-stone-500">
+                      {formatPlayerId(gameState.coinTossCallingPlayerId ?? 'A player')} called {gameState.coinTossCall}; result was {gameState.coinTossResult}.
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
+
+              {automaticFlowState ? (
+                <div className="mt-3 rounded-xl border border-amber-100 bg-[oklch(0.985_0.018_90)] p-3 text-xs leading-5 text-amber-900">
+                  <p className="font-semibold uppercase tracking-[0.14em] text-amber-800">Engine step</p>
+                  <p className="mt-1">{automaticFlowStateDetail(flowState)}</p>
+                </div>
+              ) : null}
 
               <div className="mt-3 rounded-xl border border-stone-200 bg-stone-50 p-3">
                 <div className="flex items-start justify-between gap-3">
@@ -2202,7 +2289,7 @@ function GameFlowPanel({
                   </StatusBadge>
                 </div>
 
-                {gameState.setup?.status === 'hands_drawn' && viewerPlayer && !viewerPlayer.active ? (
+                {choosingSetupActive && viewerPlayer && !viewerPlayer.active ? (
                   setupActiveCandidates.length > 0 ? (
                     <div className="mt-3 space-y-1.5">
                       {setupActiveCandidates.map(card => {
@@ -2245,7 +2332,7 @@ function GameFlowPanel({
                   </StatusBadge>
                 </div>
 
-                {gameState.setup?.status === 'hands_drawn' && viewerPlayer && viewerPlayer.active ? (
+                {choosingSetupBench && viewerPlayer && viewerPlayer.active && !viewerPlayer.setupReady ? (
                   viewerPlayer.bench.length >= 5 ? (
                     <p className="mt-3 rounded-lg border border-dashed border-stone-300 px-3 py-3 text-sm text-stone-500">
                       This viewer's Bench is full.
@@ -2278,21 +2365,36 @@ function GameFlowPanel({
                 )}
               </div>
 
-              <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
-                <ActionCommandButton disabled={!canPlacePrizes} onClick={onPlacePrizes} tone="primary">
-                  {placePrizesButtonLabel}
-                </ActionCommandButton>
+              {choosingSetupBench ? (
+                <div className="mt-3 rounded-xl border border-stone-200 bg-stone-50 p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h4 className="text-xs font-semibold uppercase tracking-[0.14em] text-stone-500">Setup ready</h4>
+                      <p className="mt-1 text-xs leading-5 text-stone-500">
+                        Mark this player done with optional Bench choices. When both players are ready, the engine places Prizes and starts turn one.
+                      </p>
+                    </div>
+                    <StatusBadge tone={viewerPlayer?.setupReady ? 'active' : allPlayersSetupReady ? 'active' : 'warning'}>
+                      {viewerPlayer?.setupReady ? 'ready' : 'choice open'}
+                    </StatusBadge>
+                  </div>
 
-                <ActionCommandButton disabled={!canCompleteSetup} onClick={onCompleteSetup} tone="primary">
-                  {completeSetupPending
-                    ? 'Completing setup...'
-                    : gameState.setup?.status === 'prizes_placed'
-                      ? 'Complete setup'
-                      : gameState.setup?.status === 'completed'
-                        ? 'Setup completed'
-                        : 'Place prizes first'}
-                </ActionCommandButton>
-              </div>
+                  <ActionCommandButton
+                    className="mt-3"
+                    disabled={!canFinishSetupChoices}
+                    onClick={() => onFinishSetupChoices({ playerId: viewerPlayerId })}
+                    tone="primary"
+                  >
+                    {finishSetupChoicesPending
+                      ? 'Saving setup choices...'
+                      : viewerPlayer?.setupReady
+                        ? 'Setup choices locked'
+                        : viewerPlayer?.active
+                          ? 'Done with setup choices'
+                          : 'Choose Active first'}
+                  </ActionCommandButton>
+                </div>
+              ) : null}
             </>
           )}
         </section>
@@ -2302,93 +2404,59 @@ function GameFlowPanel({
             <div>
               <h3 className="text-sm font-semibold text-stone-950">Turn step</h3>
               <p className="mt-1 text-xs leading-5 text-stone-500">
-                Start the turn, resolve draw-step timing, then open the action window.
+                Turn start, draw, action-window opening, pass handoff, and simple attacks advance through the flow machine.
               </p>
             </div>
             <StatusBadge tone={gameState.currentTurn ? 'active' : 'neutral'}>{turnStatus}</StatusBadge>
           </div>
 
-          {setupCompleted ? <TurnStepGuide gameState={gameState} viewerPlayerId={viewerPlayerId} /> : null}
-
-          <div className="mt-3 space-y-2">
-            <ActionCommandButton disabled={!canStartNextTurn} onClick={onStartNextTurn} tone="primary">
-              {startNextTurnPending
-                ? 'Starting turn...'
-                : gameState.currentTurn?.status === 'ended'
-                  ? nextTurnOwnerLabel
-                    ? `Start ${nextTurnOwnerLabel}'s turn`
-                    : 'Start next turn'
-                  : gameState.currentTurn
-                    ? `Turn ${gameState.currentTurn.turnNumber} in progress`
-                    : gameState.setup?.status === 'completed'
-                      ? 'Start first turn'
-                      : 'Complete setup first'}
-            </ActionCommandButton>
-
-            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
-              <ActionCommandButton
-                disabled={!canDrawForTurn}
-                onClick={() => {
-                  if (currentTurnActivePlayerId && isPlayerId(currentTurnActivePlayerId)) {
-                    onDrawForTurn({ playerId: currentTurnActivePlayerId })
-                  }
-                }}
-              >
-                {drawForTurnPending
-                  ? 'Drawing for turn...'
-                  : gameState.currentTurn?.status === 'start'
-                    ? currentTurnActivePlayerIsViewer
-                      ? `Draw for ${formatPlayerId(gameState.currentTurn.activePlayerId)}`
-                      : `Use ${currentTurnActivePlayerLabel} tab to draw`
-                    : gameState.currentTurn?.status === 'drawn'
-                      ? 'Draw for turn resolved'
-                      : gameState.currentTurn
-                        ? 'Turn is not in draw step'
-                        : 'Start first turn first'}
-              </ActionCommandButton>
-
-              <ActionCommandButton
-                disabled={!canSkipDrawForTurn}
-                onClick={() => {
-                  if (currentTurnActivePlayerId && isPlayerId(currentTurnActivePlayerId)) {
-                    onSkipDrawForTurn({ playerId: currentTurnActivePlayerId })
-                  }
-                }}
-              >
-                {skipDrawForTurnPending
-                  ? 'Skipping draw...'
-                  : gameState.currentTurn?.status === 'start'
-                    ? currentTurnActivePlayerIsViewer
-                      ? `Skip draw for ${formatPlayerId(gameState.currentTurn.activePlayerId)}`
-                      : `Use ${currentTurnActivePlayerLabel} tab to skip`
-                    : gameState.currentTurn?.status === 'action_window'
-                      ? 'Draw step skipped'
-                      : gameState.currentTurn
-                        ? 'Turn is not in draw step'
-                        : 'Start first turn first'}
-              </ActionCommandButton>
-            </div>
-
-            <ActionCommandButton disabled={!canOpenActionWindow} onClick={onOpenActionWindow} tone="primary">
-              {openActionWindowPending
-                ? 'Opening action window...'
-                : gameState.currentTurn?.status === 'drawn'
-                  ? currentTurnActivePlayerIsViewer
-                    ? 'Open action window'
-                    : `Use ${currentTurnActivePlayerLabel} tab to open actions`
-                  : gameState.currentTurn?.status === 'action_window'
-                    ? 'Action window open'
-                    : gameState.currentTurn?.status === 'start' && !currentTurnActivePlayerIsViewer
-                      ? `Use ${currentTurnActivePlayerLabel} tab for draw first`
-                    : gameState.currentTurn
-                      ? 'Draw or skip draw first'
-                      : 'Start first turn first'}
-            </ActionCommandButton>
-          </div>
+          {setupCompleted ? (
+            <TurnStepGuide gameState={gameState} viewerPlayerId={viewerPlayerId} />
+          ) : (
+            <p className="mt-3 rounded-lg border border-dashed border-stone-300 px-3 py-3 text-sm text-stone-500">
+              The turn lane opens after both players mark setup ready.
+            </p>
+          )}
         </section>
       </div>
     </Panel>
   )
+}
+
+function isAutomaticFlowState(flowState: string) {
+  return [
+    'setup_dealing_opening_hands',
+    'setup_completing_setup',
+    'turn_starting_turn',
+    'turn_drawing_for_turn',
+    'turn_opening_action_window',
+    'turn_ending_turn',
+    'turn_attack_declared',
+    'turn_attack_resolving'
+  ].includes(flowState)
+}
+
+function automaticFlowStateDetail(flowState: string) {
+  switch (flowState) {
+    case 'setup_dealing_opening_hands':
+      return 'Opening hands are dealt automatically after the starting player is chosen.'
+    case 'setup_completing_setup':
+      return 'Both players are setup ready. The engine is placing Prizes, completing setup, and starting the first turn.'
+    case 'turn_starting_turn':
+      return 'The engine is starting the next turn.'
+    case 'turn_drawing_for_turn':
+      return 'The engine is resolving the draw step.'
+    case 'turn_opening_action_window':
+      return 'The engine is opening the action window.'
+    case 'turn_ending_turn':
+      return 'The engine is ending the passed turn and handing priority to the opponent.'
+    case 'turn_attack_declared':
+      return 'The engine is resolving the declared attack when no player choice is required.'
+    case 'turn_attack_resolving':
+      return 'The engine is finishing attack cleanup when prompts and replacement Active choices are clear.'
+    default:
+      return 'The engine is resolving an automatic flow transition. Refresh if this state remains visible.'
+  }
 }
 
 function TurnStepGuide({
@@ -2399,74 +2467,54 @@ function TurnStepGuide({
   viewerPlayerId: PlayerId
 }) {
   const currentTurn = gameState.currentTurn
-  const endedTurn = currentTurn?.status === 'ended'
-  const nextTurnOwnerId = endedTurn
-    ? (gameState.players.find(player => player.playerId !== currentTurn.activePlayerId)?.playerId ?? gameState.activePlayerId)
-    : null
-  const turnOwnerId = nextTurnOwnerId ?? currentTurn?.activePlayerId ?? gameState.firstPlayerId
+  const flowState = gameState.flowState
+  const turnOwnerId = currentTurn?.activePlayerId ?? gameState.activePlayerId ?? gameState.firstPlayerId
   const turnOwnerLabel = formatPlayerId(turnOwnerId)
   const viewerLabel = formatPlayerId(viewerPlayerId)
   const viewerOwnsTurn = turnOwnerId === viewerPlayerId
   const activeWindowOpen = currentTurn?.status === 'action_window'
-  const drawStepResolved = currentTurn ? ['drawn', 'action_window', 'attack_declared', 'attack_resolving'].includes(currentTurn.status) : false
-  const guideTitle = endedTurn ? 'Next-turn path' : currentTurn ? 'Turn path' : 'First-turn path'
-  const startStepTitle = endedTurn ? 'Start the next turn' : currentTurn ? 'Turn started' : 'Start the first turn'
-  const startStepState = !currentTurn || endedTurn ? 'next' : 'done'
-  const drawStepState = !currentTurn || endedTurn
-    ? 'needed'
-    : drawStepResolved
-      ? 'done'
-      : currentTurn.status === 'start'
-        ? 'next'
-        : 'needed'
-  const actionWindowState = activeWindowOpen
+  const drawStepResolved = currentTurn
+    ? ['drawn', 'action_window', 'attack_declared', 'attack_resolving', 'ended'].includes(currentTurn.status)
+    : false
+  const actionWindowResolved = currentTurn
+    ? ['action_window', 'attack_declared', 'attack_resolving', 'ended'].includes(currentTurn.status)
+    : false
+  const handoffInProgress = ['turn_ending_turn', 'turn_attack_declared', 'turn_attack_resolving'].includes(flowState)
+  const guideTitle = currentTurn ? 'Turn path' : 'First-turn path'
+  const startStepState = currentTurn ? 'done' : flowState === 'turn_starting_turn' ? 'next' : 'needed'
+  const drawStepState = drawStepResolved
     ? 'done'
-    : currentTurn?.status === 'drawn'
+    : flowState === 'turn_drawing_for_turn' || currentTurn?.status === 'start'
       ? 'next'
       : 'needed'
-
-  const startDetail = endedTurn
-    ? `Turn ${currentTurn.turnNumber} is closed. Start turn ${currentTurn.turnNumber + 1} for ${turnOwnerLabel}. This tab is ${viewerLabel}.`
-    : currentTurn
-      ? `Turn ${currentTurn.turnNumber} belongs to ${turnOwnerLabel}. This tab is ${viewerLabel}.`
-      : `Start turn one for ${turnOwnerLabel}. This tab is ${viewerLabel}.`
-  let drawDetail = 'After the turn starts, draw for turn or skip the draw when a fixture scenario calls for it.'
-
-  if (endedTurn) {
-    drawDetail = viewerOwnsTurn
-      ? `Start ${turnOwnerLabel}'s next turn, then resolve draw timing from this tab.`
-      : `Start ${turnOwnerLabel}'s next turn, then use the ${turnOwnerLabel} tab for draw timing.`
-  } else if (currentTurn?.status === 'start') {
-    drawDetail = viewerOwnsTurn
-      ? `Use this ${turnOwnerLabel} tab to draw a card, or skip only when the fixture scenario calls for it.`
-      : `Draw timing belongs to ${turnOwnerLabel}. Use the ${turnOwnerLabel} tab to draw or skip, then refresh here.`
-  } else if (drawStepResolved) {
-    drawDetail = `Draw-step timing is resolved for ${turnOwnerLabel}.`
-  } else if (currentTurn) {
-    drawDetail = 'Finish the current attack or prompt flow before the next draw step.'
-  }
-
-  let actionWindowDetail = 'The action window opens after draw timing resolves.'
-
-  if (endedTurn) {
-    actionWindowDetail = viewerOwnsTurn
-      ? `After ${turnOwnerLabel}'s draw timing, open the action window from this tab for hand, board, battle, and end-turn choices.`
-      : `After ${turnOwnerLabel}'s draw timing, use the ${turnOwnerLabel} tab to open the action window, then refresh here.`
-  } else if (currentTurn?.status === 'start') {
-    actionWindowDetail = viewerOwnsTurn
-      ? `Draw or skip from this ${turnOwnerLabel} tab before opening actions.`
-      : `Use the ${turnOwnerLabel} tab to finish draw timing before opening actions, then refresh here.`
-  } else if (currentTurn?.status === 'drawn') {
-    actionWindowDetail = viewerOwnsTurn
-      ? `Use this ${turnOwnerLabel} tab to open the action window so hand, board, retreat, attack, and end-turn actions can appear below.`
-      : `Draw timing is resolved for ${turnOwnerLabel}. Use the ${turnOwnerLabel} tab to open the action window, then refresh here.`
-  } else if (activeWindowOpen) {
-    actionWindowDetail = viewerOwnsTurn
+  const actionWindowState = actionWindowResolved
+    ? 'done'
+    : flowState === 'turn_opening_action_window' || currentTurn?.status === 'drawn'
+      ? 'next'
+      : 'needed'
+  const handoffState = currentTurn?.status === 'ended'
+    ? 'done'
+    : handoffInProgress
+      ? 'next'
+      : activeWindowOpen
+        ? 'ready'
+        : 'needed'
+  const startDetail = currentTurn
+    ? `Turn ${currentTurn.turnNumber} belongs to ${turnOwnerLabel}. This tab is ${viewerLabel}.`
+    : `The engine starts turn one for ${turnOwnerLabel} after setup completes.`
+  const drawDetail = drawStepResolved
+    ? `Draw timing is resolved for ${turnOwnerLabel}.`
+    : `The engine draws one card for ${turnOwnerLabel}; deck-out ends the game automatically.`
+  const actionWindowDetail = activeWindowOpen
+    ? viewerOwnsTurn
       ? `Action decisions are live for ${turnOwnerLabel}. Use Available actions below.`
-      : `Action decisions are live for ${turnOwnerLabel}. Use the ${turnOwnerLabel} tab for Available actions, then refresh here.`
-  } else if (currentTurn) {
-    actionWindowDetail = 'Resolve the current battle or prompt step before opening new actions.'
-  }
+      : `Action decisions are live for ${turnOwnerLabel}. Switch to that tab for player actions.`
+    : 'The engine opens the action window after draw timing resolves.'
+  const handoffDetail = activeWindowOpen
+    ? 'Pass or declare an attack from Available actions. Either choice lets the flow machine hand off the turn.'
+    : handoffInProgress
+      ? automaticFlowStateDetail(flowState)
+      : 'Turn handoff waits until the action window accepts pass or attack.'
 
   return (
     <div className="mt-3 rounded-xl border border-amber-100 bg-[oklch(0.985_0.018_90)] p-3">
@@ -2474,11 +2522,11 @@ function TurnStepGuide({
         <div>
           <h4 className="text-xs font-semibold uppercase tracking-[0.14em] text-amber-800">{guideTitle}</h4>
           <p className="mt-1 text-xs leading-5 text-stone-600">
-            Use this timing lane after setup locks. Legal actions stay hidden until the action window opens.
+            Forced turn timing stays in the machine. Legal player choices appear only in Available actions.
           </p>
         </div>
         <StatusBadge tone={activeWindowOpen ? 'active' : 'warning'}>
-          {activeWindowOpen ? 'actions live' : currentTurn ? formatEventType(currentTurn.status) : 'next'}
+          {activeWindowOpen ? 'actions live' : formatEventType(flowState)}
         </StatusBadge>
       </div>
 
@@ -2487,7 +2535,7 @@ function TurnStepGuide({
           detail={startDetail}
           number="1"
           state={startStepState}
-          title={startStepTitle}
+          title="Start turn"
         />
         <SetupGuideRow
           detail={drawDetail}
@@ -2501,6 +2549,12 @@ function TurnStepGuide({
           state={actionWindowState}
           title="Open the action window"
         />
+        <SetupGuideRow
+          detail={handoffDetail}
+          number="4"
+          state={handoffState}
+          title="Pass or attack"
+        />
       </div>
     </div>
   )
@@ -2513,13 +2567,20 @@ function SetupPathGuide({
   gameState: GameState
   viewerPlayerId: PlayerId
 }) {
-  const setupStatus = gameState.setup?.status ?? 'not_started'
-  const setupStarted = Boolean(gameState.setup)
-  const openingHandsDrawn = ['hands_drawn', 'prizes_placed', 'completed'].includes(setupStatus)
-  const setupLocked = setupStatus === 'prizes_placed' || setupStatus === 'completed'
+  const flowState = gameState.flowState
+  const awaitingCoinToss = flowState === 'pregame_awaiting_coin_toss'
+  const awaitingStartingPlayerChoice = flowState === 'pregame_awaiting_starting_player_choice'
+  const choosingActive = flowState === 'setup_choosing_opening_active'
+  const choosingBench = flowState === 'setup_choosing_opening_bench'
+  const setupCompleted = gameState.setup?.status === 'completed' || gameState.status === 'in_progress'
+  const coinTossDone = !awaitingCoinToss
+  const startingPlayerChosen = Boolean(gameState.startingPlayerChosenByPlayerId || gameState.setup || setupCompleted)
+  const openingHandsDrawn = Boolean(gameState.setup && !awaitingCoinToss && !awaitingStartingPlayerChoice && flowState !== 'setup_dealing_opening_hands')
   const viewerPlayer = gameState.players.find(player => player.playerId === viewerPlayerId)
   const playersMissingActive = gameState.players.filter(player => !player.active)
   const allPlayersHaveSetupActive = playersMissingActive.length === 0
+  const playersSetupReady = gameState.players.filter(player => player.setupReady)
+  const allPlayersSetupReady = gameState.players.length > 0 && playersSetupReady.length === gameState.players.length
   const activeSummary = gameState.players
     .map(player => `${formatPlayerId(player.playerId)}: ${player.active?.name ?? 'needs Active'}`)
     .join(', ')
@@ -2527,6 +2588,21 @@ function SetupPathGuide({
   const benchCountSummary = gameState.players
     .map(player => `${formatPlayerId(player.playerId)} ${player.bench.length}/5`)
     .join(', ')
+  const setupReadySummary = gameState.players
+    .map(player => `${formatPlayerId(player.playerId)}: ${player.setupReady ? 'ready' : 'choosing'}`)
+    .join(', ')
+  const coinTossDetail = awaitingCoinToss
+    ? `${formatPlayerId(viewerPlayerId)} can call heads or tails from this tab.`
+    : gameState.coinTossResult && gameState.coinTossWinnerPlayerId
+      ? `${formatPlayerId(gameState.coinTossWinnerPlayerId)} won after ${gameState.coinTossResult}.`
+      : 'Coin toss is recorded.'
+  const startingPlayerDetail = awaitingStartingPlayerChoice
+    ? gameState.coinTossWinnerPlayerId
+      ? `${formatPlayerId(gameState.coinTossWinnerPlayerId)} chooses who starts.`
+      : 'The coin toss winner chooses who starts.'
+    : startingPlayerChosen
+      ? `${formatPlayerId(gameState.firstPlayerId)} starts the game.`
+      : 'Resolve the coin toss before choosing the first player.'
 
   const activeDetail = allPlayersHaveSetupActive
     ? activeSummary
@@ -2534,20 +2610,21 @@ function SetupPathGuide({
       ? viewerPlayer?.active
         ? `${viewerPlayer.active.name} is ready here. ${missingActiveSummary} still needs an Active.`
         : `${formatPlayerId(viewerPlayerId)} chooses a visible Basic Pokémon from this hand.`
-      : 'Opening hands must be drawn before either player can choose an Active Pokémon.'
+      : 'Opening hands are dealt automatically after the starting player is chosen.'
 
-  const benchDetail = setupLocked
-    ? `Opening Bench choices are locked: ${benchCountSummary}.`
-    : openingHandsDrawn && allPlayersHaveSetupActive
-      ? `Optional before Prizes: ${formatPlayerId(viewerPlayerId)} can Bench visible Basics or move on.`
+  const benchDetail = setupCompleted || allPlayersSetupReady
+    ? `Opening Bench choices are locked: ${benchCountSummary}. ${setupReadySummary}.`
+    : choosingBench && allPlayersHaveSetupActive
+      ? `Optional before setup ready: ${formatPlayerId(viewerPlayerId)} can Bench visible Basics or mark ready.`
       : 'Bench choices open after both players have an Active Pokémon.'
 
-  const lockDetail =
-    setupStatus === 'prizes_placed'
-      ? 'Prizes are down. Complete setup, then start the first turn.'
-      : openingHandsDrawn && allPlayersHaveSetupActive
-        ? 'When both seats are ready, place face-down Prizes and lock setup.'
-        : 'Finish opening Active choices before Prizes can be placed.'
+  const lockDetail = setupCompleted
+    ? 'Setup is complete. The turn flow machine has started the game.'
+    : allPlayersSetupReady
+      ? 'Both seats are ready. The engine places Prizes, completes setup, draws for turn, and opens actions.'
+      : choosingBench && viewerPlayer?.setupReady
+        ? `${formatPlayerId(viewerPlayerId)} is ready. Waiting for the other player.`
+        : 'Mark both players ready after optional Bench choices.'
 
   return (
     <div className="mt-3 rounded-xl border border-emerald-100 bg-[oklch(0.985_0.012_155)] p-3">
@@ -2555,44 +2632,50 @@ function SetupPathGuide({
         <div>
           <h4 className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-800">Setup path</h4>
           <p className="mt-1 text-xs leading-5 text-stone-600">
-            Follow these table steps after creating a board. This tab is {formatPlayerId(viewerPlayerId)}.
+            Follow player choices only. Forced setup steps are handled by the engine. This tab is {formatPlayerId(viewerPlayerId)}.
           </p>
         </div>
-        <StatusBadge tone={setupStarted ? 'warning' : 'neutral'}>
-          {setupStarted ? formatEventType(setupStatus) : 'next'}
+        <StatusBadge tone={setupCompleted ? 'active' : flowState.startsWith('setup_') ? 'warning' : 'neutral'}>
+          {formatEventType(flowState)}
         </StatusBadge>
       </div>
 
       <div className="mt-3 space-y-2">
         <SetupGuideRow
-          detail={setupStarted ? 'The persisted setup record is ready.' : 'Start setup to prepare the opening table.'}
+          detail={coinTossDetail}
           number="1"
-          state={setupStarted ? 'done' : 'next'}
-          title="Start setup"
+          state={awaitingCoinToss ? 'next' : 'done'}
+          title="Call the coin toss"
         />
         <SetupGuideRow
-          detail={openingHandsDrawn ? 'Both players have opening hands.' : 'Draw hidden opening hands for both players.'}
+          detail={startingPlayerDetail}
           number="2"
-          state={!setupStarted ? 'needed' : openingHandsDrawn ? 'done' : 'next'}
-          title="Draw opening hands"
+          state={!coinTossDone ? 'needed' : awaitingStartingPlayerChoice ? 'next' : startingPlayerChosen ? 'done' : 'needed'}
+          title="Choose who starts"
+        />
+        <SetupGuideRow
+          detail={openingHandsDrawn ? 'Both players have opening hands.' : 'Opening hands are dealt by the flow machine.'}
+          number="3"
+          state={!startingPlayerChosen ? 'needed' : openingHandsDrawn ? 'done' : 'next'}
+          title="Deal opening hands"
         />
         <SetupGuideRow
           detail={activeDetail}
-          number="3"
-          state={!openingHandsDrawn ? 'needed' : allPlayersHaveSetupActive ? 'done' : 'next'}
+          number="4"
+          state={!openingHandsDrawn ? 'needed' : allPlayersHaveSetupActive ? 'done' : choosingActive ? 'next' : 'needed'}
           title="Choose Active Pokémon"
         />
         <SetupGuideRow
           detail={benchDetail}
-          number="4"
-          state={!openingHandsDrawn || !allPlayersHaveSetupActive ? 'needed' : setupLocked ? 'done' : 'ready'}
-          title="Optional Bench"
+          number="5"
+          state={!allPlayersHaveSetupActive ? 'needed' : allPlayersSetupReady ? 'done' : choosingBench ? 'next' : 'needed'}
+          title="Bench, then mark ready"
         />
         <SetupGuideRow
           detail={lockDetail}
-          number="5"
-          state={setupStatus === 'prizes_placed' ? 'next' : openingHandsDrawn && allPlayersHaveSetupActive ? 'ready' : 'needed'}
-          title="Place Prizes, then complete"
+          number="6"
+          state={setupCompleted ? 'done' : allPlayersSetupReady ? 'ready' : 'needed'}
+          title="Auto-complete setup"
         />
       </div>
     </div>
@@ -3156,6 +3239,7 @@ function AttackProgressPanel({
   const attackLabel = turn.pendingAttackId ? formatAttackId(turn.pendingAttackId) : 'declared attack'
   const viewerCanAdvanceAttack = viewerPlayerId === turn.activePlayerId && isPlayerId(turn.activePlayerId)
   const commandPending = Boolean(resolveDeclaredAttackPendingPlayerId || finishAttackPendingPlayerId)
+  const attackFlowManaged = ['turn_attack_declared', 'turn_attack_resolving'].includes(gameState.flowState)
   const copiedAttackUnavailable = turn.pendingAttackRequiresCopiedAttack && copiedAttackOptions.length === 0
   const copiedAttackRequiresChoice = turn.pendingAttackRequiresCopiedAttack && copiedAttackOptions.length > 1 && !selectedCopiedAttackChoice
   const switchTargetRequired = pendingAttackRequiresSwitchTarget && switchTargetOptions.length > 1
@@ -3265,8 +3349,10 @@ function AttackProgressPanel({
   const attackProgressGuideDetail = turn.status === 'attack_resolving'
     ? `${attackLabel} has resolved. ${
         defender ? `${defender.name} now has ${defender.damage} damage.` : 'Damage and effects are recorded.'
-      } Finish the attack to end ${formatPlayerId(turn.activePlayerId)}'s turn.`
-    : `Resolve ${attackLabel} to apply its persisted damage and any authored effect before ending the turn.`
+      } The flow machine finishes the attack when blockers are clear.`
+    : attackFlowManaged
+      ? `The flow machine resolves ${attackLabel} automatically when no player choice is required.`
+      : `Resolve ${attackLabel} to apply its persisted damage and any authored effect before ending the turn.`
   const resolutionChecklistItems: ResolutionChecklistItem[] = []
 
   if (turn.pendingAttackRequiresCopiedAttack) {
@@ -3961,7 +4047,11 @@ function AttackProgressPanel({
           </p>
         ) : null}
 
-        {turn.status === 'attack_declared' ? (
+        {turn.status === 'attack_declared' && attackFlowManaged ? (
+          <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+            Attack resolution is flow-managed for this game. If this state remains visible, refresh the board or inspect the engine error before exposing a manual resolve control.
+          </p>
+        ) : turn.status === 'attack_declared' ? (
           <button
             className="w-full rounded-xl border border-emerald-700 px-3 py-2 text-left text-sm font-semibold text-emerald-800 transition hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:border-stone-300 disabled:text-stone-400 disabled:hover:bg-transparent"
             disabled={resolveDisabled}
@@ -3987,6 +4077,12 @@ function AttackProgressPanel({
 
         {turn.status === 'attack_resolving' ? (
           <div className="space-y-2">
+            {attackFlowManaged ? (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900">
+                Attack finish is flow-managed. Resolve any prompt or replacement Active blocker, then refresh if automatic cleanup does not continue.
+              </div>
+            ) : null}
+
             {awaitingPromptBlocksFinish ? (
               <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900">
                 {awaitingOwnPrompt
@@ -3995,14 +4091,16 @@ function AttackProgressPanel({
               </div>
             ) : null}
 
-            <button
-              className="w-full rounded-xl border border-emerald-700 px-3 py-2 text-left text-sm font-semibold text-emerald-800 transition hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:border-stone-300 disabled:text-stone-400 disabled:hover:bg-transparent"
-              disabled={!viewerCanAdvanceAttack || commandPending || attackCannotFinish}
-              onClick={() => onFinishAttack({ playerId: turn.activePlayerId })}
-              type="button"
-            >
-              {finishAttackButtonLabel}
-            </button>
+            {!attackFlowManaged ? (
+              <button
+                className="w-full rounded-xl border border-emerald-700 px-3 py-2 text-left text-sm font-semibold text-emerald-800 transition hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:border-stone-300 disabled:text-stone-400 disabled:hover:bg-transparent"
+                disabled={!viewerCanAdvanceAttack || commandPending || attackCannotFinish}
+                onClick={() => onFinishAttack({ playerId: turn.activePlayerId })}
+                type="button"
+              >
+                {finishAttackButtonLabel}
+              </button>
+            ) : null}
           </div>
         ) : null}
       </div>
@@ -4950,7 +5048,7 @@ function ActionAffordanceCard({
         >
           {declareAttackPendingKey === attackKey(action.playerId, action.attackId)
             ? `Declaring ${action.attackName ?? 'attack'}...`
-            : `${postSearchBattleAttackIds.includes(action.attackId) ? 'Attack after search — ' : ''}Declare ${
+            : `${postSearchBattleAttackIds.includes(action.attackId) ? 'Attack after search: ' : ''}Declare ${
                 action.attackName ?? formatAttackId(action.attackId)
               }${attackCostLabel(action.attackCost)}${attackDamageLabel(action.attackDamage)}`}
         </ActionCommandButton>
@@ -4965,7 +5063,7 @@ function ActionAffordanceCard({
         >
           {endTurnPendingPlayerId === action.playerId
             ? `Ending ${formatPlayerId(action.playerId)}'s turn...`
-            : `${isPostSearchEndTurnAction ? 'Pass after search — ' : ''}Pass as ${formatPlayerId(action.playerId)}`}
+            : `${isPostSearchEndTurnAction ? 'Pass after search: ' : ''}Pass as ${formatPlayerId(action.playerId)}`}
         </ActionCommandButton>
       ) : null}
     </li>
@@ -5061,11 +5159,11 @@ function ActionCommandButton({
   tone?: 'primary' | 'secondary'
 }) {
   const baseClassName =
-    'w-full rounded-lg px-3 py-2 text-left text-sm transition focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:cursor-not-allowed disabled:border-stone-300 disabled:bg-stone-100 disabled:text-stone-400 disabled:shadow-none'
+    'w-full rounded-lg px-3 py-2 text-left text-sm transition focus:outline-none focus:ring-2 focus:ring-ring/50 focus:ring-offset-2 focus:ring-offset-background disabled:cursor-not-allowed disabled:bg-muted/70 disabled:text-text-dim disabled:shadow-none'
   const toneClassName =
     tone === 'primary'
-      ? 'border border-emerald-700 bg-emerald-700 font-semibold text-stone-50 shadow-sm shadow-emerald-900/10 hover:border-emerald-800 hover:bg-emerald-800 focus:ring-emerald-600'
-      : 'border border-stone-300 bg-white font-medium text-stone-800 hover:border-emerald-500 hover:bg-emerald-50 hover:text-emerald-900 focus:ring-emerald-500'
+      ? 'bg-primary font-semibold text-primary-foreground shadow-sm shadow-black/20 hover:bg-primary/90'
+      : 'bg-secondary/85 font-medium text-foreground hover:bg-primary/10 hover:text-primary'
 
   return (
     <button className={[className, baseClassName, toneClassName].filter(Boolean).join(' ')} disabled={disabled} onClick={onClick} type="button">
@@ -5077,11 +5175,11 @@ function ActionCommandButton({
 function actionSurfaceClassName(action: ActionAffordance) {
   switch (action.key) {
     case 'choose_replacement_active':
-      return 'border-amber-200 bg-amber-50/80'
+      return 'border-attention/35 bg-attention/10'
     case 'declare_attack':
-      return 'border-emerald-200 bg-emerald-50/70'
+      return 'border-accent-mint/30 bg-accent-mint/10'
     default:
-      return 'border-stone-200 bg-white'
+      return 'border-border bg-card'
   }
 }
 
@@ -5539,7 +5637,7 @@ function BattlefieldPanel({
       title="Battlefield"
       trailing={<StatusBadge tone={currentTurn ? 'active' : 'neutral'}>{turnLabel}</StatusBadge>}
     >
-      <div className="rounded-[2rem] border border-stone-300 bg-[oklch(0.965_0.006_155)] p-3 shadow-inner shadow-stone-300/50 sm:p-4">
+      <div className="prizmo-felt rounded-[2rem] p-3 sm:p-4">
         {topPlayer ? (
           <PlayerBattleSide
             activePlayerId={activePlayerId}
@@ -5551,11 +5649,11 @@ function BattlefieldPanel({
         ) : null}
 
         <div className="my-3 grid items-center gap-3 sm:grid-cols-[1fr_auto_1fr]">
-          <div className="hidden h-px bg-stone-300 sm:block" />
-          <div className="rounded-full border border-stone-300 bg-[oklch(0.985_0.004_155)] px-4 py-2 text-center text-xs font-medium text-stone-600 shadow-sm shadow-stone-300/40">
+          <div className="hidden h-px bg-border/60 sm:block" />
+          <div className="rounded-full bg-background/55 px-4 py-2 text-center text-xs font-medium text-muted-foreground">
             {stadium ? `Stadium: ${stadium.name}` : 'No Stadium in play'}
           </div>
-          <div className="hidden h-px bg-stone-300 sm:block" />
+          <div className="hidden h-px bg-border/60 sm:block" />
         </div>
 
         {bottomPlayer ? (
@@ -5598,22 +5696,22 @@ function PlayerBattleSide({
 
   return (
     <section
-      className={`rounded-[1.5rem] border p-3 sm:p-4 ${
+      className={`rounded-[1.5rem] p-3 sm:p-4 ${
         isViewer
-          ? 'border-emerald-300 bg-[oklch(0.985_0.012_155)]'
-          : 'border-stone-300 bg-[oklch(0.978_0.006_155)]'
+          ? 'bg-accent-mint/10'
+          : 'bg-background/45'
       }`}
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <h3 className="text-base font-semibold tracking-tight text-stone-950">{formatPlayerId(player.playerId)}</h3>
+            <h3 className="text-base font-semibold tracking-tight text-foreground">{formatPlayerId(player.playerId)}</h3>
             {isViewer ? <StatusBadge tone="active">viewer</StatusBadge> : <StatusBadge>opponent</StatusBadge>}
             {isActivePlayer ? <StatusBadge tone="warning">turn owner</StatusBadge> : null}
           </div>
-          <p className="mt-1 truncate text-sm text-stone-600">{deckName ?? player.deckKey}</p>
+          <p className="mt-1 truncate text-sm text-muted-foreground">{deckName ?? player.deckKey}</p>
         </div>
-        <p className="font-mono text-xs text-stone-500">{player.deckKey}</p>
+        <p className="font-mono text-xs text-muted-foreground">{player.deckKey}</p>
       </div>
 
       <div className="mt-4 grid gap-3 xl:grid-cols-[8rem_minmax(0,1fr)_minmax(12rem,18rem)]">
@@ -5658,10 +5756,10 @@ function BattleZone({
   const cardVariant = variant === 'active' ? 'active' : 'compact'
 
   return (
-    <div className="rounded-2xl border border-stone-300 bg-[oklch(0.99_0.004_155)] p-3">
+    <div className="rounded-2xl bg-background/45 p-3">
       <div className="mb-3 flex items-center justify-between gap-2">
-        <h4 className="text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">{title}</h4>
-        <span className="rounded-full bg-stone-200 px-2 py-0.5 text-xs font-medium text-stone-600">
+        <h4 className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">{title}</h4>
+        <span className="rounded-full bg-muted/80 px-2 py-0.5 text-xs font-medium text-muted-foreground">
           {cards.length}
         </span>
       </div>
@@ -5679,7 +5777,7 @@ function BattleZone({
           ))}
         </div>
       ) : (
-        <p className="rounded-xl border border-dashed border-stone-300 px-3 py-5 text-center text-sm text-stone-500">
+        <p className="rounded-xl bg-secondary/45 px-3 py-5 text-center text-sm text-muted-foreground">
           {emptyLabel}
         </p>
       )}
@@ -5698,13 +5796,13 @@ function ZoneStack({
 }) {
   const toneClassName =
     tone === 'active'
-      ? 'border-emerald-200 bg-emerald-50 text-emerald-950'
+      ? 'bg-accent-mint/10 text-accent-mint'
       : tone === 'hidden'
-        ? 'border-stone-300 bg-stone-100 text-stone-600'
-        : 'border-stone-200 bg-stone-50 text-stone-950'
+        ? 'bg-muted/55 text-muted-foreground'
+        : 'bg-background/55 text-foreground'
 
   return (
-    <div className={`rounded-2xl border px-3 py-2.5 text-center ${toneClassName}`}>
+    <div className={`rounded-2xl px-3 py-2.5 text-center ${toneClassName}`}>
       <p className="text-xl font-semibold tabular-nums">{value}</p>
       <p className="mt-0.5 text-[0.68rem] font-semibold uppercase tracking-[0.14em] opacity-70">{label}</p>
     </div>
@@ -5713,12 +5811,12 @@ function ZoneStack({
 
 function PrivateHandZone({ isViewer, player }: { isViewer: boolean; player: PlayerView }) {
   return (
-    <div className="rounded-2xl border border-stone-300 bg-[oklch(0.99_0.004_155)] p-3">
+    <div className="rounded-2xl bg-background/45 p-3">
       <div className="mb-3 flex items-center justify-between gap-2">
-        <h4 className="text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">
+        <h4 className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
           {isViewer ? 'Your hand' : 'Opponent hand'}
         </h4>
-        <span className="rounded-full bg-stone-200 px-2 py-0.5 text-xs font-medium text-stone-600">
+        <span className="rounded-full bg-muted/80 px-2 py-0.5 text-xs font-medium text-muted-foreground">
           {player.handCount}
         </span>
       </div>
@@ -5731,12 +5829,12 @@ function PrivateHandZone({ isViewer, player }: { isViewer: boolean; player: Play
             ))}
           </div>
         ) : (
-          <p className="rounded-xl border border-dashed border-stone-300 px-3 py-5 text-center text-sm text-stone-500">
+          <p className="rounded-xl bg-secondary/45 px-3 py-5 text-center text-sm text-muted-foreground">
             Your hand is empty.
           </p>
         )
       ) : (
-        <div className="rounded-xl border border-dashed border-stone-300 bg-stone-100 px-3 py-5 text-center text-sm text-stone-500">
+        <div className="rounded-xl bg-muted/55 px-3 py-5 text-center text-sm text-muted-foreground">
           {player.handCount} hidden {player.handCount === 1 ? 'card' : 'cards'}
         </div>
       )}
@@ -5759,11 +5857,11 @@ function SessionConnectionSummary({
   const statusTone = !gameId ? 'neutral' : hasViewerMismatch || isRefreshing ? 'warning' : 'active'
 
   return (
-    <div className="rounded-2xl border border-stone-200 bg-stone-50 p-3">
+    <div className="prizmo-soft-surface rounded-2xl p-3">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-sm font-semibold text-stone-950">Table seat</p>
-          <p className="mt-1 text-xs leading-5 text-stone-500">Local browser storage keeps the table ID and tab seat separate.</p>
+          <p className="text-sm font-semibold text-foreground">Table seat</p>
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">Local browser storage keeps the table ID and tab seat separate.</p>
         </div>
         <StatusBadge tone={statusTone}>{statusLabel}</StatusBadge>
       </div>
@@ -5785,9 +5883,9 @@ function Panel({
   children: React.ReactNode
 }) {
   return (
-    <section className="rounded-2xl border border-stone-200 bg-stone-100/70 p-4 shadow-sm shadow-stone-200/50 sm:p-5">
+    <section className="prizmo-panel rounded-2xl p-4 sm:p-5">
       <div className="mb-4 flex items-center justify-between gap-3">
-        <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-stone-600">{title}</h2>
+        <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">{title}</h2>
         {trailing}
       </div>
       {children}
@@ -5811,14 +5909,14 @@ function DeckSelect({
   const selectedDeck = decks.find(deck => deck.deckKey === value) ?? null
 
   return (
-    <div className="rounded-2xl border border-stone-200 bg-stone-50 p-3">
+    <div className="prizmo-soft-surface rounded-2xl p-3">
       <label className="block space-y-2">
         <span className="flex items-center justify-between gap-3">
-          <span className="text-sm font-medium text-stone-800">{label}</span>
+          <span className="text-sm font-medium text-foreground">{label}</span>
           <StatusBadge tone={selectedDeck ? 'active' : 'neutral'}>{formatPlayerId(playerId)}</StatusBadge>
         </span>
         <select
-          className="w-full rounded-xl border border-stone-300 bg-[oklch(0.995_0.004_155)] px-3 py-2 text-sm text-stone-950 outline-none transition focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100 disabled:cursor-not-allowed disabled:text-stone-400"
+          className="w-full rounded-xl border border-input bg-input/40 px-3 py-2 text-sm text-foreground outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/30 disabled:cursor-not-allowed disabled:text-text-dim"
           disabled={decks.length === 0}
           onChange={event => onChange(event.currentTarget.value)}
           value={value}
@@ -5833,14 +5931,14 @@ function DeckSelect({
       </label>
 
       {selectedDeck ? (
-        <div className="mt-3 border-t border-stone-200 pt-3">
+        <div className="mt-3 pt-3">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-stone-950">{selectedDeck.name}</p>
-              <p className="mt-1 font-mono text-xs text-stone-500">{selectedDeck.deckKey}</p>
+              <p className="truncate text-sm font-semibold text-foreground">{selectedDeck.name}</p>
+              <p className="mt-1 font-mono text-xs text-muted-foreground">{selectedDeck.deckKey}</p>
             </div>
             <a
-              className="shrink-0 text-xs font-medium text-emerald-700 hover:text-emerald-900"
+              className="shrink-0 text-xs font-medium text-primary hover:text-primary/80"
               href={selectedDeck.sourceUrl}
               rel="noreferrer"
               target="_blank"
@@ -5848,13 +5946,13 @@ function DeckSelect({
               Source
             </a>
           </div>
-          <div className="mt-3 flex flex-wrap gap-1.5 text-xs font-medium text-stone-600">
-            <span className="rounded-full bg-stone-100 px-2 py-1">{selectedDeck.cardCount} cards</span>
-            <span className="rounded-full bg-stone-100 px-2 py-1">{selectedDeck.uniqueCardCount} unique</span>
+          <div className="mt-3 flex flex-wrap gap-1.5 text-xs font-medium text-muted-foreground">
+            <span className="rounded-full bg-muted px-2 py-1">{selectedDeck.cardCount} cards</span>
+            <span className="rounded-full bg-muted px-2 py-1">{selectedDeck.uniqueCardCount} unique</span>
           </div>
         </div>
       ) : (
-        <p className="mt-3 border-t border-stone-200 pt-3 text-xs leading-5 text-stone-500">
+        <p className="mt-3 pt-3 text-xs leading-5 text-muted-foreground">
           Choose a fixture after the engine catalog loads.
         </p>
       )}
@@ -5884,11 +5982,11 @@ function FirstRunSetupGuide({
         : 'Waiting for the engine-owned fixture catalog.'
 
   return (
-    <section className="rounded-2xl border border-emerald-100 bg-[oklch(0.982_0.015_155)] p-3">
+    <section className="rounded-2xl bg-accent-mint/10 p-3">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-sm font-semibold text-stone-950">First table checklist</p>
-          <p className="mt-1 text-xs leading-5 text-stone-600">
+          <p className="text-sm font-semibold text-foreground">First table checklist</p>
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">
             Create the board here, then run setup from the Game flow rail after the board loads.
           </p>
         </div>
@@ -5942,16 +6040,16 @@ function SetupGuideRow({
   const badgeLabel = state === 'done' ? 'done' : state === 'ready' ? 'ready' : state === 'next' ? 'next' : 'needed'
 
   return (
-    <div className="flex items-start gap-3 rounded-xl border border-stone-200 bg-[oklch(0.995_0.004_155)] px-3 py-2.5">
-      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-stone-100 text-xs font-semibold text-stone-700">
+    <div className="flex items-start gap-3 rounded-xl bg-surface-control/55 px-3 py-2.5">
+      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted/80 text-xs font-semibold text-muted-foreground">
         {number}
       </span>
       <div className="min-w-0 flex-1">
         <div className="flex items-center justify-between gap-2">
-          <p className="text-sm font-medium text-stone-950">{title}</p>
+          <p className="text-sm font-medium text-foreground">{title}</p>
           <StatusBadge tone={badgeTone}>{badgeLabel}</StatusBadge>
         </div>
-        <p className="mt-1 text-xs leading-5 text-stone-500">{detail}</p>
+        <p className="mt-1 text-xs leading-5 text-muted-foreground">{detail}</p>
       </div>
     </div>
   )
@@ -5968,7 +6066,7 @@ function SupportedDeckCatalog({
 }) {
   if (decks.length === 0) {
     return (
-      <p className="rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-sm leading-6 text-stone-600">
+      <p className="rounded-xl bg-secondary/70 px-3 py-2 text-sm leading-6 text-muted-foreground">
         Supported fixture metadata appears here after the engine catalog loads.
       </p>
     )
@@ -5976,7 +6074,7 @@ function SupportedDeckCatalog({
 
   return (
     <div className="space-y-3">
-      <p className="text-sm leading-6 text-stone-600">
+      <p className="text-sm leading-6 text-muted-foreground">
         Engine-owned deck fixtures for browser playtests. Selected fixtures are marked with their current seat.
       </p>
       {decks.map(deck => {
@@ -5986,11 +6084,11 @@ function SupportedDeckCatalog({
         ].filter(Boolean)
 
         return (
-          <div className="rounded-xl border border-stone-200 bg-stone-50 p-3" key={deck.deckKey}>
+          <div className="rounded-xl bg-secondary/70 p-3" key={deck.deckKey}>
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <p className="truncate text-sm font-medium text-stone-950">{deck.name}</p>
-                <p className="mt-1 font-mono text-xs text-stone-500">{deck.deckKey}</p>
+                <p className="truncate text-sm font-medium text-foreground">{deck.name}</p>
+                <p className="mt-1 font-mono text-xs text-muted-foreground">{deck.deckKey}</p>
               </div>
               {selectedSeats.length > 0 ? (
                 <div className="flex shrink-0 gap-1">
@@ -6001,13 +6099,13 @@ function SupportedDeckCatalog({
                   ))}
                 </div>
               ) : (
-                <span className="shrink-0 text-xs text-stone-500">{deck.uniqueCardCount} unique</span>
+                <span className="shrink-0 text-xs text-muted-foreground">{deck.uniqueCardCount} unique</span>
               )}
             </div>
-            <div className="mt-3 flex items-center justify-between gap-3 text-xs text-stone-500">
+            <div className="mt-3 flex items-center justify-between gap-3 text-xs text-muted-foreground">
               <span>{deck.cardCount} cards</span>
               <a
-                className="font-medium text-emerald-700 hover:text-emerald-900"
+                className="font-medium text-primary hover:text-primary/80"
                 href={deck.sourceUrl}
                 rel="noreferrer"
                 target="_blank"
@@ -6029,24 +6127,24 @@ function CardPill({ card, variant = 'default' }: { card: CardSummary; variant?: 
   const regularAttachedCards = attachedCards.filter(attachedCard => !evolutionStackCardIds.has(attachedCard.id))
   const cardClassName =
     variant === 'active'
-      ? 'rounded-2xl border border-emerald-200 bg-[oklch(0.985_0.01_155)] p-4 shadow-sm shadow-emerald-200/60'
+      ? 'rounded-2xl bg-accent-mint/10 p-4 shadow-sm shadow-black/20'
       : variant === 'compact'
-        ? 'rounded-xl border border-stone-200 bg-stone-50 p-2.5'
+        ? 'rounded-xl bg-secondary/80 p-2.5'
         : variant === 'hand'
-          ? 'rounded-xl border border-stone-200 bg-[oklch(0.992_0.004_155)] p-2.5'
-          : 'rounded-xl border border-stone-200 bg-stone-50 p-3'
+          ? 'rounded-xl bg-secondary/80 p-2.5'
+          : 'rounded-xl bg-secondary/80 p-3'
   const titleClassName = variant === 'active' ? 'text-base' : 'text-sm'
 
   return (
     <div className={cardClassName}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className={`truncate font-medium text-stone-950 ${titleClassName}`}>{card.name}</p>
-          <p className="mt-1 font-mono text-xs text-stone-500">{card.cardId}</p>
+          <p className={`truncate font-medium text-foreground ${titleClassName}`}>{card.name}</p>
+          <p className="mt-1 font-mono text-xs text-muted-foreground">{card.cardId}</p>
         </div>
         {card.damage > 0 ? <StatusBadge tone="warning">{card.damage} dmg</StatusBadge> : null}
       </div>
-      <div className="mt-2 flex flex-wrap gap-1.5 text-xs text-stone-500">
+      <div className="mt-2 flex flex-wrap gap-1.5 text-xs text-muted-foreground">
         {card.category ? <span>{card.category}</span> : null}
         {card.stage ? <span>{card.stage}</span> : null}
         {card.status ? <span>{card.status}</span> : null}
@@ -6086,12 +6184,12 @@ function evolutionStackForCard(card: CardSummary, attachedCards: CardSummary[]) 
 
 function AttachedCardGroup({ cards, title, titleSuffix }: { cards: CardSummary[]; title: string; titleSuffix: string }) {
   return (
-    <div className="mt-3 rounded-lg border border-stone-200 bg-stone-100 px-2.5 py-2">
-      <p className="text-xs font-medium uppercase tracking-[0.12em] text-stone-500">{title}</p>
+    <div className="mt-3 rounded-lg bg-muted/70 px-2.5 py-2">
+      <p className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">{title}</p>
       <div className="mt-2 flex flex-wrap gap-1.5">
         {cards.map(attachedCard => (
           <span
-            className="rounded-full bg-stone-50 px-2 py-1 text-xs font-medium text-stone-700"
+            className="rounded-full bg-secondary/80 px-2 py-1 text-xs font-medium text-muted-foreground"
             key={attachedCard.id}
             title={`${attachedCard.cardId} · ${titleSuffix}`}
           >
@@ -6105,9 +6203,9 @@ function AttachedCardGroup({ cards, title, titleSuffix }: { cards: CardSummary[]
 
 function Metric({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
   return (
-    <div className="min-w-0 rounded-xl border border-stone-200 bg-stone-50 p-3">
-      <p className="text-xs font-medium uppercase tracking-[0.14em] text-stone-500">{label}</p>
-      <p className={`mt-2 truncate text-sm font-semibold text-stone-950 ${mono ? 'font-mono' : ''}`}>
+    <div className="min-w-0 rounded-xl bg-secondary/70 p-3">
+      <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">{label}</p>
+      <p className={`mt-2 truncate text-sm font-semibold text-foreground ${mono ? 'font-mono' : ''}`}>
         {value}
       </p>
     </div>
@@ -6116,9 +6214,9 @@ function Metric({ label, value, mono = false }: { label: string; value: string; 
 
 function StateRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between gap-4 rounded-xl bg-stone-50 px-3 py-2 text-sm">
-      <span className="text-stone-500">{label}</span>
-      <span className="text-right font-medium text-stone-950">{value}</span>
+    <div className="flex items-center justify-between gap-4 rounded-xl bg-secondary/65 px-3 py-2 text-sm">
+      <span className="text-muted-foreground">{label}</span>
+      <span className="text-right font-medium text-foreground">{value}</span>
     </div>
   )
 }
@@ -6126,22 +6224,22 @@ function StateRow({ label, value }: { label: string; value: string }) {
 function resolutionChecklistItemClassName(tone: ResolutionChecklistTone) {
   switch (tone) {
     case 'blocked':
-      return 'border-red-200 bg-red-50/80 text-red-950'
+      return 'border-destructive/35 bg-destructive/10 text-destructive'
     case 'ready':
-      return 'border-emerald-200 bg-emerald-50/80 text-emerald-950'
+      return 'border-accent-mint/30 bg-accent-mint/10 text-accent-mint'
     case 'waiting':
-      return 'border-amber-200 bg-amber-50/80 text-amber-950'
+      return 'border-attention/35 bg-attention/10 text-attention'
   }
 }
 
 function resolutionChecklistToneClassName(tone: ResolutionChecklistTone) {
   switch (tone) {
     case 'blocked':
-      return 'bg-red-100 text-red-800'
+      return 'bg-destructive/15 text-destructive'
     case 'ready':
-      return 'bg-emerald-100 text-emerald-800'
+      return 'bg-accent-mint/15 text-accent-mint'
     case 'waiting':
-      return 'bg-amber-100 text-amber-800'
+      return 'bg-attention/15 text-attention'
   }
 }
 
@@ -6165,10 +6263,10 @@ function StatusBadge({
 }) {
   const className =
     tone === 'active'
-      ? 'bg-emerald-100 text-emerald-800'
+      ? 'bg-accent-mint/12 text-accent-mint'
       : tone === 'warning'
-        ? 'bg-amber-100 text-amber-800'
-        : 'bg-stone-200 text-stone-700'
+        ? 'bg-attention/12 text-attention'
+        : 'bg-muted/70 text-muted-foreground'
 
   return <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${className}`}>{children}</span>
 }
@@ -6184,11 +6282,11 @@ function InlineNotice({
 }) {
   const className =
     tone === 'error'
-      ? 'border-red-200 bg-red-50 text-red-900'
-      : 'border-stone-200 bg-stone-100 text-stone-700'
+      ? 'bg-destructive/10 text-destructive'
+      : 'bg-muted/70 text-muted-foreground'
 
   return (
-    <div className={`rounded-2xl border p-4 ${className}`}>
+    <div className={`rounded-2xl p-4 ${className}`}>
       <p className="text-sm font-semibold">{title}</p>
       <div className="mt-1 text-sm leading-6">{children}</div>
     </div>
@@ -6197,16 +6295,16 @@ function InlineNotice({
 
 function CommandErrorCard({ notice }: { notice: CommandErrorNotice }) {
   return (
-    <div className="rounded-2xl border border-red-200 bg-red-50 p-3 text-red-950" role="alert">
+    <div className="rounded-2xl bg-destructive/10 p-3 text-destructive" role="alert">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-sm font-semibold">{notice.title}</p>
-          <p className="mt-1 text-sm leading-6 text-red-900">{notice.message}</p>
+          <p className="mt-1 text-sm leading-6 text-destructive/90">{notice.message}</p>
         </div>
-        <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-800">not applied</span>
+        <span className="rounded-full bg-destructive/15 px-2 py-0.5 text-xs font-semibold text-destructive">not applied</span>
       </div>
-      <div className="mt-3 rounded-xl border border-red-100 bg-stone-50 px-3 py-2 text-xs leading-5 text-stone-700">
-        <span className="font-semibold text-stone-950">Next step:</span> {notice.recovery}
+      <div className="mt-3 rounded-xl bg-background/60 px-3 py-2 text-xs leading-5 text-muted-foreground">
+        <span className="font-semibold text-foreground">Next step:</span> {notice.recovery}
       </div>
     </div>
   )
@@ -6214,41 +6312,18 @@ function CommandErrorCard({ notice }: { notice: CommandErrorNotice }) {
 
 function EmptyWorkbench() {
   return (
-    <div className="grid min-h-[32rem] place-items-center rounded-3xl border border-dashed border-stone-300 bg-stone-100/60 p-8 text-center">
+    <div className="prizmo-panel grid min-h-[32rem] place-items-center rounded-3xl p-8 text-center">
       <div className="max-w-md">
-        <p className="text-sm font-semibold uppercase tracking-[0.22em] text-stone-500">No game selected</p>
-        <h2 className="mt-3 text-2xl font-semibold tracking-tight text-stone-950">
+        <p className="text-sm font-semibold uppercase tracking-[0.22em] text-primary">No game selected</p>
+        <h2 className="mt-3 text-2xl font-bold tracking-tight text-foreground">
           Create a game board or reconnect by ID
         </h2>
-        <p className="mt-3 text-sm leading-6 text-stone-600">
-          Pick two supported loadouts, create a persisted board, then use the Game flow rail for setup. Viewer identity is
-          stored per tab so separate browser sessions can safely sit in different player seats.
+        <p className="mt-3 text-sm leading-6 text-muted-foreground">
+          Choose two fixture loadouts in the left rail, then create a persisted board. Setup and player prompts appear only after the table exists.
         </p>
-        <div className="mt-6 grid gap-2 text-left text-sm text-stone-700">
-          <div className="flex items-center gap-3 rounded-xl border border-stone-200 bg-stone-50 px-3 py-2">
-            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-xs font-semibold text-emerald-800">
-              1
-            </span>
-            <span>Choose two supported player loadouts.</span>
-          </div>
-          <div className="flex items-center gap-3 rounded-xl border border-stone-200 bg-stone-50 px-3 py-2">
-            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-xs font-semibold text-emerald-800">
-              2
-            </span>
-            <span>Create a game board or paste a persisted game ID.</span>
-          </div>
-          <div className="flex items-center gap-3 rounded-xl border border-stone-200 bg-stone-50 px-3 py-2">
-            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-xs font-semibold text-emerald-800">
-              3
-            </span>
-            <span>Use Game flow to draw opening hands, choose Active Pokémon, place Prizes, and start turn one.</span>
-          </div>
-          <div className="flex items-center gap-3 rounded-xl border border-stone-200 bg-stone-50 px-3 py-2">
-            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-xs font-semibold text-emerald-800">
-              4
-            </span>
-            <span>Open another tab and choose the other player seat for two-human playtests.</span>
-          </div>
+        <div className="mt-6 rounded-2xl bg-secondary/65 px-4 py-3 text-left text-sm text-muted-foreground">
+          <p className="font-medium text-foreground">Next action</p>
+          <p className="mt-1 leading-6">Use the left rail to create a board, or paste a saved game ID to reconnect this tab.</p>
         </div>
       </div>
     </div>
@@ -6259,9 +6334,9 @@ function GameStateLoadingPanel({ gameId, viewerPlayerId }: { gameId: string; vie
   return (
     <Panel title="Catching up board" trailing={<StatusBadge tone="warning">loading</StatusBadge>}>
       <div className="space-y-4">
-        <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-          <p className="text-sm font-semibold text-stone-950">Requesting {formatPlayerId(viewerPlayerId)}'s view</p>
-          <p className="mt-2 text-sm leading-6 text-stone-600">
+        <div className="rounded-2xl bg-secondary/70 p-4">
+          <p className="text-sm font-semibold text-foreground">Requesting {formatPlayerId(viewerPlayerId)}'s view</p>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
             The board stays covered until the persisted engine returns the viewer-scoped state for {formatGameId(gameId)}.
           </p>
         </div>
@@ -6287,25 +6362,25 @@ function GameStateErrorPanel({
   onClear: () => void
 }) {
   return (
-    <Panel title="Board unavailable" trailing={<span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-800">not loaded</span>}>
+    <Panel title="Board unavailable" trailing={<StatusBadge tone="warning">not loaded</StatusBadge>}>
       <div className="space-y-4">
-        <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-red-950" role="alert">
+        <div className="rounded-2xl border border-destructive/35 bg-destructive/10 p-4 text-destructive" role="alert">
           <p className="text-sm font-semibold">Game state did not load</p>
-          <p className="mt-2 text-sm leading-6 text-red-900">{errorMessage(error)}</p>
-          <div className="mt-3 rounded-xl border border-red-100 bg-stone-50 px-3 py-2 text-xs leading-5 text-stone-700">
-            <span className="font-semibold text-stone-950">Next step:</span> Confirm the game ID still exists and this tab is
+          <p className="mt-2 text-sm leading-6 text-destructive/90">{errorMessage(error)}</p>
+          <div className="mt-3 rounded-xl border border-destructive/20 bg-background/60 px-3 py-2 text-xs leading-5 text-muted-foreground">
+            <span className="font-semibold text-foreground">Next step:</span> Confirm the game ID still exists and this tab is
             using the intended player seat, then retry the board request.
           </div>
         </div>
 
-        <div className="grid gap-2 rounded-2xl border border-stone-200 bg-stone-50 p-3 sm:grid-cols-2">
+        <div className="grid gap-2 rounded-2xl bg-secondary/70 p-3 sm:grid-cols-2">
           <StateRow label="Game" value={formatGameId(gameId)} />
           <StateRow label="Viewer" value={formatPlayerId(viewerPlayerId)} />
         </div>
 
         <div className="flex flex-col gap-2 sm:flex-row">
           <button
-            className="rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-stone-50 shadow-sm transition hover:bg-emerald-800 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:bg-stone-300 disabled:text-stone-600"
+            className="rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm shadow-black/20 transition hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
             disabled={isRetrying}
             onClick={onRetry}
             type="button"
@@ -6313,7 +6388,7 @@ function GameStateErrorPanel({
             {isRetrying ? 'Retrying board...' : 'Retry board'}
           </button>
           <button
-            className="rounded-xl border border-stone-300 px-4 py-2.5 text-sm font-medium text-stone-700 transition hover:bg-stone-100 focus:outline-none focus:ring-2 focus:ring-stone-300"
+            className="rounded-xl border border-border px-4 py-2.5 text-sm font-medium text-muted-foreground transition hover:bg-accent hover:text-accent-foreground focus:outline-none focus:ring-2 focus:ring-ring/50"
             onClick={onClear}
             type="button"
           >
@@ -6339,22 +6414,22 @@ function StaleViewerPanel({
   return (
     <Panel title="Viewer guard" trailing={<StatusBadge tone="warning">seat check</StatusBadge>}>
       <div className="space-y-4">
-        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-950">
+        <div className="rounded-2xl border border-attention/35 bg-attention/10 p-4 text-attention">
           <p className="text-sm font-semibold">Waiting for the current tab seat</p>
-          <p className="mt-2 text-sm leading-6 text-amber-900">
+          <p className="mt-2 text-sm leading-6 text-attention/90">
             The engine returned {formatPlayerId(actualViewerPlayerId)} state after this tab asked for{' '}
             {formatPlayerId(expectedViewerPlayerId)}. The board is hidden so private hand data cannot flash in the
             wrong seat.
           </p>
         </div>
 
-        <div className="grid gap-2 rounded-2xl border border-stone-200 bg-stone-50 p-3 sm:grid-cols-2">
+        <div className="grid gap-2 rounded-2xl bg-secondary/70 p-3 sm:grid-cols-2">
           <StateRow label="Returned" value={formatPlayerId(actualViewerPlayerId)} />
           <StateRow label="This tab" value={formatPlayerId(expectedViewerPlayerId)} />
         </div>
 
         <button
-          className="rounded-xl border border-stone-300 px-4 py-2.5 text-sm font-medium text-stone-700 transition hover:bg-stone-100 focus:outline-none focus:ring-2 focus:ring-stone-300 disabled:cursor-not-allowed disabled:text-stone-400"
+          className="rounded-xl border border-border px-4 py-2.5 text-sm font-medium text-muted-foreground transition hover:bg-accent hover:text-accent-foreground focus:outline-none focus:ring-2 focus:ring-ring/50 disabled:cursor-not-allowed disabled:text-text-dim"
           disabled={isRefreshing}
           onClick={onRefresh}
           type="button"
@@ -6368,18 +6443,18 @@ function StaleViewerPanel({
 
 function RailEmptyState({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-xl border border-dashed border-stone-300 bg-stone-50/80 px-3 py-4">
-      <p className="text-sm font-medium text-stone-800">{title}</p>
-      <p className="mt-2 text-sm leading-6 text-stone-500">{children}</p>
+    <div className="rounded-xl bg-secondary/70 px-3 py-4">
+      <p className="text-sm font-medium text-foreground">{title}</p>
+      <p className="mt-2 text-sm leading-6 text-muted-foreground">{children}</p>
     </div>
   )
 }
 
 function EmptyState({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-xl border border-dashed border-stone-300 px-4 py-8 text-center">
-      <p className="text-sm font-medium text-stone-800">{title}</p>
-      <p className="mt-2 text-sm leading-6 text-stone-500">{children}</p>
+    <div className="rounded-xl bg-secondary/45 px-4 py-8 text-center">
+      <p className="text-sm font-medium text-foreground">{title}</p>
+      <p className="mt-2 text-sm leading-6 text-muted-foreground">{children}</p>
     </div>
   )
 }
@@ -6388,7 +6463,7 @@ function SkeletonLines({ count }: { count: number }) {
   return (
     <div className="space-y-2" role="status">
       {Array.from({ length: count }).map((_, index) => (
-        <div className="h-10 animate-pulse rounded-xl bg-stone-200" key={index} />
+        <div className="h-10 animate-pulse rounded-xl bg-muted" key={index} />
       ))}
       <span className="sr-only">Loading</span>
     </div>
