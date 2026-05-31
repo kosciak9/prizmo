@@ -64,7 +64,7 @@ defmodule PrizmoWeb.SPAController do
   defp spa_shell(css_path, js_path, csrf_token) do
     """
     <!doctype html>
-    <html lang="en">
+    <html lang="en" class="dark">
       <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
