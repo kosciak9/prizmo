@@ -2,6 +2,14 @@
 
 Updated: 2026-05-31
 
+## Iteration 138 handoff
+
+- Current state: game `d608a1f1-6db6-4f23-a8d0-4a7d27641993` is verified at post-event-95 with Player 1 in `Turn 7, action_window`; latest event is #95 `play_basic_to_bench`, Budew is on Player 1's Bench beside Moltres, Player 1 has Ultra Ball in hand with legal actions `play_card` and `end_turn`, and Player 2 has no prompt/action visibility. The Player 1 tab verified `Bench searched Budew` clears the tab-scoped Ultra Ball handoff; the post-bench action-window guide now says to improve the board before ending the turn instead of mentioning unavailable attacks.
+- Last commit at iteration start: `f6b7353 feat(spa): preserve tcg post-search guidance`.
+- Remaining tasks: continue the substantial Web UI polish/playtest path without repeating the verified Ultra Ball discard/search or Budew Bench branches; broader north-star work still includes the formal two-independent-browser milestone, more persisted mechanics/card behavior slices, and the Electric Streams spike.
+- Blockers: no code blocker for the post-search Bench landing slice; the documented manual-tester milestone remains blocked by unreliable manual-tester browser/session isolation.
+- Recommended next atomic task: from the post-event-95 Player 1 action-window state, click `End player 1's turn`, verify the persisted ended-turn landing and Player 2 next-turn guidance from both seats, then refine only unclear next-turn copy.
+
 ## Iteration 137 handoff
 
 - Current state: game `d608a1f1-6db6-4f23-a8d0-4a7d27641993` is verified at post-event-94 with Player 1 in `Turn 7, action_window`; latest event is #94 `card_play_completed`, Player 1 has Budew plus Ultra Ball in hand, no prompts, legal actions `play_card`, `play_basic_to_bench` for Budew, and `end_turn`, while Player 2 has no prompt/action visibility. The Player 1 tab verified the post-search `Trainer complete` handoff survives a page reload through tab-scoped session storage and now uses bench-specific copy (`Bench the searched Basic if it helps now`) plus `Bench searched Budew`.

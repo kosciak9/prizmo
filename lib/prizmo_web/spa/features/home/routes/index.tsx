@@ -4328,6 +4328,7 @@ function ActionWindowGuide({
       <div className="mt-3 space-y-2">
         <ActionWindowGuideStep
           detail={priorityInstruction(primaryActionGroup, {
+            hasBattleActions: Boolean(battleGroup),
             hasHandActions: Boolean(handGroup),
             hasTurnFlow: Boolean(turnGroup),
             retreatedThisTurn: hasRetreatedThisTurn
@@ -4570,7 +4571,12 @@ function ActionWindowGuideStep({
 
 function priorityInstruction(
   group: ActionGroup,
-  context: { hasHandActions?: boolean; hasTurnFlow?: boolean; retreatedThisTurn?: boolean } = {}
+  context: {
+    hasBattleActions?: boolean
+    hasHandActions?: boolean
+    hasTurnFlow?: boolean
+    retreatedThisTurn?: boolean
+  } = {}
 ) {
   switch (group.id) {
     case 'required':
@@ -4590,7 +4596,19 @@ function priorityInstruction(
         return 'Retreat is complete and battle choices are no longer live from this Active. Use remaining hand and board actions now, then end the turn.'
       }
 
-      return 'Hand and board actions are the safest first pass. Improve the board before attacking or ending.'
+      if (context.hasBattleActions && context.hasTurnFlow) {
+        return 'Hand and board actions are the safest first pass. Improve the board before attacking or ending.'
+      }
+
+      if (context.hasBattleActions) {
+        return 'Hand and board actions are the safest first pass. Improve the board before choosing a battle action.'
+      }
+
+      if (context.hasTurnFlow) {
+        return 'Hand and board actions are the safest first pass. Improve the board before ending the turn.'
+      }
+
+      return 'Hand and board actions are the safest first pass. Improve the board before the next engine decision.'
     case 'turn':
       return 'No higher-priority move is available. End the turn after confirming the board state.'
     default:

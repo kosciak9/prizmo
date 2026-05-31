@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-31] iteration 138 | Post-search Bench landing
+- Task attempted: continued from the post-event-94 Player 1 Ultra Ball search-complete state by restoring the tab-scoped post-search handoff in the fresh browser, clicking `Bench searched Budew`, verifying the handoff cleared, and tightening the post-bench action-window priority copy so it no longer mentions attacks when only Trainer plus End Turn remain legal.
+- Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.
+- Validation: Tidewave precheck confirmed game `d608a1f1-6db6-4f23-a8d0-4a7d27641993` at cursor `94 of 94` with Player 1 in `Turn 7, action_window`, Budew in hand, a `play_basic_to_bench` affordance for Budew, and Player 2 with no legal actions; browser smoke on `http://localhost:4003` restored the tab-scoped Ultra Ball handoff, confirmed `Trainer complete` plus `Bench searched Budew`, clicked it, confirmed cursor `95 of 95`, latest event #95 `play_basic_to_bench`, Budew on Player 1's Bench, the handoff session key cleared, and refreshed copy `Improve the board before ending the turn`; browser console reported no warnings or errors; Tidewave postcheck confirmed Player 1 Bench `Moltres`, `Budew`, visible hand `Ultra Ball`, legal actions `play_card` and `end_turn`, while Player 2 had no prompts or actions; `mix format`, `mix assets.build`, and `mix check --no-test` passed.
+- Remaining/blocking notes: no code blocker for this post-search Bench landing slice. Further polish should continue from post-event-95 Player 1 action-window state by clicking `End player 1's turn`, verifying the ended-turn/Player 2 next-turn landing, and avoiding the already-verified Ultra Ball search and Budew Bench branches.
+
 ## [2026-05-31] iteration 137 | Ultra Ball post-search recovery
 - Task attempted: continued from the post-event-73 Player 1 Ultra Ball deck-search prompt, selected a searched Pokémon to verify the card-to-hand landing, then made the post-search handoff copy bench-specific and tab-recoverable through session storage.
 - Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.
