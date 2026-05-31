@@ -4311,8 +4311,16 @@ function handActionGuideDetail(
       : `${choiceLabel} visible. Bench the Basic Pokémon that improves the board ${followUpPhrase}.`
   }
 
-  if (hasAttachEnergyChoice || hasTrainerChoice) {
+  if (hasAttachEnergyChoice && hasTrainerChoice) {
     return `${choiceLabel} visible. Play Trainers or attach Energy ${followUpPhrase}.`
+  }
+
+  if (hasTrainerChoice) {
+    return `${choiceLabel} visible. Play Trainers ${followUpPhrase}.`
+  }
+
+  if (hasAttachEnergyChoice) {
+    return `${choiceLabel} visible. Attach Energy ${followUpPhrase}.`
   }
 
   return `${choiceLabel} visible. Resolve the remaining hand or board choice ${followUpPhrase}.`

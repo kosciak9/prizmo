@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-31] iteration 116 | Player 1 post-bench Trainer copy
+- Task attempted: continued the Web UI polish pass from the verified post-event-39 Player 1 action window by clicking the safe `Bench Munkidori` follow-up, verifying the persisted post-bench state, and refining the hand/board guide so a Trainer-only state no longer mentions attaching Energy.
+- Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.
+- Validation: Tidewave precheck confirmed game `d608a1f1-6db6-4f23-a8d0-4a7d27641993` was at event #39 with Player 1 in `Turn 3, action_window` and Munkidori in hand; browser smoke on `http://localhost:4003` as Player 1 clicked `Bench Munkidori`, confirmed cursor `40 of 40`, event #40 `play basic to bench`, Player 1 hand count 4, Bench count 1, and legal actions for Ultra Ball, Retreat, `Declare Fighting Wings`, and End Turn; Tidewave postcheck confirmed Munkidori on Bench and action keys `play_card`, `retreat`, `declare_attack`, `end_turn`; refreshed/HMR browser copy now says `3 hand and board choices visible. Play Trainers before attacking or passing`; browser console reported no warnings or errors; `mix format`, `mix assets.build`, and `mix check --no-test` passed.
+- Remaining/blocking notes: no code blocker for this post-bench Trainer-copy slice. Further polish should continue from the post-event-40 Player 1 action-window state by verifying the newly exposed battle choices, preferably declaring `Fighting Wings` and checking the attack-resolution landing before deciding whether more copy is needed.
+
 ## [2026-05-31] iteration 115 | Player 1 action-window priority copy
 - Task attempted: continued the Web UI polish pass from the post-event-39 Player 1 turn-3 action-window state by inspecting the visible Play/Bench/Battle/Turn-flow choices and refining the priority guide so a ready attack no longer implies skipping still-legal hand/board development.
 - Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.
