@@ -2388,7 +2388,9 @@ function TurnStepGuide({
   let actionWindowDetail = 'The action window opens after draw timing resolves.'
 
   if (endedTurn) {
-    actionWindowDetail = `After ${turnOwnerLabel}'s draw timing, open ${turnOwnerLabel}'s action window for hand, board, battle, and end-turn choices.`
+    actionWindowDetail = viewerOwnsTurn
+      ? `After ${turnOwnerLabel}'s draw timing, open the action window from this tab for hand, board, battle, and end-turn choices.`
+      : `After ${turnOwnerLabel}'s draw timing, use the ${turnOwnerLabel} tab to open the action window, then refresh here.`
   } else if (currentTurn?.status === 'start') {
     actionWindowDetail = viewerOwnsTurn
       ? 'Draw for turn or skip draw before opening actions.'
