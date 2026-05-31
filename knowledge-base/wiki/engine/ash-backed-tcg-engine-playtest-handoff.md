@@ -2,13 +2,13 @@
 
 Updated: 2026-05-31
 
-## Iteration 130 handoff
+## Iteration 131 handoff
 
-- Current state: game `d608a1f1-6db6-4f23-a8d0-4a7d27641993` is verified at post-event-56 with Player 2 in `Turn 6, start`; latest event is #56 `start_next_turn`, Player 1 remains Active Munkidori with Moltres on Bench, Player 2 remains Active Kadabra, no prompts are awaiting, and legal action affordances remain hidden until Player 2 resolves draw timing and opens the action window.
-- Last commit at iteration start: `c061f77 feat(spa): clarify tcg ended-turn landing`.
-- Remaining tasks: continue the substantial Web UI polish/playtest path without repeating already verified post-event-55 start-turn branch; broader north-star work still includes the formal two-independent-browser milestone, more persisted mechanics/card behavior slices, and the Electric Streams spike.
-- Blockers: no code blocker for the Player 2 turn-6 start landing slice; the documented manual-tester milestone remains blocked by unreliable manual-tester browser/session isolation.
-- Recommended next atomic task: from the post-event-56 Player 2 start state, click `Draw for player 2`, verify the persisted drawn landing plus Player 1 non-owner open-action guidance, then open Player 2's action window without repeating the start-turn branch.
+- Current state: game `d608a1f1-6db6-4f23-a8d0-4a7d27641993` is verified at post-event-58 with Player 2 in `Turn 6, action_window`; latest event is #58 `open_action_window`, Player 1 remains Active Munkidori with Moltres on Bench, Player 2 remains Active Kadabra with one card in hand, no prompts are awaiting, Player 1 has no legal actions, and Player 2 has only `end_turn` available.
+- Last commit at iteration start: `9b4d915 feat(spa): clarify tcg turn-six start landing`.
+- Remaining tasks: continue the substantial Web UI polish/playtest path without repeating already verified post-event-56 draw/open-action branch; broader north-star work still includes the formal two-independent-browser milestone, more persisted mechanics/card behavior slices, and the Electric Streams spike.
+- Blockers: no code blocker for the Player 2 draw/open-action landing slice; the documented manual-tester milestone remains blocked by unreliable manual-tester browser/session isolation.
+- Recommended next atomic task: from the post-event-58 Player 2 action-window state, click `End player 2's turn`, verify the persisted ended-turn/next-owner landing from both seats, and refine only unclear next-turn copy without repeating the draw/open-action branch.
 
 ## Current state
 

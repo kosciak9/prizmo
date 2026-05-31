@@ -2581,7 +2581,8 @@ function CompletedSetupSummary({
               {player.active?.name ?? 'No Active Pokémon'}
             </p>
             <p className="mt-1 text-xs leading-5 text-stone-500">
-              {player.bench.length}/5 Bench · {player.prizeCount} Prizes left · {player.handCount} cards in hand
+              {player.bench.length}/5 Bench · {actionCountLabel(player.prizeCount, 'Prize')} left ·{' '}
+              {actionCountLabel(player.handCount, 'card')} in hand
             </p>
           </div>
         ))}
@@ -4237,8 +4238,8 @@ function ActionWindowGuide({
   const hasRetreatedThisTurn = viewerOwnsTurn && Boolean(viewerPlayer?.retreatedThisTurn)
   const viewerBoardDetail = viewerOwnsTurn
     ? `${viewerLabel} has ${activeName} Active${hasRetreatedThisTurn ? ' after retreating this turn' : ''}, ${
-        viewerPlayer?.handCount ?? 0
-      } cards in hand, and ${viewerPlayer?.bench.length ?? 0} on Bench.`
+        actionCountLabel(viewerPlayer?.handCount ?? 0, 'card')
+      } in hand, and ${viewerPlayer?.bench.length ?? 0} on Bench.`
     : `${turnOwnerLabel} owns this action window. This tab is ${viewerLabel}; use the matching seat for commands.`
   const handDetail = handGroup
     ? handActionGuideDetail(handGroup, basicBenchOptions, evolutionOptions, handChoiceCount, {
