@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-31] iteration 111 | Player 2 final Bench transition
+- Task attempted: continued the Web UI polish pass from the Player 2 post-event-33 state by clicking the unique `Bench Dunsparce` choice, verifying it moved to Bench while Kadabra kept Abra under `Evolution stack`, then refining the hand/board guide so the last Bench choice points toward ending the turn when no battle action is available.
+- Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.
+- Validation: browser smoke on `http://localhost:4003` resumed game `d608a1f1-6db6-4f23-a8d0-4a7d27641993` as Player 2, clicked `Bench Dunsparce`, confirmed event #34 persisted as `play basic to bench`, Player 2 Bench advanced to 3, hand count dropped to 3, Kadabra still showed Abra under `Evolution stack`, and the remaining `Bench Abra` guide now says `before ending the turn`; clicked the final `Bench Abra`, confirmed event #35 persisted, Player 2 Bench advanced to 4, hand count dropped to 2, the rail collapsed to one `Turn flow` action with `Only turn flow remains`, and no browser console warnings or errors were reported; `mix format && mix assets.build` passed; `mix check --no-test` passed.
+- Remaining/blocking notes: no code blocker for the final Bench-transition slice. Further polish can continue from the Player 2 post-event-35 state by clicking `End player 2's turn`, verifying the ended-turn/next-turn guidance, and then preparing for the formal two-browser/manual-tester milestone once isolated contexts are guaranteed.
+
 ## [2026-05-31] iteration 110 | Player 2 post-evolution Bench flow
 - Task attempted: continued the Web UI polish pass from the verified Player 2 post-evolution state by clicking one remaining Basic Bench choice end-to-end, confirming the chosen hand copy moved to Bench while the Kadabra Active kept Abra under `Evolution stack`, then refining the `Commit or pass` guide so it no longer claims only turn flow remains while Hand and board choices are still live.
 - Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.

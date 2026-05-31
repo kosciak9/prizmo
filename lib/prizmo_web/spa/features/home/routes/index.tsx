@@ -4196,7 +4196,10 @@ function ActionWindowGuide({
       } on Bench.`
     : `${turnOwnerLabel} owns this action window. This tab is ${viewerLabel}; use the matching seat for commands.`
   const handDetail = handGroup
-    ? handActionGuideDetail(handGroup, basicBenchOptions, evolutionOptions, handChoiceCount)
+    ? handActionGuideDetail(handGroup, basicBenchOptions, evolutionOptions, handChoiceCount, {
+        hasBattleActions: Boolean(battleGroup),
+        hasTurnFlow: Boolean(turnGroup)
+      })
     : 'No hand or board command is legal from this view. Move to battle decisions or turn flow.'
   const battleDetail = battleGroup
     ? turnGroup
@@ -4249,7 +4252,8 @@ function handActionGuideDetail(
   handGroup: ActionGroup,
   basicBenchOptions: BasicBenchCommandOption[],
   evolutionOptions: EvolutionCommandOption[],
-  handChoiceCount: number
+  handChoiceCount: number,
+  followUp: { hasBattleActions: boolean; hasTurnFlow: boolean }
 ) {
   const choiceLabel = actionCountLabel(handChoiceCount, 'hand and board choice')
   const hasRepeatedBenchChoices = repeatedBasicBenchBaseLabels(basicBenchOptions).size > 0
@@ -4258,30 +4262,53 @@ function handActionGuideDetail(
   const hasEvolutionChoices = evolutionOptions.length > 0
   const hasAttachEnergyChoice = handGroup.actions.some(action => action.key === 'attach_energy')
   const hasTrainerChoice = handGroup.actions.some(action => action.key === 'play_card')
+  const followUpPhrase = handActionFollowUpPhrase(followUp)
 
   if (hasBasicBenchChoices && hasEvolutionChoices) {
     return hasRepeatedBenchChoices || hasRepeatedEvolutionChoices
-      ? `${choiceLabel} visible across Bench and Evolution. Duplicate Basics use hand-slot labels; evolution choices name the in-play target, so pick the exact cards before battle or pass.`
-      : `${choiceLabel} visible across Bench and Evolution. Grow the Bench first, then decide whether an evolution improves the battle line before passing.`
+      ? `${choiceLabel} visible across Bench and Evolution. Duplicate Basics use hand-slot labels; evolution choices name the in-play target, so pick the exact cards ${followUpPhrase}.`
+      : `${choiceLabel} visible across Bench and Evolution. Grow the Bench first, then decide whether an evolution improves the board ${followUpPhrase}.`
   }
 
   if (hasEvolutionChoices) {
     return hasRepeatedEvolutionChoices
-      ? `${choiceLabel} visible. Evolution choices name the Active or Bench target and the hand copy, so choose the exact Pokémon stack before battle or pass.`
-      : `${choiceLabel} visible. Evolution is legal now; choose the stack that improves the battle line before committing.`
+      ? `${choiceLabel} visible. Evolution choices name the Active or Bench target and the hand copy, so choose the exact Pokémon stack ${followUpPhrase}.`
+      : `${choiceLabel} visible. Evolution is legal now; choose the stack that improves the board ${followUpPhrase}.`
   }
 
   if (hasBasicBenchChoices) {
     return hasRepeatedBenchChoices
-      ? `${choiceLabel} visible. Duplicate Basics use hand-slot labels, so choose the exact copy to Bench before battle or pass.`
-      : `${choiceLabel} visible. Bench the Basic Pokémon that improves the board before committing to battle.`
+      ? `${choiceLabel} visible. Duplicate Basics use hand-slot labels, so choose the exact copy to Bench ${followUpPhrase}.`
+      : `${choiceLabel} visible. Bench the Basic Pokémon that improves the board ${followUpPhrase}.`
   }
 
   if (hasAttachEnergyChoice || hasTrainerChoice) {
-    return `${choiceLabel} visible. Play Trainers or attach Energy before committing to battle or passing.`
+    return `${choiceLabel} visible. Play Trainers or attach Energy ${followUpPhrase}.`
   }
 
-  return `${choiceLabel} visible. Resolve the remaining hand or board choice before committing to battle.`
+  return `${choiceLabel} visible. Resolve the remaining hand or board choice ${followUpPhrase}.`
+}
+
+function handActionFollowUpPhrase({
+  hasBattleActions,
+  hasTurnFlow
+}: {
+  hasBattleActions: boolean
+  hasTurnFlow: boolean
+}) {
+  if (hasBattleActions && hasTurnFlow) {
+    return 'before attacking or passing'
+  }
+
+  if (hasBattleActions) {
+    return 'before choosing a battle action'
+  }
+
+  if (hasTurnFlow) {
+    return 'before ending the turn'
+  }
+
+  return 'before the next engine decision'
 }
 
 function handActionChoiceCount(handGroup: ActionGroup, cardsById: Map<string, CardSummary>) {
