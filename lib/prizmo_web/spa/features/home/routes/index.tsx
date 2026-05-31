@@ -281,6 +281,9 @@ type CardSummary = {
   attachedCards?: CardSummary[]
 }
 
+type CardPillVariant = 'active' | 'compact' | 'default' | 'hand'
+type CardArtVariant = CardPillVariant | 'choice'
+
 type PlayerView = {
   playerId: string
   deckKey: string
@@ -359,6 +362,23 @@ type ActionRenderEntry = {
   action: ActionAffordance
   benchOptions?: BasicBenchCommandOption[]
   evolutionOptions?: EvolutionCommandOption[]
+}
+
+type CardIntent = {
+  badge: string
+  detail?: string
+  disabled?: boolean
+  label: string
+  pending?: boolean
+  tone?: 'primary' | 'secondary' | 'warning'
+  onClick: () => void
+}
+
+type CardIntentMap = Map<string, CardIntent>
+
+type CardInteractionModel = {
+  cardIntentsById: CardIntentMap
+  railActions: ActionAffordance[]
 }
 
 const ACTION_GROUPS: Array<Omit<ActionGroup, 'actions'>> = [
@@ -1031,18 +1051,13 @@ export function HomeRoute() {
 
   return (
     <main className="prizmo-workbench-bg min-h-screen text-foreground">
-      <div className="mx-auto flex w-full max-w-[96rem] flex-col gap-6 px-5 py-6 sm:px-8 lg:px-10">
-        <header className="flex flex-col gap-4 pb-2 lg:flex-row lg:items-center lg:justify-between">
+      <div className="mx-auto flex w-full max-w-[96rem] flex-col gap-4 px-5 py-5 sm:px-8 lg:px-10">
+        <header className="flex flex-col gap-3 pb-1 lg:flex-row lg:items-center lg:justify-between">
           <div className="max-w-2xl">
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary">
-              Prizmo table
-            </p>
-            <h1 className="mt-3 text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary">Prizmo</p>
+            <h1 className="mt-2 text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
               Playtest board
             </h1>
-            <p className="mt-3 max-w-xl text-sm leading-6 text-muted-foreground">
-              Create or reconnect to a persisted Pokémon TCG fixture. Keep the table primary; use the rail only when the engine needs a choice.
-            </p>
           </div>
 
           <div className="prizmo-soft-surface flex min-w-0 items-center gap-3 rounded-full px-4 py-2 text-sm text-muted-foreground">
@@ -1056,7 +1071,7 @@ export function HomeRoute() {
 
         <section
           className={`grid gap-6 ${
-            normalisedGameId ? 'lg:grid-cols-[minmax(14rem,16rem)_1fr]' : 'lg:grid-cols-[minmax(18rem,22rem)_1fr]'
+            normalisedGameId ? 'lg:grid-cols-[minmax(11rem,13rem)_1fr]' : 'lg:grid-cols-[minmax(18rem,22rem)_1fr]'
           }`}
         >
           <aside className="flex flex-col gap-5">
@@ -1075,8 +1090,7 @@ export function HomeRoute() {
 
                     {decksQuery.error ? (
                       <InlineNotice tone="error" title="Deck fixtures did not load">
-                        {errorMessage(decksQuery.error)} Refresh before creating a table so both fixture
-                        selectors use the engine-owned deck catalog.
+                        {errorMessage(decksQuery.error)} Refresh before creating a table.
                       </InlineNotice>
                     ) : null}
 
@@ -1104,7 +1118,7 @@ export function HomeRoute() {
                 ) : null}
 
                 <fieldset className="space-y-2">
-                  <legend className="text-sm font-medium text-foreground">View as</legend>
+                  <legend className="text-sm font-medium text-foreground">Seat</legend>
                   <div className="grid grid-cols-2 gap-2">
                     {PLAYER_IDS.map(playerId => (
                       <label
@@ -1157,12 +1171,8 @@ export function HomeRoute() {
                   </InlineNotice>
                 ) : null}
 
-                <label className="block space-y-2">
+                <label className={normalisedGameId ? 'hidden' : 'block space-y-2'}>
                   <span className="text-sm font-medium text-foreground">Game ID</span>
-                  <span className="block text-xs leading-5 text-muted-foreground">
-                    Paste a persisted game UUID. This tab will request {formatPlayerId(session.viewerPlayerId)}'s
-                    private view after the ID changes.
-                  </span>
                   <input
                     className="w-full rounded-xl border border-input bg-input/40 px-3 py-2 font-mono text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring/30"
                     onChange={event => {
@@ -1176,6 +1186,23 @@ export function HomeRoute() {
                   />
                 </label>
 
+                {normalisedGameId ? (
+                  <details className="rounded-xl bg-secondary/55 px-3 py-2 text-sm text-muted-foreground">
+                    <summary className="cursor-pointer font-medium text-foreground">Game ID</summary>
+                    <input
+                      className="mt-3 w-full rounded-lg border border-input bg-input/40 px-2.5 py-2 font-mono text-xs text-foreground outline-none transition placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring/30"
+                      onChange={event => {
+                        const gameId = event.currentTarget.value
+
+                        updateSession(currentSession => ({ ...currentSession, gameId }))
+                      }}
+                      placeholder="Paste UUID"
+                      type="text"
+                      value={session.gameId}
+                    />
+                  </details>
+                ) : null}
+
                 <div className="flex gap-2">
                   <button
                     className="flex-1 rounded-xl bg-secondary/70 px-3 py-2 text-sm font-medium text-muted-foreground transition hover:bg-accent hover:text-accent-foreground focus:outline-none focus:ring-2 focus:ring-ring/50 disabled:cursor-not-allowed disabled:text-text-dim"
@@ -1183,7 +1210,7 @@ export function HomeRoute() {
                     onClick={() => void gameStateQuery.refetch()}
                     type="button"
                   >
-                    {gameStateQuery.isFetching ? 'Refreshing board...' : 'Refresh board'}
+                    {gameStateQuery.isFetching ? 'Refreshing...' : 'Refresh'}
                   </button>
                   <button
                     className="rounded-xl bg-secondary/70 px-3 py-2 text-sm font-medium text-muted-foreground transition hover:bg-accent hover:text-accent-foreground focus:outline-none focus:ring-2 focus:ring-ring/50 disabled:cursor-not-allowed disabled:text-text-dim"
@@ -1945,12 +1972,47 @@ function GameStateWorkbench({
   retreatPendingKey: string | null
 }) {
   const cardsById = useMemo(() => visibleCardsById(gameState), [gameState])
+  const actionCommandPending = Boolean(
+    playCardPendingCardId ||
+      playBasicToBenchPendingCardId ||
+      attachEnergyPendingKey ||
+      chooseReplacementActivePendingCardId ||
+      declareAttackPendingKey ||
+      endTurnPendingPlayerId ||
+      evolveFromHandPendingKey ||
+      retreatPendingKey
+  )
+  const cardInteractions = buildCardInteractionModel({
+    actionCommandPending,
+    attachEnergyPendingKey,
+    cardsById,
+    chooseReplacementActivePendingCardId,
+    chooseSetupActivePendingCardId,
+    chooseSetupBenchPendingCardId,
+    declareAttackPendingKey,
+    evolveFromHandPendingKey,
+    gameState,
+    onAttachEnergy,
+    onChooseReplacementActive,
+    onChooseSetupActive,
+    onChooseSetupBench,
+    onDeclareAttack,
+    onEvolveFromHand,
+    onPlayBasicToBench,
+    onPlayCard,
+    onRetreat,
+    playBasicToBenchPendingCardId,
+    playCardPendingCardId,
+    retreatPendingKey,
+    viewerPlayerId
+  })
 
   return (
     <div className="space-y-5">
-      <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(19rem,24rem)]">
+      <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(16rem,20rem)]">
         <BattlefieldPanel
           activePlayerId={gameState.activePlayerId}
+          cardIntentsById={cardInteractions.cardIntentsById}
           currentTurn={gameState.currentTurn}
           deckNamesByKey={deckNamesByKey}
           players={gameState.players}
@@ -1958,7 +2020,7 @@ function GameStateWorkbench({
           viewerPlayerId={viewerPlayerId}
         />
 
-        <aside className="space-y-5 xl:sticky xl:top-6" aria-label="Player command rail">
+        <aside className="space-y-4 xl:sticky xl:top-5" aria-label="Player command rail">
           <GameFlowPanel
             callCoinTossPending={callCoinTossPending}
             commandError={flowCommandError}
@@ -1995,7 +2057,7 @@ function GameStateWorkbench({
           />
 
           <ActionAffordancesPanel
-            actions={gameState.actionAffordances}
+            actions={cardInteractions.railActions}
             cardsById={cardsById}
             commandError={actionCommandError}
             chooseReplacementActivePendingCardId={chooseReplacementActivePendingCardId}
@@ -2021,58 +2083,336 @@ function GameStateWorkbench({
         </aside>
       </div>
 
-      <Panel
-        title="State summary"
-        trailing={<StatusBadge tone={gameState.status === 'finished' ? 'neutral' : 'active'}>{gameState.status}</StatusBadge>}
-      >
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <Metric label="Game ID" value={gameState.gameId} mono />
-          <Metric label="Active player" value={formatPlayerId(gameState.activePlayerId)} />
-          <Metric label="Cursor" value={`${gameState.cursorIndex} of ${gameState.latestEventIndex}`} />
-          <Metric label="Setup" value={gameState.setup?.status ?? 'not started'} />
-        </div>
-
-        <div className="mt-5 grid gap-3 md:grid-cols-2">
-          <StateRow label="First player" value={formatPlayerId(gameState.firstPlayerId)} />
-          <StateRow label="Winner" value={gameState.winnerPlayerId ? formatPlayerId(gameState.winnerPlayerId) : 'None'} />
-          <StateRow
-            label="Current turn"
-            value={
-              gameState.currentTurn
-                ? `Turn ${gameState.currentTurn.turnNumber}, ${gameState.currentTurn.status}`
-                : 'None'
-            }
-          />
-          <StateRow label="Stadium" value={gameState.stadium?.name ?? 'None'} />
-        </div>
-      </Panel>
-
-      <div className="grid gap-5">
-        <Panel title="Event log">
-          {gameState.events.length > 0 ? (
-            <ol className="space-y-2">
-              {gameState.events.map(event => (
-                <li
-                  className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl bg-secondary/65 px-3 py-2 text-sm"
-                  key={event.id}
-                >
-                  <span className="font-mono text-xs text-muted-foreground">#{event.index}</span>
-                  <span className="font-medium text-foreground">{formatEventType(event.type)}</span>
-                  {event.playerId ? (
-                    <span className="text-xs text-muted-foreground">{formatPlayerId(event.playerId)}</span>
-                  ) : null}
-                </li>
-              ))}
-            </ol>
-          ) : (
-            <EmptyState title="No events persisted yet">
-              Create a game or run setup commands to populate the chronological log.
-            </EmptyState>
-          )}
-        </Panel>
-
-      </div>
+      <DiagnosticsDisclosure gameState={gameState} />
     </div>
+  )
+}
+
+function buildCardInteractionModel({
+  actionCommandPending,
+  attachEnergyPendingKey,
+  cardsById,
+  chooseReplacementActivePendingCardId,
+  chooseSetupActivePendingCardId,
+  chooseSetupBenchPendingCardId,
+  declareAttackPendingKey,
+  evolveFromHandPendingKey,
+  gameState,
+  onAttachEnergy,
+  onChooseReplacementActive,
+  onChooseSetupActive,
+  onChooseSetupBench,
+  onDeclareAttack,
+  onEvolveFromHand,
+  onPlayBasicToBench,
+  onPlayCard,
+  onRetreat,
+  playBasicToBenchPendingCardId,
+  playCardPendingCardId,
+  retreatPendingKey,
+  viewerPlayerId
+}: {
+  actionCommandPending: boolean
+  attachEnergyPendingKey: string | null
+  cardsById: Map<string, CardSummary>
+  chooseReplacementActivePendingCardId: string | null
+  chooseSetupActivePendingCardId: string | null
+  chooseSetupBenchPendingCardId: string | null
+  declareAttackPendingKey: string | null
+  evolveFromHandPendingKey: string | null
+  gameState: GameState
+  onAttachEnergy: (input: AttachEnergyCommand) => void
+  onChooseReplacementActive: (input: ChooseReplacementActiveCommand) => void
+  onChooseSetupActive: (input: SetupCardCommand) => void
+  onChooseSetupBench: (input: SetupCardCommand) => void
+  onDeclareAttack: (input: DeclareAttackCommand) => void
+  onEvolveFromHand: (input: EvolveFromHandCommand) => void
+  onPlayBasicToBench: (input: PlayBasicToBenchCommand) => void
+  onPlayCard: (input: PlayCardCommand) => void
+  onRetreat: (input: RetreatCommand) => void
+  playBasicToBenchPendingCardId: string | null
+  playCardPendingCardId: string | null
+  retreatPendingKey: string | null
+  viewerPlayerId: PlayerId
+}): CardInteractionModel {
+  const cardIntentsById: CardIntentMap = new Map()
+  const cardDirectedActionKeys = new Set<string>()
+  const viewerPlayer = gameState.players.find(player => player.playerId === viewerPlayerId)
+
+  function setCardIntent(cardInstanceId: string, intent: CardIntent) {
+    if (!cardIntentsById.has(cardInstanceId)) {
+      cardIntentsById.set(cardInstanceId, intent)
+    }
+  }
+
+  const attackSourceActionCounts = declareAttackSourceActionCounts(gameState)
+
+  if (viewerPlayer && gameState.flowState === 'setup_choosing_opening_active' && !viewerPlayer.active) {
+    for (const card of viewerPlayer.hand.filter(isSetupActiveCandidate)) {
+      const pending = chooseSetupActivePendingCardId === card.id
+
+      setCardIntent(card.id, {
+        badge: 'Active',
+        disabled: Boolean(chooseSetupActivePendingCardId),
+        label: `Choose ${card.name} as Active`,
+        pending,
+        tone: 'primary',
+        onClick: () => onChooseSetupActive({ playerId: viewerPlayerId, cardInstanceId: card.id })
+      })
+    }
+  }
+
+  if (
+    viewerPlayer &&
+    gameState.flowState === 'setup_choosing_opening_bench' &&
+    viewerPlayer.active &&
+    !viewerPlayer.setupReady
+  ) {
+    for (const card of viewerPlayer.hand.filter(isSetupBenchCandidate)) {
+      const pending = chooseSetupBenchPendingCardId === card.id
+
+      setCardIntent(card.id, {
+        badge: 'Bench',
+        disabled: Boolean(chooseSetupBenchPendingCardId),
+        label: `Bench ${card.name}`,
+        pending,
+        tone: 'secondary',
+        onClick: () => onChooseSetupBench({ playerId: viewerPlayerId, cardInstanceId: card.id })
+      })
+    }
+  }
+
+  for (const action of gameState.actionAffordances) {
+    if (!isPlayerId(action.playerId)) {
+      continue
+    }
+
+    const actionKeyValue = actionKey(action)
+    const canRunAction = !actionCommandPending
+
+    if (action.key === 'play_card') {
+      for (const cardInstanceId of action.sourceCardInstanceIds) {
+        const card = cardsById.get(cardInstanceId)
+        const pending = playCardPendingCardId === cardInstanceId
+
+        setCardIntent(cardInstanceId, {
+          badge: 'Play',
+          disabled: !canRunAction,
+          label: `Play ${card?.name ?? formatCardInstanceId(cardInstanceId)}`,
+          pending,
+          tone: 'primary',
+          onClick: () => onPlayCard({ playerId: action.playerId, cardInstanceId })
+        })
+      }
+
+      cardDirectedActionKeys.add(actionKeyValue)
+    }
+
+    if (action.key === 'play_basic_to_bench') {
+      for (const cardInstanceId of action.sourceCardInstanceIds) {
+        const card = cardsById.get(cardInstanceId)
+        const pending = playBasicToBenchPendingCardId === cardInstanceId
+
+        setCardIntent(cardInstanceId, {
+          badge: 'Bench',
+          disabled: !canRunAction,
+          label: `Bench ${card?.name ?? formatCardInstanceId(cardInstanceId)}`,
+          pending,
+          tone: 'secondary',
+          onClick: () => onPlayBasicToBench({ playerId: action.playerId, cardInstanceId })
+        })
+      }
+
+      cardDirectedActionKeys.add(actionKeyValue)
+    }
+
+    if (action.key === 'evolve_from_hand' && action.targetCardInstanceIds.length === 1) {
+      const targetCardInstanceId = action.targetCardInstanceIds[0]!
+
+      for (const evolutionCardInstanceId of action.sourceCardInstanceIds) {
+        const evolutionCard = cardsById.get(evolutionCardInstanceId)
+        const targetCard = cardsById.get(targetCardInstanceId)
+        const pendingKey = evolveKey(evolutionCardInstanceId, targetCardInstanceId)
+
+        setCardIntent(evolutionCardInstanceId, {
+          badge: 'Evolve',
+          disabled: !canRunAction,
+          label: `Evolve ${targetCard?.name ?? 'target'} with ${evolutionCard?.name ?? formatCardInstanceId(evolutionCardInstanceId)}`,
+          pending: evolveFromHandPendingKey === pendingKey,
+          tone: 'primary',
+          onClick: () => onEvolveFromHand({ playerId: action.playerId, evolutionCardInstanceId, targetCardInstanceId })
+        })
+      }
+
+      cardDirectedActionKeys.add(actionKeyValue)
+    }
+
+    if (action.key === 'attach_energy' && action.targetCardInstanceIds.length === 1) {
+      const targetCardInstanceId = action.targetCardInstanceIds[0]!
+
+      for (const energyCardInstanceId of action.sourceCardInstanceIds) {
+        const energyCard = cardsById.get(energyCardInstanceId)
+        const targetCard = cardsById.get(targetCardInstanceId)
+        const pairKey = attachEnergyPairKey(energyCardInstanceId, targetCardInstanceId)
+
+        setCardIntent(energyCardInstanceId, {
+          badge: 'Attach',
+          disabled: !canRunAction,
+          label: `Attach ${energyCard?.name ?? 'Energy'} to ${targetCard?.name ?? formatCardInstanceId(targetCardInstanceId)}`,
+          pending: attachEnergyPendingKey === pairKey,
+          tone: 'primary',
+          onClick: () => onAttachEnergy({ playerId: action.playerId, energyCardInstanceId, targetCardInstanceId })
+        })
+      }
+
+      cardDirectedActionKeys.add(actionKeyValue)
+    }
+
+    if (action.key === 'choose_replacement_active') {
+      for (const benchCardInstanceId of action.targetCardInstanceIds) {
+        const benchCard = cardsById.get(benchCardInstanceId)
+
+        setCardIntent(benchCardInstanceId, {
+          badge: 'Active',
+          disabled: !canRunAction,
+          label: `Promote ${benchCard?.name ?? formatCardInstanceId(benchCardInstanceId)}`,
+          pending: chooseReplacementActivePendingCardId === benchCardInstanceId,
+          tone: 'primary',
+          onClick: () => onChooseReplacementActive({ playerId: action.playerId, benchCardInstanceId })
+        })
+      }
+
+      cardDirectedActionKeys.add(actionKeyValue)
+    }
+
+    if (action.key === 'declare_attack' && action.attackId) {
+      const attackSourceIds = declareAttackSourceIds(action, gameState)
+      const sourceHasOneAttack = attackSourceIds.every(
+        attackerCardInstanceId => (attackSourceActionCounts.get(attackerCardInstanceId) ?? 0) === 1
+      )
+
+      if (sourceHasOneAttack) {
+        for (const attackerCardInstanceId of attackSourceIds) {
+          setCardIntent(attackerCardInstanceId, {
+            badge: 'Attack',
+            detail: attackIntentDetail(action),
+            disabled: !canRunAction,
+            label: `Declare ${attackIntentName(action)}`,
+            pending: declareAttackPendingKey === attackKey(action.playerId, action.attackId),
+            tone: 'primary',
+            onClick: () => onDeclareAttack({ playerId: action.playerId, attackId: action.attackId! })
+          })
+        }
+
+        cardDirectedActionKeys.add(actionKeyValue)
+      }
+    }
+
+    if (action.key === 'retreat') {
+      const paymentOptions = retreatPaymentOptions(action.sourceCardInstanceIds, action.requiredSourceCount)
+
+      if (paymentOptions.length === 1) {
+        const energyCardInstanceIds = paymentOptions[0]!
+
+        for (const benchCardInstanceId of action.targetCardInstanceIds) {
+          const benchCard = cardsById.get(benchCardInstanceId)
+          const paymentKey = retreatKey(benchCardInstanceId, energyCardInstanceIds)
+
+          setCardIntent(benchCardInstanceId, {
+            badge: 'Retreat',
+            disabled: !canRunAction,
+            label: `Retreat to ${benchCard?.name ?? formatCardInstanceId(benchCardInstanceId)}`,
+            pending: retreatPendingKey === paymentKey,
+            tone: 'warning',
+            onClick: () => onRetreat({ playerId: action.playerId, benchCardInstanceId, energyCardInstanceIds })
+          })
+        }
+
+        cardDirectedActionKeys.add(actionKeyValue)
+      }
+    }
+  }
+
+  return {
+    cardIntentsById,
+    railActions: gameState.actionAffordances.filter(action => !cardDirectedActionKeys.has(actionKey(action)))
+  }
+}
+
+function declareAttackSourceActionCounts(gameState: GameState) {
+  const counts = new Map<string, number>()
+
+  for (const action of gameState.actionAffordances) {
+    if (action.key !== 'declare_attack' || !action.attackId) {
+      continue
+    }
+
+    for (const attackerCardInstanceId of declareAttackSourceIds(action, gameState)) {
+      counts.set(attackerCardInstanceId, (counts.get(attackerCardInstanceId) ?? 0) + 1)
+    }
+  }
+
+  return counts
+}
+
+function declareAttackSourceIds(action: ActionAffordance, gameState: GameState) {
+  if (action.sourceCardInstanceIds.length > 0) {
+    return action.sourceCardInstanceIds
+  }
+
+  const activeCard = gameState.players.find(player => player.playerId === action.playerId)?.active
+
+  return activeCard ? [activeCard.id] : []
+}
+
+function attackIntentName(action: ActionAffordance) {
+  return action.attackName ?? (action.attackId ? formatAttackId(action.attackId) : 'attack')
+}
+
+function attackIntentDetail(action: ActionAffordance) {
+  return `${attackIntentName(action)} · ${attackCostSummary(action.attackCost)} · ${attackDamageSummary(action.attackDamage)}`
+}
+
+function DiagnosticsDisclosure({ gameState }: { gameState: GameState }) {
+  return (
+    <details className="prizmo-panel rounded-2xl p-4 text-sm text-muted-foreground sm:p-5">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
+        <span className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Diagnostics</span>
+        <span className="flex items-center gap-2">
+          <StatusBadge tone={gameState.status === 'finished' ? 'neutral' : 'active'}>{gameState.status}</StatusBadge>
+          <StatusBadge>{gameState.events.length} events</StatusBadge>
+        </span>
+      </summary>
+
+      <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <Metric label="Game ID" value={gameState.gameId} mono />
+        <Metric label="Active player" value={formatPlayerId(gameState.activePlayerId)} />
+        <Metric label="Cursor" value={`${gameState.cursorIndex} of ${gameState.latestEventIndex}`} />
+        <Metric label="Setup" value={gameState.setup?.status ?? 'not started'} />
+      </div>
+
+      <div className="mt-4 grid gap-3 md:grid-cols-2">
+        <StateRow label="First player" value={formatPlayerId(gameState.firstPlayerId)} />
+        <StateRow label="Winner" value={gameState.winnerPlayerId ? formatPlayerId(gameState.winnerPlayerId) : 'None'} />
+        <StateRow
+          label="Current turn"
+          value={gameState.currentTurn ? `Turn ${gameState.currentTurn.turnNumber}, ${gameState.currentTurn.status}` : 'None'}
+        />
+        <StateRow label="Stadium" value={gameState.stadium?.name ?? 'None'} />
+      </div>
+
+      {gameState.events.length > 0 ? (
+        <ol className="mt-4 space-y-2">
+          {gameState.events.map(event => (
+            <li className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl bg-secondary/65 px-3 py-2" key={event.id}>
+              <span className="font-mono text-xs text-muted-foreground">#{event.index}</span>
+              <span className="font-medium text-foreground">{formatEventType(event.type)}</span>
+              {event.playerId ? <span className="text-xs text-muted-foreground">{formatPlayerId(event.playerId)}</span> : null}
+            </li>
+          ))}
+        </ol>
+      ) : null}
+    </details>
   )
 }
 
@@ -2117,10 +2457,8 @@ function GameFlowPanel({
   const setupBenchCandidates = viewerPlayer?.hand.filter(isSetupBenchCandidate) ?? []
   const setupStatus = gameState.setup?.status ?? 'not started'
   const setupCompleted = gameState.setup?.status === 'completed' || gameState.status === 'in_progress'
-  const setupChoicesClosed = Boolean(viewerPlayer?.setupReady || setupCompleted)
   const coinTossWinnerPlayerId = isPlayerId(gameState.coinTossWinnerPlayerId) ? gameState.coinTossWinnerPlayerId : null
   const viewerCanChooseStartingPlayer = awaitingStartingPlayerChoice && coinTossWinnerPlayerId === viewerPlayerId
-  const allPlayersSetupReady = gameState.players.every(player => player.setupReady)
   const turnStatus = gameState.currentTurn
     ? `turn ${gameState.currentTurn.turnNumber}: ${formatEventType(gameState.currentTurn.status)}`
     : 'no turn'
@@ -2132,7 +2470,7 @@ function GameFlowPanel({
         players: gameState.players,
         viewerPlayerId
       })
-    : 'Call the coin toss, choose who starts, then make only player-owned setup choices. The engine handles forced steps.'
+    : 'Follow the live setup choice.'
   const canChooseSetupActive = Boolean(
     choosingSetupActive &&
       viewerPlayer &&
@@ -2153,273 +2491,146 @@ function GameFlowPanel({
   const canFinishSetupChoices = Boolean(
     choosingSetupBench && viewerPlayer?.active && !viewerPlayer.setupReady && !finishSetupChoicesPending
   )
-  const openingActiveStatusMessage = viewerPlayer?.active
-    ? `${viewerPlayer.active.name} is this viewer's setup Active.`
-    : setupChoicesClosed
-      ? 'Setup Active choices are locked after Prize placement.'
-      : choosingSetupActive
-        ? 'View a player without an Active Pokémon to choose one.'
-        : 'The engine will deal opening hands before Active choices open.'
-  const openingBenchUnavailableMessage = setupChoicesClosed
-    ? 'Setup Bench choices are locked after Prize placement.'
-    : choosingSetupBench
-      ? 'Choose this viewer\'s Active Pokémon before benching setup Pokémon.'
-      : 'Opening Bench choices open after both players have an Active Pokémon.'
-
   return (
-    <Panel title="Game flow" trailing={<StatusBadge tone={gameState.setup ? 'active' : 'neutral'}>{flowStatus}</StatusBadge>}>
-      <div className="space-y-4">
+    <Panel title="Next" trailing={<StatusBadge tone={gameState.setup ? 'active' : 'neutral'}>{flowStatus}</StatusBadge>}>
+      <div className="space-y-3">
         {commandError ? <CommandErrorCard notice={commandError} /> : null}
 
-        <section className={setupCompleted ? 'rounded-xl border border-emerald-100 bg-emerald-50/70 p-3' : 'rounded-xl border border-stone-200 bg-white p-3'}>
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <h3 className="text-sm font-semibold text-stone-950">Table setup</h3>
-              <p className="mt-1 text-xs leading-5 text-stone-500">
-                {tableSetupDetail}
-              </p>
-            </div>
-            <StatusBadge tone={gameState.setup?.status === 'completed' ? 'active' : 'warning'}>
-              {formatEventType(setupStatus)}
-            </StatusBadge>
-          </div>
-
-          {setupCompleted ? (
-            <CompletedSetupSummary
-              currentTurn={gameState.currentTurn}
-              firstPlayerId={gameState.firstPlayerId}
-              players={gameState.players}
-              viewerPlayerId={viewerPlayerId}
-            />
-          ) : (
-            <>
-              <SetupPathGuide gameState={gameState} viewerPlayerId={viewerPlayerId} />
-
-              {awaitingCoinToss ? (
-                <div className="mt-3 rounded-xl border border-stone-200 bg-stone-50 p-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <h4 className="text-xs font-semibold uppercase tracking-[0.14em] text-stone-500">Coin toss</h4>
-                      <p className="mt-1 text-xs leading-5 text-stone-500">
-                        Call heads or tails as {formatPlayerId(viewerPlayerId)}. The winner chooses who starts.
-                      </p>
-                    </div>
-                    <StatusBadge tone="warning">call needed</StatusBadge>
-                  </div>
-
-                  <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
-                    <ActionCommandButton
-                      disabled={callCoinTossPending}
-                      onClick={() => onCallCoinToss({ playerId: viewerPlayerId, call: 'heads' })}
-                      tone="primary"
-                    >
-                      {callCoinTossPending ? 'Calling heads...' : 'Call heads'}
-                    </ActionCommandButton>
-
-                    <ActionCommandButton
-                      disabled={callCoinTossPending}
-                      onClick={() => onCallCoinToss({ playerId: viewerPlayerId, call: 'tails' })}
-                    >
-                      {callCoinTossPending ? 'Calling tails...' : 'Call tails'}
-                    </ActionCommandButton>
-                  </div>
-                </div>
-              ) : null}
-
-              {awaitingStartingPlayerChoice ? (
-                <div className="mt-3 rounded-xl border border-stone-200 bg-stone-50 p-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <h4 className="text-xs font-semibold uppercase tracking-[0.14em] text-stone-500">Starting player</h4>
-                      <p className="mt-1 text-xs leading-5 text-stone-500">
-                        {coinTossWinnerPlayerId
-                          ? `${formatPlayerId(coinTossWinnerPlayerId)} won the toss and chooses who takes turn one.`
-                          : 'The coin toss winner chooses who takes turn one.'}
-                      </p>
-                    </div>
-                    <StatusBadge tone={viewerCanChooseStartingPlayer ? 'warning' : 'neutral'}>
-                      {viewerCanChooseStartingPlayer ? 'your choice' : 'waiting'}
-                    </StatusBadge>
-                  </div>
-
-                  <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
-                    {PLAYER_IDS.map(playerId => (
-                      <ActionCommandButton
-                        disabled={!viewerCanChooseStartingPlayer || chooseStartingPlayerPending}
-                        key={playerId}
-                        onClick={() => onChooseStartingPlayer({ chooserPlayerId: viewerPlayerId, startingPlayerId: playerId })}
-                        tone={playerId === viewerPlayerId ? 'primary' : 'secondary'}
-                      >
-                        {chooseStartingPlayerPending
-                          ? `Choosing ${formatPlayerId(playerId)}...`
-                          : viewerCanChooseStartingPlayer
-                            ? `Choose ${formatPlayerId(playerId)} to start`
-                            : coinTossWinnerPlayerId
-                              ? `Use ${formatPlayerId(coinTossWinnerPlayerId)} tab to choose`
-                              : 'Waiting for coin toss result'}
-                      </ActionCommandButton>
-                    ))}
-                  </div>
-
-                  {gameState.coinTossCall && gameState.coinTossResult ? (
-                    <p className="mt-3 rounded-lg border border-dashed border-stone-300 px-3 py-2 text-xs leading-5 text-stone-500">
-                      {formatPlayerId(gameState.coinTossCallingPlayerId ?? 'A player')} called {gameState.coinTossCall}; result was {gameState.coinTossResult}.
-                    </p>
-                  ) : null}
-                </div>
-              ) : null}
-
-              {automaticFlowState ? (
-                <div className="mt-3 rounded-xl border border-amber-100 bg-[oklch(0.985_0.018_90)] p-3 text-xs leading-5 text-amber-900">
-                  <p className="font-semibold uppercase tracking-[0.14em] text-amber-800">Engine step</p>
-                  <p className="mt-1">{automaticFlowStateDetail(flowState)}</p>
-                </div>
-              ) : null}
-
-              <div className="mt-3 rounded-xl border border-stone-200 bg-stone-50 p-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <h4 className="text-xs font-semibold uppercase tracking-[0.14em] text-stone-500">Opening Active</h4>
-                    <p className="mt-1 text-xs leading-5 text-stone-500">
-                      Choose {formatPlayerId(viewerPlayerId)}'s first Basic Pokémon.
-                    </p>
-                  </div>
-                  <StatusBadge tone={viewerPlayer?.active ? 'active' : 'neutral'}>
-                    {viewerPlayer?.active ? 'chosen' : 'pending'}
-                  </StatusBadge>
-                </div>
-
-                {choosingSetupActive && viewerPlayer && !viewerPlayer.active ? (
-                  setupActiveCandidates.length > 0 ? (
-                    <div className="mt-3 space-y-1.5">
-                      {setupActiveCandidates.map(card => {
-                        const isPending = chooseSetupActivePendingCardId === card.id
-
-                        return (
-                          <ActionCommandButton
-                            disabled={!canChooseSetupActive}
-                            key={card.id}
-                            onClick={() => onChooseSetupActive({ playerId: viewerPlayerId, cardInstanceId: card.id })}
-                            tone="primary"
-                          >
-                            {isPending ? `Choosing ${card.name}...` : `Choose ${card.name}`}
-                          </ActionCommandButton>
-                        )
-                      })}
-                    </div>
-                  ) : (
-                    <p className="mt-3 rounded-lg border border-dashed border-stone-300 px-3 py-3 text-sm text-stone-500">
-                      No Basic Pokémon are visible in this viewer's hand.
-                    </p>
-                  )
-                ) : (
-                  <p className="mt-3 rounded-lg border border-dashed border-stone-300 px-3 py-3 text-sm text-stone-500">
-                    {openingActiveStatusMessage}
-                  </p>
-                )}
-              </div>
-
-              <div className="mt-3 rounded-xl border border-stone-200 bg-stone-50 p-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <h4 className="text-xs font-semibold uppercase tracking-[0.14em] text-stone-500">Opening Bench</h4>
-                    <p className="mt-1 text-xs leading-5 text-stone-500">
-                      Add optional Basic Pokémon before Prizes are placed.
-                    </p>
-                  </div>
-                  <StatusBadge tone={viewerPlayer?.bench.length ? 'active' : 'neutral'}>
-                    {viewerPlayer?.bench.length ?? 0}/5
-                  </StatusBadge>
-                </div>
-
-                {choosingSetupBench && viewerPlayer && viewerPlayer.active && !viewerPlayer.setupReady ? (
-                  viewerPlayer.bench.length >= 5 ? (
-                    <p className="mt-3 rounded-lg border border-dashed border-stone-300 px-3 py-3 text-sm text-stone-500">
-                      This viewer's Bench is full.
-                    </p>
-                  ) : setupBenchCandidates.length > 0 ? (
-                    <div className="mt-3 space-y-1.5">
-                      {setupBenchCandidates.map(card => {
-                        const isPending = chooseSetupBenchPendingCardId === card.id
-
-                        return (
-                          <ActionCommandButton
-                            disabled={!canChooseSetupBench}
-                            key={card.id}
-                            onClick={() => onChooseSetupBench({ playerId: viewerPlayerId, cardInstanceId: card.id })}
-                          >
-                            {isPending ? `Benching ${card.name}...` : `Bench ${card.name}`}
-                          </ActionCommandButton>
-                        )
-                      })}
-                    </div>
-                  ) : (
-                    <p className="mt-3 rounded-lg border border-dashed border-stone-300 px-3 py-3 text-sm text-stone-500">
-                      No additional Basic Pokémon are visible in this viewer's hand.
-                    </p>
-                  )
-                ) : (
-                  <p className="mt-3 rounded-lg border border-dashed border-stone-300 px-3 py-3 text-sm text-stone-500">
-                    {openingBenchUnavailableMessage}
-                  </p>
-                )}
-              </div>
-
-              {choosingSetupBench ? (
-                <div className="mt-3 rounded-xl border border-stone-200 bg-stone-50 p-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <h4 className="text-xs font-semibold uppercase tracking-[0.14em] text-stone-500">Setup ready</h4>
-                      <p className="mt-1 text-xs leading-5 text-stone-500">
-                        Mark this player done with optional Bench choices. When both players are ready, the engine places Prizes and starts turn one.
-                      </p>
-                    </div>
-                    <StatusBadge tone={viewerPlayer?.setupReady ? 'active' : allPlayersSetupReady ? 'active' : 'warning'}>
-                      {viewerPlayer?.setupReady ? 'ready' : 'choice open'}
-                    </StatusBadge>
-                  </div>
-
+        {!setupCompleted ? (
+          <>
+            {awaitingCoinToss ? (
+              <RailActionBlock title="Coin toss" trailing={<StatusBadge tone="warning">call</StatusBadge>}>
+                <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
                   <ActionCommandButton
-                    className="mt-3"
-                    disabled={!canFinishSetupChoices}
-                    onClick={() => onFinishSetupChoices({ playerId: viewerPlayerId })}
+                    disabled={callCoinTossPending}
+                    onClick={() => onCallCoinToss({ playerId: viewerPlayerId, call: 'heads' })}
                     tone="primary"
                   >
-                    {finishSetupChoicesPending
-                      ? 'Saving setup choices...'
-                      : viewerPlayer?.setupReady
-                        ? 'Setup choices locked'
-                        : viewerPlayer?.active
-                          ? 'Done with setup choices'
-                          : 'Choose Active first'}
+                    {callCoinTossPending ? 'Calling...' : 'Heads'}
+                  </ActionCommandButton>
+
+                  <ActionCommandButton
+                    disabled={callCoinTossPending}
+                    onClick={() => onCallCoinToss({ playerId: viewerPlayerId, call: 'tails' })}
+                  >
+                    {callCoinTossPending ? 'Calling...' : 'Tails'}
                   </ActionCommandButton>
                 </div>
-              ) : null}
-            </>
-          )}
-        </section>
+              </RailActionBlock>
+            ) : null}
 
-        <section className="rounded-xl border border-stone-200 bg-white p-3">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <h3 className="text-sm font-semibold text-stone-950">Turn step</h3>
-              <p className="mt-1 text-xs leading-5 text-stone-500">
-                Turn start, draw, action-window opening, pass handoff, and simple attacks advance through the flow machine.
-              </p>
-            </div>
-            <StatusBadge tone={gameState.currentTurn ? 'active' : 'neutral'}>{turnStatus}</StatusBadge>
-          </div>
+            {awaitingStartingPlayerChoice ? (
+              <RailActionBlock
+                title="Starting player"
+                trailing={<StatusBadge tone={viewerCanChooseStartingPlayer ? 'warning' : 'neutral'}>{viewerCanChooseStartingPlayer ? 'choose' : 'wait'}</StatusBadge>}
+              >
+                <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
+                  {PLAYER_IDS.map(playerId => (
+                    <ActionCommandButton
+                      disabled={!viewerCanChooseStartingPlayer || chooseStartingPlayerPending}
+                      key={playerId}
+                      onClick={() => onChooseStartingPlayer({ chooserPlayerId: viewerPlayerId, startingPlayerId: playerId })}
+                      tone={playerId === viewerPlayerId ? 'primary' : 'secondary'}
+                    >
+                      {chooseStartingPlayerPending
+                        ? 'Choosing...'
+                        : viewerCanChooseStartingPlayer
+                          ? formatPlayerId(playerId)
+                          : coinTossWinnerPlayerId
+                            ? `${formatPlayerId(coinTossWinnerPlayerId)} tab`
+                            : 'Waiting'}
+                    </ActionCommandButton>
+                  ))}
+                </div>
+              </RailActionBlock>
+            ) : null}
 
-          {setupCompleted ? (
-            <TurnStepGuide gameState={gameState} viewerPlayerId={viewerPlayerId} />
-          ) : (
-            <p className="mt-3 rounded-lg border border-dashed border-stone-300 px-3 py-3 text-sm text-stone-500">
-              The turn lane opens after both players mark setup ready.
-            </p>
-          )}
-        </section>
+            {automaticFlowState ? (
+              <RailActionBlock title="Engine" trailing={<StatusBadge tone="warning">auto</StatusBadge>}>
+                <p className="text-sm text-muted-foreground">{automaticFlowStateDetail(flowState)}</p>
+              </RailActionBlock>
+            ) : null}
+
+            {choosingSetupActive ? (
+              <RailActionBlock title="Opening Active" trailing={<StatusBadge tone="warning">active</StatusBadge>}>
+                <p className="text-sm text-muted-foreground">
+                  {canChooseSetupActive ? 'Pick from hand.' : 'No Basic visible.'}
+                </p>
+              </RailActionBlock>
+            ) : null}
+
+            {choosingSetupBench ? (
+              <RailActionBlock
+                title="Opening Bench"
+                trailing={<StatusBadge tone={viewerPlayer?.bench.length ? 'active' : 'neutral'}>{viewerPlayer?.bench.length ?? 0}/5</StatusBadge>}
+              >
+                <p className="text-sm text-muted-foreground">
+                  {canChooseSetupBench ? 'Pick Basics from hand.' : 'Bench is optional.'}
+                </p>
+
+                <ActionCommandButton
+                  className="mt-2"
+                  disabled={!canFinishSetupChoices}
+                  onClick={() => onFinishSetupChoices({ playerId: viewerPlayerId })}
+                  tone="primary"
+                >
+                  {finishSetupChoicesPending ? 'Saving...' : viewerPlayer?.setupReady ? 'Ready' : 'Done'}
+                </ActionCommandButton>
+              </RailActionBlock>
+            ) : null}
+
+            {!awaitingCoinToss && !awaitingStartingPlayerChoice && !automaticFlowState && !choosingSetupActive && !choosingSetupBench ? (
+              <RailActionBlock title={formatEventType(flowState)} trailing={<StatusBadge>{formatEventType(setupStatus)}</StatusBadge>}>
+                <p className="text-sm text-muted-foreground">Waiting.</p>
+              </RailActionBlock>
+            ) : null}
+
+            <RailDetailsSummary label="Setup path">
+              <SetupPathGuide gameState={gameState} viewerPlayerId={viewerPlayerId} />
+            </RailDetailsSummary>
+          </>
+        ) : (
+          <>
+            <RailActionBlock title="Turn" trailing={<StatusBadge tone={gameState.currentTurn ? 'active' : 'neutral'}>{turnStatus}</StatusBadge>}>
+              <p className="text-sm text-muted-foreground">{tableSetupDetail}</p>
+            </RailActionBlock>
+
+            <RailDetailsSummary label="Turn path">
+              <TurnStepGuide gameState={gameState} viewerPlayerId={viewerPlayerId} />
+            </RailDetailsSummary>
+          </>
+        )}
       </div>
     </Panel>
+  )
+}
+
+function RailActionBlock({
+  title,
+  trailing,
+  children
+}: {
+  title: string
+  trailing?: React.ReactNode
+  children: React.ReactNode
+}) {
+  return (
+    <section className="rounded-xl bg-secondary/60 p-3">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+        {trailing}
+      </div>
+      {children}
+    </section>
+  )
+}
+
+function RailDetailsSummary({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <details className="rounded-xl bg-secondary/35 px-3 py-2 text-sm text-muted-foreground">
+      <summary className="cursor-pointer font-medium text-muted-foreground">{label}</summary>
+      <div className="mt-3">{children}</div>
+    </details>
   )
 }
 
@@ -2500,21 +2711,21 @@ function TurnStepGuide({
         ? 'ready'
         : 'needed'
   const startDetail = currentTurn
-    ? `Turn ${currentTurn.turnNumber} belongs to ${turnOwnerLabel}. This tab is ${viewerLabel}.`
-    : `The engine starts turn one for ${turnOwnerLabel} after setup completes.`
+    ? `Turn ${currentTurn.turnNumber}: ${turnOwnerLabel}. Tab: ${viewerLabel}.`
+    : `Turn one: ${turnOwnerLabel}.`
   const drawDetail = drawStepResolved
-    ? `Draw timing is resolved for ${turnOwnerLabel}.`
-    : `The engine draws one card for ${turnOwnerLabel}; deck-out ends the game automatically.`
+    ? `Draw resolved for ${turnOwnerLabel}.`
+    : `Draw one card for ${turnOwnerLabel}.`
   const actionWindowDetail = activeWindowOpen
     ? viewerOwnsTurn
-      ? `Action decisions are live for ${turnOwnerLabel}. Use Available actions below.`
-      : `Action decisions are live for ${turnOwnerLabel}. Switch to that tab for player actions.`
-    : 'The engine opens the action window after draw timing resolves.'
+      ? `Actions live for ${turnOwnerLabel}.`
+      : `Switch to ${turnOwnerLabel} for actions.`
+    : 'Opens after draw.'
   const handoffDetail = activeWindowOpen
-    ? 'Pass or declare an attack from Available actions. Either choice lets the flow machine hand off the turn.'
+    ? 'Pass or attack.'
     : handoffInProgress
       ? automaticFlowStateDetail(flowState)
-      : 'Turn handoff waits until the action window accepts pass or attack.'
+      : 'Waiting for pass or attack.'
 
   return (
     <div className="mt-3 rounded-xl border border-amber-100 bg-[oklch(0.985_0.018_90)] p-3">
@@ -2522,7 +2733,7 @@ function TurnStepGuide({
         <div>
           <h4 className="text-xs font-semibold uppercase tracking-[0.14em] text-amber-800">{guideTitle}</h4>
           <p className="mt-1 text-xs leading-5 text-stone-600">
-            Forced turn timing stays in the machine. Legal player choices appear only in Available actions.
+            Legal choices appear in Available actions.
           </p>
         </div>
         <StatusBadge tone={activeWindowOpen ? 'active' : 'warning'}>
@@ -2544,10 +2755,10 @@ function TurnStepGuide({
           title="Resolve draw timing"
         />
         <SetupGuideRow
-          detail={actionWindowDetail}
-          number="3"
-          state={actionWindowState}
-          title="Open the action window"
+            detail={actionWindowDetail}
+            number="3"
+            state={actionWindowState}
+            title="Action window"
         />
         <SetupGuideRow
           detail={handoffDetail}
@@ -2901,7 +3112,7 @@ function PromptChoiceCard({
 
       {legalChoiceIds.length > 0 ? (
         <div className="mt-3 space-y-2">
-          {promptChoiceRows.map(({ cardInstanceId, detail, label }) => {
+          {promptChoiceRows.map(({ card, cardInstanceId, detail, label }) => {
             const selected = selectedCardInstanceIds.includes(cardInstanceId)
 
             return (
@@ -2916,8 +3127,13 @@ function PromptChoiceCard({
                 onClick={() => toggleChoice(cardInstanceId)}
                 type="button"
               >
-                <span className="block font-semibold">{label}</span>
-                <span className="mt-0.5 block text-xs text-stone-500">{detail}</span>
+                <span className="flex items-center gap-3">
+                  {card ? <CardArt card={card} variant="choice" /> : null}
+                  <span className="min-w-0">
+                    <span className="block truncate font-semibold">{label}</span>
+                    <span className="mt-0.5 block text-xs text-stone-500">{detail}</span>
+                  </span>
+                </span>
               </button>
             )
           })}
@@ -4175,7 +4391,6 @@ function ActionAffordancesPanel({
     cardsById,
     actionGroups
   )
-  const showActionWindowGuide = Boolean(gameState.currentTurn?.status === 'action_window' && primaryActionGroup)
 
   if (actionGroups.length === 0 && !commandError) {
     return null
@@ -4183,47 +4398,26 @@ function ActionAffordancesPanel({
 
   return (
     <Panel
-      title="Available actions"
+      title="Actions"
       trailing={<StatusBadge tone={actions.length > 0 ? 'active' : 'neutral'}>{actions.length}</StatusBadge>}
     >
-      <div className="space-y-4">
+      <div className="space-y-3">
         {commandError ? <CommandErrorCard notice={commandError} /> : null}
 
         {postSearchHandoff ? (
           <UltraBallPostSearchHandoffCard handoff={postSearchHandoff} />
-        ) : primaryActionGroup && showActionWindowGuide ? (
-          <ActionWindowGuide
-            actionGroups={actionGroups}
-            cardsById={cardsById}
-            currentTurn={gameState.currentTurn}
-            primaryActionGroup={primaryActionGroup}
-            viewerPlayer={gameState.players.find(player => player.playerId === viewerPlayerId) ?? null}
-            viewerPlayerId={viewerPlayerId}
-          />
-        ) : primaryActionGroup ? (
-          <div className="rounded-xl border border-emerald-200 bg-emerald-50/80 px-3 py-2 text-xs leading-5 text-emerald-950">
-            <span className="font-semibold uppercase tracking-[0.14em] text-emerald-800">Current priority</span>
-            <span className="mt-0.5 block">
-              {primaryActionGroup.title}: {actionGroupDescription(primaryActionGroup, actionGroups)}
-            </span>
-          </div>
         ) : null}
 
         {actionGroups.length > 0 ? (
           actionGroups.map(group => (
             <section className="space-y-2" key={group.id}>
-              <div className="flex items-start justify-between gap-3 px-1">
-                <div>
-                  <h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">
-                    {group.title}
-                  </h3>
-                  <p className="mt-1 text-xs leading-5 text-stone-500">
-                    {actionGroupDescription(group, actionGroups)}
-                  </p>
-                </div>
+              <div className="flex items-center justify-between gap-3 px-1">
+                <h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                  {group.title}
+                </h3>
                 <div className="flex shrink-0 items-center gap-2">
                   {group.id === primaryActionGroupId ? (
-                    <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800">
+                    <span className="rounded-full bg-accent-mint/15 px-2 py-0.5 text-xs font-medium text-accent-mint">
                       next
                     </span>
                   ) : null}
@@ -4267,9 +4461,8 @@ function ActionAffordancesPanel({
             </section>
           ))
         ) : (
-          <RailEmptyState title="No legal action returned for this viewer">
-            The command error above did not expose a follow-up action. Refresh state, confirm turn ownership, or switch
-            to the player currently asked to act.
+          <RailEmptyState title="No legal action">
+            Refresh or switch seats.
           </RailEmptyState>
         )}
       </div>
@@ -4845,8 +5038,8 @@ function ActionAffordanceCard({
   const repeatedEvolutionLabels = repeatedEvolutionBaseLabels(evolutionOptions)
 
   return (
-    <li className={`rounded-xl border px-3 py-2.5 text-sm ${actionSurfaceClassName(action)}`}>
-      <div className="flex flex-wrap items-start justify-between gap-3">
+    <li className={`rounded-xl border px-3 py-2 text-sm ${actionSurfaceClassName(action)}`}>
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <p className="font-medium leading-5 text-stone-950">{action.label}</p>
@@ -4854,27 +5047,32 @@ function ActionAffordanceCard({
               {formatEventType(action.kind)}
             </span>
           </div>
-          <p className="mt-1 text-xs leading-5 text-stone-500">{actionSummary(action)}</p>
         </div>
         <StatusBadge tone={action.key === 'choose_replacement_active' ? 'warning' : 'neutral'}>
           {formatPlayerId(action.playerId)}
         </StatusBadge>
       </div>
 
-      {action.note ? <p className="mt-2 text-xs leading-5 text-stone-600">{action.note}</p> : null}
-
-      {playCardPromptGuide ? <PromptFlowGuideCard guide={playCardPromptGuide} /> : null}
-
-      {actionHasMetadata(action) ? (
+      {playCardPromptGuide ? (
         <details className="mt-2 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-xs text-stone-600">
-          <summary className="cursor-pointer font-medium text-stone-700">Engine details</summary>
-          <div className="mt-2 flex flex-wrap gap-2">
-            <ActionCount count={action.sourceCardInstanceIds.length} label="source" />
-            <ActionCount count={action.targetCardInstanceIds.length} label="target" />
-            <ActionCount count={action.requiredSourceCount} label="required source" />
-            <ActionCount count={action.promptIds.length} label="prompt" />
-            <ActionCount count={action.choiceKeys.length} label="choice key" />
-          </div>
+          <summary className="cursor-pointer font-medium text-stone-700">Prompt plan</summary>
+          <PromptFlowGuideCard guide={playCardPromptGuide} />
+        </details>
+      ) : null}
+
+      {action.note || actionHasMetadata(action) ? (
+        <details className="mt-2 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-xs text-stone-600">
+          <summary className="cursor-pointer font-medium text-stone-700">Details</summary>
+          {action.note ? <p className="mt-2 leading-5">{action.note}</p> : null}
+          {actionHasMetadata(action) ? (
+            <div className="mt-2 flex flex-wrap gap-2">
+              <ActionCount count={action.sourceCardInstanceIds.length} label="source" />
+              <ActionCount count={action.targetCardInstanceIds.length} label="target" />
+              <ActionCount count={action.requiredSourceCount} label="required source" />
+              <ActionCount count={action.promptIds.length} label="prompt" />
+              <ActionCount count={action.choiceKeys.length} label="choice key" />
+            </div>
+          ) : null}
         </details>
       ) : null}
 
@@ -5613,6 +5811,7 @@ function actionGroupBadgeTone(groupId: ActionGroupId, isPrimaryGroup: boolean): 
 
 function BattlefieldPanel({
   activePlayerId,
+  cardIntentsById,
   currentTurn,
   deckNamesByKey,
   players,
@@ -5620,6 +5819,7 @@ function BattlefieldPanel({
   viewerPlayerId
 }: {
   activePlayerId: string
+  cardIntentsById: CardIntentMap
   currentTurn: GameState['currentTurn']
   deckNamesByKey: Map<string, string>
   players: PlayerView[]
@@ -5634,13 +5834,14 @@ function BattlefieldPanel({
 
   return (
     <Panel
-      title="Battlefield"
+      title="Table"
       trailing={<StatusBadge tone={currentTurn ? 'active' : 'neutral'}>{turnLabel}</StatusBadge>}
     >
-      <div className="prizmo-felt rounded-[2rem] p-3 sm:p-4">
+      <div className="prizmo-felt rounded-[2rem] p-2.5 sm:p-3">
         {topPlayer ? (
           <PlayerBattleSide
             activePlayerId={activePlayerId}
+            cardIntentsById={cardIntentsById}
             deckName={deckNamesByKey.get(topPlayer.deckKey)}
             isViewer={topPlayer.playerId === viewerPlayerId}
             player={topPlayer}
@@ -5648,10 +5849,10 @@ function BattlefieldPanel({
           />
         ) : null}
 
-        <div className="my-3 grid items-center gap-3 sm:grid-cols-[1fr_auto_1fr]">
+        <div className="my-2 grid items-center gap-3 sm:grid-cols-[1fr_auto_1fr]">
           <div className="hidden h-px bg-border/60 sm:block" />
-          <div className="rounded-full bg-background/55 px-4 py-2 text-center text-xs font-medium text-muted-foreground">
-            {stadium ? `Stadium: ${stadium.name}` : 'No Stadium in play'}
+          <div className="rounded-full bg-background/55 px-3 py-1.5 text-center text-xs font-medium text-muted-foreground">
+            {stadium ? `Stadium: ${stadium.name}` : 'No stadium'}
           </div>
           <div className="hidden h-px bg-border/60 sm:block" />
         </div>
@@ -5659,6 +5860,7 @@ function BattlefieldPanel({
         {bottomPlayer ? (
           <PlayerBattleSide
             activePlayerId={activePlayerId}
+            cardIntentsById={cardIntentsById}
             deckName={deckNamesByKey.get(bottomPlayer.deckKey)}
             isViewer={bottomPlayer.playerId === viewerPlayerId}
             player={bottomPlayer}
@@ -5672,12 +5874,14 @@ function BattlefieldPanel({
 
 function PlayerBattleSide({
   activePlayerId,
+  cardIntentsById,
   deckName,
   isViewer,
   player,
   side
 }: {
   activePlayerId: string
+  cardIntentsById: CardIntentMap
   deckName?: string
   isViewer: boolean
   player: PlayerView
@@ -5687,34 +5891,40 @@ function PlayerBattleSide({
   const activeZone = (
     <BattleZone
       cards={player.active ? [player.active] : []}
+      cardIntentsById={cardIntentsById}
       emptyLabel="No Active Pokémon"
       title="Active Spot"
       variant="active"
     />
   )
-  const benchZone = <BattleZone cards={player.bench} emptyLabel="Bench is empty" title="Bench" variant="bench" />
+  const benchZone = (
+    <BattleZone
+      cards={player.bench}
+      cardIntentsById={cardIntentsById}
+      emptyLabel="Bench is empty"
+      title="Bench"
+      variant="bench"
+    />
+  )
 
   return (
     <section
-      className={`rounded-[1.5rem] p-3 sm:p-4 ${
+      className={`rounded-[1.5rem] p-2.5 sm:p-3 ${
         isViewer
           ? 'bg-accent-mint/10'
           : 'bg-background/45'
       }`}
     >
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <h3 className="text-base font-semibold tracking-tight text-foreground">{formatPlayerId(player.playerId)}</h3>
-            {isViewer ? <StatusBadge tone="active">viewer</StatusBadge> : <StatusBadge>opponent</StatusBadge>}
-            {isActivePlayer ? <StatusBadge tone="warning">turn owner</StatusBadge> : null}
-          </div>
-          <p className="mt-1 truncate text-sm text-muted-foreground">{deckName ?? player.deckKey}</p>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="min-w-0 flex items-center gap-2">
+          <h3 className="text-sm font-semibold tracking-tight text-foreground">{formatPlayerId(player.playerId)}</h3>
+          {isViewer ? <StatusBadge tone="active">you</StatusBadge> : null}
+          {isActivePlayer ? <StatusBadge tone="warning">turn</StatusBadge> : null}
         </div>
-        <p className="font-mono text-xs text-muted-foreground">{player.deckKey}</p>
+        <p className="max-w-[16rem] truncate text-xs text-muted-foreground">{deckName ?? player.deckKey}</p>
       </div>
 
-      <div className="mt-4 grid gap-3 xl:grid-cols-[8rem_minmax(0,1fr)_minmax(12rem,18rem)]">
+      <div className="mt-3 grid gap-2.5 xl:grid-cols-[5.5rem_minmax(0,1fr)_minmax(10rem,14rem)]">
         <div className="grid grid-cols-4 gap-2 xl:grid-cols-1">
           <ZoneStack label="Deck" value={player.deckCount} />
           <ZoneStack label="Prizes" value={player.prizeCount} />
@@ -5736,7 +5946,7 @@ function PlayerBattleSide({
           )}
         </div>
 
-        <PrivateHandZone isViewer={isViewer} player={player} />
+        <PrivateHandZone cardIntentsById={cardIntentsById} isViewer={isViewer} player={player} />
       </div>
     </section>
   )
@@ -5744,11 +5954,13 @@ function PlayerBattleSide({
 
 function BattleZone({
   cards,
+  cardIntentsById,
   emptyLabel,
   title,
   variant
 }: {
   cards: CardSummary[]
+  cardIntentsById: CardIntentMap
   emptyLabel: string
   title: string
   variant: 'active' | 'bench'
@@ -5756,8 +5968,8 @@ function BattleZone({
   const cardVariant = variant === 'active' ? 'active' : 'compact'
 
   return (
-    <div className="rounded-2xl bg-background/45 p-3">
-      <div className="mb-3 flex items-center justify-between gap-2">
+    <div className="rounded-2xl bg-background/45 p-2.5">
+      <div className="mb-2 flex items-center justify-between gap-2">
         <h4 className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">{title}</h4>
         <span className="rounded-full bg-muted/80 px-2 py-0.5 text-xs font-medium text-muted-foreground">
           {cards.length}
@@ -5773,11 +5985,11 @@ function BattleZone({
           }
         >
           {cards.map(card => (
-            <CardPill card={card} key={card.id} variant={cardVariant} />
+            <CardPill card={card} intent={cardIntentsById.get(card.id)} key={card.id} variant={cardVariant} />
           ))}
         </div>
       ) : (
-        <p className="rounded-xl bg-secondary/45 px-3 py-5 text-center text-sm text-muted-foreground">
+        <p className="rounded-xl bg-secondary/45 px-3 py-4 text-center text-sm text-muted-foreground">
           {emptyLabel}
         </p>
       )}
@@ -5802,17 +6014,25 @@ function ZoneStack({
         : 'bg-background/55 text-foreground'
 
   return (
-    <div className={`rounded-2xl px-3 py-2.5 text-center ${toneClassName}`}>
-      <p className="text-xl font-semibold tabular-nums">{value}</p>
+    <div className={`rounded-xl px-2 py-2 text-center ${toneClassName}`}>
+      <p className="text-lg font-semibold tabular-nums">{value}</p>
       <p className="mt-0.5 text-[0.68rem] font-semibold uppercase tracking-[0.14em] opacity-70">{label}</p>
     </div>
   )
 }
 
-function PrivateHandZone({ isViewer, player }: { isViewer: boolean; player: PlayerView }) {
+function PrivateHandZone({
+  cardIntentsById,
+  isViewer,
+  player
+}: {
+  cardIntentsById: CardIntentMap
+  isViewer: boolean
+  player: PlayerView
+}) {
   return (
-    <div className="rounded-2xl bg-background/45 p-3">
-      <div className="mb-3 flex items-center justify-between gap-2">
+    <div className="rounded-2xl bg-background/45 p-2.5">
+      <div className="mb-2 flex items-center justify-between gap-2">
         <h4 className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
           {isViewer ? 'Your hand' : 'Opponent hand'}
         </h4>
@@ -5823,21 +6043,49 @@ function PrivateHandZone({ isViewer, player }: { isViewer: boolean; player: Play
 
       {isViewer ? (
         player.hand.length > 0 ? (
-          <div className="max-h-80 space-y-2 overflow-auto pr-1">
+          <div className="grid max-h-80 grid-cols-2 gap-2 overflow-auto pr-1">
             {player.hand.map(card => (
-              <CardPill card={card} key={card.id} variant="hand" />
+              <HandCardTile card={card} intent={cardIntentsById.get(card.id)} key={card.id} />
             ))}
           </div>
         ) : (
-          <p className="rounded-xl bg-secondary/45 px-3 py-5 text-center text-sm text-muted-foreground">
-            Your hand is empty.
+          <p className="rounded-xl bg-secondary/45 px-3 py-4 text-center text-sm text-muted-foreground">
+            Empty.
           </p>
         )
       ) : (
-        <div className="rounded-xl bg-muted/55 px-3 py-5 text-center text-sm text-muted-foreground">
-          {player.handCount} hidden {player.handCount === 1 ? 'card' : 'cards'}
+        <div className="rounded-xl bg-muted/55 px-3 py-4 text-center text-sm text-muted-foreground">
+          {player.handCount} hidden
         </div>
       )}
+    </div>
+  )
+}
+
+function HandCardTile({ card, intent }: { card: CardSummary; intent?: CardIntent }) {
+  const content = (
+    <>
+      <CardArt card={card} variant="hand" />
+      {intent ? <CardIntentBadge intent={intent} compact /> : null}
+    </>
+  )
+  const className = `relative rounded-xl bg-secondary/70 p-1.5 text-left ring-1 ring-border/40 ${intent ? cardIntentClassName(intent) : ''}`
+  const title = intent ? `${intent.label} · ${card.name} · ${card.cardId}` : `${card.name} · ${card.cardId}`
+
+  return intent ? (
+    <button
+      aria-label={intent.label}
+      className={className}
+      disabled={intent.disabled}
+      onClick={intent.onClick}
+      title={title}
+      type="button"
+    >
+      {content}
+    </button>
+  ) : (
+    <div className={className} title={title}>
+      {content}
     </div>
   )
 }
@@ -5858,16 +6106,14 @@ function SessionConnectionSummary({
 
   return (
     <div className="prizmo-soft-surface rounded-2xl p-3">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-sm font-semibold text-foreground">Table seat</p>
-          <p className="mt-1 text-xs leading-5 text-muted-foreground">Local browser storage keeps the table ID and tab seat separate.</p>
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-foreground">{formatPlayerId(viewerPlayerId)}</p>
+          <p className="mt-1 truncate font-mono text-xs text-muted-foreground">
+            {gameId ? formatGameId(gameId) : 'No game'}
+          </p>
         </div>
         <StatusBadge tone={statusTone}>{statusLabel}</StatusBadge>
-      </div>
-      <div className="mt-3 space-y-2">
-        <StateRow label="Game" value={gameId ? formatGameId(gameId) : 'Create or paste an ID'} />
-        <StateRow label="Viewer" value={`${formatPlayerId(viewerPlayerId)} in this tab`} />
       </div>
     </div>
   )
@@ -6038,6 +6284,7 @@ function SetupGuideRow({
 }) {
   const badgeTone = state === 'done' || state === 'ready' ? 'active' : state === 'next' ? 'warning' : 'neutral'
   const badgeLabel = state === 'done' ? 'done' : state === 'ready' ? 'ready' : state === 'next' ? 'next' : 'needed'
+  const showDetail = state === 'next' || state === 'ready'
 
   return (
     <div className="flex items-start gap-3 rounded-xl bg-surface-control/55 px-3 py-2.5">
@@ -6049,7 +6296,7 @@ function SetupGuideRow({
           <p className="text-sm font-medium text-foreground">{title}</p>
           <StatusBadge tone={badgeTone}>{badgeLabel}</StatusBadge>
         </div>
-        <p className="mt-1 text-xs leading-5 text-muted-foreground">{detail}</p>
+        {showDetail ? <p className="mt-1 text-xs leading-5 text-muted-foreground">{detail}</p> : null}
       </div>
     </div>
   )
@@ -6074,9 +6321,7 @@ function SupportedDeckCatalog({
 
   return (
     <div className="space-y-3">
-      <p className="text-sm leading-6 text-muted-foreground">
-        Engine-owned deck fixtures for browser playtests. Selected fixtures are marked with their current seat.
-      </p>
+      <p className="text-sm leading-6 text-muted-foreground">Engine fixtures. Selected seats are marked.</p>
       {decks.map(deck => {
         const selectedSeats = [
           deck.deckKey === playerOneDeckKey ? 'P1' : null,
@@ -6120,45 +6365,290 @@ function SupportedDeckCatalog({
   )
 }
 
-function CardPill({ card, variant = 'default' }: { card: CardSummary; variant?: 'active' | 'compact' | 'default' | 'hand' }) {
+function CardPill({
+  card,
+  intent,
+  variant = 'default'
+}: {
+  card: CardSummary
+  intent?: CardIntent
+  variant?: CardPillVariant
+}) {
   const attachedCards = card.attachedCards ?? []
   const evolutionStackCards = evolutionStackForCard(card, attachedCards)
   const evolutionStackCardIds = new Set(evolutionStackCards.map(attachedCard => attachedCard.id))
   const regularAttachedCards = attachedCards.filter(attachedCard => !evolutionStackCardIds.has(attachedCard.id))
+  const cardMeta = [card.category, card.stage, card.status]
+    .filter((value): value is string => Boolean(value))
+    .map(formatEventType)
   const cardClassName =
     variant === 'active'
-      ? 'rounded-2xl bg-accent-mint/10 p-4 shadow-sm shadow-black/20'
+      ? 'rounded-2xl bg-accent-mint/10 p-3 shadow-sm shadow-black/20 ring-1 ring-accent-mint/20'
       : variant === 'compact'
-        ? 'rounded-xl bg-secondary/80 p-2.5'
+        ? 'rounded-xl bg-secondary/80 p-2.5 ring-1 ring-border/40'
         : variant === 'hand'
-          ? 'rounded-xl bg-secondary/80 p-2.5'
-          : 'rounded-xl bg-secondary/80 p-3'
+          ? 'rounded-xl bg-secondary/80 p-2.5 ring-1 ring-border/40'
+          : 'rounded-xl bg-secondary/80 p-3 ring-1 ring-border/40'
   const titleClassName = variant === 'active' ? 'text-base' : 'text-sm'
+  const contentClassName =
+    variant === 'active'
+      ? 'grid gap-3 sm:grid-cols-[minmax(6.75rem,8.5rem)_minmax(0,1fr)]'
+      : variant === 'hand'
+        ? 'grid grid-cols-[3.25rem_minmax(0,1fr)] gap-3'
+        : 'space-y-2'
+  const showMeta = variant !== 'hand' && cardMeta.length > 0
 
-  return (
-    <div className={cardClassName}>
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className={`truncate font-medium text-foreground ${titleClassName}`}>{card.name}</p>
-          <p className="mt-1 font-mono text-xs text-muted-foreground">{card.cardId}</p>
+  if (variant === 'compact') {
+    const content = (
+      <>
+        <CardArt card={card} variant={variant} />
+        <div className="mt-2 flex items-start justify-between gap-2">
+          <p className="min-w-0 truncate text-xs font-medium text-foreground">{card.name}</p>
+          {card.damage > 0 ? <StatusBadge tone="warning">{card.damage}</StatusBadge> : null}
         </div>
-        {card.damage > 0 ? <StatusBadge tone="warning">{card.damage} dmg</StatusBadge> : null}
+        {attachedCards.length > 0 ? (
+          <p className="mt-1 text-[0.68rem] font-medium text-muted-foreground">{attachedCards.length} attached</p>
+        ) : null}
+        {intent ? <CardIntentBadge intent={intent} compact /> : null}
+      </>
+    )
+
+    return intent ? (
+      <button
+        aria-label={intent.label}
+        className={`${cardClassName} relative text-left transition ${cardIntentClassName(intent)}`}
+        disabled={intent.disabled}
+        onClick={intent.onClick}
+        type="button"
+      >
+        {content}
+      </button>
+    ) : (
+      <div className={cardClassName}>
+        {content}
       </div>
-      <div className="mt-2 flex flex-wrap gap-1.5 text-xs text-muted-foreground">
-        {card.category ? <span>{card.category}</span> : null}
-        {card.stage ? <span>{card.stage}</span> : null}
-        {card.status ? <span>{card.status}</span> : null}
+    )
+  }
+
+  const content = (
+    <div className={contentClassName}>
+      <CardArt card={card} variant={variant} />
+
+      <div className="min-w-0">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className={`truncate font-medium text-foreground ${titleClassName}`}>{card.name}</p>
+            <p className="mt-1 font-mono text-xs text-muted-foreground">{card.cardId}</p>
+          </div>
+          {card.damage > 0 ? <StatusBadge tone="warning">{card.damage} dmg</StatusBadge> : null}
+        </div>
+
+        {showMeta ? (
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {cardMeta.map(meta => (
+              <span
+                className="rounded-full bg-muted/70 px-2 py-0.5 text-[0.68rem] font-medium text-muted-foreground"
+                key={meta}
+              >
+                {meta}
+              </span>
+            ))}
+          </div>
+        ) : null}
+
+        {evolutionStackCards.length > 0 ? (
+          <AttachedCardGroup cards={evolutionStackCards} title="Evolution" titleSuffix="evolved under" />
+        ) : null}
+
+        {regularAttachedCards.length > 0 ? (
+          <AttachedCardGroup cards={regularAttachedCards} title="Attached" titleSuffix="attached" />
+        ) : null}
+
+        {intent?.detail ? <CardIntentDetail intent={intent} /> : null}
       </div>
 
-      {evolutionStackCards.length > 0 ? (
-        <AttachedCardGroup cards={evolutionStackCards} title="Evolution stack" titleSuffix="evolved under" />
-      ) : null}
-
-      {regularAttachedCards.length > 0 ? (
-        <AttachedCardGroup cards={regularAttachedCards} title="Attached cards" titleSuffix="attached" />
-      ) : null}
+      {intent ? <CardIntentBadge intent={intent} /> : null}
     </div>
   )
+
+  return intent ? (
+    <button
+      aria-label={intent.label}
+      className={`${cardClassName} relative text-left transition ${cardIntentClassName(intent)}`}
+      disabled={intent.disabled}
+      onClick={intent.onClick}
+      type="button"
+    >
+      {content}
+    </button>
+  ) : (
+    <div className={cardClassName}>
+      {content}
+    </div>
+  )
+}
+
+function CardIntentDetail({ intent }: { intent: CardIntent }) {
+  return (
+    <span className="mt-3 block rounded-lg bg-primary/12 px-2.5 py-2 text-xs font-medium leading-5 text-primary">
+      {intent.pending ? 'Resolving...' : intent.detail}
+    </span>
+  )
+}
+
+function CardIntentBadge({ intent, compact = false }: { intent: CardIntent; compact?: boolean }) {
+  const className =
+    intent.tone === 'warning'
+      ? 'bg-attention text-primary-foreground'
+      : intent.tone === 'secondary'
+        ? 'bg-muted text-foreground'
+        : 'bg-primary text-primary-foreground'
+
+  return (
+    <span
+      className={`absolute right-2 top-2 rounded-full px-2 py-0.5 font-semibold shadow-sm shadow-black/25 ${
+        compact ? 'text-[0.62rem]' : 'text-[0.68rem]'
+      } ${className}`}
+    >
+      {intent.pending ? '...' : intent.badge}
+    </span>
+  )
+}
+
+function cardIntentClassName(intent: CardIntent) {
+  const ringClassName =
+    intent.tone === 'warning'
+      ? 'ring-attention/70 hover:ring-attention'
+      : intent.tone === 'secondary'
+        ? 'ring-muted-foreground/55 hover:ring-foreground/70'
+        : 'ring-primary/70 hover:ring-primary'
+
+  return `cursor-pointer focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background disabled:cursor-wait disabled:opacity-70 ${ringClassName}`
+}
+
+function CardArt({ card, variant }: { card: CardSummary; variant: CardArtVariant }) {
+  const [failed, setFailed] = useState(false)
+  const quality = variant === 'active' ? 'high' : 'low'
+  const imageSrc = !failed ? cardImageSrc(card, quality) : null
+  const artClassName = cardArtClassName(variant)
+
+  return (
+    <div className={`relative overflow-hidden rounded-lg bg-muted/55 ring-1 ring-border/50 ${artClassName}`}>
+      {imageSrc ? (
+        <img
+          alt={`${card.name} card image`}
+          className="h-full w-full object-contain"
+          decoding="async"
+          loading={variant === 'active' ? 'eager' : 'lazy'}
+          onError={() => setFailed(true)}
+          src={imageSrc}
+        />
+      ) : isEnergyCard(card) ? (
+        <EnergyCardFallback card={card} />
+      ) : (
+        <div className="flex h-full w-full flex-col items-center justify-center gap-1 px-2 text-center">
+          <span className="line-clamp-2 text-xs font-medium leading-tight text-foreground">{card.name}</span>
+          <span className="font-mono text-[0.62rem] text-muted-foreground">{card.cardId}</span>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function EnergyCardFallback({ card }: { card: CardSummary }) {
+  return (
+    <div className={`flex h-full w-full items-center justify-center ${energyCardFallbackClassName(card)}`}>
+      <span className="flex h-9 w-9 items-center justify-center rounded-full bg-background/65 font-semibold text-foreground shadow-sm shadow-black/30 ring-1 ring-foreground/10">
+        {energySymbol(card)}
+      </span>
+      <span className="sr-only">{card.name}</span>
+    </div>
+  )
+}
+
+function energyCardFallbackClassName(card: CardSummary) {
+  const name = card.name.toLowerCase()
+
+  if (name.includes('fire')) {
+    return 'bg-attention/18'
+  }
+
+  if (name.includes('water')) {
+    return 'bg-sky-100/15'
+  }
+
+  if (name.includes('grass')) {
+    return 'bg-accent-mint/15'
+  }
+
+  if (name.includes('lightning')) {
+    return 'bg-yellow-100/15'
+  }
+
+  if (name.includes('psychic')) {
+    return 'bg-fuchsia-100/15'
+  }
+
+  if (name.includes('fighting')) {
+    return 'bg-orange-100/15'
+  }
+
+  if (name.includes('darkness')) {
+    return 'bg-muted/75'
+  }
+
+  return 'bg-secondary/80'
+}
+
+function energySymbol(card: CardSummary) {
+  const name = card.name.toLowerCase()
+
+  if (name.includes('fire')) return 'R'
+  if (name.includes('water')) return 'W'
+  if (name.includes('grass')) return 'G'
+  if (name.includes('lightning')) return 'L'
+  if (name.includes('psychic')) return 'P'
+  if (name.includes('fighting')) return 'F'
+  if (name.includes('darkness')) return 'D'
+
+  return 'E'
+}
+
+function cardImageSrc(card: CardSummary, quality: 'high' | 'low') {
+  return tcgdexCardImageSrc(card.image, quality) ?? localEnergyCardImageSrc(card)
+}
+
+function tcgdexCardImageSrc(image: string | null, quality: 'high' | 'low') {
+  if (!image) {
+    return null
+  }
+
+  if (/\.(?:avif|gif|jpe?g|png|webp)$/i.test(image)) {
+    return image
+  }
+
+  return `${image.replace(/\/+$/, '')}/${quality}.webp`
+}
+
+function localEnergyCardImageSrc(card: CardSummary) {
+  const match = /^MEE-(\d{3})$/.exec(card.cardId)
+
+  return match ? `/tcg/cards/limitless/MEE/MEE_${match[1]}_R_EN_SM.png` : null
+}
+
+function cardArtClassName(variant: CardArtVariant) {
+  switch (variant) {
+    case 'active':
+      return 'aspect-[63/88] w-full max-w-[8.5rem] justify-self-center sm:justify-self-start'
+    case 'choice':
+      return 'aspect-[63/88] w-12 shrink-0'
+    case 'hand':
+      return 'aspect-[63/88] w-full'
+    case 'compact':
+      return 'aspect-[63/88] w-full'
+    case 'default':
+      return 'aspect-[63/88] w-full'
+  }
 }
 
 function evolutionStackForCard(card: CardSummary, attachedCards: CardSummary[]) {
