@@ -2,9 +2,8 @@
   "compilerOptions": {
     "esModuleInterop": true,
     "jsx": "react-jsx",
-    "baseUrl": ".",
     "paths": {
-      "@/*": ["lib/prizmo_web/spa/*"]
+      "@/*": ["./lib/prizmo_web/spa/*"]
     },
     "allowJs": true,
     "noEmit": true

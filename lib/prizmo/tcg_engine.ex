@@ -13,6 +13,7 @@ defmodule Prizmo.TcgEngine do
 
   typescript_rpc do
     resource Game do
+      rpc_action :list_tcg_engine_games, :read
       rpc_action :list_supported_tcg_decks, :list_supported_decks
       rpc_action :create_tcg_engine_game, :create_from_supported_decks
       rpc_action :get_tcg_engine_game_state, :get_state
@@ -50,6 +51,7 @@ defmodule Prizmo.TcgEngine do
 
     resource Game do
       define :get_game_by_id, action: :read, get_by: [:id]
+      define :list_games, action: :read
       define :list_supported_decks, action: :list_supported_decks
       define :create_supported_game, action: :create_from_supported_decks, args: [:players]
       define :get_game_state, action: :get_state, args: [:game_id, :viewer_player_id]

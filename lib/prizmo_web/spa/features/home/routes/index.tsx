@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useNavigate, useSearch } from '@tanstack/react-router'
 import { useEffect, useMemo, useState } from 'react'
 
 import {
@@ -19,6 +20,7 @@ import {
   runFinishTcgEngineAttack,
   runFinishTcgEngineSetupChoices,
   runGetTcgEngineGameState,
+  runListTcgEngineGames,
   runListSupportedTcgDecks,
   runOpenTcgEngineActionWindow,
   runPassTcgEngineTurn,
@@ -33,15 +35,13 @@ import {
   runUndoTcgEngineGame,
   type CreateTcgEngineGameFields,
   type GetTcgEngineGameStateFields,
+  type ListTcgEngineGamesFields,
   type ListSupportedTcgDecksFields
 } from '@/lib/ash/client'
 
 const PLAYER_ONE_ID = 'player_1'
 const PLAYER_TWO_ID = 'player_2'
 const PLAYER_IDS = [PLAYER_ONE_ID, PLAYER_TWO_ID] as const
-const LEGACY_SESSION_STORAGE_KEY = 'prizmo:tcg-playtest-session'
-const GAME_ID_STORAGE_KEY = 'prizmo:tcg-playtest-game-id'
-const VIEWER_STORAGE_KEY = 'prizmo:tcg-playtest-viewer'
 const ULTRA_BALL_POST_SEARCH_HANDOFF_STORAGE_KEY = 'prizmo:tcg-ultra-ball-post-search-handoff'
 const DISCARD_OWN_BASIC_ENERGY_FOR_DAMAGE_EFFECT = 'damage_per_discarded_own_basic_energy'
 const DISCARD_OWN_BENCH_ENERGY_FOR_BONUS_DAMAGE_EFFECT = 'discard_energy_from_own_bench_for_bonus_damage'
@@ -72,6 +72,17 @@ const GAME_RESOURCE_FIELDS: CreateTcgEngineGameFields = [
   'coinTossResult',
   'coinTossWinnerPlayerId',
   'startingPlayerChosenByPlayerId',
+  'cursorIndex',
+  'latestEventIndex'
+]
+
+const GAME_LIST_FIELDS: ListTcgEngineGamesFields = [
+  'id',
+  'status',
+  'flowState',
+  'activePlayerId',
+  'firstPlayerId',
+  'winnerPlayerId',
   'cursorIndex',
   'latestEventIndex'
 ]
@@ -260,6 +271,17 @@ type CreatedGame = {
   coinTossResult: string | null
   coinTossWinnerPlayerId: string | null
   startingPlayerChosenByPlayerId: string | null
+  cursorIndex: number
+  latestEventIndex: number
+}
+
+type AvailableGame = {
+  id: string
+  status: string
+  flowState: string
+  activePlayerId: string
+  firstPlayerId: string
+  winnerPlayerId: string | null
   cursorIndex: number
   latestEventIndex: number
 }
@@ -640,16 +662,18 @@ type GameState = {
 }
 
 export function HomeRoute() {
+  const navigate = useNavigate({ from: '/' })
+  const search = useSearch({ from: '/' })
   const queryClient = useQueryClient()
-  const [session, setSession] = useState<PlaytestSession>(readStoredSession)
   const [playerOneDeckKey, setPlayerOneDeckKey] = useState('')
   const [playerTwoDeckKey, setPlayerTwoDeckKey] = useState('')
   const [ultraBallPostSearchHandoff, setUltraBallPostSearchHandoff] =
     useState<UltraBallPostSearchHandoff | null>(readStoredUltraBallPostSearchHandoff)
 
-  useEffect(() => {
-    setStoredSession(session)
-  }, [session])
+  const session: PlaytestSession = {
+    gameId: search.gameId,
+    viewerPlayerId: isPlayerId(search.viewerPlayerId) ? search.viewerPlayerId : PLAYER_ONE_ID
+  }
 
   useEffect(() => {
     setStoredUltraBallPostSearchHandoff(ultraBallPostSearchHandoff)
@@ -660,7 +684,14 @@ export function HomeRoute() {
     queryFn: listSupportedDecks
   })
 
+  const availableGamesQuery = useQuery({
+    queryKey: ['tcg-engine', 'game-list'],
+    queryFn: listAvailableGames,
+    refetchOnWindowFocus: false
+  })
+
   const decks = decksQuery.data ?? []
+  const availableGames = availableGamesQuery.data ?? []
   const selectedPlayerOneDeckKey = playerOneDeckKey || decks[0]?.deckKey || ''
   const selectedPlayerTwoDeckKey = playerTwoDeckKey || decks[1]?.deckKey || decks[0]?.deckKey || ''
   const normalisedGameId = session.gameId.trim()
@@ -703,6 +734,7 @@ export function HomeRoute() {
       }))
 
       await queryClient.invalidateQueries({ queryKey: ['tcg-engine', 'game-state'] })
+      await queryClient.invalidateQueries({ queryKey: ['tcg-engine', 'game-list'] })
     }
   })
 
@@ -1050,7 +1082,16 @@ export function HomeRoute() {
   )
 
   function updateSession(updater: (currentSession: PlaytestSession) => PlaytestSession) {
-    setSession(currentSession => updater(currentSession))
+    const nextSession = updater(session)
+
+    void navigate({
+      search: currentSearch => ({
+        ...currentSearch,
+        gameId: nextSession.gameId,
+        viewerPlayerId: nextSession.viewerPlayerId
+      }),
+      replace: true
+    })
   }
 
   function clearGame() {
@@ -1256,7 +1297,15 @@ export function HomeRoute() {
 
           <section className="min-w-0">
             {!normalisedGameId ? (
-              <EmptyWorkbench />
+              <AvailableGamesPanel
+                games={availableGames}
+                isLoading={availableGamesQuery.isPending}
+                loadError={availableGamesQuery.error}
+                onChooseGame={(gameId: string) => {
+                  updateSession(currentSession => ({ ...currentSession, gameId }))
+                }}
+                viewerPlayerId={session.viewerPlayerId}
+              />
             ) : gameStateQuery.isPending ? (
               <GameStateLoadingPanel gameId={normalisedGameId} viewerPlayerId={session.viewerPlayerId} />
             ) : gameStateQuery.error ? (
@@ -1521,6 +1570,23 @@ async function listSupportedDecks(): Promise<SupportedDeck[]> {
   }
 
   return result.data as SupportedDeck[]
+}
+
+async function listAvailableGames(): Promise<AvailableGame[]> {
+  const result = await runListTcgEngineGames({
+    fields: GAME_LIST_FIELDS,
+    headers: buildAshRpcHeaders(),
+    page: { limit: 50 }
+  })
+
+  if (!result.success) {
+    throw new Error(rpcErrorMessage(result.errors))
+  }
+
+  const data = result.data as AvailableGame[] | { results: AvailableGame[] }
+  const games = Array.isArray(data) ? data : data.results
+
+  return games as AvailableGame[]
 }
 
 async function createGame(input: {
@@ -7044,20 +7110,100 @@ function CommandErrorCard({ notice }: { notice: CommandErrorNotice }) {
   )
 }
 
+function AvailableGamesPanel({
+  games,
+  isLoading,
+  loadError,
+  onChooseGame,
+  viewerPlayerId
+}: {
+  games: AvailableGame[]
+  isLoading: boolean
+  loadError: unknown
+  onChooseGame: (gameId: string) => void
+  viewerPlayerId: PlayerId
+}) {
+  if (isLoading) {
+    return (
+      <Panel title="Available games" trailing={<StatusBadge tone="warning">loading</StatusBadge>}>
+        <SkeletonLines count={6} />
+      </Panel>
+    )
+  }
+
+  if (loadError) {
+    return (
+      <Panel title="Available games" trailing={<StatusBadge tone="warning">unavailable</StatusBadge>}>
+        <InlineNotice tone="error" title="Game list did not load">
+          {errorMessage(loadError)} Refresh the page or create a new board from the left rail.
+        </InlineNotice>
+      </Panel>
+    )
+  }
+
+  if (games.length === 0) {
+    return <EmptyWorkbench />
+  }
+
+  return (
+    <Panel title="Available games" trailing={<StatusBadge tone="active">{games.length}</StatusBadge>}>
+      <div className="space-y-3">
+        <p className="text-sm leading-6 text-muted-foreground">
+          Pick a persisted board to open as {formatPlayerId(viewerPlayerId)}. Refreshing this page will reuse the URL and refetch the same viewer state.
+        </p>
+
+        <ol className="space-y-2">
+          {games.map(game => (
+            <li className="rounded-2xl bg-secondary/60 p-3" key={game.id}>
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="font-medium text-foreground">{formatGameId(game.id)}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {formatEventType(game.status)}, {formatEventType(game.flowState)}
+                  </p>
+                </div>
+                <StatusBadge tone={game.status === 'in_progress' ? 'active' : 'neutral'}>
+                  {game.status === 'finished' && game.winnerPlayerId
+                    ? `${formatPlayerId(game.winnerPlayerId)} won`
+                    : `cursor ${game.cursorIndex}/${game.latestEventIndex}`}
+                </StatusBadge>
+              </div>
+
+              <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                <span>{formatPlayerId(game.activePlayerId)} active</span>
+                <span className="h-1 w-1 rounded-full bg-muted-foreground/45" />
+                <span>{formatPlayerId(game.firstPlayerId)} went first</span>
+              </div>
+
+              <button
+                className="mt-3 rounded-xl bg-secondary px-3 py-2 text-sm font-medium text-foreground transition hover:bg-accent hover:text-accent-foreground focus:outline-none focus:ring-2 focus:ring-ring/50"
+                onClick={() => onChooseGame(game.id)}
+                type="button"
+              >
+                Open board
+              </button>
+            </li>
+          ))}
+        </ol>
+      </div>
+    </Panel>
+  )
+}
+
 function EmptyWorkbench() {
   return (
     <div className="prizmo-panel grid min-h-[32rem] place-items-center rounded-3xl p-8 text-center">
       <div className="max-w-md">
         <p className="text-sm font-semibold uppercase tracking-[0.22em] text-primary">No game selected</p>
         <h2 className="mt-3 text-2xl font-bold tracking-tight text-foreground">
-          Create a game board or reconnect by ID
+          Create a game board or open one from the list
         </h2>
         <p className="mt-3 text-sm leading-6 text-muted-foreground">
-          Choose two fixture loadouts in the left rail, then create a persisted board. Setup and player prompts appear only after the table exists.
+          Choose two fixture loadouts in the left rail, then create a persisted board. Existing boards appear here whenever the server still has them.
         </p>
         <div className="mt-6 rounded-2xl bg-secondary/65 px-4 py-3 text-left text-sm text-muted-foreground">
           <p className="font-medium text-foreground">Next action</p>
-          <p className="mt-1 leading-6">Use the left rail to create a board, or paste a saved game ID to reconnect this tab.</p>
+          <p className="mt-1 leading-6">Use the left rail to create a board, or pick one from the game list when it is available.</p>
         </div>
       </div>
     </div>
@@ -7204,72 +7350,6 @@ function SkeletonLines({ count }: { count: number }) {
   )
 }
 
-function readStoredSession(): PlaytestSession {
-  if (typeof window === 'undefined') {
-    return defaultSession()
-  }
-
-  return {
-    gameId: readStoredGameId(),
-    viewerPlayerId: readStoredViewerPlayerId()
-  }
-}
-
-function setStoredSession(session: PlaytestSession) {
-  if (typeof window === 'undefined') {
-    return
-  }
-
-  if (session.gameId) {
-    window.localStorage.setItem(GAME_ID_STORAGE_KEY, session.gameId)
-  } else {
-    window.localStorage.removeItem(GAME_ID_STORAGE_KEY)
-  }
-
-  window.localStorage.removeItem(LEGACY_SESSION_STORAGE_KEY)
-  window.sessionStorage.setItem(VIEWER_STORAGE_KEY, session.viewerPlayerId)
-}
-
-function readStoredGameId() {
-  try {
-    const storedGameId = window.localStorage.getItem(GAME_ID_STORAGE_KEY)
-
-    if (storedGameId !== null) {
-      return storedGameId
-    }
-
-    return readLegacyStoredGameId()
-  } catch {
-    return ''
-  }
-}
-
-function readLegacyStoredGameId() {
-  try {
-    const item = window.localStorage.getItem(LEGACY_SESSION_STORAGE_KEY)
-
-    if (!item) {
-      return ''
-    }
-
-    const parsed = JSON.parse(item) as Partial<PlaytestSession>
-
-    return typeof parsed.gameId === 'string' ? parsed.gameId : ''
-  } catch {
-    return ''
-  }
-}
-
-function readStoredViewerPlayerId() {
-  try {
-    const viewerPlayerId = window.sessionStorage.getItem(VIEWER_STORAGE_KEY)
-
-    return isPlayerId(viewerPlayerId) ? viewerPlayerId : PLAYER_ONE_ID
-  } catch {
-    return PLAYER_ONE_ID
-  }
-}
-
 function readStoredUltraBallPostSearchHandoff(): UltraBallPostSearchHandoff | null {
   if (typeof window === 'undefined') {
     return null
@@ -7304,10 +7384,6 @@ function setStoredUltraBallPostSearchHandoff(handoff: UltraBallPostSearchHandoff
   } catch {
     // Tab-scoped recovery guidance should never block command rendering.
   }
-}
-
-function defaultSession(): PlaytestSession {
-  return { gameId: '', viewerPlayerId: PLAYER_ONE_ID }
 }
 
 function isPlayerId(value: unknown): value is PlayerId {
