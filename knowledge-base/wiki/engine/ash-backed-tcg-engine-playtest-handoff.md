@@ -2,6 +2,14 @@
 
 Updated: 2026-05-31
 
+## Iteration 152 handoff
+
+- Current state: the current playtest game `f6df7025-7d0f-4d9b-9bc2-31c864de1d4e` advanced from cursor/latest `75`, `turn_action_window`, active Player 1, by executing the same Ash domain command behind the SPA `Declare Fighting Wings` action. The available MCP browser profile was still locked, so this could not be clicked through the SPA. The engine auto-continued the simple attack/turn flow and appended events/snapshots `76`-`82`: `declare_attack`, `resolve_declared_attack`, `finish_attack`, `turn_ended`, `turn_started`, `turn_card_drawn`, and `action_window_opened`. The game is now cursor/latest `82`, `turn_action_window`, `Turn 10, action_window`, active Player 2, with no prompts. Player 1 sees no legal actions; Player 2 sees legal actions `play_basic_to_bench` for `Rellor` and `pass`.
+- Last commit at iteration start: `5f9b3cc docs(wiki): capture tcg pass handoff`.
+- Remaining tasks: continue the substantial Web UI polish/playtest path on the current game state, rerun a true browser/UI smoke when an isolated Playwright or browser context is available, eventually rerun the formal two-independent-browser milestone, and continue broader persisted mechanics/card behavior plus Electric Streams spike work from the north-star plan.
+- Blockers: the MCP browser profile remained locked during this iteration, so the Player 1 `Fighting Wings` action was validated through the Ash domain command and database/read-model checks rather than an actual SPA click.
+- Recommended next atomic task: from current game `f6df7025-7d0f-4d9b-9bc2-31c864de1d4e` at post-event-82 Player 2 action window, use an isolated/browser-available SPA context to click `Bench Rellor` if possible, then verify the persisted Bench landing plus Player 1 hidden/action guidance from both seats without repeating the already-validated Player 1 `Fighting Wings` auto-continue branch.
+
 ## Iteration 151 handoff
 
 - Current state: the prior documented game `d608a1f1-6db6-4f23-a8d0-4a7d27641993` was not present in the current dev database, so the iteration-150 Rellor branch could not be continued. The current in-progress game is `f6df7025-7d0f-4d9b-9bc2-31c864de1d4e`. It was advanced from cursor/latest `70`, `turn_action_window`, active Player 2, by executing the same Ash domain command behind the SPA `Pass as player 2` action. Stabilization appended events/snapshots `71`-`75`: `turn_passed`, `turn_ended`, `turn_started`, `turn_card_drawn`, and `action_window_opened`. The game is now cursor/latest `75`, `turn_action_window`, `Turn 9, action_window`, active Player 1, with no prompts. Player 1 sees legal actions `play_card`, `attach_energy`, `declare_attack`, and `pass`; Player 2 sees no legal actions.
