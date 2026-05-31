@@ -4233,6 +4233,10 @@ function ActionWindowGuide({
         : 'Only turn flow remains. End the turn after confirming hand, Bench, and attached Energy.'
       : 'Finish the required choice before battle or turn-flow actions appear.'
   const guideTitle = currentTurn?.turnNumber === 1 ? 'First action window' : 'Action window plan'
+  const priorityTitle =
+    primaryActionGroup.id === 'battle' && handGroup
+      ? 'Battle ready, board still open'
+      : `Follow ${primaryActionGroup.title}`
 
   return (
     <div className="rounded-xl border border-emerald-200 bg-[oklch(0.982_0.018_155)] p-3 text-xs leading-5 text-emerald-950">
@@ -4248,9 +4252,12 @@ function ActionWindowGuide({
 
       <div className="mt-3 space-y-2">
         <ActionWindowGuideStep
-          detail={priorityInstruction(primaryActionGroup)}
+          detail={priorityInstruction(primaryActionGroup, {
+            hasHandActions: Boolean(handGroup),
+            hasTurnFlow: Boolean(turnGroup)
+          })}
           label="focus"
-          title={`Follow ${primaryActionGroup.title}`}
+          title={priorityTitle}
           tone="focus"
         />
         <ActionWindowGuideStep
@@ -4387,11 +4394,22 @@ function ActionWindowGuideStep({
   )
 }
 
-function priorityInstruction(group: ActionGroup) {
+function priorityInstruction(
+  group: ActionGroup,
+  context: { hasHandActions?: boolean; hasTurnFlow?: boolean } = {}
+) {
   switch (group.id) {
     case 'required':
       return 'A required choice is blocking progress. Resolve it before optional actions.'
     case 'battle':
+      if (context.hasHandActions && context.hasTurnFlow) {
+        return 'Battle is ready, but hand and board choices remain legal. Improve the board first if it helps, then attack or pass.'
+      }
+
+      if (context.hasHandActions) {
+        return 'Battle is ready, but hand and board choices remain legal. Improve the board first if it helps, then choose the attack.'
+      }
+
       return 'Battle decisions are most consequential now. Review retreat and paid attacks first.'
     case 'hand':
       return 'Hand and board actions are the safest first pass. Improve the board before attacking or ending.'

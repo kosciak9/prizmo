@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-31] iteration 115 | Player 1 action-window priority copy
+- Task attempted: continued the Web UI polish pass from the post-event-39 Player 1 turn-3 action-window state by inspecting the visible Play/Bench/Battle/Turn-flow choices and refining the priority guide so a ready attack no longer implies skipping still-legal hand/board development.
+- Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.
+- Validation: Tidewave precheck confirmed game `d608a1f1-6db6-4f23-a8d0-4a7d27641993` was at event #39 with `Turn 3, action_window`, Player 1 had four legal actions, and Player 2 had none; browser smoke on `http://localhost:4003` as Player 1 confirmed the `Available actions` rail now says `Battle ready, board still open` with copy explaining hand/board choices remain legal before attacking or passing, while `Bench Munkidori`, Ultra Ball actions, `Declare Fighting Wings`, and `End player 1's turn` remain visible; browser console reported no warnings or errors; `mix format && mix assets.build` passed; `mix check --no-test` passed.
+- Remaining/blocking notes: no code blocker for this action-window priority-copy slice. Further polish can continue from the same post-event-39 state by executing one safe Player 1 follow-up action, preferably `Bench Munkidori`, then verifying the resulting action-window guide and rail priority without repeating the draw/open-action branch.
+
 ## [2026-05-31] iteration 114 | Player 1 action-window landing
 - Task attempted: continued the Web UI polish pass from the post-event-37 state by drawing for Player 1 on turn 3, verifying the persisted drawn landing, refining Player 2's non-owner post-draw action-window guide to name the Player 1 tab explicitly, and opening Player 1's action window.
 - Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.
