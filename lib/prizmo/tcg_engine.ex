@@ -56,6 +56,11 @@ defmodule Prizmo.TcgEngine do
       define :list_supported_decks, action: :list_supported_decks
       define :create_supported_game, action: :create_from_supported_decks, args: [:players]
       define :create_open_deck_game, action: :create_from_decklists, args: [:players]
+
+      define :create_open_deck_game_with_seed,
+        action: :create_from_decklists,
+        args: [:players, :rng_seed]
+
       define :get_game_state, action: :get_state, args: [:game_id, :viewer_player_id]
 
       define :call_coin_toss_for_game,

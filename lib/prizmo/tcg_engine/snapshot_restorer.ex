@@ -63,6 +63,9 @@ defmodule Prizmo.TcgEngine.SnapshotRestorer do
       coin_toss_result: maybe_string_to_existing_atom(Map.get(data, "coin_toss_result")),
       coin_toss_winner_player_id: Map.get(data, "coin_toss_winner_player_id"),
       starting_player_chosen_by_player_id: Map.get(data, "starting_player_chosen_by_player_id"),
+      rng_seed: Map.get(data, "rng_seed"),
+      rng_seed_source: Map.get(data, "rng_seed_source"),
+      rng_algorithm: Map.get(data, "rng_algorithm"),
       cursor_index: Map.fetch!(data, "cursor_index"),
       latest_event_index: max(game.latest_event_index, Map.fetch!(data, "latest_event_index"))
     })

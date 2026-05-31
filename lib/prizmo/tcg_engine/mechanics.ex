@@ -85,6 +85,7 @@ defmodule Prizmo.TcgEngine.Mechanics do
   alias Prizmo.TcgEngine.PendingEffect
   alias Prizmo.TcgEngine.PendingEffects
   alias Prizmo.TcgEngine.Prompt
+  alias Prizmo.TcgEngine.Rng
   alias Prizmo.TcgEngine.Setup
   alias Prizmo.TcgEngine.SnapshotRestorer
   alias Prizmo.TcgEngine.Turn
@@ -103,12 +104,56 @@ defmodule Prizmo.TcgEngine.Mechanics do
 
     transaction(fn ->
       with :ok <- GameSetup.require_two_players(player_decks),
-           {:ok, game} <- GameSetup.create_game_record(active_player_id),
+           {:ok, game} <-
+             GameSetup.create_game_record(active_player_id, rng_metadata: rng_metadata(opts)),
            {:ok, _players} <- GameSetup.create_players_and_cards(game, player_decks),
-           {:ok, _snapshot} <- write_snapshot(game.id, nil, 0) do
+           {:ok, _snapshot} <- write_snapshot(game.id, nil, 0),
+           {:ok, _shuffle_events} <- maybe_shuffle_opening_decks(game, player_decks, opts) do
         get_game(game.id)
       end
     end)
+  end
+
+  defp rng_metadata(opts) do
+    case Keyword.get(opts, :rng_seed) do
+      nil ->
+        %{}
+
+      seed ->
+        %{
+          rng_seed: seed,
+          rng_seed_source: Keyword.get(opts, :rng_seed_source, "explicit"),
+          rng_algorithm: Keyword.get(opts, :rng_algorithm, Rng.algorithm())
+        }
+    end
+  end
+
+  defp maybe_shuffle_opening_decks(%Game{} = game, player_decks, opts) do
+    if Keyword.get(opts, :shuffle_decks?, false) do
+      case Keyword.get(opts, :rng_seed) do
+        seed when is_binary(seed) ->
+          player_decks
+          |> Enum.map(fn {player_id, deck} ->
+            with {:ok, fact} <- GameSetup.shuffle_deck(game, player_id, deck, seed) do
+              write_event_and_snapshot(
+                game.id,
+                :deck_shuffled,
+                player_id,
+                Map.delete(fact, :player_id)
+              )
+            end
+          end)
+          |> collect_results()
+
+        nil ->
+          {:error, :missing_rng_seed_for_shuffle}
+
+        seed ->
+          {:error, {:invalid_rng_seed, seed}}
+      end
+    else
+      {:ok, []}
+    end
   end
 
   @spec call_coin_toss(Game.t() | String.t(), String.t(), atom() | String.t()) ::

@@ -71,6 +71,11 @@ defmodule Prizmo.TcgEngine.Game do
     define :list_supported_decks
     define :create_from_supported_decks, args: [:players]
     define :create_from_decklists, args: [:players]
+
+    define :create_from_decklists_with_seed,
+      action: :create_from_decklists,
+      args: [:players, :rng_seed]
+
     define :start_setup_command, args: [:game_id]
     define :call_coin_toss_command, args: [:game_id, :player_id, :call]
 
@@ -151,13 +156,13 @@ defmodule Prizmo.TcgEngine.Game do
       end
 
       argument :active_player_id, :string
+      argument :rng_seed, :string
 
       run fn input, _context ->
         opts =
-          case Map.get(input.arguments, :active_player_id) do
-            nil -> []
-            active_player_id -> [active_player_id: active_player_id]
-          end
+          []
+          |> maybe_put_opt(:active_player_id, Map.get(input.arguments, :active_player_id))
+          |> maybe_put_opt(:rng_seed, Map.get(input.arguments, :rng_seed))
 
         Decklists.create_game(input.arguments.players, opts)
       end
@@ -175,7 +180,16 @@ defmodule Prizmo.TcgEngine.Game do
 
     create :create do
       primary? true
-      accept [:active_player_id, :first_player_id, :cursor_index, :latest_event_index]
+
+      accept [
+        :active_player_id,
+        :first_player_id,
+        :rng_seed,
+        :rng_seed_source,
+        :rng_algorithm,
+        :cursor_index,
+        :latest_event_index
+      ]
     end
 
     update :start_setup do
@@ -244,6 +258,9 @@ defmodule Prizmo.TcgEngine.Game do
         :coin_toss_result,
         :coin_toss_winner_player_id,
         :starting_player_chosen_by_player_id,
+        :rng_seed,
+        :rng_seed_source,
+        :rng_algorithm,
         :cursor_index,
         :latest_event_index
       ]
@@ -307,6 +324,18 @@ defmodule Prizmo.TcgEngine.Game do
       public? true
     end
 
+    attribute :rng_seed, :string do
+      sensitive? true
+    end
+
+    attribute :rng_seed_source, :string do
+      public? true
+    end
+
+    attribute :rng_algorithm, :string do
+      public? true
+    end
+
     attribute :cursor_index, :integer do
       allow_nil? false
       default 0
@@ -332,4 +361,7 @@ defmodule Prizmo.TcgEngine.Game do
     has_many :prompts, Prizmo.TcgEngine.Prompt
     has_one :setup, Prizmo.TcgEngine.Setup
   end
+
+  defp maybe_put_opt(opts, _key, nil), do: opts
+  defp maybe_put_opt(opts, key, value), do: Keyword.put(opts, key, value)
 end

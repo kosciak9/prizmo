@@ -16,7 +16,7 @@ The goal is not yet complete Standard card-effect coverage, an AI opponent, an e
 - The engine is persisted with Ash resources for games, players, turns, card instances, prompts, pending effects, setup, game events, and snapshots.
 - Card play is generic and registry-driven for the first Ultra Ball-style flow, including costs, effects, prompts, pending continuations, and domain-fact events.
 - `Prizmo.TcgEngine.CardCatalog` now owns the engine catalog boundary. It builds catalog records from committed TCGdex metadata plus authored behavior manifests instead of delegating to `Prizmo.Tcg.Sim.CardRegistry`.
-- `Prizmo.TcgEngine.Decklists` now accepts arbitrary deck payloads made of catalog card IDs through the Ash `create_from_decklists` / TypeScript RPC `create_open_deck_tcg_engine_game` path. It validates deck size, duplicate card rows, catalog resolution, and Basic Pokémon presence before creating persisted games. This is a backend/API step toward open-deck play; UI decklist entry, engine-owned RNG shuffle/seed persistence, and shuffle/setup domain facts remain follow-up work.
+- `Prizmo.TcgEngine.Decklists` now accepts arbitrary deck payloads made of catalog card IDs through the Ash `create_from_decklists` / TypeScript RPC `create_open_deck_tcg_engine_game` path. It validates deck size, duplicate card rows, catalog resolution, and Basic Pokémon presence before creating persisted games. Open-deck creation now assigns a fresh seed by default or accepts an explicit deterministic seed, persists `rng_seed`, `rng_seed_source`, and `rng_algorithm` on the game, reorders each player's deck through engine-owned shuffle, and records per-player `deck_shuffled` domain facts/snapshots before setup starts. Opening hands and prizes therefore consume server-owned shuffled deck order, while UI decklist entry, mulligan/setup edge cases, and richer random-choice facts remain follow-up work.
 - The temporary Phoenix channel and temporary TCG SPA route were removed.
 - The old `Prizmo.Tcg.Sim` reducer still exists as legacy/reference code and still has tests, but it is no longer the canonical engine target.
 - Recent iterations have repeatedly advanced one long-lived preseeded playtest game. That game remains useful for engine-correctness validation, regression checks, UI smoke tests, and incremental mechanic work. It is not the final product target by itself. North-star work should keep moving the system toward open-deck, RNG-backed game creation plus card-first UI density, while still using fixtures whenever they are the best way to prove correctness.
@@ -142,10 +142,10 @@ Important boundary: Electric should be a delivery and replay layer, not the rule
 
 - Add or harden decklist ingestion for normal game creation. Decks should resolve through `Prizmo.TcgEngine.CardCatalog` and report unresolved cards clearly.
 - Validate deck shape enough for supported play: deck size, recognizable card records, Basic Pokémon availability for setup, and copy-limit warnings or errors as appropriate.
-- Add game creation inputs for player decklists and an optional explicit RNG seed for tests and reproducible dev runs.
-- Persist the seed or equivalent RNG metadata and record shuffle/setup domain facts.
-- Replace product-path preseeded hands and scripted prize maps with engine-owned shuffle, opening hand draw, prize placement, and top-deck order.
-- Validate that different fresh seeds produce different opening hands/prizes, while the same explicit seed is deterministic.
+- Keep the optional explicit RNG seed path available for tests and reproducible dev runs, and expose it cleanly from the browser decklist-entry surface when useful.
+- Continue expanding persisted random/setup facts beyond the current per-player `deck_shuffled` facts, especially mulligans, prize placement, and any later random choices.
+- Replace any remaining product-path preseeded hands and scripted prize maps with the existing engine-owned shuffled deck order, opening hand draw, prize placement, and top-deck order.
+- Validate setup end-to-end from open decklists: different fresh seeds should produce different hands/prizes, while the same explicit seed is deterministic.
 
 ### 3. Make any loaded deck safe to start
 

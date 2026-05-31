@@ -8,6 +8,7 @@ defmodule Prizmo.TcgEngine.GameSetup do
   alias Prizmo.TcgEngine.Game
   alias Prizmo.TcgEngine.GamePlayer
   alias Prizmo.TcgEngine.PlayerStore
+  alias Prizmo.TcgEngine.Rng
 
   def first_player_id([{player_id, _deck} | _rest]), do: player_id
   def first_player_id([]), do: nil
@@ -23,8 +24,13 @@ defmodule Prizmo.TcgEngine.GameSetup do
     end
   end
 
-  def create_game_record(active_player_id) do
-    create(Game, :create, %{active_player_id: active_player_id, first_player_id: active_player_id})
+  def create_game_record(active_player_id, opts \\ []) do
+    attrs = %{
+      active_player_id: active_player_id,
+      first_player_id: active_player_id
+    }
+
+    create(Game, :create, Map.merge(attrs, Keyword.get(opts, :rng_metadata, %{})))
   end
 
   def create_players_and_cards(%Game{} = game, player_decks) do
@@ -40,6 +46,40 @@ defmodule Prizmo.TcgEngine.GameSetup do
       end
     end)
     |> collect_results()
+  end
+
+  def shuffle_decks(%Game{} = game, player_decks, seed) when is_binary(seed) do
+    player_decks
+    |> Enum.map(fn {player_id, deck} -> shuffle_deck(game, player_id, deck, seed) end)
+    |> collect_results()
+  end
+
+  def shuffle_deck(%Game{} = game, player_id, deck, seed)
+      when is_binary(player_id) and is_binary(seed) do
+    with {:ok, cards} <- CardStore.cards_in_zone(game.id, player_id, :deck) do
+      shuffled_cards = Rng.shuffle(cards, seed, {:opening_deck_shuffle, player_id, deck_id(deck)})
+
+      shuffled_cards
+      |> Enum.with_index(1)
+      |> Enum.map(fn {card, position} ->
+        update(card, :reorder_deck, %{position: position})
+      end)
+      |> collect_results()
+      |> case do
+        {:ok, cards} ->
+          {:ok,
+           %{
+             player_id: player_id,
+             deck_key: deck_id(deck),
+             card_count: length(cards),
+             shuffle: "opening_deck",
+             rng_algorithm: Rng.algorithm()
+           }}
+
+        {:error, reason} ->
+          {:error, reason}
+      end
+    end
   end
 
   def draw_opening_cards(game_id) do

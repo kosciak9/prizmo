@@ -61,6 +61,7 @@ defmodule Prizmo.TcgEngine.CardInstance do
     define :attach
     define :return_to_hand
     define :shuffle_into_deck
+    define :reorder_deck
     define :evolve_to_active
     define :evolve_to_bench
     define :evolve_under
@@ -148,6 +149,10 @@ defmodule Prizmo.TcgEngine.CardInstance do
     update :shuffle_into_deck do
       accept [:attached_to_card_instance_id, :position]
       change transition_state(:deck)
+    end
+
+    update :reorder_deck do
+      accept [:position]
     end
 
     update :evolve_to_active do

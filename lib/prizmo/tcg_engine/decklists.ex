@@ -4,6 +4,7 @@ defmodule Prizmo.TcgEngine.Decklists do
   alias Prizmo.TcgEngine.CardCatalog
   alias Prizmo.TcgEngine.Game
   alias Prizmo.TcgEngine.Mechanics
+  alias Prizmo.TcgEngine.Rng
 
   @expected_deck_size 60
 
@@ -26,12 +27,37 @@ defmodule Prizmo.TcgEngine.Decklists do
   def create_game(player_decks, opts \\ [])
 
   def create_game(player_decks, opts) when is_list(player_decks) do
-    with {:ok, resolved_player_decks} <- resolve_player_decks(player_decks) do
-      Mechanics.create_game(resolved_player_decks, opts)
+    with {:ok, resolved_player_decks} <- resolve_player_decks(player_decks),
+         {:ok, rng_opts} <- open_deck_rng_opts(opts) do
+      Mechanics.create_game(resolved_player_decks, Keyword.merge(opts, rng_opts))
     end
   end
 
   def create_game(_player_decks, _opts), do: {:error, :expected_player_deck_list}
+
+  defp open_deck_rng_opts(opts) do
+    case Keyword.get(opts, :rng_seed) do
+      nil ->
+        {:ok,
+         [
+           rng_seed: Rng.generate_seed(),
+           rng_seed_source: "fresh",
+           rng_algorithm: Rng.algorithm(),
+           shuffle_decks?: true
+         ]}
+
+      seed ->
+        with {:ok, seed} <- Rng.normalize_seed(seed) do
+          {:ok,
+           [
+             rng_seed: seed,
+             rng_seed_source: "explicit",
+             rng_algorithm: Rng.algorithm(),
+             shuffle_decks?: true
+           ]}
+        end
+    end
+  end
 
   defp resolve_player_deck(selection) do
     with {:ok, {player_id, deck_key, cards}} <- normalize_selection(selection),

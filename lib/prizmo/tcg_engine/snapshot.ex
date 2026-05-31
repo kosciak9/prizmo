@@ -95,6 +95,9 @@ defmodule Prizmo.TcgEngine.Snapshot do
       "coin_toss_result" => if(game.coin_toss_result, do: Atom.to_string(game.coin_toss_result)),
       "coin_toss_winner_player_id" => game.coin_toss_winner_player_id,
       "starting_player_chosen_by_player_id" => game.starting_player_chosen_by_player_id,
+      "rng_seed" => game.rng_seed,
+      "rng_seed_source" => game.rng_seed_source,
+      "rng_algorithm" => game.rng_algorithm,
       "cursor_index" => game.cursor_index,
       "latest_event_index" => game.latest_event_index
     }
