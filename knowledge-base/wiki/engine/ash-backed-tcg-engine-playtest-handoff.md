@@ -2,6 +2,14 @@
 
 Updated: 2026-05-31
 
+## Iteration 151 handoff
+
+- Current state: the prior documented game `d608a1f1-6db6-4f23-a8d0-4a7d27641993` was not present in the current dev database, so the iteration-150 Rellor branch could not be continued. The current in-progress game is `f6df7025-7d0f-4d9b-9bc2-31c864de1d4e`. It was advanced from cursor/latest `70`, `turn_action_window`, active Player 2, by executing the same Ash domain command behind the SPA `Pass as player 2` action. Stabilization appended events/snapshots `71`-`75`: `turn_passed`, `turn_ended`, `turn_started`, `turn_card_drawn`, and `action_window_opened`. The game is now cursor/latest `75`, `turn_action_window`, `Turn 9, action_window`, active Player 1, with no prompts. Player 1 sees legal actions `play_card`, `attach_energy`, `declare_attack`, and `pass`; Player 2 sees no legal actions.
+- Last commit at iteration start: `c63093c feat(spa): add clickable card table interactions`.
+- Remaining tasks: continue the substantial Web UI polish/playtest path on the current game state, rerun a true browser/UI smoke when an isolated Playwright or browser context is available, eventually rerun the formal two-independent-browser milestone, and continue broader persisted mechanics/card behavior plus Electric Streams spike work from the north-star plan.
+- Blockers: the MCP browser profile was locked during this iteration, so the pass handoff was validated through the Ash domain command and database/read-model checks rather than an actual SPA click. The stale iteration-150 game is absent from the current database.
+- Recommended next atomic task: from current game `f6df7025-7d0f-4d9b-9bc2-31c864de1d4e` at post-event-75 Player 1 action window, use an isolated/browser-available SPA context to execute one Player 1 legal action, preferably attaching Energy or declaring `Fighting Wings`, then verify the persisted landing from both seats without repeating the already-validated Player 2 pass handoff.
+
 ## Iteration 150 handoff
 
 - Current state: the documented playtest game `d608a1f1-6db6-4f23-a8d0-4a7d27641993` has advanced from post-event-105 Player 2 turn start. Clicking `Draw for player 2` and then `Open action window` through the SPA wrote events/snapshots `106` and `107`; the game is now cursor/latest `107`, `Turn 10, action_window`, active Player 2, latest event `open_action_window`, with no prompts. Player 1 sees no legal actions and non-owner guidance pointing to the Player 2 tab; Player 2 sees legal actions `play_basic_to_bench` for `Rellor` and `end_turn`, with 3 cards in hand.
