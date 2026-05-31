@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-31] iteration 113 | Player 1 turn-3 draw landing
+- Task attempted: continued the Web UI polish pass from the post-event-36 state by switching to Player 1, clicking `Start player 1's turn`, verifying the persisted turn-3 start transition, and refining the non-owner turn-start guide so Player 2 is explicitly told to use the Player 1 tab for draw timing before actions can open.
+- Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.
+- Validation: Tidewave precheck confirmed game `d608a1f1-6db6-4f23-a8d0-4a7d27641993` was at cursor `36 of 36` with `Turn 2, ended`; browser smoke on `http://localhost:4003` as Player 1 clicked `Start player 1's turn`, confirmed event #37 persisted as `start next turn`, cursor advanced to `37 of 37`, and current turn became `Turn 3, start`; after the copy refinement, refreshed as Player 2 and confirmed the disabled draw/skip controls plus guide copy now say `Use the player 1 tab for draw timing` and `Use the player 1 tab to resolve draw timing before opening actions`; no browser console warnings or errors were reported; `mix format && mix assets.build` passed; `mix check --no-test` passed.
+- Remaining/blocking notes: no code blocker for this turn-3 start landing slice. Further polish can continue from the post-event-37 state by switching back to Player 1, clicking `Draw for player 1`, verifying the drawn landing and Player 2 open-action owner-tab guidance, then opening Player 1's action window before rerunning the formal two-browser/manual-tester milestone once isolated contexts are guaranteed.
+
 ## [2026-05-31] iteration 112 | Player 2 end-turn landing
 - Task attempted: continued the Web UI polish pass from the Player 2 post-event-35 state by clicking `End player 2's turn`, verifying the persisted ended-turn transition, and refining the next-turn landing so it names Player 1's upcoming turn instead of stale first-turn or ambiguous next-player copy.
 - Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.

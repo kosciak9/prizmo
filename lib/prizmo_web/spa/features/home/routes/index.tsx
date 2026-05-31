@@ -2376,7 +2376,7 @@ function TurnStepGuide({
   } else if (currentTurn?.status === 'start') {
     drawDetail = viewerOwnsTurn
       ? `Draw a card for ${turnOwnerLabel}, or skip only when the fixture scenario calls for it.`
-      : `${turnOwnerLabel} is the turn owner. Use that player tab for table-faithful play, then refresh here.`
+      : `${turnOwnerLabel} is the turn owner. Use the ${turnOwnerLabel} tab for draw timing, then refresh here.`
   } else if (drawStepResolved) {
     drawDetail = 'Draw-step timing is resolved for this turn.'
   } else if (currentTurn) {
@@ -2388,7 +2388,9 @@ function TurnStepGuide({
   if (endedTurn) {
     actionWindowDetail = `After ${turnOwnerLabel}'s draw timing, open ${turnOwnerLabel}'s action window for hand, board, battle, and end-turn choices.`
   } else if (currentTurn?.status === 'start') {
-    actionWindowDetail = 'Draw for turn or skip draw before opening actions.'
+    actionWindowDetail = viewerOwnsTurn
+      ? 'Draw for turn or skip draw before opening actions.'
+      : `Use the ${turnOwnerLabel} tab to resolve draw timing before opening actions, then refresh here.`
   } else if (currentTurn?.status === 'drawn') {
     actionWindowDetail = viewerOwnsTurn
       ? 'Open the action window so hand, board, retreat, attack, and end-turn actions can appear below.'
