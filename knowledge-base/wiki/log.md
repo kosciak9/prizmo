@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-31] iteration 126 | Player 1 turn-5 start landing
+- Task attempted: continued the Web UI polish pass from the verified post-event-50 Player 2 ended-turn state by clicking `Start player 1's turn`, verifying the persisted turn-5 start landing from both seats, and tightening owner/non-owner draw-timing copy for the start-state guide.
+- Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.
+- Validation: Tidewave precheck confirmed game `d608a1f1-6db6-4f23-a8d0-4a7d27641993` was at event #50 with `Turn 4, ended`, no awaiting prompts, and no legal actions; browser smoke on `http://localhost:4003` as Player 1 clicked `Start player 1's turn`, confirmed cursor `51 of 51`, event #51 `start_next_turn`, `Turn 5, start`, enabled `Draw for player 1`/`Skip draw for player 1`, refined owner copy `Use this player 1 tab to draw a card`, and Player 2 non-owner copy `Draw timing belongs to player 1`; browser console reported no warnings or errors; Tidewave postcheck confirmed both viewers at turn 5 `start`, active Player 1, no awaiting prompts, and no action affordances; `mix format`, `mix assets.build`, and `mix check --no-test` passed.
+- Remaining/blocking notes: no code blocker for this Player 1 turn-5 start landing slice. Further polish should continue from the post-event-51 state by drawing for Player 1, verifying the drawn landing and Player 2 open-action owner-tab guidance, then opening Player 1's action window without repeating the start-turn branch.
+
 ## [2026-05-31] iteration 125 | Player 2 end-turn landing
 - Task attempted: continued the Web UI polish pass from the verified post-event-49 Player 2 turn-4 action-window state by clicking `End player 2's turn`, verifying the persisted ended-turn/next-owner landing, and refining the ended-turn action-window guide so the Player 2 tab points back to the Player 1 tab for opening actions after draw timing.
 - Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.

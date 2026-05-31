@@ -2377,8 +2377,8 @@ function TurnStepGuide({
       : `Start ${turnOwnerLabel}'s next turn, then use the ${turnOwnerLabel} tab for draw timing.`
   } else if (currentTurn?.status === 'start') {
     drawDetail = viewerOwnsTurn
-      ? `Draw a card for ${turnOwnerLabel}, or skip only when the fixture scenario calls for it.`
-      : `${turnOwnerLabel} is the turn owner. Use the ${turnOwnerLabel} tab for draw timing, then refresh here.`
+      ? `Use this ${turnOwnerLabel} tab to draw a card, or skip only when the fixture scenario calls for it.`
+      : `Draw timing belongs to ${turnOwnerLabel}. Use the ${turnOwnerLabel} tab, then refresh here.`
   } else if (drawStepResolved) {
     drawDetail = 'Draw-step timing is resolved for this turn.'
   } else if (currentTurn) {
@@ -2393,8 +2393,8 @@ function TurnStepGuide({
       : `After ${turnOwnerLabel}'s draw timing, use the ${turnOwnerLabel} tab to open the action window, then refresh here.`
   } else if (currentTurn?.status === 'start') {
     actionWindowDetail = viewerOwnsTurn
-      ? 'Draw for turn or skip draw before opening actions.'
-      : `Use the ${turnOwnerLabel} tab to resolve draw timing before opening actions, then refresh here.`
+      ? `Draw or skip from this ${turnOwnerLabel} tab before opening actions.`
+      : `Use the ${turnOwnerLabel} tab to finish draw timing before opening actions, then refresh here.`
   } else if (currentTurn?.status === 'drawn') {
     actionWindowDetail = viewerOwnsTurn
       ? 'Open the action window so hand, board, retreat, attack, and end-turn actions can appear below.'
