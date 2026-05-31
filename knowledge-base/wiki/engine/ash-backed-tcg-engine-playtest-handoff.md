@@ -2,6 +2,14 @@
 
 Updated: 2026-05-31
 
+## Iteration 148 handoff
+
+- Current state: the documented playtest game `d608a1f1-6db6-4f23-a8d0-4a7d27641993` has advanced through the repaired branch replacement path. Clicking `End player 1's turn` from cursor `103` through the SPA pruned the stale future Ultra Ball events/snapshots `104`-`107` and wrote replacement event/snapshot `104`; the game is now cursor/latest `104`, `Turn 9, ended`, latest event `end_turn`, with both viewers seeing no prompts and no legal actions. Player 1 copy points to the Player 2 tab for the next-turn path; Player 2 copy enables `Start player 2's turn` and says draw timing resolves from this tab.
+- Last commit at iteration start: `eac46bb fix(tcg-engine): prune future events on branch append`.
+- Remaining tasks: continue the substantial Web UI polish/playtest path from post-event-104, eventually rerun the formal two-independent-browser milestone, and continue broader persisted mechanics/card behavior plus Electric Streams spike work from the north-star plan.
+- Blockers: no code blocker for continuing this repaired branch; the documented manual-tester milestone remains blocked until separate browser contexts can be guaranteed.
+- Recommended next atomic task: from the post-event-104 ended state, switch/use the Player 2 seat, click `Start player 2's turn`, verify the persisted turn-10 start landing and owner/non-owner draw guidance from both seats, then refine only unclear start-turn copy without repeating the branch-replacement End Turn validation.
+
 ## Iteration 147 handoff
 
 - Current state: `Prizmo.TcgEngine.EventLog.write_event/4` now treats appending from an undone cursor as branch replacement. When `cursor_index < latest_event_index`, it destroys future `GameSnapshot` rows first and then future `GameEvent` rows through internal Ash destroy actions before creating the new event at `cursor_index + 1`; redo history remains available until a new event is appended. The documented game `d608a1f1-6db6-4f23-a8d0-4a7d27641993` was checked read-only and is still at cursor `103`, latest `107`, with future event/snapshot indexes `[104, 105, 106, 107]` plus cancelled prompt/pending-effect rows.

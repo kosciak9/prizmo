@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-31] iteration 148 | Branch replacement UI end-turn landing
+- Task attempted: advanced the repaired documented playtest branch from the post-event-103 Player 1 action-window state by clicking `End player 1's turn` through the React SPA, validating that branch-safe append pruning replaces the stale future Ultra Ball branch with a clean end-turn event.
+- Files changed: updated this log and the TCG engine playtest handoff; no product source changed.
+- Validation: Tidewave precheck confirmed game `d608a1f1-6db6-4f23-a8d0-4a7d27641993` at cursor `103`, latest `107`, with future event/snapshot rows `104`-`107` and cancelled prompt/pending-effect rows; browser smoke on `http://localhost:4003` as Player 1 clicked `End player 1's turn` and confirmed `Cursor 104 of 104`, `Turn 9, ended`, and event `#104 end turn`; Player 2 view confirmed the next-turn lane with enabled `Start player 2's turn` and owner-tab draw guidance; browser console reported no warnings or errors; Tidewave postcheck confirmed cursor/latest `104`, only events/snapshots `100`-`104` remain, replacement event `104` is `end_turn`, prompts remain `%{cancelled: 7}`, pending effects remain `%{cancelled: 4}`, and both player read models have no prompts or legal actions.
+- Remaining/blocking notes: no code blocker remains for continuing the repaired playtest branch. Further polish should continue from post-event-104 by switching/using Player 2, clicking `Start player 2's turn`, verifying the persisted turn-10 start landing and owner-tab draw guidance from both seats, and avoiding the already-verified branch-replacement End Turn path.
+
 ## [2026-05-31] iteration 147 | Branch-safe event truncation
 - Task attempted: implemented branch-safe replacement after undo so appending a new event from an earlier cursor deletes future `GameSnapshot` rows first, then future `GameEvent` rows, before writing the replacement event at `cursor_index + 1`.
 - Files changed: updated `lib/prizmo/tcg_engine/event_log.ex`, `lib/prizmo/tcg_engine/game_event.ex`, `lib/prizmo/tcg_engine/game_snapshot.ex`, `lib/prizmo/tcg_engine/operation.ex`, this log, and the TCG engine playtest handoff.
