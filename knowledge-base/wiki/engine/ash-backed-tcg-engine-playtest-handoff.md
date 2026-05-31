@@ -2,13 +2,13 @@
 
 Updated: 2026-05-31
 
-## Iteration 136 handoff
+## Iteration 137 handoff
 
-- Current state: game `d608a1f1-6db6-4f23-a8d0-4a7d27641993` is verified at post-event-73 with Player 1 in `Turn 7, action_window`; latest event is #73 `prompt_created`, Player 1 is awaiting the Ultra Ball `search_deck_for_pokemon` prompt with seven legal Pokémon choices, Player 1 has one `choose_prompt` action, Player 2 has no prompt/action visibility, and duplicate deck rows now show `Dragapult ex, copy 1 of 2` / `copy 2 of 2` and `Budew, copy 1 of 2` / `copy 2 of 2` with zone-aware deck-copy guidance.
-- Last commit at iteration start: `4058625 feat(spa): disambiguate tcg prompt choices`.
-- Remaining tasks: continue the substantial Web UI polish/playtest path without repeating the already verified discard-to-search branch; broader north-star work still includes the formal two-independent-browser milestone, more persisted mechanics/card behavior slices, and the Electric Streams spike.
-- Blockers: no code blocker for the deck-copy prompt guidance slice; the documented manual-tester milestone remains blocked by unreliable manual-tester browser/session isolation.
-- Recommended next atomic task: from the post-event-73 Player 1 Ultra Ball search prompt, select one Pokémon, verify the card-to-hand/search-complete landing and post-search action-window copy, then refine only unclear post-search guidance without replaying the discard branch.
+- Current state: game `d608a1f1-6db6-4f23-a8d0-4a7d27641993` is verified at post-event-94 with Player 1 in `Turn 7, action_window`; latest event is #94 `card_play_completed`, Player 1 has Budew plus Ultra Ball in hand, no prompts, legal actions `play_card`, `play_basic_to_bench` for Budew, and `end_turn`, while Player 2 has no prompt/action visibility. The Player 1 tab verified the post-search `Trainer complete` handoff survives a page reload through tab-scoped session storage and now uses bench-specific copy (`Bench the searched Basic if it helps now`) plus `Bench searched Budew`.
+- Last commit at iteration start: `9ea1463 feat(spa): clarify tcg deck prompt copies`.
+- Remaining tasks: continue the substantial Web UI polish/playtest path without repeating the already verified Ultra Ball discard/search branch; broader north-star work still includes the formal two-independent-browser milestone, more persisted mechanics/card behavior slices, and the Electric Streams spike.
+- Blockers: no code blocker for the post-search recovery slice; the documented manual-tester milestone remains blocked by unreliable manual-tester browser/session isolation.
+- Recommended next atomic task: from the post-event-94 Player 1 action-window state, click `Bench searched Budew`, verify the handoff clears and Budew lands on Bench, then refine only unclear post-bench guidance without replaying the Ultra Ball branch.
 
 ## Current state
 

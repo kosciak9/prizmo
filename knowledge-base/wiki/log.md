@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-31] iteration 137 | Ultra Ball post-search recovery
+- Task attempted: continued from the post-event-73 Player 1 Ultra Ball deck-search prompt, selected a searched Pokémon to verify the card-to-hand landing, then made the post-search handoff copy bench-specific and tab-recoverable through session storage.
+- Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.
+- Validation: Tidewave precheck confirmed game `d608a1f1-6db6-4f23-a8d0-4a7d27641993` was at cursor `73 of 73` with Player 1 awaiting `search_deck_for_pokemon`, Player 1 one `choose_prompt` action, and Player 2 no prompt/action visibility; browser smoke as Player 1 selected `Munkidori`, submitted `Add Pokémon to hand 1/1`, and confirmed cursor `78 of 78`, latest event #78 `card_play_completed`, the post-search action-window landing, `Bench searched Munkidori`, and no browser warnings/errors; `mix format`, `mix assets.build`, and `mix check --no-test` passed; focused browser smoke then played the remaining Ultra Ball, discarded `Munkidori` plus `Dragapult ex`, selected `Budew, copy 1 of 2`, confirmed cursor `94 of 94`, refreshed the page, and verified the `Trainer complete` handoff persisted with copy `Bench the searched Basic if it helps now` plus `Bench searched Budew`; final Tidewave postcheck confirmed Player 1 has actions `play_card`, `play_basic_to_bench` for Budew, and `end_turn`, while Player 2 has no prompts or actions.
+- Remaining/blocking notes: no code blocker for this post-search recovery slice. Further polish should continue from the post-event-94 Player 1 action-window state by clicking `Bench searched Budew`, verifying the handoff clears and Budew lands on Bench, and avoiding the already-verified Ultra Ball search branch.
+
 ## [2026-05-31] iteration 136 | Ultra Ball deck-copy prompt guidance
 - Task attempted: continued the Web UI polish path from the verified post-event-66 Player 1 Ultra Ball discard prompt by selecting the two duplicated Drakloak discard choices, verifying the persisted search-prompt landing, and making repeated deck-search copy guidance zone-aware.
 - Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.

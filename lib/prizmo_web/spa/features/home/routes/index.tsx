@@ -38,6 +38,7 @@ const PLAYER_IDS = [PLAYER_ONE_ID, PLAYER_TWO_ID] as const
 const LEGACY_SESSION_STORAGE_KEY = 'prizmo:tcg-playtest-session'
 const GAME_ID_STORAGE_KEY = 'prizmo:tcg-playtest-game-id'
 const VIEWER_STORAGE_KEY = 'prizmo:tcg-playtest-viewer'
+const ULTRA_BALL_POST_SEARCH_HANDOFF_STORAGE_KEY = 'prizmo:tcg-ultra-ball-post-search-handoff'
 const DISCARD_OWN_BASIC_ENERGY_FOR_DAMAGE_EFFECT = 'damage_per_discarded_own_basic_energy'
 const DISCARD_OWN_BENCH_ENERGY_FOR_BONUS_DAMAGE_EFFECT = 'discard_energy_from_own_bench_for_bonus_damage'
 const DISCARD_DEFENDING_ENERGY_ON_COIN_HEADS_EFFECT = 'discard_defending_energy_on_coin_heads'
@@ -581,11 +582,15 @@ export function HomeRoute() {
   const [playerOneDeckKey, setPlayerOneDeckKey] = useState('')
   const [playerTwoDeckKey, setPlayerTwoDeckKey] = useState('')
   const [ultraBallPostSearchHandoff, setUltraBallPostSearchHandoff] =
-    useState<UltraBallPostSearchHandoff | null>(null)
+    useState<UltraBallPostSearchHandoff | null>(readStoredUltraBallPostSearchHandoff)
 
   useEffect(() => {
     setStoredSession(session)
   }, [session])
+
+  useEffect(() => {
+    setStoredUltraBallPostSearchHandoff(ultraBallPostSearchHandoff)
+  }, [ultraBallPostSearchHandoff])
 
   const decksQuery = useQuery({
     queryKey: ['tcg-engine', 'supported-decks'],
@@ -4110,6 +4115,7 @@ type UltraBallPostSearchHandoffPlan = {
   benchableCardInstanceIds: string[]
   battleAttackIds: string[]
   endTurnPlayerIds: PlayerId[]
+  handTitle: string
   handDetail: string
   battleDetail: string
   turnDetail: string
@@ -4142,6 +4148,7 @@ function ultraBallPostSearchHandoffPlan(
     .map(card => card?.name)
     .filter((name): name is string => Boolean(name))
     .join(', ')
+  const selectedCardSummary = selectedCardNames || 'The selected Pokémon'
   const handGroup = actionGroups.find(group => group.id === 'hand')
   const battleGroup = actionGroups.find(group => group.id === 'battle')
   const turnGroup = actionGroups.find(group => group.id === 'turn')
@@ -4158,6 +4165,7 @@ function ultraBallPostSearchHandoffPlan(
     .map(cardInstanceId => cardsById.get(cardInstanceId)?.name)
     .filter((name): name is string => Boolean(name))
     .join(', ')
+  const benchableSummary = benchableNames || 'The searched Basic Pokémon'
   const battleAttackIds =
     battleGroup?.actions.flatMap(action =>
       action.key === 'declare_attack' && action.attackId ? [action.attackId] : []
@@ -4172,15 +4180,20 @@ function ultraBallPostSearchHandoffPlan(
   const turnActionLabel = turnAction ? `End ${formatPlayerId(turnAction.playerId)}'s turn` : null
 
   return {
-    selectedCardNames: selectedCardNames || 'The selected Pokémon',
+    selectedCardNames: selectedCardSummary,
     benchableCardInstanceIds: benchableSearchedCards,
     battleAttackIds,
     endTurnPlayerIds,
-    handDetail: benchableSearchedCards.length
-      ? `Bench ${benchableNames || 'the searched Basic Pokémon'} from Hand and board if it improves the board now.`
+    handTitle: benchableSearchedCards.length
+      ? 'Bench the searched Basic if it helps now'
       : handGroup
-        ? 'The searched Pokémon is in hand. Use any remaining Hand and board actions before committing to battle.'
-        : 'No Hand and board action remains from this state. Move directly to battle or turn flow.',
+        ? 'Review the searched card in hand'
+        : 'Searched card is ready for later',
+    handDetail: benchableSearchedCards.length
+      ? `${benchableSummary} is now in hand and can take the next Bench slot. Bench it if it improves this turn.`
+      : handGroup
+        ? `${selectedCardSummary} is in hand. Use any remaining Hand and board actions before committing to battle.`
+        : `${selectedCardSummary} is in hand. No Hand and board action remains from this state; move directly to battle or turn flow.`,
     battleDetail: battleActionLabel
       ? `${battleActionLabel} is live in Battle decisions; choosing it clears this handoff and advances into attack resolution.`
       : battleGroup
@@ -4220,7 +4233,7 @@ function UltraBallPostSearchHandoffCard({ handoff }: { handoff: UltraBallPostSea
         <ActionWindowGuideStep
           detail={handoff.handDetail}
           label={handoff.nextLabel}
-          title="Use the searched card if it helps now"
+          title={handoff.handTitle}
           tone="focus"
         />
         <ActionWindowGuideStep
@@ -6361,12 +6374,63 @@ function readStoredViewerPlayerId() {
   }
 }
 
+function readStoredUltraBallPostSearchHandoff(): UltraBallPostSearchHandoff | null {
+  if (typeof window === 'undefined') {
+    return null
+  }
+
+  try {
+    const item = window.sessionStorage.getItem(ULTRA_BALL_POST_SEARCH_HANDOFF_STORAGE_KEY)
+
+    if (!item) {
+      return null
+    }
+
+    const parsed = JSON.parse(item) as unknown
+
+    return isUltraBallPostSearchHandoff(parsed) ? parsed : null
+  } catch {
+    return null
+  }
+}
+
+function setStoredUltraBallPostSearchHandoff(handoff: UltraBallPostSearchHandoff | null) {
+  if (typeof window === 'undefined') {
+    return
+  }
+
+  try {
+    if (handoff) {
+      window.sessionStorage.setItem(ULTRA_BALL_POST_SEARCH_HANDOFF_STORAGE_KEY, JSON.stringify(handoff))
+    } else {
+      window.sessionStorage.removeItem(ULTRA_BALL_POST_SEARCH_HANDOFF_STORAGE_KEY)
+    }
+  } catch {
+    // Tab-scoped recovery guidance should never block command rendering.
+  }
+}
+
 function defaultSession(): PlaytestSession {
   return { gameId: '', viewerPlayerId: PLAYER_ONE_ID }
 }
 
 function isPlayerId(value: unknown): value is PlayerId {
   return PLAYER_IDS.some(playerId => playerId === value)
+}
+
+function isUltraBallPostSearchHandoff(value: unknown): value is UltraBallPostSearchHandoff {
+  if (!value || typeof value !== 'object') {
+    return false
+  }
+
+  const handoff = value as Partial<UltraBallPostSearchHandoff>
+
+  return (
+    typeof handoff.gameId === 'string' &&
+    isPlayerId(handoff.playerId) &&
+    Array.isArray(handoff.selectedCardInstanceIds) &&
+    handoff.selectedCardInstanceIds.every(cardInstanceId => typeof cardInstanceId === 'string')
+  )
 }
 
 function isSetupActiveCandidate(card: CardSummary) {
