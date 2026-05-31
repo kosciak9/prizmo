@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-31] iteration 108 | Player 2 post-bench choice guidance
+- Task attempted: continued the Web UI polish pass by clicking a labeled Player 2 Basic Bench action end-to-end, then refining the post-bench action-window guide so it describes player-visible hand/board choices across Bench and Evolution instead of raw engine command counts.
+- Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.
+- Validation: `mix format && mix assets.build` passed; browser smoke on `http://localhost:4003` resumed game `d608a1f1-6db6-4f23-a8d0-4a7d27641993` as Player 2 on turn 2 action window, clicked `Bench Abra from hand slot 3`, confirmed Player 2 Bench advanced to 1, hand count dropped to 6, event #31 persisted as `play basic to bench`, remaining Basic Bench buttons stayed labeled by hand slot, the action guide now reads `6 hand and board choices visible across Bench and Evolution`, and no browser console warnings or errors were reported; `mix check --no-test` passed.
+- Remaining/blocking notes: no code blocker for this post-bench guidance slice. Further polish can continue from the Player 2 turn-2 post-bench state by verifying one evolution choice end-to-end and refining the resulting post-evolution action priority, board-stack presentation, or action counts before rerunning the formal two-browser/manual-tester milestone once isolated contexts are guaranteed.
+
 ## [2026-05-31] iteration 107 | Player 2 Basic Bench choice clarity
 - Task attempted: continued the Web UI polish pass in the Player 2 turn-2 action window by consolidating repeated Basic Bench affordance rendering and disambiguating duplicate `Bench Abra` choices with hand-copy labels.
 - Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.

@@ -4181,8 +4181,10 @@ function ActionWindowGuide({
   const basicBenchOptions = handGroup
     ? uniqueBasicBenchOptions(handGroup.actions.flatMap(action => basicBenchCommandOptions(action, cardsById)))
     : []
-  const repeatedBasicBenchLabelCount = repeatedBasicBenchBaseLabels(basicBenchOptions).size
-  const evolutionAction = handGroup?.actions.find(action => action.key === 'evolve_from_hand')
+  const evolutionOptions = handGroup
+    ? uniqueEvolutionOptions(handGroup.actions.flatMap(action => evolutionCommandOptions(action, cardsById)))
+    : []
+  const handChoiceCount = handGroup ? handActionChoiceCount(handGroup, cardsById) : 0
   const turnOwnerId = currentTurn?.activePlayerId ?? viewerPlayerId
   const turnOwnerLabel = formatPlayerId(turnOwnerId)
   const viewerLabel = formatPlayerId(viewerPlayerId)
@@ -4194,11 +4196,7 @@ function ActionWindowGuide({
       } on Bench.`
     : `${turnOwnerLabel} owns this action window. This tab is ${viewerLabel}; use the matching seat for commands.`
   const handDetail = handGroup
-    ? evolutionAction
-      ? `${handGroup.actions.length} hand or board command${handGroup.actions.length === 1 ? '' : 's'} available. Evolution is legal now; use the Active/Bench labels on duplicate rows to choose exactly which Pokémon changes before committing to battle.`
-      : repeatedBasicBenchLabelCount > 0
-        ? `${handGroup.actions.length} hand or board command${handGroup.actions.length === 1 ? '' : 's'} available. Repeated Basic Pokémon now show hand-slot labels, so choose the exact copy to Bench before committing to battle.`
-        : `${handGroup.actions.length} hand or board command${handGroup.actions.length === 1 ? '' : 's'} available. Bench Basics, attach Energy, or play a Trainer before committing to battle.`
+    ? handActionGuideDetail(handGroup, basicBenchOptions, evolutionOptions, handChoiceCount)
     : 'No hand or board command is legal from this view. Move to battle decisions or turn flow.'
   const battleDetail = battleGroup
     ? turnGroup
@@ -4243,6 +4241,62 @@ function ActionWindowGuide({
       </div>
     </div>
   )
+}
+
+function handActionGuideDetail(
+  handGroup: ActionGroup,
+  basicBenchOptions: BasicBenchCommandOption[],
+  evolutionOptions: EvolutionCommandOption[],
+  handChoiceCount: number
+) {
+  const choiceLabel = actionCountLabel(handChoiceCount, 'hand and board choice')
+  const hasRepeatedBenchChoices = repeatedBasicBenchBaseLabels(basicBenchOptions).size > 0
+  const hasRepeatedEvolutionChoices = repeatedEvolutionBaseLabels(evolutionOptions).size > 0
+  const hasBasicBenchChoices = basicBenchOptions.length > 0
+  const hasEvolutionChoices = evolutionOptions.length > 0
+  const hasAttachEnergyChoice = handGroup.actions.some(action => action.key === 'attach_energy')
+  const hasTrainerChoice = handGroup.actions.some(action => action.key === 'play_card')
+
+  if (hasBasicBenchChoices && hasEvolutionChoices) {
+    return hasRepeatedBenchChoices || hasRepeatedEvolutionChoices
+      ? `${choiceLabel} visible across Bench and Evolution. Duplicate Basics use hand-slot labels; evolution choices name the in-play target, so pick the exact cards before battle or pass.`
+      : `${choiceLabel} visible across Bench and Evolution. Grow the Bench first, then decide whether an evolution improves the battle line before passing.`
+  }
+
+  if (hasEvolutionChoices) {
+    return hasRepeatedEvolutionChoices
+      ? `${choiceLabel} visible. Evolution choices name the Active or Bench target and the hand copy, so choose the exact Pokémon stack before battle or pass.`
+      : `${choiceLabel} visible. Evolution is legal now; choose the stack that improves the battle line before committing.`
+  }
+
+  if (hasBasicBenchChoices) {
+    return hasRepeatedBenchChoices
+      ? `${choiceLabel} visible. Duplicate Basics use hand-slot labels, so choose the exact copy to Bench before battle or pass.`
+      : `${choiceLabel} visible. Bench the Basic Pokémon that improves the board before committing to battle.`
+  }
+
+  if (hasAttachEnergyChoice || hasTrainerChoice) {
+    return `${choiceLabel} visible. Play Trainers or attach Energy before committing to battle or passing.`
+  }
+
+  return `${choiceLabel} visible. Resolve the remaining hand or board choice before committing to battle.`
+}
+
+function handActionChoiceCount(handGroup: ActionGroup, cardsById: Map<string, CardSummary>) {
+  return handGroup.actions.reduce((count, action) => {
+    switch (action.key) {
+      case 'play_basic_to_bench':
+        return count + basicBenchCommandOptions(action, cardsById).length
+      case 'evolve_from_hand':
+        return count + evolutionCommandOptions(action, cardsById).length
+      case 'attach_energy':
+        return count + action.sourceCardInstanceIds.length * action.targetCardInstanceIds.length
+      case 'play_card':
+        return count + action.sourceCardInstanceIds.length
+      default:
+        return count + 1
+    }
+  }, 0)
 }
 
 function ActionWindowGuideStep({
