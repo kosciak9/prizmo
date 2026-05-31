@@ -5610,6 +5610,9 @@ function SupportedDeckCatalog({
 
 function CardPill({ card, variant = 'default' }: { card: CardSummary; variant?: 'active' | 'compact' | 'default' | 'hand' }) {
   const attachedCards = card.attachedCards ?? []
+  const evolutionStackCards = evolutionStackForCard(card, attachedCards)
+  const evolutionStackCardIds = new Set(evolutionStackCards.map(attachedCard => attachedCard.id))
+  const regularAttachedCards = attachedCards.filter(attachedCard => !evolutionStackCardIds.has(attachedCard.id))
   const cardClassName =
     variant === 'active'
       ? 'rounded-2xl border border-emerald-200 bg-[oklch(0.985_0.01_155)] p-4 shadow-sm shadow-emerald-200/60'
@@ -5635,22 +5638,53 @@ function CardPill({ card, variant = 'default' }: { card: CardSummary; variant?: 
         {card.status ? <span>{card.status}</span> : null}
       </div>
 
-      {attachedCards.length > 0 ? (
-        <div className="mt-3 rounded-lg border border-stone-200 bg-stone-100 px-2.5 py-2">
-          <p className="text-xs font-medium uppercase tracking-[0.12em] text-stone-500">Attached</p>
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {attachedCards.map(attachedCard => (
-              <span
-                className="rounded-full bg-stone-50 px-2 py-1 text-xs font-medium text-stone-700"
-                key={attachedCard.id}
-                title={`${attachedCard.cardId} · ${formatEventType(attachedCard.zone)}`}
-              >
-                {attachedCard.name}
-              </span>
-            ))}
-          </div>
-        </div>
+      {evolutionStackCards.length > 0 ? (
+        <AttachedCardGroup cards={evolutionStackCards} title="Evolution stack" titleSuffix="evolved under" />
       ) : null}
+
+      {regularAttachedCards.length > 0 ? (
+        <AttachedCardGroup cards={regularAttachedCards} title="Attached cards" titleSuffix="attached" />
+      ) : null}
+    </div>
+  )
+}
+
+function evolutionStackForCard(card: CardSummary, attachedCards: CardSummary[]) {
+  const attachedCardsById = new Map(attachedCards.map(attachedCard => [attachedCard.id, attachedCard]))
+  const stackCards: CardSummary[] = []
+  const visitedCardIds = new Set<string>()
+  let nextCardId = card.evolvesFromCardInstanceId
+
+  while (nextCardId && !visitedCardIds.has(nextCardId)) {
+    visitedCardIds.add(nextCardId)
+    const stackCard = attachedCardsById.get(nextCardId)
+
+    if (!stackCard) {
+      break
+    }
+
+    stackCards.push(stackCard)
+    nextCardId = stackCard.evolvesFromCardInstanceId
+  }
+
+  return stackCards
+}
+
+function AttachedCardGroup({ cards, title, titleSuffix }: { cards: CardSummary[]; title: string; titleSuffix: string }) {
+  return (
+    <div className="mt-3 rounded-lg border border-stone-200 bg-stone-100 px-2.5 py-2">
+      <p className="text-xs font-medium uppercase tracking-[0.12em] text-stone-500">{title}</p>
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        {cards.map(attachedCard => (
+          <span
+            className="rounded-full bg-stone-50 px-2 py-1 text-xs font-medium text-stone-700"
+            key={attachedCard.id}
+            title={`${attachedCard.cardId} · ${titleSuffix}`}
+          >
+            {attachedCard.name}
+          </span>
+        ))}
+      </div>
     </div>
   )
 }
