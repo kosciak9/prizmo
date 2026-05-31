@@ -2,6 +2,14 @@
 
 Updated: 2026-05-31
 
+## Iteration 166 handoff
+
+- Current state: the current playtest game `f6df7025-7d0f-4d9b-9bc2-31c864de1d4e` advanced from cursor/latest `122`, `turn_action_window`, by executing the same Ash domain command behind the SPA `Declare Fighting Wings` action for Player 1. The available MCP browser profile was still locked, so this could not be clicked through the SPA. The command appended events/snapshots `123`-`129`: `declare_attack`, `resolve_declared_attack` for 20 damage and 20 resulting damage on Player 2's Active Dudunsparce, `finish_attack`, `turn_ended`, `turn_started`, `turn_card_drawn`, and `action_window_opened`. The game is now cursor/latest `129`, `Turn 16, action_window`, active Player 2, with no prompts. Player 1 has Moltres Active with three attached Energy, Dreepy on Bench, hand count `12`, and no legal actions. Player 2 has Dudunsparce Active with 20 damage, Bench `Genesect`, `Kadabra`, `Kadabra`, and `Rabsca`, hand count `3`, and legal actions `Bench Basic Pokémon` and `Pass`.
+- Last commit at iteration start: `11650db docs(wiki): capture tcg player one bench handoff`.
+- Remaining tasks: continue the substantial Web UI polish/playtest path on the current game state, rerun a true browser/UI smoke when an isolated Playwright or browser context is available, eventually rerun the formal two-independent-browser milestone, and continue broader persisted mechanics/card behavior plus Electric Streams spike work from the north-star plan.
+- Blockers: the MCP browser profile remained locked during this iteration, so the Player 1 `Declare Fighting Wings` action was validated through the Ash domain command and database/read-model checks rather than an actual SPA click.
+- Recommended next atomic task: from current game `f6df7025-7d0f-4d9b-9bc2-31c864de1d4e` at post-event-129 Player 2 action-window state, use an isolated/browser-available SPA context to execute one Player 2 legal action if possible, preferably `Bench Basic Pokémon` or `Pass`, then verify the persisted landing from both seats without repeating the already-validated Player 1 `Declare Fighting Wings` branch.
+
 ## Iteration 165 handoff
 
 - Current state: the current playtest game `f6df7025-7d0f-4d9b-9bc2-31c864de1d4e` advanced from cursor/latest `121`, `turn_action_window`, by executing the same Ash domain command behind the SPA `Bench Basic Pokémon` action for Player 1. The available MCP browser profile was still locked, so this could not be clicked through the SPA. Dreepy card instance `dcc63d96-87c5-4f00-8293-f1fc607c3189` moved from Player 1 hand to Bench position `1`, creating event/snapshot `122`. The game is now cursor/latest `122`, `Turn 15, action_window`, active Player 1, with no prompts. Player 1 has hand count `12` and legal actions `Play engine-defined card`, `Bench Basic Pokémon`, `Retreat Active Pokémon`, `Declare Fighting Wings`, and `Pass`; Player 2 sees no legal actions.
