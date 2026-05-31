@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-31] iteration 144 | Player 1 draw/open-action landing
+- Task attempted: continued from the verified post-event-101 Player 1 turn-start state by clicking `Draw for player 1`, verifying the persisted drawn landing and Player 2 non-owner open-action guidance, then opening Player 1's action window and checking the resulting action rail.
+- Files changed: updated this log and the TCG engine playtest handoff; no product source changed.
+- Validation: Tidewave precheck confirmed game `d608a1f1-6db6-4f23-a8d0-4a7d27641993` at latest event #101 `start_next_turn` with `Turn 9, start`, active Player 1, no prompts, and Player 2 with no legal actions; browser smoke on `http://localhost:4003` as Player 1 clicked `Draw for player 1`, confirmed cursor `102 of 102`, `Turn 9, drawn`, Player 1 hand count 2, and Player 2 disabled open-action guidance pointing to the Player 1 tab; browser smoke then clicked `Open action window`, confirmed cursor `103 of 103`, latest event #103 `open_action_window`, Player 1-only `Play Ultra Ball` plus `End player 1's turn`, and Player 2 with no Available actions; browser console reported no warnings or errors; Tidewave postcheck confirmed cursor/latest event `103`, Player 1 in `Turn 9, action_window`, no prompts, Player 1 action keys `play_card` and `end_turn`, Player 2 no actions, pending effects all `completed`, and prompts all `resolved`.
+- Remaining/blocking notes: no code blocker for this draw/open-action landing slice. Further polish should continue from the post-event-103 Player 1 action-window state by clicking `Play Ultra Ball`, verifying the cost-prompt landing from both seats, and avoiding the already-verified draw/open-action branch.
+
 ## [2026-05-31] iteration 143 | Player 1 turn-9 start landing
 - Task attempted: continued from the verified post-event-100 ended-turn state by clicking `Start player 1's turn`, verifying the persisted turn-9 start landing from both seats, and confirming the existing start-turn copy already points owner and non-owner tabs to the right draw-timing lane.
 - Files changed: updated this log and the TCG engine playtest handoff; no product source changed.

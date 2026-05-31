@@ -2,6 +2,14 @@
 
 Updated: 2026-05-31
 
+## Iteration 144 handoff
+
+- Current state: game `d608a1f1-6db6-4f23-a8d0-4a7d27641993` is verified at post-event-103 with `Turn 9, action_window`; latest event is #103 `open_action_window`, active player is Player 1, Player 1 has Munkidori Active with Moltres plus Budew on Bench and two cards in hand, Player 2 has Kadabra Active with four Benched Pokémon and two cards in hand, no prompts or pending effects are open, Player 1 sees `Play Ultra Ball` plus `End player 1's turn`, and Player 2 sees no Available actions plus copy pointing back to the Player 1 tab.
+- Last commit at iteration start: `c0aca91 docs(wiki): capture tcg turn-nine start handoff`.
+- Remaining tasks: continue the substantial Web UI polish/playtest path without repeating the verified Player 1 draw/open-action branch; broader north-star work still includes the formal two-independent-browser milestone, more persisted mechanics/card behavior slices, and the Electric Streams spike.
+- Blockers: no code blocker for the draw/open-action landing slice; the documented manual-tester milestone remains blocked by unreliable manual-tester browser/session isolation.
+- Recommended next atomic task: from the post-event-103 Player 1 action-window state, click `Play Ultra Ball`, verify the persisted Ultra Ball cost-prompt landing and Player 2 hidden-prompt behavior from both seats, then refine only unclear prompt or action-window copy.
+
 ## Iteration 143 handoff
 
 - Current state: game `d608a1f1-6db6-4f23-a8d0-4a7d27641993` is verified at post-event-101 with `Turn 9, start`; latest event is #101 `start_next_turn`, active player is Player 1, Player 1 has Munkidori Active with Moltres plus Budew on Bench and one hidden hand card, Player 2 has Kadabra Active with four Benched Pokémon and two cards in hand, no prompts or pending effects are open, Player 1 sees enabled `Draw for player 1` / `Skip draw for player 1`, and Player 2 sees disabled draw/open-action controls that point to the Player 1 tab.
