@@ -2019,6 +2019,11 @@ function GameFlowPanel({
     ? (gameState.players.find(player => player.playerId !== gameState.currentTurn?.activePlayerId)?.playerId ?? gameState.activePlayerId)
     : null
   const nextTurnOwnerLabel = nextTurnOwnerId ? formatPlayerId(nextTurnOwnerId) : null
+  const tableSetupDetail = setupCompleted
+    ? gameState.currentTurn?.status === 'ended'
+      ? `Opening choices are locked. Use Turn step to start ${nextTurnOwnerLabel ?? 'the next player'}'s next turn.`
+      : 'Opening choices are locked. Use Turn step for the live turn path.'
+    : 'Build the opening board from the viewer hand, then move into the first turn.'
   const canStartSetup = !gameState.setup && !startSetupPending
   const canDrawOpeningHand = gameState.setup?.status === 'waiting_to_draw' && !drawOpeningHandPending
   const canChooseSetupActive = Boolean(
@@ -2092,9 +2097,7 @@ function GameFlowPanel({
             <div>
               <h3 className="text-sm font-semibold text-stone-950">Table setup</h3>
               <p className="mt-1 text-xs leading-5 text-stone-500">
-                {setupCompleted
-                  ? 'Opening choices are locked. Use Turn step for the live turn path.'
-                  : 'Build the opening board from the viewer hand, then move into the first turn.'}
+                {tableSetupDetail}
               </p>
             </div>
             <StatusBadge tone={gameState.setup?.status === 'completed' ? 'active' : 'warning'}>

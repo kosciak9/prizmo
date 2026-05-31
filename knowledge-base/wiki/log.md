@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-31] iteration 129 | Player 1 ended-turn landing
+- Task attempted: continued the Web UI polish pass from the verified post-event-54 Player 1 turn-5 action-window state by clicking `End player 1's turn`, verifying the persisted ended-turn/next-owner landing from both seats, and refining the setup summary so ended turns point to the next-turn path instead of the generic live-turn path.
+- Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.
+- Validation: Tidewave precheck confirmed game `d608a1f1-6db6-4f23-a8d0-4a7d27641993` was at event #54 with `Turn 5, action_window`, Player 1 active Munkidori, Player 1 Bench Moltres, no awaiting prompts, and Player 1 End Turn available; browser smoke on `http://localhost:4003` as Player 1 clicked `End player 1's turn`, confirmed event #55 `end_turn`, `Turn 5, ended`, `Start player 2's turn`, Player 1 guidance `use the player 2 tab for draw timing`, Player 2 guidance `resolve draw timing from this tab`, and refreshed copy `Use Turn step to start player 2's next turn`; browser console reported no warnings or errors; Tidewave postcheck confirmed cursor `55 of 55`, no awaiting prompts, no legal actions for either viewer, Player 1 Active Munkidori, Player 2 Active Kadabra, and latest event #55 `end_turn`; `mix format`, `mix assets.build`, and `mix check --no-test` passed.
+- Remaining/blocking notes: no code blocker for this ended-turn landing slice. Further polish should continue from the post-event-55 ended state by switching to Player 2, clicking `Start player 2's turn`, verifying the turn-6 start landing and owner-tab draw guidance, and avoiding the already-verified Player 1 End Turn branch.
+
 ## [2026-05-31] iteration 128 | Player 1 retreat landing
 - Task attempted: continued the Web UI polish pass from the verified post-event-53 Player 1 turn-5 action-window state by clicking `Retreat to Munkidori, discarding Fire Energy`, verifying the persisted post-retreat landing, and refining the action-window guide so it names the completed retreat state.
 - Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.
