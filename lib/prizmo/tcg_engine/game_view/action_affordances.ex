@@ -110,7 +110,7 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
       evolve_from_hand_affordances(player, current_turn, cards) ++
       declare_attack_affordances(player, current_turn, cards, all_cards) ++
       [
-        end_turn_affordance(player)
+        pass_affordance(player)
       ]
   end
 
@@ -248,9 +248,9 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
     end
   end
 
-  defp end_turn_affordance(%GamePlayer{} = player) do
-    affordance(:end_turn, "End turn", :command, player.player_id,
-      note: "Pass the action to the next player after resolving optional actions."
+  defp pass_affordance(%GamePlayer{} = player) do
+    affordance(:pass, "Pass", :command, player.player_id,
+      note: "Pass to end this turn and let the engine start the next player's turn."
     )
   end
 

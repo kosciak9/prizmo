@@ -249,6 +249,24 @@ defmodule Prizmo.TcgEngine.Game.ActionCommands do
       end
     end
 
+    action :pass_turn_command, :struct do
+      description "Pass from the action window and let the flow machine hand off the turn."
+
+      constraints instance_of: Game
+
+      argument :game_id, :uuid do
+        allow_nil? false
+      end
+
+      argument :player_id, :string do
+        allow_nil? false
+      end
+
+      run fn input, _context ->
+        Mechanics.pass_turn(input.arguments.game_id, input.arguments.player_id)
+      end
+    end
+
     action :play_card_command, :struct do
       description "Play an engine-defined card from hand through the generic mechanics layer."
 

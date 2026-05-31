@@ -33,6 +33,7 @@ defmodule Prizmo.TcgEngine do
       rpc_action :play_tcg_engine_basic_to_bench, :play_basic_to_bench_command
       rpc_action :evolve_tcg_engine_from_hand, :evolve_from_hand_command
       rpc_action :attach_tcg_engine_energy, :attach_energy_command
+      rpc_action :pass_tcg_engine_turn, :pass_turn_command
       rpc_action :end_tcg_engine_turn, :end_turn_command
       rpc_action :retreat_tcg_engine_active, :retreat_command
       rpc_action :declare_tcg_engine_attack, :declare_attack_command
@@ -101,6 +102,10 @@ defmodule Prizmo.TcgEngine do
       define :attach_energy_for_game,
         action: :attach_energy_command,
         args: [:game_id, :player_id, :energy_card_instance_id, :target_card_instance_id]
+
+      define :pass_turn_for_game,
+        action: :pass_turn_command,
+        args: [:game_id, :player_id]
 
       define :end_turn_for_game,
         action: :end_turn_command,

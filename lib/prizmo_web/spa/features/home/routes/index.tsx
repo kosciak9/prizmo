@@ -19,6 +19,7 @@ import {
   runGetTcgEngineGameState,
   runListSupportedTcgDecks,
   runOpenTcgEngineActionWindow,
+  runPassTcgEngineTurn,
   runPlaceTcgEnginePrizes,
   runPlayTcgEngineBasicToBench,
   runPlayTcgEngineCard,
@@ -958,7 +959,7 @@ export function HomeRoute() {
     ) ??
     commandErrorNotice(
       endTurnMutation.error,
-      'End turn failed',
+      'Pass failed',
       'The turn stayed open. Refresh state and confirm no required prompt, attack, or replacement choice is blocking.'
     )
 
@@ -1659,7 +1660,7 @@ async function attachEnergy(input: AttachEnergyInput): Promise<CreatedGame> {
 }
 
 async function endTurn(input: EndTurnInput): Promise<CreatedGame> {
-  const result = await runEndTcgEngineTurn({
+  const result = await runPassTcgEngineTurn({
     input,
     fields: GAME_RESOURCE_FIELDS,
     headers: buildAshRpcHeaders()
@@ -4221,7 +4222,7 @@ function ultraBallPostSearchHandoffPlan(
   const battleGroup = actionGroups.find(group => group.id === 'battle')
   const turnGroup = actionGroups.find(group => group.id === 'turn')
   const battleAction = battleGroup?.actions.find(action => action.key === 'declare_attack')
-  const turnAction = turnGroup?.actions.find(action => action.key === 'end_turn')
+  const turnAction = turnGroup?.actions.find(action => action.key === 'pass')
   const benchableSearchedCards = handGroup
     ? handGroup.actions.flatMap(action =>
         action.key === 'play_basic_to_bench'
@@ -4239,13 +4240,13 @@ function ultraBallPostSearchHandoffPlan(
       action.key === 'declare_attack' && action.attackId ? [action.attackId] : []
     ) ?? []
   const endTurnPlayerIds =
-    turnGroup?.actions.flatMap(action => (action.key === 'end_turn' && isPlayerId(action.playerId) ? [action.playerId] : [])) ?? []
+    turnGroup?.actions.flatMap(action => (action.key === 'pass' && isPlayerId(action.playerId) ? [action.playerId] : [])) ?? []
   const battleActionLabel = battleAction?.attackName
     ? `Declare ${battleAction.attackName}`
     : battleAction?.attackId
       ? `Declare ${formatAttackId(battleAction.attackId)}`
       : null
-  const turnActionLabel = turnAction ? `End ${formatPlayerId(turnAction.playerId)}'s turn` : null
+  const turnActionLabel = turnAction ? `Pass as ${formatPlayerId(turnAction.playerId)}` : null
 
   return {
     selectedCardNames: selectedCardSummary,
@@ -4366,12 +4367,12 @@ function ActionWindowGuide({
         : 'No hand or board command is legal from this view. Finish the required choice before more actions appear.'
   const battleDetail = battleGroup
     ? turnGroup
-      ? 'Battle decisions and End Turn are both legal. Attack when the board is set, otherwise pass the turn.'
+      ? 'Battle decisions and Pass are both legal. Attack when the board is set, otherwise pass the turn.'
       : 'Battle decisions are available. Review retreat and paid attacks before leaving the window.'
     : turnGroup
       ? handGroup
-        ? 'Turn flow is available, but hand and board choices are still live. End the turn only after this board is set.'
-        : 'Only turn flow remains. End the turn after confirming hand, Bench, and attached Energy.'
+        ? 'Turn flow is available, but hand and board choices are still live. Pass only after this board is set.'
+        : 'Only turn flow remains. Pass after confirming hand, Bench, and attached Energy.'
       : 'Finish the required choice before battle or turn-flow actions appear.'
   const guideTitle = currentTurn?.turnNumber === 1 ? 'First action window' : 'Action window plan'
   const priorityTitle =
@@ -4661,7 +4662,7 @@ function priorityInstruction(
       return 'Battle decisions are most consequential now. Review retreat and paid attacks first.'
     case 'hand':
       if (context.retreatedThisTurn && context.hasTurnFlow) {
-        return 'Retreat is complete and battle choices are no longer live from this Active. Use remaining hand and board actions now, then end the turn.'
+        return 'Retreat is complete and battle choices are no longer live from this Active. Use remaining hand and board actions now, then pass.'
       }
 
       if (context.hasBattleActions && context.hasTurnFlow) {
@@ -4678,7 +4679,7 @@ function priorityInstruction(
 
       return 'Hand and board actions are the safest first pass. Improve the board before the next engine decision.'
     case 'turn':
-      return 'No higher-priority move is available. End the turn after confirming the board state.'
+      return 'No higher-priority move is available. Pass after confirming the board state.'
     default:
       return 'Use the engine action exposed first, then refresh the board if the next step is unclear.'
   }
@@ -4955,7 +4956,7 @@ function ActionAffordanceCard({
         </ActionCommandButton>
       ) : null}
 
-      {action.key === 'end_turn' ? (
+      {action.key === 'pass' ? (
         <ActionCommandButton
           className="mt-2"
           disabled={!canRunAction}
@@ -4964,7 +4965,7 @@ function ActionAffordanceCard({
         >
           {endTurnPendingPlayerId === action.playerId
             ? `Ending ${formatPlayerId(action.playerId)}'s turn...`
-            : `${isPostSearchEndTurnAction ? 'Pass after search — ' : ''}End ${formatPlayerId(action.playerId)}'s turn`}
+            : `${isPostSearchEndTurnAction ? 'Pass after search — ' : ''}Pass as ${formatPlayerId(action.playerId)}`}
         </ActionCommandButton>
       ) : null}
     </li>
@@ -5112,7 +5113,7 @@ function actionSummary(action: ActionAffordance) {
       return `${action.attackName ?? (action.attackId ? formatAttackId(action.attackId) : 'Attack')}: ${attackCostSummary(
         action.attackCost
       )}, ${attackDamageSummary(action.attackDamage)}.`
-    case 'end_turn':
+    case 'pass':
       return `End the action window for ${formatPlayerId(action.playerId)}.`
     default:
       return `${formatEventType(action.kind)} command exposed by the current engine state.`
@@ -5497,7 +5498,7 @@ function actionGroupId(action: ActionAffordance): ActionGroupId {
     case 'retreat':
     case 'declare_attack':
       return 'battle'
-    case 'end_turn':
+    case 'pass':
       return 'turn'
     default:
       return 'other'

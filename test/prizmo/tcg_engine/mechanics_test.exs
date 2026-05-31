@@ -72,25 +72,7 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
     end
 
     test "setup ready choices automatically place prizes and open the first action window" do
-      {:ok, game} = create_game()
-      {:ok, game} = Mechanics.call_coin_toss(game, "player_1", :heads)
-
-      {:ok, game} =
-        Mechanics.choose_starting_player(game, game.coin_toss_winner_player_id, "player_1")
-
-      player_1_active = hand_basic_card(game.id, "player_1")
-      player_2_active = hand_basic_card(game.id, "player_2")
-
-      assert {:ok, game} = Mechanics.choose_active_from_hand(game, "player_1", player_1_active.id)
-      assert game.flow_state == :setup_choosing_opening_active
-
-      assert {:ok, game} = Mechanics.choose_active_from_hand(game, "player_2", player_2_active.id)
-      assert game.flow_state == :setup_choosing_opening_bench
-
-      assert {:ok, game} = Mechanics.finish_setup_choices(game, "player_1")
-      assert game.flow_state == :setup_choosing_opening_bench
-
-      assert {:ok, game} = Mechanics.finish_setup_choices(game, "player_2")
+      {:ok, game} = create_flow_action_window_game()
 
       assert game.status == :in_progress
       assert game.flow_state == :turn_action_window
@@ -111,6 +93,29 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
                "setup_player_ready",
                "prizes_placed",
                "setup_completed",
+               "turn_started",
+               "turn_card_drawn",
+               "action_window_opened"
+             ]
+    end
+
+    test "pass ends the current turn and automatically opens the opponent action window" do
+      {:ok, game} = create_flow_action_window_game()
+
+      assert {:ok, game} = Mechanics.pass_turn(game, "player_1")
+
+      assert game.status == :in_progress
+      assert game.flow_state == :turn_action_window
+      assert game.active_player_id == "player_2"
+      assert counts_by_zone(game.id) == %{active: 2, deck: 92, hand: 14, prize: 12}
+
+      assert [turn_1, turn_2] = turns(game.id)
+      assert %Turn{turn_number: 1, active_player_id: "player_1", status: :ended} = turn_1
+      assert %Turn{turn_number: 2, active_player_id: "player_2", status: :action_window} = turn_2
+
+      assert game.id |> event_types() |> Enum.slice(-5, 5) == [
+               "turn_passed",
+               "turn_ended",
                "turn_started",
                "turn_card_drawn",
                "action_window_opened"
@@ -264,6 +269,20 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
     ])
   end
 
+  defp create_flow_action_window_game do
+    with {:ok, game} <- create_game(),
+         {:ok, game} <- Mechanics.call_coin_toss(game, "player_1", :heads),
+         {:ok, game} <-
+           Mechanics.choose_starting_player(game, game.coin_toss_winner_player_id, "player_1"),
+         player_1_active = hand_basic_card(game.id, "player_1"),
+         player_2_active = hand_basic_card(game.id, "player_2"),
+         {:ok, game} <- Mechanics.choose_active_from_hand(game, "player_1", player_1_active.id),
+         {:ok, game} <- Mechanics.choose_active_from_hand(game, "player_2", player_2_active.id),
+         {:ok, game} <- Mechanics.finish_setup_choices(game, "player_1") do
+      Mechanics.finish_setup_choices(game, "player_2")
+    end
+  end
+
   defp create_started_setup_game do
     with {:ok, game} <-
            Mechanics.create_game([
@@ -341,6 +360,13 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
     |> Ash.Query.sort(turn_number: :desc)
     |> Ash.read!()
     |> List.first()
+  end
+
+  defp turns(game_id) do
+    Turn
+    |> Ash.Query.filter(game_id == ^game_id)
+    |> Ash.Query.sort(turn_number: :asc)
+    |> Ash.read!()
   end
 
   defp zone(card_id) do

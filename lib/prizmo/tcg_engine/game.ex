@@ -72,6 +72,7 @@ defmodule Prizmo.TcgEngine.Game do
     define :open_action_window_command, args: [:game_id]
     define :play_card_command, args: [:game_id, :player_id, :card_instance_id]
     define :play_basic_to_bench_command, args: [:game_id, :player_id, :card_instance_id]
+    define :pass_turn_command, args: [:game_id, :player_id]
     define :start_setup
     define :complete_setup
     define :finish

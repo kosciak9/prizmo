@@ -25,6 +25,7 @@ defmodule Prizmo.TcgEngine.Turn do
       transition(:declare_attack, from: :action_window, to: :attack_declared)
       transition(:resolve_attack, from: :attack_declared, to: :attack_resolving)
       transition(:finish_attack, from: :attack_resolving, to: :ended)
+      transition(:pass, from: :action_window, to: :ended)
       transition(:end_turn, from: :action_window, to: :ended)
     end
   end
@@ -38,6 +39,7 @@ defmodule Prizmo.TcgEngine.Turn do
     define :declare_attack
     define :resolve_attack
     define :finish_attack
+    define :pass
     define :end_turn
     define :restore
   end
@@ -77,6 +79,10 @@ defmodule Prizmo.TcgEngine.Turn do
     end
 
     update :finish_attack do
+      change transition_state(:ended)
+    end
+
+    update :pass do
       change transition_state(:ended)
     end
 

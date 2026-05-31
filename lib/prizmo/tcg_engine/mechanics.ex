@@ -237,6 +237,11 @@ defmodule Prizmo.TcgEngine.Mechanics do
     FlowInterpreter.dispatch(game_or_id, :finish_setup_choices, %{player_id: player_id})
   end
 
+  @spec pass_turn(Game.t() | String.t(), String.t()) :: {:ok, Game.t()} | {:error, term()}
+  def pass_turn(game_or_id, player_id) when is_binary(player_id) do
+    FlowInterpreter.dispatch(game_or_id, :pass, %{player_id: player_id})
+  end
+
   @spec place_prizes(Game.t() | String.t()) :: {:ok, Game.t()} | {:error, term()}
   def place_prizes(game_or_id) do
     transaction(fn ->

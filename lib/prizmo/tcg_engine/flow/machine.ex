@@ -26,6 +26,11 @@ defmodule Prizmo.TcgEngine.Flow.Machine do
       from: :setup_choosing_opening_bench,
       action: :finish_setup_choices,
       target: :setup_choosing_opening_bench
+    },
+    pass: %{
+      from: :turn_action_window,
+      action: :pass_turn,
+      target: :turn_ending_turn
     }
   }
 
@@ -77,6 +82,13 @@ defmodule Prizmo.TcgEngine.Flow.Machine do
         guard: :can_open_action_window?,
         action: :open_action_window,
         target: :turn_action_window
+      }
+    ],
+    turn_ending_turn: [
+      %{
+        guard: :can_end_turn?,
+        action: :end_turn,
+        target: :turn_starting_turn
       }
     ]
   }

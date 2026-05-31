@@ -18,7 +18,12 @@ defmodule Prizmo.TcgEngine.Flow.Actions do
   import Prizmo.TcgEngine.Operation, only: [create: 3, update: 3]
 
   import Prizmo.TcgEngine.Requirements,
-    only: [require_card_owned_by_player: 2, require_card_zone: 2]
+    only: [
+      require_active_player: 2,
+      require_card_owned_by_player: 2,
+      require_card_zone: 2,
+      require_turn_player: 2
+    ]
 
   import Prizmo.TcgEngine.TurnDraw, only: [draw_one_for_turn: 2]
 
@@ -68,6 +73,13 @@ defmodule Prizmo.TcgEngine.Flow.Actions do
   def can_open_action_window?(%Context{game: %Game{} = game}, _attrs) do
     case current_turn(game.id) do
       {:ok, %Turn{status: :drawn}} -> true
+      _other -> false
+    end
+  end
+
+  def can_end_turn?(%Context{game: %Game{} = game}, _attrs) do
+    case current_turn(game.id) do
+      {:ok, %Turn{status: :action_window}} -> true
       _other -> false
     end
   end
@@ -298,6 +310,33 @@ defmodule Prizmo.TcgEngine.Flow.Actions do
     end
   end
 
+  def pass_turn(%Context{game: %Game{} = game} = context, attrs) do
+    player_id = Map.fetch!(attrs, :player_id)
+
+    with :ok <- require_player(context, player_id),
+         :ok <- require_active_player(game, player_id),
+         {:ok, turn} <- current_turn(game.id),
+         :ok <- require_turn_player(turn, player_id),
+         :ok <- require_turn_status(turn, :action_window),
+         {:ok, game} <- update(game, :set_flow_state, %{flow_state: :turn_ending_turn}),
+         {:ok, event} <- write_event(game, :turn_passed, player_id, %{turn_id: turn.id}),
+         {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do
+      {:ok, game}
+    end
+  end
+
+  def end_turn(%Context{game: %Game{} = game}, _attrs) do
+    with {:ok, turn} <- current_turn(game.id),
+         :ok <- require_turn_status(turn, :action_window),
+         {:ok, turn} <- update(turn, :pass, %{}),
+         {:ok, game} <- update(game, :set_flow_state, %{flow_state: :turn_starting_turn}),
+         {:ok, event} <-
+           write_event(game, :turn_ended, turn.active_player_id, %{turn_id: turn.id}),
+         {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do
+      {:ok, game}
+    end
+  end
+
   defp normalize_coin_face(face) when face in @coin_faces, do: {:ok, face}
   defp normalize_coin_face("heads"), do: {:ok, :heads}
   defp normalize_coin_face("tails"), do: {:ok, :tails}
@@ -337,6 +376,11 @@ defmodule Prizmo.TcgEngine.Flow.Actions do
       {:error, reason} -> {:error, reason}
     end
   end
+
+  defp require_turn_status(%Turn{status: status}, status), do: :ok
+
+  defp require_turn_status(%Turn{status: actual}, expected),
+    do: {:error, {:invalid_turn_status, actual, expected}}
 
   defp player(%Context{players: players}, player_id) do
     Enum.find(players, &(&1.player_id == player_id))
