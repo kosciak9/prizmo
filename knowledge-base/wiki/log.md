@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-31] iteration 105 | Player 2 next-turn owner tab
+- Task attempted: continued the Web UI polish pass by verifying the post-search pass/end-turn next-player path and aligning turn-step command availability with the current turn owner's tab, so non-owner tabs now point players to the correct seat for draw timing and opening the action window.
+- Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.
+- Validation: `mix format && mix assets.build` passed; browser smoke on `http://localhost:4003` resumed game `d608a1f1-6db6-4f23-a8d0-4a7d27641993`, switched to Player 2, started turn 2, confirmed Player 1's tab showed disabled `Use player 2 tab to draw/skip/open actions` copy, drew for Player 2, opened the Player 2 action window, confirmed `Action window plan` and legal actions appeared, and reported no browser warnings or errors; `mix check --no-test` passed.
+- Remaining/blocking notes: no code blocker for the Player 2 post-pass start/draw/open-action path. Further polish can refine the newly visible Player 2 turn-2 action-window choices, especially repeated evolution rows and first-decision clarity, before rerunning the formal two-browser/manual-tester milestone once isolated contexts are guaranteed.
+
 ## [2026-05-31] iteration 104 | Post-search pass next-turn guide
 - Task attempted: continued the Web UI polish pass by explicitly validating the Ultra Ball post-search pass/end-turn branch and refining the `Turn step` guide so an ended turn becomes a `Next-turn path` that names the next player and the persisted start/draw/open-action sequence.
 - Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.

@@ -1976,6 +1976,10 @@ function GameFlowPanel({
 }) {
   const viewerPlayer = gameState.players.find(player => player.playerId === viewerPlayerId)
   const currentTurnActivePlayerId = gameState.currentTurn?.activePlayerId
+  const currentTurnActivePlayerIsViewer = currentTurnActivePlayerId === viewerPlayerId
+  const currentTurnActivePlayerLabel = currentTurnActivePlayerId
+    ? formatPlayerId(currentTurnActivePlayerId)
+    : 'the turn owner'
   const setupActiveCandidates = viewerPlayer?.hand.filter(isSetupActiveCandidate) ?? []
   const setupBenchCandidates = viewerPlayer?.hand.filter(isSetupBenchCandidate) ?? []
   const allPlayersHaveSetupActive = gameState.players.every(player => player.active)
@@ -2023,11 +2027,15 @@ function GameFlowPanel({
       gameState.currentTurn?.status === 'start' &&
       currentTurnActivePlayerId &&
       isPlayerId(currentTurnActivePlayerId) &&
+      currentTurnActivePlayerIsViewer &&
       !turnStepPending
   )
   const canSkipDrawForTurn = canDrawForTurn
   const canOpenActionWindow = Boolean(
-    gameState.status === 'in_progress' && gameState.currentTurn?.status === 'drawn' && !turnStepPending
+    gameState.status === 'in_progress' &&
+      gameState.currentTurn?.status === 'drawn' &&
+      currentTurnActivePlayerIsViewer &&
+      !turnStepPending
   )
   const openingActiveStatusMessage = viewerPlayer?.active
     ? `${viewerPlayer.active.name} is this viewer's setup Active.`
@@ -2233,7 +2241,9 @@ function GameFlowPanel({
                 {drawForTurnPending
                   ? 'Drawing for turn...'
                   : gameState.currentTurn?.status === 'start'
-                    ? `Draw for ${formatPlayerId(gameState.currentTurn.activePlayerId)}`
+                    ? currentTurnActivePlayerIsViewer
+                      ? `Draw for ${formatPlayerId(gameState.currentTurn.activePlayerId)}`
+                      : `Use ${currentTurnActivePlayerLabel} tab to draw`
                     : gameState.currentTurn?.status === 'drawn'
                       ? 'Draw for turn resolved'
                       : gameState.currentTurn
@@ -2252,7 +2262,9 @@ function GameFlowPanel({
                 {skipDrawForTurnPending
                   ? 'Skipping draw...'
                   : gameState.currentTurn?.status === 'start'
-                    ? `Skip draw for ${formatPlayerId(gameState.currentTurn.activePlayerId)}`
+                    ? currentTurnActivePlayerIsViewer
+                      ? `Skip draw for ${formatPlayerId(gameState.currentTurn.activePlayerId)}`
+                      : `Use ${currentTurnActivePlayerLabel} tab to skip`
                     : gameState.currentTurn?.status === 'action_window'
                       ? 'Draw step skipped'
                       : gameState.currentTurn
@@ -2265,7 +2277,9 @@ function GameFlowPanel({
               {openActionWindowPending
                 ? 'Opening action window...'
                 : gameState.currentTurn?.status === 'drawn'
-                  ? 'Open action window'
+                  ? currentTurnActivePlayerIsViewer
+                    ? 'Open action window'
+                    : `Use ${currentTurnActivePlayerLabel} tab to open actions`
                   : gameState.currentTurn?.status === 'action_window'
                     ? 'Action window open'
                     : gameState.currentTurn
@@ -2341,7 +2355,9 @@ function TurnStepGuide({
   } else if (currentTurn?.status === 'start') {
     actionWindowDetail = 'Draw for turn or skip draw before opening actions.'
   } else if (currentTurn?.status === 'drawn') {
-    actionWindowDetail = 'Open the action window so hand, board, retreat, attack, and end-turn actions can appear below.'
+    actionWindowDetail = viewerOwnsTurn
+      ? 'Open the action window so hand, board, retreat, attack, and end-turn actions can appear below.'
+      : `Draw timing is resolved for ${turnOwnerLabel}. Use that player tab to open the action window, then refresh here.`
   } else if (activeWindowOpen) {
     actionWindowDetail = `Action decisions are live for ${turnOwnerLabel}. Use Available actions below.`
   } else if (currentTurn) {
