@@ -2,13 +2,13 @@
 
 Updated: 2026-05-31
 
-## Iteration 133 handoff
+## Iteration 134 handoff
 
-- Current state: game `d608a1f1-6db6-4f23-a8d0-4a7d27641993` is verified at post-event-60 with Player 1's turn started in `Turn 7, start`; latest event is #60 `start_next_turn`, Player 1 remains Active Munkidori with Moltres on Bench and five cards in hand, Player 2 remains Active Kadabra with one card in hand, no prompts are awaiting, neither viewer has action-window legal actions, Player 1 has `Draw for player 1` and `Skip draw for player 1` enabled, and Player 2 is pointed back to the Player 1 tab for draw timing.
-- Last commit at iteration start: `afe68d5 feat(spa): clarify tcg ended-turn owner copy`.
-- Remaining tasks: continue the substantial Web UI polish/playtest path without repeating the already verified post-event-59 Player 1 Start Turn branch; broader north-star work still includes the formal two-independent-browser milestone, more persisted mechanics/card behavior slices, and the Electric Streams spike.
-- Blockers: no code blocker for the Player 1 turn-7 start landing slice; the documented manual-tester milestone remains blocked by unreliable manual-tester browser/session isolation.
-- Recommended next atomic task: from the post-event-60 Player 1 start state, click `Draw for player 1`, verify the persisted drawn landing and Player 2 open-action owner-tab guidance, then open Player 1's action window without repeating the start-turn branch.
+- Current state: game `d608a1f1-6db6-4f23-a8d0-4a7d27641993` is verified at post-event-62 with Player 1 in `Turn 7, action_window`; latest event is #62 `open_action_window`, Player 1 remains Active Munkidori with Moltres on Bench and six cards in hand, Player 2 remains Active Kadabra with one card in hand, no prompts are awaiting, Player 1 has legal actions `play_card` and `end_turn`, Player 2 has no legal actions, and the repeated Ultra Ball choices now render as `Play Ultra Ball from hand slot 4/5/6`.
+- Last commit at iteration start: `8d8b133 feat(spa): clarify tcg turn-seven start landing`.
+- Remaining tasks: continue the substantial Web UI polish/playtest path without repeating the already verified post-event-60 Player 1 draw/open-action branch; broader north-star work still includes the formal two-independent-browser milestone, more persisted mechanics/card behavior slices, and the Electric Streams spike.
+- Blockers: no code blocker for the repeated-Trainer choice-label slice; the documented manual-tester milestone remains blocked by unreliable manual-tester browser/session isolation.
+- Recommended next atomic task: from the post-event-62 Player 1 action-window state, choose one labeled Ultra Ball copy, verify the cost prompt landing and repeated discard-choice labels, then refine only unclear prompt/action copy without repeating the draw/open-action branch.
 
 ## Current state
 

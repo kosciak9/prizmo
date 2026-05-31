@@ -308,6 +308,13 @@ type BasicBenchCommandOption = {
   baseLabel: string
 }
 
+type PlayCardCommandOption = {
+  key: string
+  cardInstanceId: string
+  card: CardSummary | undefined
+  baseLabel: string
+}
+
 type ActionRenderEntry = {
   key: string
   action: ActionAffordance
@@ -4231,6 +4238,9 @@ function ActionWindowGuide({
   const basicBenchOptions = handGroup
     ? uniqueBasicBenchOptions(handGroup.actions.flatMap(action => basicBenchCommandOptions(action, cardsById)))
     : []
+  const playCardOptions = handGroup
+    ? uniquePlayCardOptions(handGroup.actions.flatMap(action => playCardCommandOptions(action, cardsById)))
+    : []
   const evolutionOptions = handGroup
     ? uniqueEvolutionOptions(handGroup.actions.flatMap(action => evolutionCommandOptions(action, cardsById)))
     : []
@@ -4247,7 +4257,7 @@ function ActionWindowGuide({
       } in hand, and ${viewerPlayer?.bench.length ?? 0} on Bench.`
     : `${turnOwnerLabel} owns this action window. This tab is ${viewerLabel}; use the matching seat for commands.`
   const handDetail = handGroup
-    ? handActionGuideDetail(handGroup, basicBenchOptions, evolutionOptions, handChoiceCount, {
+    ? handActionGuideDetail(handGroup, basicBenchOptions, evolutionOptions, playCardOptions, handChoiceCount, {
         hasBattleActions: Boolean(battleGroup),
         hasTurnFlow: Boolean(turnGroup)
       })
@@ -4341,16 +4351,18 @@ function handActionGuideDetail(
   handGroup: ActionGroup,
   basicBenchOptions: BasicBenchCommandOption[],
   evolutionOptions: EvolutionCommandOption[],
+  playCardOptions: PlayCardCommandOption[],
   handChoiceCount: number,
   followUp: { hasBattleActions: boolean; hasTurnFlow: boolean }
 ) {
   const choiceLabel = actionCountLabel(handChoiceCount, 'hand and board choice')
   const hasRepeatedBenchChoices = repeatedBasicBenchBaseLabels(basicBenchOptions).size > 0
   const hasRepeatedEvolutionChoices = repeatedEvolutionBaseLabels(evolutionOptions).size > 0
+  const hasRepeatedPlayCardChoices = repeatedPlayCardBaseLabels(playCardOptions).size > 0
   const hasBasicBenchChoices = basicBenchOptions.length > 0
   const hasEvolutionChoices = evolutionOptions.length > 0
   const hasAttachEnergyChoice = handGroup.actions.some(action => action.key === 'attach_energy')
-  const hasTrainerChoice = handGroup.actions.some(action => action.key === 'play_card')
+  const hasTrainerChoice = playCardOptions.length > 0
   const followUpPhrase = handActionFollowUpPhrase(followUp)
   const evolutionTargetScope = evolutionTargetScopeLabel(evolutionOptions)
   const evolutionSourceCount = new Set(evolutionOptions.map(option => option.evolutionCardInstanceId)).size
@@ -4381,11 +4393,15 @@ function handActionGuideDetail(
   }
 
   if (hasAttachEnergyChoice && hasTrainerChoice) {
-    return `${choiceLabel} visible. Play Trainers or attach Energy ${followUpPhrase}.`
+    return hasRepeatedPlayCardChoices
+      ? `${choiceLabel} visible. Duplicate Trainers use hand-slot labels; play one or attach Energy ${followUpPhrase}.`
+      : `${choiceLabel} visible. Play Trainers or attach Energy ${followUpPhrase}.`
   }
 
   if (hasTrainerChoice) {
-    return `${choiceLabel} visible. Play Trainers ${followUpPhrase}.`
+    return hasRepeatedPlayCardChoices
+      ? `${choiceLabel} visible. Duplicate Trainers use hand-slot labels, so choose the exact copy to play ${followUpPhrase}.`
+      : `${choiceLabel} visible. Play Trainers ${followUpPhrase}.`
   }
 
   if (hasAttachEnergyChoice) {
@@ -4606,6 +4622,8 @@ function ActionAffordanceCard({
   const canRunAction = !actionCommandPending && isPlayerId(action.playerId)
   const isPostSearchEndTurnAction = isPlayerId(action.playerId) && postSearchEndTurnPlayerIds.includes(action.playerId)
   const playCardPromptGuide = ultraBallPlayCardPromptGuide(action, cardsById)
+  const playCardOptions = uniquePlayCardOptions(playCardCommandOptions(action, cardsById))
+  const repeatedPlayCardLabels = repeatedPlayCardBaseLabels(playCardOptions)
   const benchOptions = providedBenchOptions ?? basicBenchCommandOptions(action, cardsById)
   const repeatedBenchLabels = repeatedBasicBenchBaseLabels(benchOptions)
   const evolutionOptions = providedEvolutionOptions ?? evolutionCommandOptions(action, cardsById)
@@ -4645,19 +4663,21 @@ function ActionAffordanceCard({
         </details>
       ) : null}
 
-      {action.key === 'play_card' && action.sourceCardInstanceIds.length > 0 ? (
+      {playCardOptions.length > 0 ? (
         <div className="mt-2 space-y-1.5">
-          {action.sourceCardInstanceIds.map(cardInstanceId => {
-            const card = cardsById.get(cardInstanceId)
-            const isPending = playCardPendingCardId === cardInstanceId
+          {playCardOptions.length > 1 ? <PlayCardChoiceGuide options={playCardOptions} /> : null}
+
+          {playCardOptions.map(option => {
+            const isPending = playCardPendingCardId === option.cardInstanceId
+            const needsSourceCopyLabel = repeatedPlayCardLabels.has(option.baseLabel)
 
             return (
               <ActionCommandButton
                 disabled={!canRunAction}
-                key={cardInstanceId}
-                onClick={() => onPlayCard({ playerId: action.playerId, cardInstanceId })}
+                key={option.key}
+                onClick={() => onPlayCard({ playerId: action.playerId, cardInstanceId: option.cardInstanceId })}
               >
-                {isPending ? `Playing ${card?.name ?? 'card'}...` : `Play ${card?.name ?? formatCardInstanceId(cardInstanceId)}`}
+                {isPending ? playCardPendingLabel(option) : playCardButtonLabel(option, needsSourceCopyLabel)}
               </ActionCommandButton>
             )
           })}
@@ -4858,6 +4878,27 @@ function BasicBenchChoiceGuide({ options }: { options: BasicBenchCommandOption[]
   )
 }
 
+function PlayCardChoiceGuide({ options }: { options: PlayCardCommandOption[] }) {
+  const duplicatedBaseLabelCount = repeatedPlayCardBaseLabels(options).size
+  const detail = duplicatedBaseLabelCount > 0
+    ? 'Repeated playable names are separate cards in hand. Buttons include the hand slot so the chosen copy is unambiguous.'
+    : 'Choose which engine-defined card to play. The engine uses the exact hand card you choose.'
+
+  return (
+    <div className="rounded-lg border border-emerald-200 bg-emerald-50/70 px-3 py-2 text-xs leading-5 text-emerald-950">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <p className="font-semibold uppercase tracking-[0.14em] text-emerald-800">Playable card choice</p>
+          <p className="mt-0.5 text-emerald-900/80">{detail}</p>
+        </div>
+        <StatusBadge tone="active">
+          {options.length} {options.length === 1 ? 'choice' : 'choices'}
+        </StatusBadge>
+      </div>
+    </div>
+  )
+}
+
 function EvolutionChoiceGuide({ options }: { options: EvolutionCommandOption[] }) {
   const targetCount = new Set(options.map(option => option.targetCardInstanceId)).size
   const sourceCount = new Set(options.map(option => option.evolutionCardInstanceId)).size
@@ -5007,6 +5048,26 @@ function basicBenchCommandOptions(
   })
 }
 
+function playCardCommandOptions(
+  action: ActionAffordance,
+  cardsById: Map<string, CardSummary>
+): PlayCardCommandOption[] {
+  if (action.key !== 'play_card') {
+    return []
+  }
+
+  return action.sourceCardInstanceIds.map(cardInstanceId => {
+    const card = cardsById.get(cardInstanceId)
+
+    return {
+      key: cardInstanceId,
+      cardInstanceId,
+      card,
+      baseLabel: card?.name ?? formatCardInstanceId(cardInstanceId)
+    }
+  })
+}
+
 function repeatedBasicBenchBaseLabels(options: BasicBenchCommandOption[]) {
   const labelCounts = new Map<string, number>()
 
@@ -5015,6 +5076,27 @@ function repeatedBasicBenchBaseLabels(options: BasicBenchCommandOption[]) {
   }
 
   return new Set([...labelCounts.entries()].filter(([, count]) => count > 1).map(([label]) => label))
+}
+
+function repeatedPlayCardBaseLabels(options: PlayCardCommandOption[]) {
+  const labelCounts = new Map<string, number>()
+
+  for (const option of options) {
+    labelCounts.set(option.baseLabel, (labelCounts.get(option.baseLabel) ?? 0) + 1)
+  }
+
+  return new Set([...labelCounts.entries()].filter(([, count]) => count > 1).map(([label]) => label))
+}
+
+function playCardPendingLabel(option: PlayCardCommandOption) {
+  return `Playing ${option.card?.name ?? 'card'}...`
+}
+
+function playCardButtonLabel(option: PlayCardCommandOption, includeSourceCopyLabel: boolean) {
+  const cardName = option.card?.name ?? formatCardInstanceId(option.cardInstanceId)
+  const sourceCopyLabel = includeSourceCopyLabel ? ` from ${cardLocationLabel(option.card, 'hand')}` : ''
+
+  return `Play ${cardName}${sourceCopyLabel}`
 }
 
 function basicBenchPendingLabel(option: BasicBenchCommandOption) {
@@ -5247,6 +5329,16 @@ function uniqueEvolutionOptions(options: EvolutionCommandOption[]) {
 
 function uniqueBasicBenchOptions(options: BasicBenchCommandOption[]) {
   const optionsByKey = new Map<string, BasicBenchCommandOption>()
+
+  for (const option of options) {
+    optionsByKey.set(option.key, option)
+  }
+
+  return [...optionsByKey.values()]
+}
+
+function uniquePlayCardOptions(options: PlayCardCommandOption[]) {
+  const optionsByKey = new Map<string, PlayCardCommandOption>()
 
   for (const option of options) {
     optionsByKey.set(option.key, option)
