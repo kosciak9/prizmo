@@ -2,13 +2,13 @@
 
 Updated: 2026-05-31
 
-## Iteration 129 handoff
+## Iteration 130 handoff
 
-- Current state: game `d608a1f1-6db6-4f23-a8d0-4a7d27641993` is verified at post-event-55 with Player 1 in `Turn 5, ended`; latest event is #55 `end_turn`, Player 1 remains Active Munkidori with Moltres on Bench, Player 2 remains Active Kadabra, no prompts are awaiting, and no legal actions are visible until Player 2 starts the next turn.
-- Last commit at iteration start: `eee5f1f feat(spa): clarify tcg retreat landing`.
-- Remaining tasks: continue the substantial Web UI polish/playtest path without repeating already verified turn-5 draw/open-action, Retreat, or Player 1 End Turn branches; broader north-star work still includes the formal two-independent-browser milestone, more persisted mechanics/card behavior slices, and the Electric Streams spike.
-- Blockers: no code blocker for the ended-turn landing slice; the documented manual-tester milestone remains blocked by unreliable manual-tester browser/session isolation.
-- Recommended next atomic task: from the post-event-55 ended state, switch to Player 2, click `Start player 2's turn`, verify the persisted turn-6 start landing and owner-tab draw guidance, and refine only unclear copy.
+- Current state: game `d608a1f1-6db6-4f23-a8d0-4a7d27641993` is verified at post-event-56 with Player 2 in `Turn 6, start`; latest event is #56 `start_next_turn`, Player 1 remains Active Munkidori with Moltres on Bench, Player 2 remains Active Kadabra, no prompts are awaiting, and legal action affordances remain hidden until Player 2 resolves draw timing and opens the action window.
+- Last commit at iteration start: `c061f77 feat(spa): clarify tcg ended-turn landing`.
+- Remaining tasks: continue the substantial Web UI polish/playtest path without repeating already verified post-event-55 start-turn branch; broader north-star work still includes the formal two-independent-browser milestone, more persisted mechanics/card behavior slices, and the Electric Streams spike.
+- Blockers: no code blocker for the Player 2 turn-6 start landing slice; the documented manual-tester milestone remains blocked by unreliable manual-tester browser/session isolation.
+- Recommended next atomic task: from the post-event-56 Player 2 start state, click `Draw for player 2`, verify the persisted drawn landing plus Player 1 non-owner open-action guidance, then open Player 2's action window without repeating the start-turn branch.
 
 ## Current state
 

@@ -2022,6 +2022,8 @@ function GameFlowPanel({
   const tableSetupDetail = setupCompleted
     ? gameState.currentTurn?.status === 'ended'
       ? `Opening choices are locked. Use Turn step to start ${nextTurnOwnerLabel ?? 'the next player'}'s next turn.`
+      : gameState.currentTurn?.status === 'start'
+        ? `Opening choices are locked. Turn ${gameState.currentTurn.turnNumber} belongs to ${currentTurnActivePlayerLabel}; resolve draw timing in Turn step before actions reopen.`
       : 'Opening choices are locked. Use Turn step for the live turn path.'
     : 'Build the opening board from the viewer hand, then move into the first turn.'
   const canStartSetup = !gameState.setup && !startSetupPending
@@ -2548,9 +2550,12 @@ function CompletedSetupSummary({
   firstPlayerId: string
   players: PlayerView[]
 }) {
+  const turnOwnerLabel = formatPlayerId(currentTurn?.activePlayerId ?? firstPlayerId)
   const setupDetail = currentTurn
     ? currentTurn.status === 'ended'
       ? 'Opening choices are locked. Use Turn step to start the next turn, resolve draw timing from the turn owner tab, and reopen legal actions.'
+      : currentTurn.status === 'start'
+        ? `Opening choices are locked. Turn ${currentTurn.turnNumber} belongs to ${turnOwnerLabel}; resolve draw timing from the ${turnOwnerLabel} tab before legal actions reopen.`
       : 'Opening choices are locked. Use Turn step to track this turn, draw timing, and live legal actions.'
     : 'Opening choices are locked. Use Turn step to start turn one, resolve draw timing, and open legal actions.'
 

@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-31] iteration 130 | Player 2 turn-6 start landing
+- Task attempted: continued the Web UI polish pass from the verified post-event-55 ended-turn state by switching to Player 2, clicking `Start player 2's turn`, verifying the persisted turn-6 start landing from both seats, and tightening completed-setup copy so live draw timing names Player 2's tab.
+- Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.
+- Validation: Tidewave precheck confirmed game `d608a1f1-6db6-4f23-a8d0-4a7d27641993` was at cursor `55 of 55` with `Turn 5, ended`, no awaiting prompts, no legal actions, Player 1 Active Munkidori, and Player 2 Active Kadabra; browser smoke on `http://localhost:4003` as Player 2 clicked `Start player 2's turn`, confirmed event #56 `start_next_turn`, `Turn 6, start`, enabled `Draw for player 2`/`Skip draw for player 2`, and refreshed completed-setup copy `Turn 6 belongs to player 2; resolve draw timing from the player 2 tab`; switching to Player 1 confirmed disabled `Use player 2 tab to draw/skip` and non-owner draw guidance; browser console reported no warnings or errors; Tidewave postcheck confirmed both viewers at cursor `56 of 56`, latest event #56 `start_next_turn`, active player Player 2, no awaiting prompts, no action affordances, Player 1 Active Munkidori, and Player 2 Active Kadabra; `mix format`, `mix assets.build`, and `mix check --no-test` passed.
+- Remaining/blocking notes: no code blocker for this Player 2 turn-6 start landing slice. Further polish should continue from the post-event-56 Player 2 start state by clicking `Draw for player 2`, verifying the drawn landing and Player 1 open-action owner-tab guidance, then opening Player 2's action window without repeating the start-turn branch.
+
 ## [2026-05-31] iteration 129 | Player 1 ended-turn landing
 - Task attempted: continued the Web UI polish pass from the verified post-event-54 Player 1 turn-5 action-window state by clicking `End player 1's turn`, verifying the persisted ended-turn/next-owner landing from both seats, and refining the setup summary so ended turns point to the next-turn path instead of the generic live-turn path.
 - Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.
