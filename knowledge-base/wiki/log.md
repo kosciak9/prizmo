@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-31] iteration 120 | Player 2 turn-4 start landing
+- Task attempted: continued the Web UI polish pass from the verified post-event-43 ended-turn state by switching to Player 2, clicking `Start player 2's turn`, verifying the persisted turn-4 start landing, and refining the non-owner disabled open-action CTA to name the Player 2 tab for draw timing.
+- Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.
+- Validation: Tidewave precheck confirmed game `d608a1f1-6db6-4f23-a8d0-4a7d27641993` was at event #43 with `Turn 3, ended`, no prompts, and no legal actions; browser smoke on `http://localhost:4003` as Player 2 clicked `Start player 2's turn`, confirmed cursor `44 of 44`, event #44 `start next turn`, `Turn 4, start`, and enabled `Draw for player 2`/`Skip draw for player 2`; switched to Player 1 and confirmed non-owner guide copy plus disabled CTA `Use player 2 tab for draw first`; browser console reported no warnings or errors; Tidewave postcheck confirmed event #44, Player 2 active on turn 4 start, no awaiting prompts, and no legal actions yet; `mix format`, `mix assets.build`, and `mix check --no-test` passed.
+- Remaining/blocking notes: no code blocker for this Player 2 turn-start landing slice. Further polish should continue from the post-event-44 state by drawing for Player 2, verifying the drawn landing and Player 1 non-owner open-action guidance, then opening Player 2's action window without repeating the start-turn branch.
+
 ## [2026-05-31] iteration 119 | Player 1 finish-attack landing
 - Task attempted: continued the Web UI polish pass from the verified post-event-42 Player 1 attack-resolving state by clicking `Finish attack and end turn`, verifying the persisted ended-turn landing, and refining the non-owner next-turn draw guidance to explicitly name the Player 2 tab.
 - Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.

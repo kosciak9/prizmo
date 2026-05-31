@@ -2317,6 +2317,8 @@ function GameFlowPanel({
                     : `Use ${currentTurnActivePlayerLabel} tab to open actions`
                   : gameState.currentTurn?.status === 'action_window'
                     ? 'Action window open'
+                    : gameState.currentTurn?.status === 'start' && !currentTurnActivePlayerIsViewer
+                      ? `Use ${currentTurnActivePlayerLabel} tab for draw first`
                     : gameState.currentTurn
                       ? 'Draw or skip draw first'
                       : 'Start first turn first'}
