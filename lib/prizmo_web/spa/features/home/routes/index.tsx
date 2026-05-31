@@ -2046,9 +2046,10 @@ function GameFlowPanel({
     ? (gameState.players.find(player => player.playerId !== gameState.currentTurn?.activePlayerId)?.playerId ?? gameState.activePlayerId)
     : null
   const nextTurnOwnerLabel = nextTurnOwnerId ? formatPlayerId(nextTurnOwnerId) : null
+  const nextTurnOwnerTabLabel = nextTurnOwnerLabel ? `the ${nextTurnOwnerLabel} tab` : 'the next player tab'
   const tableSetupDetail = setupCompleted
     ? gameState.currentTurn?.status === 'ended'
-      ? `Opening choices are locked. Use Turn step to start ${nextTurnOwnerLabel ?? 'the next player'}'s next turn.`
+      ? `Opening choices are locked. Use Turn step to start ${nextTurnOwnerLabel ?? 'the next player'}'s next turn, then resolve draw timing from ${nextTurnOwnerTabLabel}.`
       : gameState.currentTurn?.status === 'start'
         ? `Opening choices are locked. Turn ${gameState.currentTurn.turnNumber} belongs to ${currentTurnActivePlayerLabel}; resolve draw timing from the ${currentTurnActivePlayerLabel} tab before actions reopen.`
       : 'Opening choices are locked. Use Turn step for the live turn path.'

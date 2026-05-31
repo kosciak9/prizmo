@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-31] iteration 139 | Player 1 ended-turn landing
+- Task attempted: continued from the verified post-event-95 Player 1 action-window state by clicking `End player 1's turn`, verifying the persisted ended-turn/Player 2 next-turn landing from both seats, and tightening the Table setup copy so the ended state names the Player 2 tab for draw timing.
+- Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.
+- Validation: Tidewave precheck confirmed game `d608a1f1-6db6-4f23-a8d0-4a7d27641993` at cursor `95 of 95` with Player 1 in `Turn 7, action_window`, legal actions `play_card` plus `end_turn`, Budew on Bench, and Player 2 with no prompt/action visibility; browser smoke on `http://localhost:4003` clicked `End player 1's turn`, confirmed cursor `96 of 96`, latest event #96 `end_turn`, `Turn 7, ended`, Player 1 copy pointing to the Player 2 tab, switched to Player 2 and confirmed owner copy `Start player 2's next turn, then resolve draw timing from this tab`; browser console reported no warnings or errors; Tidewave postcheck confirmed both viewers at cursor `96 of 96`, latest event #96 `end_turn`, no prompts, and no legal actions; `mix format`, `mix assets.build`, and `mix check --no-test` passed.
+- Remaining/blocking notes: no code blocker for this ended-turn landing slice. Further polish should continue from the post-event-96 ended state by clicking `Start player 2's turn`, verifying the turn-8 start landing and draw-timing guidance from both seats, and avoiding the already-verified Player 1 End Turn branch.
+
 ## [2026-05-31] iteration 138 | Post-search Bench landing
 - Task attempted: continued from the post-event-94 Player 1 Ultra Ball search-complete state by restoring the tab-scoped post-search handoff in the fresh browser, clicking `Bench searched Budew`, verifying the handoff cleared, and tightening the post-bench action-window priority copy so it no longer mentions attacks when only Trainer plus End Turn remain legal.
 - Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.

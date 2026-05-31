@@ -2,6 +2,14 @@
 
 Updated: 2026-05-31
 
+## Iteration 139 handoff
+
+- Current state: game `d608a1f1-6db6-4f23-a8d0-4a7d27641993` is verified at post-event-96 with `Turn 7, ended`; latest event is #96 `end_turn`, Player 1 has Munkidori Active, Moltres plus Budew on Bench, and Ultra Ball in hand, Player 2 has Kadabra Active with four Benched Pokémon and one card in hand, both viewers have no prompts or legal actions, and the ended-turn Table setup copy now says to start Player 2's next turn and resolve draw timing from the Player 2 tab.
+- Last commit at iteration start: `960e3c2 feat(spa): clarify tcg post-bench guidance`.
+- Remaining tasks: continue the substantial Web UI polish/playtest path without repeating the verified Ultra Ball discard/search, Budew Bench, or Player 1 End Turn branches; broader north-star work still includes the formal two-independent-browser milestone, more persisted mechanics/card behavior slices, and the Electric Streams spike.
+- Blockers: no code blocker for the ended-turn landing slice; the documented manual-tester milestone remains blocked by unreliable manual-tester browser/session isolation.
+- Recommended next atomic task: from the post-event-96 ended state, switch/use the Player 2 seat, click `Start player 2's turn`, verify the persisted turn-8 start landing and draw-timing guidance from both seats, then refine only unclear start-turn copy.
+
 ## Iteration 138 handoff
 
 - Current state: game `d608a1f1-6db6-4f23-a8d0-4a7d27641993` is verified at post-event-95 with Player 1 in `Turn 7, action_window`; latest event is #95 `play_basic_to_bench`, Budew is on Player 1's Bench beside Moltres, Player 1 has Ultra Ball in hand with legal actions `play_card` and `end_turn`, and Player 2 has no prompt/action visibility. The Player 1 tab verified `Bench searched Budew` clears the tab-scoped Ultra Ball handoff; the post-bench action-window guide now says to improve the board before ending the turn instead of mentioning unavailable attacks.
