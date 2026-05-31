@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-31] iteration 164 | Player 2 pass to turn 15 handoff
+- Task attempted: continued from current playtest game `f6df7025-7d0f-4d9b-9bc2-31c864de1d4e` at the post-event-116 Player 2 action-window state by executing the same Ash domain command behind the SPA `Pass` control for Player 2.
+- Files changed: updated this log and the TCG engine playtest handoff; no product source changed.
+- Validation: precheck confirmed game `f6df7025-7d0f-4d9b-9bc2-31c864de1d4e` was cursor/latest `116`, `Turn 14, action_window`, active Player 2, no prompts, with Player 2 legal action `Pass` and Player 1 no legal actions; the MCP browser profile was still locked (`mcp-chrome-88a2ee9`), so the browser smoke could not be run through the available Playwright tool; `Prizmo.TcgEngine.pass_turn_for_game/3` advanced the persisted flow to cursor/latest `121`; SQL postcheck confirmed events/snapshots `117`-`121` exist with `turn_passed`, `turn_ended`, `turn_started`, `turn_card_drawn`, and `action_window_opened`; Tidewave postcheck confirmed both viewers at `Turn 15, action_window`, active Player 1, no prompts, Player 1 legal actions `Play engine-defined card`, `Bench Basic Pokémon`, `Declare Fighting Wings`, and `Pass`, Player 2 with no legal actions, Player 1 hand count `13`, and no Tidewave error logs; `mix test test/prizmo/tcg_engine/mechanics_test.exs` passed; `mix check --no-test` passed.
+- Remaining/blocking notes: the shared MCP browser profile remained locked during this iteration, so a true UI click still needs confirmation when a browser context is available. Continue from the current post-event-121 Player 1 action-window state by executing one Player 1 legal action in an isolated/browser-available SPA context if possible, preferably `Bench Basic Pokémon`, `Declare Fighting Wings`, or `Pass`, and avoid repeating the already-validated Player 2 `Pass` branch.
+
 ## [2026-05-31] iteration 163 | Player 2 Genesect bench handoff
 - Task attempted: continued from current playtest game `f6df7025-7d0f-4d9b-9bc2-31c864de1d4e` at the post-event-115 Player 2 action-window state by executing the same Ash domain command behind the SPA `Bench Basic Pokémon` control for Player 2's Genesect.
 - Files changed: updated `lib/prizmo/tcg_engine/card_store.ex`, this log, and the TCG engine playtest handoff.
