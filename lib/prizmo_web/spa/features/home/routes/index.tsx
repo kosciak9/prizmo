@@ -2023,7 +2023,7 @@ function GameFlowPanel({
     ? gameState.currentTurn?.status === 'ended'
       ? `Opening choices are locked. Use Turn step to start ${nextTurnOwnerLabel ?? 'the next player'}'s next turn.`
       : gameState.currentTurn?.status === 'start'
-        ? `Opening choices are locked. Turn ${gameState.currentTurn.turnNumber} belongs to ${currentTurnActivePlayerLabel}; resolve draw timing in Turn step before actions reopen.`
+        ? `Opening choices are locked. Turn ${gameState.currentTurn.turnNumber} belongs to ${currentTurnActivePlayerLabel}; resolve draw timing from the ${currentTurnActivePlayerLabel} tab before actions reopen.`
       : 'Opening choices are locked. Use Turn step for the live turn path.'
     : 'Build the opening board from the viewer hand, then move into the first turn.'
   const canStartSetup = !gameState.setup && !startSetupPending

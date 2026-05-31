@@ -2,13 +2,13 @@
 
 Updated: 2026-05-31
 
-## Iteration 132 handoff
+## Iteration 133 handoff
 
-- Current state: game `d608a1f1-6db6-4f23-a8d0-4a7d27641993` is verified at post-event-59 with Player 2's turn closed in `Turn 6, ended`; latest event is #59 `end_turn`, Player 1 remains Active Munkidori with Moltres on Bench, Player 2 remains Active Kadabra with one card in hand, no prompts are awaiting, neither viewer has legal actions, and the UI points both seats to `Start player 1's turn`.
-- Last commit at iteration start: `3f93fae feat(spa): clarify tcg action-window counts`.
-- Remaining tasks: continue the substantial Web UI polish/playtest path without repeating the already verified post-event-58 Player 2 End Turn branch; broader north-star work still includes the formal two-independent-browser milestone, more persisted mechanics/card behavior slices, and the Electric Streams spike.
-- Blockers: no code blocker for the Player 2 ended-turn landing slice; the documented manual-tester milestone remains blocked by unreliable manual-tester browser/session isolation.
-- Recommended next atomic task: from the post-event-59 ended state, switch to Player 1, click `Start player 1's turn`, verify the persisted turn-7 start landing and owner/non-owner draw guidance, and refine only unclear start-turn copy without repeating the Player 2 End Turn branch.
+- Current state: game `d608a1f1-6db6-4f23-a8d0-4a7d27641993` is verified at post-event-60 with Player 1's turn started in `Turn 7, start`; latest event is #60 `start_next_turn`, Player 1 remains Active Munkidori with Moltres on Bench and five cards in hand, Player 2 remains Active Kadabra with one card in hand, no prompts are awaiting, neither viewer has action-window legal actions, Player 1 has `Draw for player 1` and `Skip draw for player 1` enabled, and Player 2 is pointed back to the Player 1 tab for draw timing.
+- Last commit at iteration start: `afe68d5 feat(spa): clarify tcg ended-turn owner copy`.
+- Remaining tasks: continue the substantial Web UI polish/playtest path without repeating the already verified post-event-59 Player 1 Start Turn branch; broader north-star work still includes the formal two-independent-browser milestone, more persisted mechanics/card behavior slices, and the Electric Streams spike.
+- Blockers: no code blocker for the Player 1 turn-7 start landing slice; the documented manual-tester milestone remains blocked by unreliable manual-tester browser/session isolation.
+- Recommended next atomic task: from the post-event-60 Player 1 start state, click `Draw for player 1`, verify the persisted drawn landing and Player 2 open-action owner-tab guidance, then open Player 1's action window without repeating the start-turn branch.
 
 ## Current state
 

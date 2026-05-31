@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-31] iteration 133 | Player 1 turn-7 start landing
+- Task attempted: continued the Web UI polish pass from the verified post-event-59 ended-turn state by switching to Player 1, clicking `Start player 1's turn`, verifying the persisted turn-7 start landing from both seats, and tightening the Table setup copy so it names the Player 1 tab for draw timing.
+- Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.
+- Validation: Tidewave precheck confirmed game `d608a1f1-6db6-4f23-a8d0-4a7d27641993` was at `Turn 6, ended` with latest event #59 `end_turn`, no prompts, no legal actions, Player 1 Active Munkidori, and Player 2 Active Kadabra; browser smoke on `http://localhost:4003` as Player 1 clicked `Start player 1's turn`, confirmed `Turn 7, start`, event #60 `start_next_turn`, enabled `Draw for player 1`/`Skip draw for player 1`, refreshed Table setup copy `resolve draw timing from the player 1 tab`, and Player 2 non-owner guidance/buttons pointing back to the Player 1 tab; browser console reported no warnings or errors; Tidewave postcheck confirmed both viewers at cursor `60 of 60`, latest event #60 `start_next_turn`, active player Player 1, no awaiting prompts, no action affordances, Player 1 Active Munkidori, and Player 2 Active Kadabra; `mix format`, `mix assets.build`, and `mix check --no-test` passed.
+- Remaining/blocking notes: no code blocker for this Player 1 turn-7 start landing slice. Further polish should continue from the post-event-60 Player 1 start state by clicking `Draw for player 1`, verifying the drawn landing and Player 2 open-action owner-tab guidance, then opening Player 1's action window without repeating the start-turn branch.
+
 ## [2026-05-31] iteration 132 | Player 2 ended-turn owner copy
 - Task attempted: continued the Web UI polish pass from the verified post-event-58 Player 2 action-window state by clicking `End player 2's turn`, verifying the persisted ended-turn/next-owner landing from both seats, and tightening completed-setup copy so it names Player 1's next turn and tab instead of the generic turn-owner tab.
 - Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.
