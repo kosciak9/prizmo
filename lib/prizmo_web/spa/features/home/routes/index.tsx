@@ -44,6 +44,7 @@ const DISCARD_DEFENDING_ENERGY_ON_COIN_HEADS_EFFECT = 'discard_defending_energy_
 const SHUFFLE_ATTACHED_ENERGY_INTO_DECK_THEN_DAMAGE_OPPONENT_BENCH_EFFECT =
   'shuffle_attached_energy_into_deck_then_damage_opponent_bench'
 const COPY_OPPONENT_ACTIVE_TERA_POKEMON_ATTACK_EFFECT = 'copy_opponent_active_tera_pokemon_attack'
+const ULTRA_BALL_CARD_ID = 'MEG-131'
 
 const SUPPORTED_DECK_FIELDS: ListSupportedTcgDecksFields = [
   'deckKey',
@@ -172,6 +173,20 @@ type ResolutionChecklistItem = {
   label: string
   tone: ResolutionChecklistTone
   value: string
+}
+
+type PromptFlowStep = {
+  label: string
+  title: string
+  detail: string
+  tone: 'complete' | 'focus' | 'next'
+}
+
+type PromptFlowGuide = {
+  eyebrow: string
+  title: string
+  detail: string
+  steps: PromptFlowStep[]
 }
 
 type PlaytestSession = {
@@ -2500,6 +2515,8 @@ function PromptChoiceCard({
     selectedCardInstanceIds.length <= max &&
     !promptPendingId &&
     isPlayerId(prompt.playerId)
+  const choiceKey = promptChoiceKey(prompt.payload)
+  const promptFlowGuide = ultraBallPromptFlowGuide(choiceKey, min, max, legalChoiceIds.length)
   const promptGuidance = promptGuidanceMessages(prompt, min, max, legalChoiceIds.length)
 
   function toggleChoice(cardInstanceId: string) {
@@ -2529,7 +2546,9 @@ function PromptChoiceCard({
         <StatusBadge tone="warning">{prompt.status}</StatusBadge>
       </div>
 
-      {promptGuidance.length > 0 ? (
+      {promptFlowGuide ? (
+        <PromptFlowGuideCard guide={promptFlowGuide} />
+      ) : promptGuidance.length > 0 ? (
         <div className="mt-3 rounded-lg border border-emerald-200 bg-stone-50 px-3 py-2 text-xs leading-5 text-emerald-900">
           {promptGuidance.map(message => (
             <p key={message}>{message}</p>
@@ -2578,7 +2597,7 @@ function PromptChoiceCard({
             }
             type="button"
           >
-            {isPending ? 'Submitting choice...' : `Submit ${selectedCardInstanceIds.length}/${max}`}
+            {promptSubmitLabel(choiceKey, selectedCardInstanceIds.length, max, isPending)}
           </button>
         </div>
       ) : (
@@ -2594,6 +2613,43 @@ function PromptChoiceCard({
         </pre>
       </details>
     </div>
+  )
+}
+
+function PromptFlowGuideCard({ guide }: { guide: PromptFlowGuide }) {
+  return (
+    <div className="mt-3 rounded-lg bg-[oklch(0.99_0.01_155)] px-3 py-2.5 text-xs leading-5 text-emerald-950">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <p className="font-semibold uppercase tracking-[0.14em] text-emerald-800">{guide.eyebrow}</p>
+          <p className="mt-1 font-medium text-stone-950">{guide.title}</p>
+          <p className="mt-0.5 text-stone-600">{guide.detail}</p>
+        </div>
+      </div>
+
+      <PromptFlowStepList steps={guide.steps} />
+    </div>
+  )
+}
+
+function PromptFlowStepList({ steps }: { steps: PromptFlowStep[] }) {
+  return (
+    <ol className="mt-3 grid gap-1.5">
+      {steps.map(step => (
+        <li
+          className={`flex items-start gap-2 rounded-md px-2 py-1.5 ${promptFlowStepClassName(step.tone)}`}
+          key={`${step.label}:${step.title}`}
+        >
+          <span className={`mt-0.5 rounded-full px-2 py-0.5 text-[0.68rem] font-semibold uppercase tracking-[0.12em] ${promptFlowStepBadgeClassName(step.tone)}`}>
+            {step.label}
+          </span>
+          <span className="min-w-0">
+            <span className="block font-medium text-stone-950">{step.title}</span>
+            <span className="block text-stone-600">{step.detail}</span>
+          </span>
+        </li>
+      ))}
+    </ol>
   )
 }
 
@@ -4009,6 +4065,7 @@ function ActionAffordanceCard({
   retreatPendingKey: string | null
 }) {
   const canRunAction = !actionCommandPending && isPlayerId(action.playerId)
+  const playCardPromptGuide = ultraBallPlayCardPromptGuide(action, cardsById)
 
   return (
     <li className={`rounded-xl border px-3 py-2.5 text-sm ${actionSurfaceClassName(action)}`}>
@@ -4028,6 +4085,8 @@ function ActionAffordanceCard({
       </div>
 
       {action.note ? <p className="mt-2 text-xs leading-5 text-stone-600">{action.note}</p> : null}
+
+      {playCardPromptGuide ? <PromptFlowGuideCard guide={playCardPromptGuide} /> : null}
 
       {actionHasMetadata(action) ? (
         <details className="mt-2 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-xs text-stone-600">
@@ -5391,6 +5450,153 @@ function promptChoiceInstruction(min: number, max: number) {
   }
 
   return `choose ${min}-${max} cards`
+}
+
+function ultraBallPlayCardPromptGuide(action: ActionAffordance, cardsById: Map<string, CardSummary>): PromptFlowGuide | null {
+  if (action.key !== 'play_card') {
+    return null
+  }
+
+  const hasUltraBallSource = action.sourceCardInstanceIds.some(cardInstanceId => {
+    const card = cardsById.get(cardInstanceId)
+
+    return card?.cardId === ULTRA_BALL_CARD_ID
+  })
+
+  if (!hasUltraBallSource) {
+    return null
+  }
+
+  return {
+    eyebrow: 'Trainer prompt path',
+    title: 'Ultra Ball resolves through Viewer prompts',
+    detail:
+      'Play the Trainer here, then continue in Viewer prompts above the action list. The engine pauses at each required choice.',
+    steps: [
+      {
+        label: 'play',
+        title: 'Start Ultra Ball',
+        detail: 'The card-play command starts the Trainer and opens the cost prompt.',
+        tone: 'focus'
+      },
+      {
+        label: 'cost',
+        title: 'Discard 2 cards',
+        detail: 'Choose two other hand cards in Viewer prompts before the Trainer can move on.',
+        tone: 'next'
+      },
+      {
+        label: 'search',
+        title: 'Find 1 Pokémon',
+        detail: 'After the discard resolves, choose a Pokémon from deck and the engine shuffles.',
+        tone: 'next'
+      }
+    ]
+  }
+}
+
+function ultraBallPromptFlowGuide(
+  choiceKey: string,
+  min: number,
+  max: number,
+  legalChoiceCount: number
+): PromptFlowGuide | null {
+  if (choiceKey === 'discard_two_from_hand') {
+    return {
+      eyebrow: 'Ultra Ball prompt',
+      title: 'Pay the discard cost',
+      detail: 'This is the required follow-up from playing Ultra Ball. Submit the cost to open the deck search.',
+      steps: [
+        {
+          label: 'play',
+          title: 'Trainer started',
+          detail: 'Ultra Ball is paused by the engine until its cost is paid.',
+          tone: 'complete'
+        },
+        {
+          label: 'cost',
+          title: 'Discard from hand',
+          detail: `${promptChoiceInstruction(min, max)} from ${legalChoiceCount} legal hand choices.`,
+          tone: 'focus'
+        },
+        {
+          label: 'search',
+          title: 'Search next',
+          detail: 'The Pokémon search prompt replaces this prompt after the discard resolves.',
+          tone: 'next'
+        }
+      ]
+    }
+  }
+
+  if (choiceKey === 'search_deck_for_pokemon') {
+    return {
+      eyebrow: 'Ultra Ball prompt',
+      title: 'Choose the Pokémon to add to hand',
+      detail: 'The discard cost is complete. Finish the Trainer by selecting one Pokémon from deck.',
+      steps: [
+        {
+          label: 'play',
+          title: 'Trainer started',
+          detail: 'Ultra Ball is resolving from the prior action.',
+          tone: 'complete'
+        },
+        {
+          label: 'cost',
+          title: 'Discard cost paid',
+          detail: 'The selected hand cards moved to discard.',
+          tone: 'complete'
+        },
+        {
+          label: 'search',
+          title: 'Search deck',
+          detail: `${promptChoiceInstruction(min, max)} from ${legalChoiceCount} legal Pokémon choices, then shuffle.`,
+          tone: 'focus'
+        }
+      ]
+    }
+  }
+
+  return null
+}
+
+function promptSubmitLabel(choiceKey: string, selectedCount: number, max: number, isPending: boolean) {
+  if (isPending) {
+    return 'Resolving prompt...'
+  }
+
+  switch (choiceKey) {
+    case 'discard_two_from_hand':
+      return `Discard selected cards ${selectedCount}/${max}`
+    case 'search_deck_for_pokemon':
+      return `Add Pokémon to hand ${selectedCount}/${max}`
+    case 'knockout_prize_cards':
+      return `Take selected Prizes ${selectedCount}/${max}`
+    default:
+      return `Submit ${selectedCount}/${max}`
+  }
+}
+
+function promptFlowStepClassName(tone: PromptFlowStep['tone']) {
+  switch (tone) {
+    case 'complete':
+      return 'bg-emerald-100/70 text-emerald-950'
+    case 'focus':
+      return 'bg-white text-emerald-950 shadow-sm shadow-emerald-900/5'
+    case 'next':
+      return 'bg-[oklch(0.985_0.004_155)] text-stone-700'
+  }
+}
+
+function promptFlowStepBadgeClassName(tone: PromptFlowStep['tone']) {
+  switch (tone) {
+    case 'complete':
+      return 'bg-emerald-700 text-stone-50'
+    case 'focus':
+      return 'bg-emerald-100 text-emerald-800'
+    case 'next':
+      return 'bg-stone-200 text-stone-600'
+  }
 }
 
 function promptGuidanceMessages(

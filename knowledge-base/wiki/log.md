@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-31] iteration 100 | Ultra Ball prompt handoff
+- Task attempted: continued the Web UI polish pass by bridging the Ultra Ball legal action into guided prompt resolution, adding a Trainer prompt path preview to the play-card action row and step guides for the discard-cost and deck-search prompts with task-specific submit labels.
+- Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.
+- Validation: `mix format && mix assets.build` passed; browser smoke on `http://localhost:4003` loaded existing game `7ea2441d-746c-4d55-a540-d3769e1636e1`, confirmed the Ultra Ball action handoff, played Ultra Ball, resolved the first discard prompt by selecting two cards, confirmed the guided search prompt appeared, and reported no browser warnings or errors; `mix check --no-test` passed.
+- Remaining/blocking notes: no code blocker for this Trainer/prompt handoff slice. Further Web UI polish should refine the post-search handoff after the Ultra Ball Pokémon choice resolves and confirm the action rail returns players cleanly to board, battle, or turn-flow decisions.
+
 ## [2026-05-31] iteration 99 | First action-window onboarding
 - Task attempted: continued the Web UI polish pass by replacing the generic live-action priority notice with a compact `First action window` guide that names the viewer board state, explains the highlighted priority lane, and coaches turn-one hand/board decisions before battle or end-turn choices.
 - Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.
