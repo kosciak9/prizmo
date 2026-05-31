@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-31] iteration 95 | Top-level playtest states
+- Task attempted: continued the Web UI polish pass by refining the top-level create/reconnect and board-state surfaces, adding a tab-seat summary, clearer reconnect copy, a no-game checklist, product-facing loading/error panels, retry/clear recovery for missing games, and a safer stale-viewer guard panel.
+- Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.
+- Validation: `mix format` passed; `mix assets.build` passed; `mix check --no-test` passed; browser smoke on `http://localhost:4003` loaded an existing persisted game, verified the no-game empty state after clearing only browser storage, verified the invalid-ID `Board unavailable` retry/clear state, and reported no browser warnings or errors.
+- Remaining/blocking notes: no code blocker for this top-level state polish slice. Further Web UI polish should refine the supported-deck/deck-selection sidebar and first-run setup guidance before rerunning the formal two-browser playtest milestone.
+
 ## [2026-05-31] iteration 94 | Command error recovery states
 - Task attempted: continued the Web UI polish pass by replacing terse command rail error notices with command-specific recovery cards, adding compact prompt/action no-follow-up empty states after failed commands, and refreshing the no-game empty workbench copy to describe persisted games plus tab-scoped viewer seats.
 - Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.

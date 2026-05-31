@@ -842,14 +842,17 @@ export function HomeRoute() {
               Ash-backed playtest console
             </h1>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-stone-600">
-              Create a supported fixture game, reconnect by game ID, and inspect the viewer-scoped
-              board state returned by the persisted engine.
+              Create a supported fixture game, reconnect by game ID, and play from a tab-scoped
+              player seat backed by the persisted engine.
             </p>
           </div>
 
-          <div className="rounded-2xl border border-stone-200 bg-stone-100 px-4 py-3 text-sm text-stone-700">
-            <p className="font-medium text-stone-950">Current viewer</p>
-            <p className="mt-1 font-mono text-xs">{session.viewerPlayerId}</p>
+          <div className="min-w-56 rounded-2xl border border-stone-200 bg-stone-100 px-4 py-3 text-sm text-stone-700">
+            <p className="font-medium text-stone-950">Current seat</p>
+            <p className="mt-1 text-sm font-semibold text-stone-950">{formatPlayerId(session.viewerPlayerId)}</p>
+            <p className="mt-1 font-mono text-xs text-stone-500">
+              {normalisedGameId ? formatGameId(normalisedGameId) : 'No game selected'}
+            </p>
           </div>
         </header>
 
@@ -857,11 +860,19 @@ export function HomeRoute() {
           <aside className="flex flex-col gap-5">
             <Panel title="Create or reconnect">
               <div className="space-y-4">
+                <SessionConnectionSummary
+                  gameId={normalisedGameId}
+                  hasViewerMismatch={gameStateHasViewerMismatch}
+                  isRefreshing={gameStateQuery.isFetching}
+                  viewerPlayerId={session.viewerPlayerId}
+                />
+
                 {decksQuery.isPending ? <SkeletonLines count={3} /> : null}
 
                 {decksQuery.error ? (
                   <InlineNotice tone="error" title="Deck fixtures did not load">
-                    {errorMessage(decksQuery.error)}
+                    {errorMessage(decksQuery.error)} Refresh before creating a table so both fixture
+                    selectors use the engine-owned deck catalog.
                   </InlineNotice>
                 ) : null}
 
@@ -921,12 +932,17 @@ export function HomeRoute() {
 
                 {createGameMutation.error ? (
                   <InlineNotice tone="error" title="Game creation failed">
-                    {errorMessage(createGameMutation.error)}
+                    {errorMessage(createGameMutation.error)} No table was created. Confirm both fixture
+                    decks are still available, then try again.
                   </InlineNotice>
                 ) : null}
 
                 <label className="block space-y-2">
-                  <span className="text-sm font-medium text-stone-800">Reconnect to game ID</span>
+                  <span className="text-sm font-medium text-stone-800">Game ID</span>
+                  <span className="block text-xs leading-5 text-stone-500">
+                    Paste a persisted game UUID. This tab will request {formatPlayerId(session.viewerPlayerId)}'s
+                    private view after the ID changes.
+                  </span>
                   <input
                     className="w-full rounded-xl border border-stone-300 bg-stone-50 px-3 py-2 font-mono text-sm text-stone-950 outline-none transition placeholder:text-stone-400 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
                     onChange={event => {
@@ -944,10 +960,10 @@ export function HomeRoute() {
                   <button
                     className="flex-1 rounded-xl border border-stone-300 px-3 py-2 text-sm font-medium text-stone-700 transition hover:bg-stone-100 focus:outline-none focus:ring-2 focus:ring-stone-300 disabled:cursor-not-allowed disabled:text-stone-400"
                     disabled={!normalisedGameId || gameStateQuery.isFetching}
-                    onClick={() => gameStateQuery.refetch()}
+                    onClick={() => void gameStateQuery.refetch()}
                     type="button"
                   >
-                    {gameStateQuery.isFetching ? 'Refreshing...' : 'Refresh state'}
+                    {gameStateQuery.isFetching ? 'Refreshing board...' : 'Refresh board'}
                   </button>
                   <button
                     className="rounded-xl border border-stone-300 px-3 py-2 text-sm font-medium text-stone-700 transition hover:bg-stone-100 focus:outline-none focus:ring-2 focus:ring-stone-300 disabled:cursor-not-allowed disabled:text-stone-400"
@@ -991,18 +1007,23 @@ export function HomeRoute() {
             {!normalisedGameId ? (
               <EmptyWorkbench />
             ) : gameStateQuery.isPending ? (
-              <Panel title="Loading game state">
-                <SkeletonLines count={8} />
-              </Panel>
+              <GameStateLoadingPanel gameId={normalisedGameId} viewerPlayerId={session.viewerPlayerId} />
             ) : gameStateQuery.error ? (
-              <InlineNotice tone="error" title="Game state did not load">
-                {errorMessage(gameStateQuery.error)}
-              </InlineNotice>
+              <GameStateErrorPanel
+                error={gameStateQuery.error}
+                gameId={normalisedGameId}
+                isRetrying={gameStateQuery.isFetching}
+                viewerPlayerId={session.viewerPlayerId}
+                onClear={clearGame}
+                onRetry={() => void gameStateQuery.refetch()}
+              />
             ) : gameStateHasViewerMismatch ? (
-              <InlineNotice tone="info" title="Viewer state is refreshing">
-                Ignoring a stale {formatPlayerId(queriedGameState?.viewerPlayerId ?? 'unknown')} read while this tab is
-                viewing {formatPlayerId(session.viewerPlayerId)}. Refresh state again if this persists.
-              </InlineNotice>
+              <StaleViewerPanel
+                actualViewerPlayerId={queriedGameState?.viewerPlayerId ?? 'unknown'}
+                expectedViewerPlayerId={session.viewerPlayerId}
+                isRefreshing={gameStateQuery.isFetching}
+                onRefresh={() => void gameStateQuery.refetch()}
+              />
             ) : gameState ? (
               <GameStateWorkbench
                 actionCommandError={actionCommandError}
@@ -4279,6 +4300,37 @@ function PrivateHandZone({ isViewer, player }: { isViewer: boolean; player: Play
   )
 }
 
+function SessionConnectionSummary({
+  gameId,
+  viewerPlayerId,
+  isRefreshing,
+  hasViewerMismatch
+}: {
+  gameId: string
+  viewerPlayerId: PlayerId
+  isRefreshing: boolean
+  hasViewerMismatch: boolean
+}) {
+  const statusLabel = !gameId ? 'not connected' : hasViewerMismatch ? 'seat guard' : isRefreshing ? 'refreshing' : 'connected'
+  const statusTone = !gameId ? 'neutral' : hasViewerMismatch || isRefreshing ? 'warning' : 'active'
+
+  return (
+    <div className="rounded-2xl border border-stone-200 bg-stone-50 p-3">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold text-stone-950">Table seat</p>
+          <p className="mt-1 text-xs leading-5 text-stone-500">Local browser storage keeps the table ID and tab seat separate.</p>
+        </div>
+        <StatusBadge tone={statusTone}>{statusLabel}</StatusBadge>
+      </div>
+      <div className="mt-3 space-y-2">
+        <StateRow label="Game" value={gameId ? formatGameId(gameId) : 'Create or paste an ID'} />
+        <StateRow label="Viewer" value={`${formatPlayerId(viewerPlayerId)} in this tab`} />
+      </div>
+    </div>
+  )
+}
+
 function Panel({
   title,
   trailing,
@@ -4498,8 +4550,139 @@ function EmptyWorkbench() {
           Choose fixture decks to start a persisted game, or paste a game ID to rejoin one. Viewer identity is stored per
           tab so separate browser sessions can safely sit in different player seats.
         </p>
+        <div className="mt-6 grid gap-2 text-left text-sm text-stone-700">
+          <div className="flex items-center gap-3 rounded-xl border border-stone-200 bg-stone-50 px-3 py-2">
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-xs font-semibold text-emerald-800">
+              1
+            </span>
+            <span>Choose two supported fixture decks.</span>
+          </div>
+          <div className="flex items-center gap-3 rounded-xl border border-stone-200 bg-stone-50 px-3 py-2">
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-xs font-semibold text-emerald-800">
+              2
+            </span>
+            <span>Create or paste a persisted game ID.</span>
+          </div>
+          <div className="flex items-center gap-3 rounded-xl border border-stone-200 bg-stone-50 px-3 py-2">
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-xs font-semibold text-emerald-800">
+              3
+            </span>
+            <span>Open another tab and choose the other player seat for two-human playtests.</span>
+          </div>
+        </div>
       </div>
     </div>
+  )
+}
+
+function GameStateLoadingPanel({ gameId, viewerPlayerId }: { gameId: string; viewerPlayerId: PlayerId }) {
+  return (
+    <Panel title="Catching up board" trailing={<StatusBadge tone="warning">loading</StatusBadge>}>
+      <div className="space-y-4">
+        <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+          <p className="text-sm font-semibold text-stone-950">Requesting {formatPlayerId(viewerPlayerId)}'s view</p>
+          <p className="mt-2 text-sm leading-6 text-stone-600">
+            The board stays covered until the persisted engine returns the viewer-scoped state for {formatGameId(gameId)}.
+          </p>
+        </div>
+        <SkeletonLines count={6} />
+      </div>
+    </Panel>
+  )
+}
+
+function GameStateErrorPanel({
+  error,
+  gameId,
+  viewerPlayerId,
+  isRetrying,
+  onRetry,
+  onClear
+}: {
+  error: unknown
+  gameId: string
+  viewerPlayerId: PlayerId
+  isRetrying: boolean
+  onRetry: () => void
+  onClear: () => void
+}) {
+  return (
+    <Panel title="Board unavailable" trailing={<span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-800">not loaded</span>}>
+      <div className="space-y-4">
+        <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-red-950" role="alert">
+          <p className="text-sm font-semibold">Game state did not load</p>
+          <p className="mt-2 text-sm leading-6 text-red-900">{errorMessage(error)}</p>
+          <div className="mt-3 rounded-xl border border-red-100 bg-stone-50 px-3 py-2 text-xs leading-5 text-stone-700">
+            <span className="font-semibold text-stone-950">Next step:</span> Confirm the game ID still exists and this tab is
+            using the intended player seat, then retry the board request.
+          </div>
+        </div>
+
+        <div className="grid gap-2 rounded-2xl border border-stone-200 bg-stone-50 p-3 sm:grid-cols-2">
+          <StateRow label="Game" value={formatGameId(gameId)} />
+          <StateRow label="Viewer" value={formatPlayerId(viewerPlayerId)} />
+        </div>
+
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <button
+            className="rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-stone-50 shadow-sm transition hover:bg-emerald-800 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:bg-stone-300 disabled:text-stone-600"
+            disabled={isRetrying}
+            onClick={onRetry}
+            type="button"
+          >
+            {isRetrying ? 'Retrying board...' : 'Retry board'}
+          </button>
+          <button
+            className="rounded-xl border border-stone-300 px-4 py-2.5 text-sm font-medium text-stone-700 transition hover:bg-stone-100 focus:outline-none focus:ring-2 focus:ring-stone-300"
+            onClick={onClear}
+            type="button"
+          >
+            Clear game ID
+          </button>
+        </div>
+      </div>
+    </Panel>
+  )
+}
+
+function StaleViewerPanel({
+  actualViewerPlayerId,
+  expectedViewerPlayerId,
+  isRefreshing,
+  onRefresh
+}: {
+  actualViewerPlayerId: string
+  expectedViewerPlayerId: PlayerId
+  isRefreshing: boolean
+  onRefresh: () => void
+}) {
+  return (
+    <Panel title="Viewer guard" trailing={<StatusBadge tone="warning">seat check</StatusBadge>}>
+      <div className="space-y-4">
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-950">
+          <p className="text-sm font-semibold">Waiting for the current tab seat</p>
+          <p className="mt-2 text-sm leading-6 text-amber-900">
+            The engine returned {formatPlayerId(actualViewerPlayerId)} state after this tab asked for{' '}
+            {formatPlayerId(expectedViewerPlayerId)}. The board is hidden so private hand data cannot flash in the
+            wrong seat.
+          </p>
+        </div>
+
+        <div className="grid gap-2 rounded-2xl border border-stone-200 bg-stone-50 p-3 sm:grid-cols-2">
+          <StateRow label="Returned" value={formatPlayerId(actualViewerPlayerId)} />
+          <StateRow label="This tab" value={formatPlayerId(expectedViewerPlayerId)} />
+        </div>
+
+        <button
+          className="rounded-xl border border-stone-300 px-4 py-2.5 text-sm font-medium text-stone-700 transition hover:bg-stone-100 focus:outline-none focus:ring-2 focus:ring-stone-300 disabled:cursor-not-allowed disabled:text-stone-400"
+          disabled={isRefreshing}
+          onClick={onRefresh}
+          type="button"
+        >
+          {isRefreshing ? 'Refreshing seat...' : `Retry for ${formatPlayerId(expectedViewerPlayerId)}`}
+        </button>
+      </div>
+    </Panel>
   )
 }
 
@@ -4882,6 +5065,10 @@ function commandErrorNotice(error: unknown, title: string, recovery: string): Co
   }
 
   return { title, message: errorMessage(error), recovery }
+}
+
+function formatGameId(gameId: string) {
+  return gameId.length > 16 ? `${gameId.slice(0, 8)}...${gameId.slice(-4)}` : gameId
 }
 
 function formatPlayerId(playerId: string) {
