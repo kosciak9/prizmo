@@ -2287,19 +2287,44 @@ function TurnStepGuide({
   viewerPlayerId: PlayerId
 }) {
   const currentTurn = gameState.currentTurn
-  const turnOwnerId = currentTurn?.activePlayerId ?? gameState.firstPlayerId
+  const endedTurn = currentTurn?.status === 'ended'
+  const nextTurnOwnerId = endedTurn
+    ? (gameState.players.find(player => player.playerId !== currentTurn.activePlayerId)?.playerId ?? gameState.activePlayerId)
+    : null
+  const turnOwnerId = nextTurnOwnerId ?? currentTurn?.activePlayerId ?? gameState.firstPlayerId
   const turnOwnerLabel = formatPlayerId(turnOwnerId)
   const viewerLabel = formatPlayerId(viewerPlayerId)
   const viewerOwnsTurn = turnOwnerId === viewerPlayerId
   const activeWindowOpen = currentTurn?.status === 'action_window'
-  const drawStepResolved = currentTurn ? ['drawn', 'action_window', 'attack_declared', 'attack_resolving', 'ended'].includes(currentTurn.status) : false
+  const drawStepResolved = currentTurn ? ['drawn', 'action_window', 'attack_declared', 'attack_resolving'].includes(currentTurn.status) : false
+  const guideTitle = endedTurn ? 'Next-turn path' : currentTurn ? 'Turn path' : 'First-turn path'
+  const startStepTitle = endedTurn ? 'Start the next turn' : currentTurn ? 'Turn started' : 'Start the first turn'
+  const startStepState = !currentTurn || endedTurn ? 'next' : 'done'
+  const drawStepState = !currentTurn || endedTurn
+    ? 'needed'
+    : drawStepResolved
+      ? 'done'
+      : currentTurn.status === 'start'
+        ? 'next'
+        : 'needed'
+  const actionWindowState = activeWindowOpen
+    ? 'done'
+    : currentTurn?.status === 'drawn'
+      ? 'next'
+      : 'needed'
 
-  const startDetail = currentTurn
-    ? `Turn ${currentTurn.turnNumber} belongs to ${turnOwnerLabel}. This tab is ${viewerLabel}.`
-    : `Start turn one for ${turnOwnerLabel}. This tab is ${viewerLabel}.`
+  const startDetail = endedTurn
+    ? `Turn ${currentTurn.turnNumber} is closed. Start turn ${currentTurn.turnNumber + 1} for ${turnOwnerLabel}. This tab is ${viewerLabel}.`
+    : currentTurn
+      ? `Turn ${currentTurn.turnNumber} belongs to ${turnOwnerLabel}. This tab is ${viewerLabel}.`
+      : `Start turn one for ${turnOwnerLabel}. This tab is ${viewerLabel}.`
   let drawDetail = 'After the turn starts, draw for turn or skip the draw when a fixture scenario calls for it.'
 
-  if (currentTurn?.status === 'start') {
+  if (endedTurn) {
+    drawDetail = viewerOwnsTurn
+      ? `Start your next turn, then resolve ${turnOwnerLabel}'s draw step from this tab.`
+      : `Start ${turnOwnerLabel}'s next turn, then use that player tab for draw timing.`
+  } else if (currentTurn?.status === 'start') {
     drawDetail = viewerOwnsTurn
       ? `Draw a card for ${turnOwnerLabel}, or skip only when the fixture scenario calls for it.`
       : `${turnOwnerLabel} is the turn owner. Use that player tab for table-faithful play, then refresh here.`
@@ -2311,14 +2336,14 @@ function TurnStepGuide({
 
   let actionWindowDetail = 'The action window opens after draw timing resolves.'
 
-  if (currentTurn?.status === 'start') {
+  if (endedTurn) {
+    actionWindowDetail = `After ${turnOwnerLabel}'s draw timing, open the action window for the next player's hand, board, battle, and end-turn choices.`
+  } else if (currentTurn?.status === 'start') {
     actionWindowDetail = 'Draw for turn or skip draw before opening actions.'
   } else if (currentTurn?.status === 'drawn') {
     actionWindowDetail = 'Open the action window so hand, board, retreat, attack, and end-turn actions can appear below.'
   } else if (activeWindowOpen) {
     actionWindowDetail = `Action decisions are live for ${turnOwnerLabel}. Use Available actions below.`
-  } else if (currentTurn?.status === 'ended') {
-    actionWindowDetail = 'This turn is closed. Start the next turn to continue the table loop.'
   } else if (currentTurn) {
     actionWindowDetail = 'Resolve the current battle or prompt step before opening new actions.'
   }
@@ -2327,7 +2352,7 @@ function TurnStepGuide({
     <div className="mt-3 rounded-xl border border-amber-100 bg-[oklch(0.985_0.018_90)] p-3">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h4 className="text-xs font-semibold uppercase tracking-[0.14em] text-amber-800">First-turn path</h4>
+          <h4 className="text-xs font-semibold uppercase tracking-[0.14em] text-amber-800">{guideTitle}</h4>
           <p className="mt-1 text-xs leading-5 text-stone-600">
             Use this timing lane after setup locks. Legal actions stay hidden until the action window opens.
           </p>
@@ -2341,19 +2366,19 @@ function TurnStepGuide({
         <SetupGuideRow
           detail={startDetail}
           number="1"
-          state={currentTurn ? 'done' : 'next'}
-          title="Start the first turn"
+          state={startStepState}
+          title={startStepTitle}
         />
         <SetupGuideRow
           detail={drawDetail}
           number="2"
-          state={!currentTurn ? 'needed' : drawStepResolved ? 'done' : currentTurn.status === 'start' ? 'next' : 'needed'}
+          state={drawStepState}
           title="Resolve draw timing"
         />
         <SetupGuideRow
           detail={actionWindowDetail}
           number="3"
-          state={activeWindowOpen ? 'done' : currentTurn?.status === 'drawn' ? 'next' : currentTurn?.status === 'ended' ? 'ready' : 'needed'}
+          state={actionWindowState}
           title="Open the action window"
         />
       </div>

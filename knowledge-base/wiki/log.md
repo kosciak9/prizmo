@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-31] iteration 104 | Post-search pass next-turn guide
+- Task attempted: continued the Web UI polish pass by explicitly validating the Ultra Ball post-search pass/end-turn branch and refining the `Turn step` guide so an ended turn becomes a `Next-turn path` that names the next player and the persisted start/draw/open-action sequence.
+- Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.
+- Validation: `mix format && mix assets.build` passed; browser smoke on `http://localhost:4003` created game `d608a1f1-6db6-4f23-a8d0-4a7d27641993`, completed setup, attached Fire Energy, played Ultra Ball, discarded Drakloak and Fire Energy, searched Munkidori, clicked `Pass after search — End player 1's turn`, confirmed `Trainer complete` cleared, current turn persisted as `Turn 1, ended`, `Next-turn path` showed `Start turn 2 for player 2`, `Start next turn` was available, and no browser warnings or errors were reported; `mix check --no-test` passed.
+- Remaining/blocking notes: no code blocker for the post-search pass/end-turn branch. Further polish can verify the next player's post-pass start/draw/open-action path from the Player 2 tab before rerunning the formal two-browser/manual-tester milestone.
+
 ## [2026-05-31] iteration 103 | Ultra Ball post-search battle branch
 - Task attempted: continued the Web UI polish pass by making the post-search Ultra Ball battle/pass follow-up explicit, adding `Attack after search` and `Pass after search` action labels plus handoff copy that confirms those commands clear the Trainer handoff and advance the persisted step.
 - Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.
