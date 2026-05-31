@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-31] iteration 150 | Player 2 draw/open-action landing
+- Task attempted: continued from the verified post-event-105 Player 2 turn-start state by clicking `Draw for player 2`, checking Player 1's non-owner open-action guidance, then opening Player 2's action window through the React SPA.
+- Files changed: updated this log and the TCG engine playtest handoff; no product source changed.
+- Validation: Tidewave precheck confirmed game `d608a1f1-6db6-4f23-a8d0-4a7d27641993` at cursor/latest `105`, `Turn 10, start`, active Player 2, no prompts, and no legal actions for either viewer; browser smoke on `http://localhost:4003` switched to Player 2, clicked `Draw for player 2`, confirmed cursor `106 of 106` and `Turn 10, drawn`, switched to Player 1 and confirmed disabled open-action guidance points to the Player 2 tab, then switched back to Player 2 and clicked `Open action window`; browser confirmed cursor `107 of 107`, `Turn 10, action_window`, latest event `#107 open_action_window`, enabled `Bench Rellor` plus `End player 2's turn`, and no browser warnings or errors; Tidewave postcheck confirmed Player 1 has no prompts/actions, Player 2 has hand count 3 and legal actions `play_basic_to_bench` plus `end_turn`; SQL postcheck confirmed events/snapshots `105`-`107` are present for `start_next_turn`, `draw_for_turn`, and `open_action_window`.
+- Remaining/blocking notes: no code blocker for this draw/open-action landing slice. Further polish should continue from the post-event-107 Player 2 action-window state by clicking `Bench Rellor`, verifying the persisted Bench landing plus Player 1 hidden/action guidance, and avoiding the already-verified draw/open-action branch.
+
 ## [2026-05-31] iteration 149 | Player 2 turn-10 start landing
 - Task attempted: continued from the repaired post-event-104 ended-turn state by switching to the Player 2 seat, clicking `Start player 2's turn` through the React SPA, and verifying the persisted turn-10 start landing from both seats.
 - Files changed: updated this log and the TCG engine playtest handoff; no product source changed.

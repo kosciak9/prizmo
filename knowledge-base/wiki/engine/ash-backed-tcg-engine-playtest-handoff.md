@@ -2,6 +2,14 @@
 
 Updated: 2026-05-31
 
+## Iteration 150 handoff
+
+- Current state: the documented playtest game `d608a1f1-6db6-4f23-a8d0-4a7d27641993` has advanced from post-event-105 Player 2 turn start. Clicking `Draw for player 2` and then `Open action window` through the SPA wrote events/snapshots `106` and `107`; the game is now cursor/latest `107`, `Turn 10, action_window`, active Player 2, latest event `open_action_window`, with no prompts. Player 1 sees no legal actions and non-owner guidance pointing to the Player 2 tab; Player 2 sees legal actions `play_basic_to_bench` for `Rellor` and `end_turn`, with 3 cards in hand.
+- Last commit at iteration start: `95d6c29 docs(wiki): capture tcg turn-ten start handoff`.
+- Remaining tasks: continue the substantial Web UI polish/playtest path from post-event-107, eventually rerun the formal two-independent-browser milestone, and continue broader persisted mechanics/card behavior plus Electric Streams spike work from the north-star plan.
+- Blockers: no code blocker for continuing this branch; the documented manual-tester milestone remains blocked until separate browser contexts can be guaranteed.
+- Recommended next atomic task: from the post-event-107 Player 2 action-window state, click `Bench Rellor`, verify the persisted Bench landing plus Player 1 hidden/action guidance from both seats, then refine only unclear post-bench copy without repeating the already-verified draw/open-action branch.
+
 ## Iteration 149 handoff
 
 - Current state: the documented playtest game `d608a1f1-6db6-4f23-a8d0-4a7d27641993` has advanced from the repaired post-event-104 ended-turn state. Clicking `Start player 2's turn` through the SPA as Player 2 wrote event/snapshot `105`; the game is now cursor/latest `105`, `Turn 10, start`, active Player 2, latest event `start_next_turn`, with no prompts and no legal action affordances yet. Player 2 sees enabled `Draw for player 2` and `Skip draw for player 2` controls with owner-tab guidance; Player 1 sees disabled draw/open-action controls pointing back to the Player 2 tab.
