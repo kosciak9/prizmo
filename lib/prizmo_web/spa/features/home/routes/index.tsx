@@ -4203,7 +4203,9 @@ function ActionWindowGuide({
       ? 'Battle decisions and End Turn are both legal. Attack when the board is set, otherwise pass the turn.'
       : 'Battle decisions are available. Review retreat and paid attacks before leaving the window.'
     : turnGroup
-      ? 'Only turn flow remains. End the turn after confirming hand, Bench, and attached Energy.'
+      ? handGroup
+        ? 'Turn flow is available, but hand and board choices are still live. End the turn only after this board is set.'
+        : 'Only turn flow remains. End the turn after confirming hand, Bench, and attached Energy.'
       : 'Finish the required choice before battle or turn-flow actions appear.'
   const guideTitle = currentTurn?.turnNumber === 1 ? 'First action window' : 'Action window plan'
 

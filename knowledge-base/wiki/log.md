@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-31] iteration 110 | Player 2 post-evolution Bench flow
+- Task attempted: continued the Web UI polish pass from the verified Player 2 post-evolution state by clicking one remaining Basic Bench choice end-to-end, confirming the chosen hand copy moved to Bench while the Kadabra Active kept Abra under `Evolution stack`, then refining the `Commit or pass` guide so it no longer claims only turn flow remains while Hand and board choices are still live.
+- Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.
+- Validation: `mix format && mix assets.build` passed; browser smoke on `http://localhost:4003` resumed game `d608a1f1-6db6-4f23-a8d0-4a7d27641993` as Player 2, clicked `Bench Abra from hand slot 4`, confirmed event #33 persisted as `play basic to bench`, Player 2 Bench advanced to 2, hand count dropped to 4, the Battlefield still showed Kadabra with Abra under `Evolution stack` plus two separate Bench Abra, the refreshed `Commit or pass` copy now says turn flow is available while hand/board choices remain live, and no browser console warnings or errors were reported; `mix check --no-test` passed.
+- Remaining/blocking notes: no code blocker for this post-evolution Bench-flow slice. Further polish can continue from the Player 2 post-event-33 state by verifying the remaining unique Basic Bench choices, especially Dunsparce, and then checking that the rail cleanly shifts to a true turn-flow-only state before rerunning the formal two-browser/manual-tester milestone once isolated contexts are guaranteed.
+
 ## [2026-05-31] iteration 109 | Player 2 evolution stack presentation
 - Task attempted: continued the Web UI polish pass from the verified Player 2 post-bench state by clicking one labeled Kadabra evolution choice end-to-end, confirming the exact hand-slot copy evolved the intended Active Abra while the newly benched Abra stayed a separate ineligible Basic, then refining the Battlefield card surface so evolved-under Pokémon render as an `Evolution stack` instead of generic attachments.
 - Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.
