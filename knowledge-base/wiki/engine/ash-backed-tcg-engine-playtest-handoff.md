@@ -2,6 +2,14 @@
 
 Updated: 2026-05-31
 
+## Iteration 143 handoff
+
+- Current state: game `d608a1f1-6db6-4f23-a8d0-4a7d27641993` is verified at post-event-101 with `Turn 9, start`; latest event is #101 `start_next_turn`, active player is Player 1, Player 1 has Munkidori Active with Moltres plus Budew on Bench and one hidden hand card, Player 2 has Kadabra Active with four Benched Pokémon and two cards in hand, no prompts or pending effects are open, Player 1 sees enabled `Draw for player 1` / `Skip draw for player 1`, and Player 2 sees disabled draw/open-action controls that point to the Player 1 tab.
+- Last commit at iteration start: `9d003d7 feat(spa): clarify tcg ended-turn owner guidance`.
+- Remaining tasks: continue the substantial Web UI polish/playtest path without repeating the verified Player 1 Start Turn branch; broader north-star work still includes the formal two-independent-browser milestone, more persisted mechanics/card behavior slices, and the Electric Streams spike.
+- Blockers: no code blocker for the turn-9 start landing slice; the documented manual-tester milestone remains blocked by unreliable manual-tester browser/session isolation.
+- Recommended next atomic task: from the post-event-101 Player 1 start state, click `Draw for player 1`, verify the persisted drawn landing plus Player 2 non-owner open-action guidance, then open Player 1's action window and refine only unclear draw/open-action copy.
+
 ## Iteration 142 handoff
 
 - Current state: game `d608a1f1-6db6-4f23-a8d0-4a7d27641993` is verified at post-event-100 with `Turn 8, ended`; latest event is #100 `end_turn`, previous active player was Player 2, Player 1 has Munkidori Active with Moltres plus Budew on Bench and one hidden hand card, Player 2 has Kadabra Active with four Benched Pokémon and two cards in hand, neither viewer has prompts or legal actions, and the ended-turn completed-setup copy now points Player 1 to resolve draw timing from `this tab` while Player 2 is pointed to the Player 1 tab.

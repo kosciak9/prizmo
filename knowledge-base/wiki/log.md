@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-31] iteration 143 | Player 1 turn-9 start landing
+- Task attempted: continued from the verified post-event-100 ended-turn state by clicking `Start player 1's turn`, verifying the persisted turn-9 start landing from both seats, and confirming the existing start-turn copy already points owner and non-owner tabs to the right draw-timing lane.
+- Files changed: updated this log and the TCG engine playtest handoff; no product source changed.
+- Validation: Tidewave precheck confirmed game `d608a1f1-6db6-4f23-a8d0-4a7d27641993` at cursor `100 of 100` with `Turn 8, ended`, latest event #100 `end_turn`, no prompts, and no pending effects; browser smoke on `http://localhost:4003` as Player 1 clicked `Start player 1's turn`, confirmed `Turn 9, start`, enabled `Draw for player 1` and `Skip draw for player 1`, then switched to Player 2 and confirmed disabled draw/open-action controls point to the Player 1 tab; browser console reported no warnings or errors; Tidewave postcheck confirmed cursor `101 of 101`, latest event #101 `start_next_turn`, active Player 1 on `Turn 9, start`, no prompts, and no pending effects.
+- Remaining/blocking notes: no code blocker for this turn-9 start landing slice. Further polish should continue from the post-event-101 Player 1 start state by clicking `Draw for player 1`, verifying the drawn landing and Player 2 open-action owner-tab guidance, then opening Player 1's action window without repeating the already-verified start-turn branch.
+
 ## [2026-05-31] iteration 142 | Player 2 ended-turn landing
 - Task attempted: continued from the verified post-event-99 Player 2 action-window state by clicking `End player 2's turn`, verifying the persisted ended-turn/Player 1 next-turn landing from both seats, and tightening the completed-setup copy so the Player 1 owner tab says to resolve draw timing from `this tab` while non-owner Player 2 still points to the Player 1 tab.
 - Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.
