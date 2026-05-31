@@ -2,6 +2,14 @@
 
 Updated: 2026-05-31
 
+## Iteration 156 handoff
+
+- Current state: the current playtest game `f6df7025-7d0f-4d9b-9bc2-31c864de1d4e` advanced from cursor/latest `89`, `turn_action_window`, active Player 1, by executing the same Ash domain command behind the SPA `Declare Fighting Wings` action. The available MCP browser profile was still locked, so this could not be clicked through the SPA. The command appended events/snapshots `90`-`96`: `declare_attack`, `resolve_declared_attack` for 20 damage and 40 resulting damage on Player 2 Active Abra, `finish_attack`, `turn_ended`, `turn_started`, `turn_card_drawn`, and `action_window_opened`. The game is now cursor/latest `96`, `turn_action_window`, `Turn 12, action_window`, active Player 2, with no prompts. Player 1 sees no legal actions; Player 2 sees legal actions `evolve_from_hand` (`Evolve Pokémon`) and `pass`.
+- Last commit at iteration start: `cdaf8c3 docs(wiki): capture tcg attach energy handoff`.
+- Remaining tasks: continue the substantial Web UI polish/playtest path on the current game state, rerun a true browser/UI smoke when an isolated Playwright or browser context is available, eventually rerun the formal two-independent-browser milestone, and continue broader persisted mechanics/card behavior plus Electric Streams spike work from the north-star plan.
+- Blockers: the MCP browser profile remained locked during this iteration, so the Player 1 `Declare Fighting Wings` action was validated through the Ash domain command and database/read-model checks rather than an actual SPA click.
+- Recommended next atomic task: from current game `f6df7025-7d0f-4d9b-9bc2-31c864de1d4e` at post-event-96 Player 2 action window, use an isolated/browser-available SPA context to execute one Player 2 legal action such as `Evolve Pokémon` or `Pass` if possible, then verify the persisted landing from both seats without repeating the already-validated Player 1 `Declare Fighting Wings` branch.
+
 ## Iteration 155 handoff
 
 - Current state: the current playtest game `f6df7025-7d0f-4d9b-9bc2-31c864de1d4e` advanced from cursor/latest `88`, `turn_action_window`, active Player 1, by executing the same Ash domain command behind the SPA `Attach Energy` action. The available MCP browser profile was still locked, so this could not be clicked through the SPA. The command appended event/snapshot `89`: `attach_energy` for Fire Energy card instance `bfefed2f-e0bd-4a30-b717-596732801596` attached to Player 1 Active Moltres `49be2144-9b41-4515-bd97-5a87f71df0a5` at attached position `2`. The game is now cursor/latest `89`, `turn_action_window`, `Turn 11, action_window`, active Player 1, with no prompts. Player 1 sees legal actions `play_card`, `declare_attack` for `Fighting Wings`, and `pass`; Player 2 sees no legal actions.
