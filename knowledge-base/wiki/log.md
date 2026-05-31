@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-31] iteration 132 | Player 2 ended-turn owner copy
+- Task attempted: continued the Web UI polish pass from the verified post-event-58 Player 2 action-window state by clicking `End player 2's turn`, verifying the persisted ended-turn/next-owner landing from both seats, and tightening completed-setup copy so it names Player 1's next turn and tab instead of the generic turn-owner tab.
+- Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.
+- Validation: Tidewave precheck confirmed game `d608a1f1-6db6-4f23-a8d0-4a7d27641993` was at event count 58 with `Turn 6, action_window`, Player 2 active, no prompts, Player 1 no legal actions, and Player 2 only `end_turn`; browser smoke on `http://localhost:4003` as Player 2 clicked `End player 2's turn`, confirmed `Turn 6, ended`, event count 59/latest `end_turn`, no legal actions, `Start player 1's turn`, Player 1 owner guidance, and Player 2 non-owner guidance; refreshed/HMR copy now says `Use Turn step to start player 1's next turn, resolve draw timing from the player 1 tab, and reopen legal actions`; browser console reported no warnings or errors; Tidewave postcheck confirmed both viewers at event count 59, latest `end_turn`, no awaiting prompts, no legal actions, Player 1 Active Munkidori, and Player 2 Active Kadabra; `mix format`, `mix assets.build`, and `mix check --no-test` passed.
+- Remaining/blocking notes: no code blocker for this Player 2 ended-turn landing slice. Further polish should continue from the post-event-59 ended state by switching to Player 1, clicking `Start player 1's turn`, verifying the turn-7 start landing and owner-tab draw guidance, and avoiding the already-verified Player 2 End Turn branch.
+
 ## [2026-05-31] iteration 131 | Player 2 action-window landing copy
 - Task attempted: continued the Web UI polish pass from the verified post-event-56 Player 2 turn-6 start state by drawing for Player 2, checking Player 1's non-owner open-action guidance, opening Player 2's action window, and fixing singular count copy on the landing so `1 card in hand` no longer renders as `1 cards in hand`.
 - Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.

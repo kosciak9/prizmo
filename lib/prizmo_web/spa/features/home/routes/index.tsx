@@ -2551,9 +2551,14 @@ function CompletedSetupSummary({
   players: PlayerView[]
 }) {
   const turnOwnerLabel = formatPlayerId(currentTurn?.activePlayerId ?? firstPlayerId)
+  const nextTurnOwnerId = currentTurn?.status === 'ended'
+    ? (players.find(player => player.playerId !== currentTurn.activePlayerId)?.playerId ?? firstPlayerId)
+    : null
+  const nextTurnOwnerLabel = nextTurnOwnerId ? formatPlayerId(nextTurnOwnerId) : null
+  const nextTurnOwnerTabLabel = nextTurnOwnerLabel ? `the ${nextTurnOwnerLabel} tab` : 'the turn owner tab'
   const setupDetail = currentTurn
     ? currentTurn.status === 'ended'
-      ? 'Opening choices are locked. Use Turn step to start the next turn, resolve draw timing from the turn owner tab, and reopen legal actions.'
+      ? `Opening choices are locked. Use Turn step to start ${nextTurnOwnerLabel ?? 'the next player'}'s next turn, resolve draw timing from ${nextTurnOwnerTabLabel}, and reopen legal actions.`
       : currentTurn.status === 'start'
         ? `Opening choices are locked. Turn ${currentTurn.turnNumber} belongs to ${turnOwnerLabel}; resolve draw timing from the ${turnOwnerLabel} tab before legal actions reopen.`
       : 'Opening choices are locked. Use Turn step to track this turn, draw timing, and live legal actions.'
