@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-31] iteration 153 | Player 2 Rellor bench handoff
+- Task attempted: continued from current playtest game `f6df7025-7d0f-4d9b-9bc2-31c864de1d4e` at Player 2's post-event-82 action window by executing the same Ash domain command behind the SPA `Bench Rellor` control.
+- Files changed: updated this log and the TCG engine playtest handoff; no product source changed.
+- Validation: precheck confirmed game `f6df7025-7d0f-4d9b-9bc2-31c864de1d4e` was cursor/latest `82`, `Turn 10, action_window`, active Player 2, setup completed, no prompts, with Player 1 seeing no legal actions and Player 2 legal actions `Bench Basic Pokémon` for Rellor card instance `05fe0929-e0d2-49e1-9037-8ccf760dae22` plus `Pass`; the MCP browser profile was still locked, so the browser smoke could not be run through the available Playwright tool; `Prizmo.TcgEngine.play_basic_to_bench_for_game/3` advanced the persisted flow to cursor/latest `83`; Tidewave postcheck confirmed both viewers at `Turn 10, action_window`, active Player 2, no prompts, Player 2 Bench with `Rellor` at position `4`, Player 2 hand count `2`, Player 1 no legal actions, and Player 2 only `Pass`; SQL postcheck confirmed event/snapshot `83` is `play_basic_to_bench` with the Rellor card instance persisted in `bench` at position `4`; `mix test test/prizmo/tcg_engine/mechanics_test.exs` passed with 9 tests and no failures; Tidewave error log check returned no errors.
+- Remaining/blocking notes: the shared MCP browser profile remained locked during this iteration, so a true UI click still needs confirmation when a browser context is available. Continue from the current post-event-83 Player 2 action-window state by clicking `Pass` in an isolated/browser-available SPA context if possible, and avoid repeating the already-validated Player 2 `Bench Rellor` branch.
+
 ## [2026-05-31] iteration 152 | Current flow Fighting Wings handoff
 - Task attempted: continued from current playtest game `f6df7025-7d0f-4d9b-9bc2-31c864de1d4e` at Player 1's post-event-75 action window by executing the same Ash domain command behind the SPA `Declare Fighting Wings` control.
 - Files changed: updated this log and the TCG engine playtest handoff; no product source changed.

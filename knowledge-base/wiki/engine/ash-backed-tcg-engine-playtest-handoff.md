@@ -2,6 +2,14 @@
 
 Updated: 2026-05-31
 
+## Iteration 153 handoff
+
+- Current state: the current playtest game `f6df7025-7d0f-4d9b-9bc2-31c864de1d4e` advanced from cursor/latest `82`, `turn_action_window`, active Player 2, by executing the same Ash domain command behind the SPA `Bench Rellor` action. The available MCP browser profile was still locked, so this could not be clicked through the SPA. The command appended event/snapshot `83`: `play_basic_to_bench` for Rellor card instance `05fe0929-e0d2-49e1-9037-8ccf760dae22` at Bench position `4`. The game is now cursor/latest `83`, `turn_action_window`, `Turn 10, action_window`, active Player 2, with no prompts. Player 1 sees no legal actions; Player 2 sees only `Pass`.
+- Last commit at iteration start: `e27418f docs(wiki): capture tcg fighting wings handoff`.
+- Remaining tasks: continue the substantial Web UI polish/playtest path on the current game state, rerun a true browser/UI smoke when an isolated Playwright or browser context is available, eventually rerun the formal two-independent-browser milestone, and continue broader persisted mechanics/card behavior plus Electric Streams spike work from the north-star plan.
+- Blockers: the MCP browser profile remained locked during this iteration, so the Player 2 `Bench Rellor` action was validated through the Ash domain command and database/read-model checks rather than an actual SPA click.
+- Recommended next atomic task: from current game `f6df7025-7d0f-4d9b-9bc2-31c864de1d4e` at post-event-83 Player 2 action window, use an isolated/browser-available SPA context to click `Pass` if possible, then verify the persisted auto-continue landing from both seats without repeating the already-validated Player 2 `Bench Rellor` branch.
+
 ## Iteration 152 handoff
 
 - Current state: the current playtest game `f6df7025-7d0f-4d9b-9bc2-31c864de1d4e` advanced from cursor/latest `75`, `turn_action_window`, active Player 1, by executing the same Ash domain command behind the SPA `Declare Fighting Wings` action. The available MCP browser profile was still locked, so this could not be clicked through the SPA. The engine auto-continued the simple attack/turn flow and appended events/snapshots `76`-`82`: `declare_attack`, `resolve_declared_attack`, `finish_attack`, `turn_ended`, `turn_started`, `turn_card_drawn`, and `action_window_opened`. The game is now cursor/latest `82`, `turn_action_window`, `Turn 10, action_window`, active Player 2, with no prompts. Player 1 sees no legal actions; Player 2 sees legal actions `play_basic_to_bench` for `Rellor` and `pass`.
