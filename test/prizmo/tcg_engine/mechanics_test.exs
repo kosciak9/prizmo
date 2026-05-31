@@ -14,6 +14,63 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
 
   require Ash.Query
 
+  describe "flow machine pregame" do
+    test "coin toss winner chooses starting player and opening hands are dealt automatically" do
+      {:ok, game} = create_game()
+
+      assert game.flow_state == :pregame_awaiting_coin_toss
+      assert counts_by_zone(game.id) == %{deck: 120}
+
+      assert {:ok, game} = Mechanics.call_coin_toss(game, "player_1", :heads)
+      assert game.flow_state == :pregame_awaiting_starting_player_choice
+      assert game.coin_toss_calling_player_id == "player_1"
+      assert game.coin_toss_call == :heads
+      assert game.coin_toss_result in [:heads, :tails]
+      assert game.coin_toss_winner_player_id in ["player_1", "player_2"]
+      assert counts_by_zone(game.id) == %{deck: 120}
+
+      assert {:ok, game} =
+               Mechanics.choose_starting_player(
+                 game,
+                 game.coin_toss_winner_player_id,
+                 "player_2"
+               )
+
+      assert game.status == :setup
+      assert game.flow_state == :setup_choosing_opening_active
+      assert game.first_player_id == "player_2"
+      assert game.active_player_id == "player_2"
+      assert setup_status(game.id) == :hands_drawn
+      assert counts_by_zone(game.id) == %{deck: 106, hand: 14}
+
+      assert event_types(game.id) == [
+               "coin_toss_resolved",
+               "starting_player_chosen",
+               "opening_hands_drawn"
+             ]
+
+      assert snapshot_indexes(game.id) == [0, 1, 2, 3]
+    end
+
+    test "only the coin toss winner can choose who starts" do
+      {:ok, game} = create_game()
+      {:ok, game} = Mechanics.call_coin_toss(game, "player_1", :heads)
+
+      loser_player_id =
+        ["player_1", "player_2"]
+        |> Enum.reject(&(&1 == game.coin_toss_winner_player_id))
+        |> List.first()
+
+      winner_player_id = game.coin_toss_winner_player_id
+
+      assert {:error, {:not_coin_toss_winner, ^winner_player_id}} =
+               Mechanics.choose_starting_player(game, loser_player_id, "player_1")
+
+      assert counts_by_zone(game.id) == %{deck: 120}
+      assert event_types(game.id) == ["coin_toss_resolved"]
+    end
+  end
+
   describe "setup flow" do
     test "opening hands can only be drawn once and rejected attempts are not saved" do
       {:ok, game} = create_started_setup_game()
@@ -151,6 +208,13 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
                "card_play_completed"
              ]
     end
+  end
+
+  defp create_game do
+    Mechanics.create_game([
+      {"player_1", Alakazam27147},
+      {"player_2", Dragapult27431}
+    ])
   end
 
   defp create_started_setup_game do

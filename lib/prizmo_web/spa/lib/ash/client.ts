@@ -1,8 +1,10 @@
 export {
   attachTcgEngineEnergy as runAttachTcgEngineEnergy,
   buildCSRFHeaders as buildAshRpcHeaders,
+  callTcgEngineCoinToss as runCallTcgEngineCoinToss,
   chooseTcgEngineReplacementActive as runChooseTcgEngineReplacementActive,
   chooseTcgEnginePrompt as runChooseTcgEnginePrompt,
+  chooseTcgEngineStartingPlayer as runChooseTcgEngineStartingPlayer,
   declareTcgEngineAttack as runDeclareTcgEngineAttack,
   chooseTcgEngineActiveFromHand as runChooseTcgEngineActiveFromHand,
   chooseTcgEngineSetupBenchFromHand as runChooseTcgEngineSetupBenchFromHand,
@@ -30,6 +32,8 @@ export {
 export type {
   AttachTcgEngineEnergyInput,
   AttachTcgEngineEnergyResult,
+  CallTcgEngineCoinTossInput,
+  CallTcgEngineCoinTossResult,
   ChooseTcgEngineActiveFromHandInput,
   ChooseTcgEngineActiveFromHandResult,
   ChooseTcgEnginePromptInput,
@@ -38,6 +42,8 @@ export type {
   ChooseTcgEngineReplacementActiveResult,
   ChooseTcgEngineSetupBenchFromHandInput,
   ChooseTcgEngineSetupBenchFromHandResult,
+  ChooseTcgEngineStartingPlayerInput,
+  ChooseTcgEngineStartingPlayerResult,
   CreateTcgEngineGameFields,
   CompleteTcgEngineSetupInput,
   CompleteTcgEngineSetupResult,

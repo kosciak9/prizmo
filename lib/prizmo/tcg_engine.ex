@@ -16,6 +16,8 @@ defmodule Prizmo.TcgEngine do
       rpc_action :list_supported_tcg_decks, :list_supported_decks
       rpc_action :create_tcg_engine_game, :create_from_supported_decks
       rpc_action :get_tcg_engine_game_state, :get_state
+      rpc_action :call_tcg_engine_coin_toss, :call_coin_toss_command
+      rpc_action :choose_tcg_engine_starting_player, :choose_starting_player_command
       rpc_action :start_tcg_engine_setup, :start_setup_command
       rpc_action :draw_tcg_engine_opening_hand, :draw_opening_hand_command
       rpc_action :choose_tcg_engine_active_from_hand, :choose_active_from_hand_command
@@ -48,6 +50,15 @@ defmodule Prizmo.TcgEngine do
       define :list_supported_decks, action: :list_supported_decks
       define :create_supported_game, action: :create_from_supported_decks, args: [:players]
       define :get_game_state, action: :get_state, args: [:game_id, :viewer_player_id]
+
+      define :call_coin_toss_for_game,
+        action: :call_coin_toss_command,
+        args: [:game_id, :player_id, :call]
+
+      define :choose_starting_player_for_game,
+        action: :choose_starting_player_command,
+        args: [:game_id, :chooser_player_id, :starting_player_id]
+
       define :start_setup_game, action: :start_setup_command, args: [:game_id]
       define :draw_opening_hand_for_game, action: :draw_opening_hand_command, args: [:game_id]
 

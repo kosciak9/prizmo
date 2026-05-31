@@ -79,6 +79,7 @@ defmodule Prizmo.TcgEngine.Mechanics do
   alias Prizmo.TcgEngine.CardPlay
   alias Prizmo.TcgEngine.Cards.Registry, as: EngineCardRegistry
   alias Prizmo.TcgEngine.ChoiceValidator
+  alias Prizmo.TcgEngine.Flow.Interpreter, as: FlowInterpreter
   alias Prizmo.TcgEngine.Game
   alias Prizmo.TcgEngine.GameSetup
   alias Prizmo.TcgEngine.PendingEffect
@@ -106,6 +107,22 @@ defmodule Prizmo.TcgEngine.Mechanics do
         get_game(game.id)
       end
     end)
+  end
+
+  @spec call_coin_toss(Game.t() | String.t(), String.t(), atom() | String.t()) ::
+          {:ok, Game.t()} | {:error, term()}
+  def call_coin_toss(game_or_id, player_id, call) when is_binary(player_id) do
+    FlowInterpreter.dispatch(game_or_id, :call_coin_toss, %{player_id: player_id, call: call})
+  end
+
+  @spec choose_starting_player(Game.t() | String.t(), String.t(), String.t()) ::
+          {:ok, Game.t()} | {:error, term()}
+  def choose_starting_player(game_or_id, chooser_player_id, starting_player_id)
+      when is_binary(chooser_player_id) and is_binary(starting_player_id) do
+    FlowInterpreter.dispatch(game_or_id, :choose_starting_player, %{
+      chooser_player_id: chooser_player_id,
+      starting_player_id: starting_player_id
+    })
   end
 
   @spec start_setup(Game.t() | String.t()) :: {:ok, Game.t()} | {:error, term()}

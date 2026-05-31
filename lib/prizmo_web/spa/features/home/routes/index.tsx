@@ -58,9 +58,15 @@ const SUPPORTED_DECK_FIELDS: ListSupportedTcgDecksFields = [
 const GAME_RESOURCE_FIELDS: CreateTcgEngineGameFields = [
   'id',
   'status',
+  'flowState',
   'activePlayerId',
   'firstPlayerId',
   'winnerPlayerId',
+  'coinTossCallingPlayerId',
+  'coinTossCall',
+  'coinTossResult',
+  'coinTossWinnerPlayerId',
+  'startingPlayerChosenByPlayerId',
   'cursorIndex',
   'latestEventIndex'
 ]
@@ -111,9 +117,15 @@ const GAME_STATE_FIELDS = [
   'gameId',
   'viewerPlayerId',
   'status',
+  'flowState',
   'activePlayerId',
   'firstPlayerId',
   'winnerPlayerId',
+  'coinTossCallingPlayerId',
+  'coinTossCall',
+  'coinTossResult',
+  'coinTossWinnerPlayerId',
+  'startingPlayerChosenByPlayerId',
   'cursorIndex',
   'latestEventIndex',
   'awaitingPromptPlayerIds',
@@ -233,9 +245,15 @@ type SupportedDeck = {
 type CreatedGame = {
   id: string
   status: string
+  flowState: string
   activePlayerId: string
   firstPlayerId: string
   winnerPlayerId: string | null
+  coinTossCallingPlayerId: string | null
+  coinTossCall: string | null
+  coinTossResult: string | null
+  coinTossWinnerPlayerId: string | null
+  startingPlayerChosenByPlayerId: string | null
   cursorIndex: number
   latestEventIndex: number
 }
@@ -529,9 +547,15 @@ type GameState = {
   gameId: string
   viewerPlayerId: string
   status: string
+  flowState: string
   activePlayerId: string
   firstPlayerId: string
   winnerPlayerId: string | null
+  coinTossCallingPlayerId: string | null
+  coinTossCall: string | null
+  coinTossResult: string | null
+  coinTossWinnerPlayerId: string | null
+  startingPlayerChosenByPlayerId: string | null
   cursorIndex: number
   latestEventIndex: number
   awaitingPromptPlayerIds: string[]

@@ -12,7 +12,6 @@ defmodule Prizmo.TcgEngine.Game do
   alias Prizmo.TcgEngine.Game
   alias Prizmo.TcgEngine.GameView
   alias Prizmo.TcgEngine.GameView.Fields, as: GameViewFields
-  alias Prizmo.TcgEngine.Mechanics
   alias Prizmo.TcgEngine.SupportedDecks
 
   @supported_deck_fields [
@@ -40,6 +39,7 @@ defmodule Prizmo.TcgEngine.Game do
 
     transitions do
       transition(:start_setup, from: :created, to: :setup)
+      transition(:choose_starting_player, from: :created, to: :setup)
       transition(:complete_setup, from: :setup, to: :in_progress)
       transition(:finish, from: [:created, :setup, :in_progress], to: :finished)
     end
@@ -55,6 +55,11 @@ defmodule Prizmo.TcgEngine.Game do
     define :list_supported_decks
     define :create_from_supported_decks, args: [:players]
     define :start_setup_command, args: [:game_id]
+    define :call_coin_toss_command, args: [:game_id, :player_id, :call]
+
+    define :choose_starting_player_command,
+      args: [:game_id, :chooser_player_id, :starting_player_id]
+
     define :draw_opening_hand_command, args: [:game_id]
     define :choose_active_from_hand_command, args: [:game_id, :player_id, :card_instance_id]
     define :choose_setup_bench_from_hand_command, args: [:game_id, :player_id, :card_instance_id]
@@ -71,6 +76,9 @@ defmodule Prizmo.TcgEngine.Game do
     define :finish
     define :set_active_player
     define :set_winner
+    define :record_coin_toss
+    define :choose_starting_player
+    define :set_flow_state
     define :set_cursor
     define :record_event_cursor
     define :restore
@@ -122,178 +130,6 @@ defmodule Prizmo.TcgEngine.Game do
       end
     end
 
-    action :start_setup_command, :struct do
-      description "Start setup for a persisted TCG engine game through the mechanics layer."
-
-      constraints instance_of: Game
-
-      argument :game_id, :uuid do
-        allow_nil? false
-      end
-
-      run fn input, _context ->
-        Mechanics.start_setup(input.arguments.game_id)
-      end
-    end
-
-    action :draw_opening_hand_command, :struct do
-      description "Draw opening hands for a persisted TCG engine game through the mechanics layer."
-
-      constraints instance_of: Game
-
-      argument :game_id, :uuid do
-        allow_nil? false
-      end
-
-      run fn input, _context ->
-        Mechanics.draw_opening_hand(input.arguments.game_id)
-      end
-    end
-
-    action :choose_active_from_hand_command, :struct do
-      description "Choose a player's setup Active Pokémon from hand through the mechanics layer."
-
-      constraints instance_of: Game
-
-      argument :game_id, :uuid do
-        allow_nil? false
-      end
-
-      argument :player_id, :string do
-        allow_nil? false
-      end
-
-      argument :card_instance_id, :uuid do
-        allow_nil? false
-      end
-
-      run fn input, _context ->
-        Mechanics.choose_active_from_hand(
-          input.arguments.game_id,
-          input.arguments.player_id,
-          input.arguments.card_instance_id
-        )
-      end
-    end
-
-    action :choose_setup_bench_from_hand_command, :struct do
-      description "Choose a player's setup Benched Pokémon from hand through the mechanics layer."
-
-      constraints instance_of: Game
-
-      argument :game_id, :uuid do
-        allow_nil? false
-      end
-
-      argument :player_id, :string do
-        allow_nil? false
-      end
-
-      argument :card_instance_id, :uuid do
-        allow_nil? false
-      end
-
-      run fn input, _context ->
-        Mechanics.choose_setup_bench_from_hand(
-          input.arguments.game_id,
-          input.arguments.player_id,
-          input.arguments.card_instance_id
-        )
-      end
-    end
-
-    action :place_prizes_command, :struct do
-      description "Place setup Prize cards for a persisted TCG engine game through the mechanics layer."
-
-      constraints instance_of: Game
-
-      argument :game_id, :uuid do
-        allow_nil? false
-      end
-
-      run fn input, _context ->
-        Mechanics.place_prizes(input.arguments.game_id)
-      end
-    end
-
-    action :complete_setup_command, :struct do
-      description "Complete setup for a persisted TCG engine game through the mechanics layer."
-
-      constraints instance_of: Game
-
-      argument :game_id, :uuid do
-        allow_nil? false
-      end
-
-      run fn input, _context ->
-        Mechanics.complete_setup(input.arguments.game_id)
-      end
-    end
-
-    action :start_next_turn_command, :struct do
-      description "Start the next turn for a persisted TCG engine game through the mechanics layer."
-
-      constraints instance_of: Game
-
-      argument :game_id, :uuid do
-        allow_nil? false
-      end
-
-      run fn input, _context ->
-        Mechanics.start_next_turn(input.arguments.game_id)
-      end
-    end
-
-    action :draw_for_turn_command, :struct do
-      description "Draw a card for the active player's current turn through the mechanics layer."
-
-      constraints instance_of: Game
-
-      argument :game_id, :uuid do
-        allow_nil? false
-      end
-
-      argument :player_id, :string do
-        allow_nil? false
-      end
-
-      run fn input, _context ->
-        Mechanics.draw_for_turn(input.arguments.game_id, input.arguments.player_id)
-      end
-    end
-
-    action :skip_draw_for_turn_command, :struct do
-      description "Skip drawing for the active player's current turn through the mechanics layer."
-
-      constraints instance_of: Game
-
-      argument :game_id, :uuid do
-        allow_nil? false
-      end
-
-      argument :player_id, :string do
-        allow_nil? false
-      end
-
-      run fn input, _context ->
-        Mechanics.skip_draw_for_turn(input.arguments.game_id, input.arguments.player_id)
-      end
-    end
-
-    action :open_action_window_command, :struct do
-      description "Open the active player's current turn action window through the mechanics layer."
-
-      constraints instance_of: Game
-
-      argument :game_id, :uuid do
-        allow_nil? false
-      end
-
-      run fn input, _context ->
-        Mechanics.open_action_window(input.arguments.game_id)
-      end
-    end
-
     create :create do
       primary? true
       accept [:active_player_id, :first_player_id, :cursor_index, :latest_event_index]
@@ -320,6 +156,31 @@ defmodule Prizmo.TcgEngine.Game do
       accept [:winner_player_id]
     end
 
+    update :record_coin_toss do
+      accept [
+        :flow_state,
+        :coin_toss_calling_player_id,
+        :coin_toss_call,
+        :coin_toss_result,
+        :coin_toss_winner_player_id
+      ]
+    end
+
+    update :choose_starting_player do
+      accept [
+        :flow_state,
+        :active_player_id,
+        :first_player_id,
+        :starting_player_chosen_by_player_id
+      ]
+
+      change transition_state(:setup)
+    end
+
+    update :set_flow_state do
+      accept [:flow_state]
+    end
+
     update :set_cursor do
       accept [:cursor_index]
     end
@@ -334,6 +195,12 @@ defmodule Prizmo.TcgEngine.Game do
         :active_player_id,
         :first_player_id,
         :winner_player_id,
+        :flow_state,
+        :coin_toss_calling_player_id,
+        :coin_toss_call,
+        :coin_toss_result,
+        :coin_toss_winner_player_id,
+        :starting_player_chosen_by_player_id,
         :cursor_index,
         :latest_event_index
       ]
@@ -368,6 +235,32 @@ defmodule Prizmo.TcgEngine.Game do
     end
 
     attribute :winner_player_id, :string do
+      public? true
+    end
+
+    attribute :flow_state, :atom do
+      allow_nil? false
+      default :pregame_awaiting_coin_toss
+      public? true
+    end
+
+    attribute :coin_toss_calling_player_id, :string do
+      public? true
+    end
+
+    attribute :coin_toss_call, :atom do
+      public? true
+    end
+
+    attribute :coin_toss_result, :atom do
+      public? true
+    end
+
+    attribute :coin_toss_winner_player_id, :string do
+      public? true
+    end
+
+    attribute :starting_player_chosen_by_player_id, :string do
       public? true
     end
 
