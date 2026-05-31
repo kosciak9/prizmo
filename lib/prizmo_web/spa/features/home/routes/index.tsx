@@ -2394,7 +2394,7 @@ function TurnStepGuide({
   } else if (currentTurn?.status === 'drawn') {
     actionWindowDetail = viewerOwnsTurn
       ? 'Open the action window so hand, board, retreat, attack, and end-turn actions can appear below.'
-      : `Draw timing is resolved for ${turnOwnerLabel}. Use that player tab to open the action window, then refresh here.`
+      : `Draw timing is resolved for ${turnOwnerLabel}. Use the ${turnOwnerLabel} tab to open the action window, then refresh here.`
   } else if (activeWindowOpen) {
     actionWindowDetail = `Action decisions are live for ${turnOwnerLabel}. Use Available actions below.`
   } else if (currentTurn) {

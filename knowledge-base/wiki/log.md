@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-31] iteration 114 | Player 1 action-window landing
+- Task attempted: continued the Web UI polish pass from the post-event-37 state by drawing for Player 1 on turn 3, verifying the persisted drawn landing, refining Player 2's non-owner post-draw action-window guide to name the Player 1 tab explicitly, and opening Player 1's action window.
+- Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.
+- Validation: Tidewave precheck confirmed game `d608a1f1-6db6-4f23-a8d0-4a7d27641993` was at cursor `37 of 37` with `Turn 3, start`; browser smoke on `http://localhost:4003` as Player 1 clicked `Draw for player 1`, confirmed event #38 persisted as `draw for turn`, cursor advanced to `38 of 38`, current turn became `Turn 3, drawn`, and Player 1 hand count became 5; switched to Player 2 and confirmed the disabled `Use player 1 tab to open actions` control plus guide copy now says `Use the player 1 tab to open the action window`; switched back to Player 1, clicked `Open action window`, confirmed event #39 persisted as `open action window`, cursor advanced to `39 of 39`, current turn became `Turn 3, action_window`, and 4 legal actions appeared; no browser console warnings or errors were reported; `mix format && mix assets.build` passed; `mix check --no-test` passed.
+- Remaining/blocking notes: no code blocker for this drawn/open-action landing slice. Further polish can continue from the post-event-39 state by verifying Player 1's turn-3 action-window priority and one safe follow-up action, or by preparing the isolated-context formal two-browser/manual-tester milestone once the harness is guaranteed.
+
 ## [2026-05-31] iteration 113 | Player 1 turn-3 draw landing
 - Task attempted: continued the Web UI polish pass from the post-event-36 state by switching to Player 1, clicking `Start player 1's turn`, verifying the persisted turn-3 start transition, and refining the non-owner turn-start guide so Player 2 is explicitly told to use the Player 1 tab for draw timing before actions can open.
 - Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.
