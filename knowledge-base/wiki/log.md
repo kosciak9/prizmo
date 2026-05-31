@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-31] iteration 96 | Deck setup sidebar polish
+- Task attempted: continued the Web UI polish pass by refining the supported-deck/deck-selection sidebar and first-run setup guidance, replacing plain deck selects with player loadout cards, adding a first-table checklist, marking selected fixtures in a fixture catalog, and aligning the no-game empty state with the setup path.
+- Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.
+- Validation: `mix format && mix assets.build && mix check --no-test` passed; browser smoke on `http://localhost:4003` confirmed the first-table checklist, fixture catalog, selected loadout summaries, and updated no-game setup guidance render with no browser warnings or errors.
+- Remaining/blocking notes: no code blocker for this deck/setup sidebar polish slice. Further Web UI polish should refine the post-create Game flow setup guidance and then rerun a fresh browser setup path before the formal two-browser/manual-tester milestone.
+
 ## [2026-05-31] iteration 95 | Top-level playtest states
 - Task attempted: continued the Web UI polish pass by refining the top-level create/reconnect and board-state surfaces, adding a tab-seat summary, clearer reconnect copy, a no-game checklist, product-facing loading/error panels, retry/clear recovery for missing games, and a safer stale-viewer guard panel.
 - Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.

@@ -710,6 +710,14 @@ export function HomeRoute() {
     () => new Map(decks.map(deck => [deck.deckKey, deck.name])),
     [decks]
   )
+  const selectedPlayerOneDeck = useMemo(
+    () => decks.find(deck => deck.deckKey === selectedPlayerOneDeckKey) ?? null,
+    [decks, selectedPlayerOneDeckKey]
+  )
+  const selectedPlayerTwoDeck = useMemo(
+    () => decks.find(deck => deck.deckKey === selectedPlayerTwoDeckKey) ?? null,
+    [decks, selectedPlayerTwoDeckKey]
+  )
   const canCreateGame =
     Boolean(selectedPlayerOneDeckKey && selectedPlayerTwoDeckKey) && !createGameMutation.isPending
   const promptCommandError = commandErrorNotice(
@@ -883,13 +891,15 @@ export function HomeRoute() {
                 ) : null}
 
                 <DeckSelect
-                  label="Player 1 deck"
+                  label="Player 1 loadout"
+                  playerId={PLAYER_ONE_ID}
                   value={selectedPlayerOneDeckKey}
                   decks={decks}
                   onChange={setPlayerOneDeckKey}
                 />
                 <DeckSelect
-                  label="Player 2 deck"
+                  label="Player 2 loadout"
+                  playerId={PLAYER_TWO_ID}
                   value={selectedPlayerTwoDeckKey}
                   decks={decks}
                   onChange={setPlayerTwoDeckKey}
@@ -927,8 +937,16 @@ export function HomeRoute() {
                   onClick={() => createGameMutation.mutate()}
                   type="button"
                 >
-                  {createGameMutation.isPending ? 'Creating game...' : 'Create fixture game'}
+                  {createGameMutation.isPending ? 'Creating table...' : 'Create game board'}
                 </button>
+
+                <FirstRunSetupGuide
+                  deckCount={decks.length}
+                  hasGame={Boolean(normalisedGameId)}
+                  selectedPlayerOneDeck={selectedPlayerOneDeck}
+                  selectedPlayerTwoDeck={selectedPlayerTwoDeck}
+                  viewerPlayerId={session.viewerPlayerId}
+                />
 
                 {createGameMutation.error ? (
                   <InlineNotice tone="error" title="Game creation failed">
@@ -978,28 +996,15 @@ export function HomeRoute() {
               </div>
             </Panel>
 
-            <Panel title="Supported decks">
-              <div className="space-y-3">
-                {decks.map(deck => (
-                  <div className="rounded-xl border border-stone-200 bg-stone-50 p-3" key={deck.deckKey}>
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-medium text-stone-950">{deck.name}</p>
-                        <p className="mt-1 font-mono text-xs text-stone-500">{deck.deckKey}</p>
-                      </div>
-                      <p className="text-xs text-stone-500">{deck.uniqueCardCount} unique</p>
-                    </div>
-                    <a
-                      className="mt-2 inline-flex text-xs font-medium text-emerald-700 hover:text-emerald-900"
-                      href={deck.sourceUrl}
-                      rel="noreferrer"
-                      target="_blank"
-                    >
-                      Source decklist
-                    </a>
-                  </div>
-                ))}
-              </div>
+            <Panel
+              title="Fixture catalog"
+              trailing={<StatusBadge tone={decks.length > 0 ? 'active' : 'neutral'}>{decks.length} decks</StatusBadge>}
+            >
+              <SupportedDeckCatalog
+                decks={decks}
+                playerOneDeckKey={selectedPlayerOneDeckKey}
+                playerTwoDeckKey={selectedPlayerTwoDeckKey}
+              />
             </Panel>
           </aside>
 
@@ -4353,32 +4358,228 @@ function Panel({
 
 function DeckSelect({
   label,
+  playerId,
   value,
   decks,
   onChange
 }: {
   label: string
+  playerId: PlayerId
   value: string
   decks: SupportedDeck[]
   onChange: (value: string) => void
 }) {
+  const selectedDeck = decks.find(deck => deck.deckKey === value) ?? null
+
   return (
-    <label className="block space-y-2">
-      <span className="text-sm font-medium text-stone-800">{label}</span>
-      <select
-        className="w-full rounded-xl border border-stone-300 bg-stone-50 px-3 py-2 text-sm text-stone-950 outline-none transition focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100 disabled:cursor-not-allowed disabled:text-stone-400"
-        disabled={decks.length === 0}
-        onChange={event => onChange(event.currentTarget.value)}
-        value={value}
-      >
-        {decks.length === 0 ? <option value="">No decks available</option> : null}
-        {decks.map(deck => (
-          <option key={deck.deckKey} value={deck.deckKey}>
-            {deck.name}
-          </option>
-        ))}
-      </select>
-    </label>
+    <div className="rounded-2xl border border-stone-200 bg-stone-50 p-3">
+      <label className="block space-y-2">
+        <span className="flex items-center justify-between gap-3">
+          <span className="text-sm font-medium text-stone-800">{label}</span>
+          <StatusBadge tone={selectedDeck ? 'active' : 'neutral'}>{formatPlayerId(playerId)}</StatusBadge>
+        </span>
+        <select
+          className="w-full rounded-xl border border-stone-300 bg-[oklch(0.995_0.004_155)] px-3 py-2 text-sm text-stone-950 outline-none transition focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100 disabled:cursor-not-allowed disabled:text-stone-400"
+          disabled={decks.length === 0}
+          onChange={event => onChange(event.currentTarget.value)}
+          value={value}
+        >
+          {decks.length === 0 ? <option value="">No decks available</option> : null}
+          {decks.map(deck => (
+            <option key={deck.deckKey} value={deck.deckKey}>
+              {deck.name}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      {selectedDeck ? (
+        <div className="mt-3 border-t border-stone-200 pt-3">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-stone-950">{selectedDeck.name}</p>
+              <p className="mt-1 font-mono text-xs text-stone-500">{selectedDeck.deckKey}</p>
+            </div>
+            <a
+              className="shrink-0 text-xs font-medium text-emerald-700 hover:text-emerald-900"
+              href={selectedDeck.sourceUrl}
+              rel="noreferrer"
+              target="_blank"
+            >
+              Source
+            </a>
+          </div>
+          <div className="mt-3 flex flex-wrap gap-1.5 text-xs font-medium text-stone-600">
+            <span className="rounded-full bg-stone-100 px-2 py-1">{selectedDeck.cardCount} cards</span>
+            <span className="rounded-full bg-stone-100 px-2 py-1">{selectedDeck.uniqueCardCount} unique</span>
+          </div>
+        </div>
+      ) : (
+        <p className="mt-3 border-t border-stone-200 pt-3 text-xs leading-5 text-stone-500">
+          Choose a fixture after the engine catalog loads.
+        </p>
+      )}
+    </div>
+  )
+}
+
+function FirstRunSetupGuide({
+  deckCount,
+  hasGame,
+  selectedPlayerOneDeck,
+  selectedPlayerTwoDeck,
+  viewerPlayerId
+}: {
+  deckCount: number
+  hasGame: boolean
+  selectedPlayerOneDeck: SupportedDeck | null
+  selectedPlayerTwoDeck: SupportedDeck | null
+  viewerPlayerId: PlayerId
+}) {
+  const loadoutsReady = Boolean(selectedPlayerOneDeck && selectedPlayerTwoDeck)
+  const loadoutDetail =
+    selectedPlayerOneDeck && selectedPlayerTwoDeck
+      ? `${selectedPlayerOneDeck.name} vs ${selectedPlayerTwoDeck.name}`
+      : deckCount > 0
+        ? 'Choose one supported fixture for each player.'
+        : 'Waiting for the engine-owned fixture catalog.'
+
+  return (
+    <section className="rounded-2xl border border-emerald-100 bg-[oklch(0.982_0.015_155)] p-3">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold text-stone-950">First table checklist</p>
+          <p className="mt-1 text-xs leading-5 text-stone-600">
+            Create the board here, then run setup from the Game flow rail after the board loads.
+          </p>
+        </div>
+        <StatusBadge tone={hasGame ? 'active' : loadoutsReady ? 'warning' : 'neutral'}>
+          {hasGame ? 'board linked' : loadoutsReady ? 'ready' : 'setup'}
+        </StatusBadge>
+      </div>
+
+      <div className="mt-3 space-y-2">
+        <SetupGuideRow
+          detail={loadoutDetail}
+          number="1"
+          state={loadoutsReady ? 'ready' : 'needed'}
+          title="Pick player loadouts"
+        />
+        <SetupGuideRow
+          detail={hasGame ? 'This tab is connected to a persisted game.' : 'Create a board when both loadouts are ready.'}
+          number="2"
+          state={hasGame ? 'done' : loadoutsReady ? 'next' : 'needed'}
+          title="Create the game board"
+        />
+        <SetupGuideRow
+          detail="Use Game flow for opening hands, Active choices, Prizes, and the first turn."
+          number="3"
+          state={hasGame ? 'next' : 'needed'}
+          title="Run table setup"
+        />
+        <SetupGuideRow
+          detail={`This tab is ${formatPlayerId(viewerPlayerId)}. Open another tab and select the other seat.`}
+          number="4"
+          state={hasGame ? 'ready' : 'needed'}
+          title="Seat the second player"
+        />
+      </div>
+    </section>
+  )
+}
+
+function SetupGuideRow({
+  number,
+  title,
+  detail,
+  state
+}: {
+  number: string
+  title: string
+  detail: string
+  state: 'done' | 'needed' | 'next' | 'ready'
+}) {
+  const badgeTone = state === 'done' || state === 'ready' ? 'active' : state === 'next' ? 'warning' : 'neutral'
+  const badgeLabel = state === 'done' ? 'done' : state === 'ready' ? 'ready' : state === 'next' ? 'next' : 'needed'
+
+  return (
+    <div className="flex items-start gap-3 rounded-xl border border-stone-200 bg-[oklch(0.995_0.004_155)] px-3 py-2.5">
+      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-stone-100 text-xs font-semibold text-stone-700">
+        {number}
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-sm font-medium text-stone-950">{title}</p>
+          <StatusBadge tone={badgeTone}>{badgeLabel}</StatusBadge>
+        </div>
+        <p className="mt-1 text-xs leading-5 text-stone-500">{detail}</p>
+      </div>
+    </div>
+  )
+}
+
+function SupportedDeckCatalog({
+  decks,
+  playerOneDeckKey,
+  playerTwoDeckKey
+}: {
+  decks: SupportedDeck[]
+  playerOneDeckKey: string
+  playerTwoDeckKey: string
+}) {
+  if (decks.length === 0) {
+    return (
+      <p className="rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-sm leading-6 text-stone-600">
+        Supported fixture metadata appears here after the engine catalog loads.
+      </p>
+    )
+  }
+
+  return (
+    <div className="space-y-3">
+      <p className="text-sm leading-6 text-stone-600">
+        Engine-owned deck fixtures for browser playtests. Selected fixtures are marked with their current seat.
+      </p>
+      {decks.map(deck => {
+        const selectedSeats = [
+          deck.deckKey === playerOneDeckKey ? 'P1' : null,
+          deck.deckKey === playerTwoDeckKey ? 'P2' : null
+        ].filter(Boolean)
+
+        return (
+          <div className="rounded-xl border border-stone-200 bg-stone-50 p-3" key={deck.deckKey}>
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium text-stone-950">{deck.name}</p>
+                <p className="mt-1 font-mono text-xs text-stone-500">{deck.deckKey}</p>
+              </div>
+              {selectedSeats.length > 0 ? (
+                <div className="flex shrink-0 gap-1">
+                  {selectedSeats.map(seat => (
+                    <StatusBadge key={seat} tone="active">
+                      {seat}
+                    </StatusBadge>
+                  ))}
+                </div>
+              ) : (
+                <span className="shrink-0 text-xs text-stone-500">{deck.uniqueCardCount} unique</span>
+              )}
+            </div>
+            <div className="mt-3 flex items-center justify-between gap-3 text-xs text-stone-500">
+              <span>{deck.cardCount} cards</span>
+              <a
+                className="font-medium text-emerald-700 hover:text-emerald-900"
+                href={deck.sourceUrl}
+                rel="noreferrer"
+                target="_blank"
+              >
+                Source decklist
+              </a>
+            </div>
+          </div>
+        )
+      })}
+    </div>
   )
 }
 
@@ -4544,28 +4745,34 @@ function EmptyWorkbench() {
       <div className="max-w-md">
         <p className="text-sm font-semibold uppercase tracking-[0.22em] text-stone-500">No game selected</p>
         <h2 className="mt-3 text-2xl font-semibold tracking-tight text-stone-950">
-          Create a fixture game or reconnect by ID
+          Create a game board or reconnect by ID
         </h2>
         <p className="mt-3 text-sm leading-6 text-stone-600">
-          Choose fixture decks to start a persisted game, or paste a game ID to rejoin one. Viewer identity is stored per
-          tab so separate browser sessions can safely sit in different player seats.
+          Pick two supported loadouts, create a persisted board, then use the Game flow rail for setup. Viewer identity is
+          stored per tab so separate browser sessions can safely sit in different player seats.
         </p>
         <div className="mt-6 grid gap-2 text-left text-sm text-stone-700">
           <div className="flex items-center gap-3 rounded-xl border border-stone-200 bg-stone-50 px-3 py-2">
             <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-xs font-semibold text-emerald-800">
               1
             </span>
-            <span>Choose two supported fixture decks.</span>
+            <span>Choose two supported player loadouts.</span>
           </div>
           <div className="flex items-center gap-3 rounded-xl border border-stone-200 bg-stone-50 px-3 py-2">
             <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-xs font-semibold text-emerald-800">
               2
             </span>
-            <span>Create or paste a persisted game ID.</span>
+            <span>Create a game board or paste a persisted game ID.</span>
           </div>
           <div className="flex items-center gap-3 rounded-xl border border-stone-200 bg-stone-50 px-3 py-2">
             <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-xs font-semibold text-emerald-800">
               3
+            </span>
+            <span>Use Game flow to draw opening hands, choose Active Pokémon, place Prizes, and start turn one.</span>
+          </div>
+          <div className="flex items-center gap-3 rounded-xl border border-stone-200 bg-stone-50 px-3 py-2">
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-xs font-semibold text-emerald-800">
+              4
             </span>
             <span>Open another tab and choose the other player seat for two-human playtests.</span>
           </div>
