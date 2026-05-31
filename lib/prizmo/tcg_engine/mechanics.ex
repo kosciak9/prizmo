@@ -157,8 +157,24 @@ defmodule Prizmo.TcgEngine.Mechanics do
           {:ok, Game.t()} | {:error, term()}
   def choose_active_from_hand(game_or_id, player_id, card_instance_id)
       when is_binary(player_id) and is_binary(card_instance_id) do
+    case get_game(game_or_id) do
+      {:ok, %Game{flow_state: :setup_choosing_opening_active} = game} ->
+        FlowInterpreter.dispatch(game, :choose_setup_active, %{
+          player_id: player_id,
+          card_instance_id: card_instance_id
+        })
+
+      {:ok, %Game{} = game} ->
+        choose_active_from_hand_legacy(game, player_id, card_instance_id)
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  defp choose_active_from_hand_legacy(%Game{} = game, player_id, card_instance_id) do
     transaction(fn ->
-      with {:ok, game} <- get_game(game_or_id),
+      with {:ok, game} <- get_game(game.id),
            {:ok, _setup} <- require_setup_status(game.id, :hands_drawn),
            {:ok, card} <- get_card(game.id, card_instance_id),
            :ok <- require_card_owned_by_player(card, player_id),
@@ -178,8 +194,24 @@ defmodule Prizmo.TcgEngine.Mechanics do
           {:ok, Game.t()} | {:error, term()}
   def choose_setup_bench_from_hand(game_or_id, player_id, card_instance_id)
       when is_binary(player_id) and is_binary(card_instance_id) do
+    case get_game(game_or_id) do
+      {:ok, %Game{flow_state: :setup_choosing_opening_bench} = game} ->
+        FlowInterpreter.dispatch(game, :choose_setup_bench, %{
+          player_id: player_id,
+          card_instance_id: card_instance_id
+        })
+
+      {:ok, %Game{} = game} ->
+        choose_setup_bench_from_hand_legacy(game, player_id, card_instance_id)
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  defp choose_setup_bench_from_hand_legacy(%Game{} = game, player_id, card_instance_id) do
     transaction(fn ->
-      with {:ok, game} <- get_game(game_or_id),
+      with {:ok, game} <- get_game(game.id),
            {:ok, _setup} <- require_setup_status(game.id, :hands_drawn),
            {:ok, card} <- get_card(game.id, card_instance_id),
            :ok <- require_card_owned_by_player(card, player_id),
@@ -197,6 +229,12 @@ defmodule Prizmo.TcgEngine.Mechanics do
         get_game(game.id)
       end
     end)
+  end
+
+  @spec finish_setup_choices(Game.t() | String.t(), String.t()) ::
+          {:ok, Game.t()} | {:error, term()}
+  def finish_setup_choices(game_or_id, player_id) when is_binary(player_id) do
+    FlowInterpreter.dispatch(game_or_id, :finish_setup_choices, %{player_id: player_id})
   end
 
   @spec place_prizes(Game.t() | String.t()) :: {:ok, Game.t()} | {:error, term()}

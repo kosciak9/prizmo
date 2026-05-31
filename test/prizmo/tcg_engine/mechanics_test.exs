@@ -3,6 +3,7 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
 
   alias Prizmo.Tcg.Decks.Alakazam27147
   alias Prizmo.Tcg.Decks.Dragapult27431
+  alias Prizmo.TcgEngine.CardCatalog
   alias Prizmo.TcgEngine.CardInstance
   alias Prizmo.TcgEngine.GameEvent
   alias Prizmo.TcgEngine.GameSnapshot
@@ -68,6 +69,52 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
 
       assert counts_by_zone(game.id) == %{deck: 120}
       assert event_types(game.id) == ["coin_toss_resolved"]
+    end
+
+    test "setup ready choices automatically place prizes and open the first action window" do
+      {:ok, game} = create_game()
+      {:ok, game} = Mechanics.call_coin_toss(game, "player_1", :heads)
+
+      {:ok, game} =
+        Mechanics.choose_starting_player(game, game.coin_toss_winner_player_id, "player_1")
+
+      player_1_active = hand_basic_card(game.id, "player_1")
+      player_2_active = hand_basic_card(game.id, "player_2")
+
+      assert {:ok, game} = Mechanics.choose_active_from_hand(game, "player_1", player_1_active.id)
+      assert game.flow_state == :setup_choosing_opening_active
+
+      assert {:ok, game} = Mechanics.choose_active_from_hand(game, "player_2", player_2_active.id)
+      assert game.flow_state == :setup_choosing_opening_bench
+
+      assert {:ok, game} = Mechanics.finish_setup_choices(game, "player_1")
+      assert game.flow_state == :setup_choosing_opening_bench
+
+      assert {:ok, game} = Mechanics.finish_setup_choices(game, "player_2")
+
+      assert game.status == :in_progress
+      assert game.flow_state == :turn_action_window
+      assert setup_status(game.id) == :completed
+      assert counts_by_zone(game.id) == %{active: 2, deck: 93, hand: 13, prize: 12}
+
+      assert %Turn{turn_number: 1, active_player_id: "player_1", status: :action_window} =
+               current_turn(game.id)
+
+      assert event_types(game.id) == [
+               "coin_toss_resolved",
+               "starting_player_chosen",
+               "opening_hands_drawn",
+               "setup_active_chosen",
+               "setup_active_chosen",
+               "setup_bench_choices_opened",
+               "setup_player_ready",
+               "setup_player_ready",
+               "prizes_placed",
+               "setup_completed",
+               "turn_started",
+               "turn_card_drawn",
+               "action_window_opened"
+             ]
     end
   end
 
@@ -278,6 +325,22 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
     |> Ash.Query.sort(position: :asc)
     |> Ash.read!()
     |> Enum.reject(&(&1.id in excluded_ids))
+  end
+
+  defp hand_basic_card(game_id, player_id) do
+    CardInstance
+    |> Ash.Query.filter(game_id == ^game_id and owner_player_id == ^player_id and zone == :hand)
+    |> Ash.Query.sort(position: :asc)
+    |> Ash.read!()
+    |> Enum.find(&CardCatalog.basic_pokemon?(&1.card_id))
+  end
+
+  defp current_turn(game_id) do
+    Turn
+    |> Ash.Query.filter(game_id == ^game_id)
+    |> Ash.Query.sort(turn_number: :desc)
+    |> Ash.read!()
+    |> List.first()
   end
 
   defp zone(card_id) do

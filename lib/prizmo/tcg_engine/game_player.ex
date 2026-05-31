@@ -19,6 +19,7 @@ defmodule Prizmo.TcgEngine.GamePlayer do
     define :mark_supporter_played
     define :mark_ace_spec_played
     define :mark_retreated
+    define :mark_setup_ready
     define :reset_turn_flags
     define :restore
   end
@@ -47,6 +48,10 @@ defmodule Prizmo.TcgEngine.GamePlayer do
       change set_attribute(:retreated_this_turn?, true)
     end
 
+    update :mark_setup_ready do
+      change set_attribute(:setup_ready?, true)
+    end
+
     update :reset_turn_flags do
       change set_attribute(:energy_attached_this_turn?, false)
       change set_attribute(:supporter_played_this_turn?, false)
@@ -58,7 +63,8 @@ defmodule Prizmo.TcgEngine.GamePlayer do
         :energy_attached_this_turn?,
         :supporter_played_this_turn?,
         :retreated_this_turn?,
-        :ace_spec_played_this_game?
+        :ace_spec_played_this_game?,
+        :setup_ready?
       ]
     end
   end
@@ -110,6 +116,12 @@ defmodule Prizmo.TcgEngine.GamePlayer do
     end
 
     attribute :ace_spec_played_this_game?, :boolean do
+      allow_nil? false
+      default false
+      public? true
+    end
+
+    attribute :setup_ready?, :boolean do
       allow_nil? false
       default false
       public? true

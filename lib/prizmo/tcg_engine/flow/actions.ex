@@ -1,20 +1,75 @@
 defmodule Prizmo.TcgEngine.Flow.Actions do
   @moduledoc false
 
-  import Prizmo.TcgEngine.BoardState, only: [require_no_prizes_placed: 1]
+  import Prizmo.TcgEngine.BoardState,
+    only: [
+      require_all_players_have_active: 1,
+      require_all_players_have_prizes: 2,
+      require_no_active: 2,
+      require_no_prizes_placed: 1
+    ]
+
+  import Prizmo.TcgEngine.CardMetadataRequirements, only: [require_basic_pokemon: 1]
+
+  import Prizmo.TcgEngine.CardStore,
+    only: [get_card: 2, next_bench_position: 2]
+
   import Prizmo.TcgEngine.EventLog, only: [write_event: 4, write_snapshot: 3]
   import Prizmo.TcgEngine.Operation, only: [create: 3, update: 3]
 
+  import Prizmo.TcgEngine.Requirements,
+    only: [require_card_owned_by_player: 2, require_card_zone: 2]
+
+  import Prizmo.TcgEngine.TurnDraw, only: [draw_one_for_turn: 2]
+
+  import Prizmo.TcgEngine.TurnFlow,
+    only: [next_turn_number: 1, next_turn_player_id: 1, opponent_player_id: 2]
+
+  import Prizmo.TcgEngine.TurnStore, only: [current_turn: 1]
+
   alias Prizmo.TcgEngine.Flow.Context
   alias Prizmo.TcgEngine.Game
+  alias Prizmo.TcgEngine.GamePlayer
   alias Prizmo.TcgEngine.GameSetup
   alias Prizmo.TcgEngine.Setup
   alias Prizmo.TcgEngine.SetupStore
+  alias Prizmo.TcgEngine.Turn
 
   @coin_faces [:heads, :tails]
 
   def opening_hands_not_dealt?(%Context{game: %Game{} = game}, _attrs) do
     GameSetup.require_no_setup_cards_moved(game.id) == :ok
+  end
+
+  def all_players_have_active?(%Context{game: %Game{} = game}, _attrs) do
+    require_all_players_have_active(game.id) == :ok
+  end
+
+  def all_players_setup_ready?(%Context{game: %Game{} = game, players: players}, _attrs) do
+    require_all_players_have_active(game.id) == :ok and Enum.all?(players, & &1.setup_ready?)
+  end
+
+  def setup_prizes_complete?(%Context{game: %Game{} = game}, _attrs) do
+    require_all_players_have_active(game.id) == :ok and
+      require_all_players_have_prizes(game.id, 6) == :ok
+  end
+
+  def can_start_turn?(%Context{game: %Game{} = game}, _attrs) do
+    match?({:ok, _player_id}, next_turn_player_id(game))
+  end
+
+  def can_draw_for_turn?(%Context{game: %Game{} = game}, _attrs) do
+    case current_turn(game.id) do
+      {:ok, %Turn{status: :start}} -> true
+      _other -> false
+    end
+  end
+
+  def can_open_action_window?(%Context{game: %Game{} = game}, _attrs) do
+    case current_turn(game.id) do
+      {:ok, %Turn{status: :drawn}} -> true
+      _other -> false
+    end
   end
 
   def record_coin_toss(%Context{} = context, attrs) do
@@ -83,6 +138,166 @@ defmodule Prizmo.TcgEngine.Flow.Actions do
     end
   end
 
+  def choose_setup_active(%Context{game: %Game{} = game} = context, attrs) do
+    player_id = Map.fetch!(attrs, :player_id)
+    card_instance_id = Map.fetch!(attrs, :card_instance_id)
+
+    with :ok <- require_player(context, player_id),
+         :ok <- require_setup_player_not_ready(context, player_id),
+         {:ok, card} <- get_card(game.id, card_instance_id),
+         :ok <- require_card_owned_by_player(card, player_id),
+         :ok <- require_card_zone(card, :hand),
+         :ok <- require_basic_pokemon(card.card_id),
+         :ok <- require_no_active(game.id, player_id),
+         {:ok, _card} <- update(card, :choose_active, %{position: 1, turn_entered_play: 0}),
+         {:ok, game} <-
+           update(game, :set_flow_state, %{flow_state: :setup_choosing_opening_active}),
+         {:ok, event} <-
+           write_event(game, :setup_active_chosen, player_id, %{card_instance_id: card.id}),
+         {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do
+      {:ok, game}
+    end
+  end
+
+  def open_setup_bench_choices(%Context{game: %Game{} = game}, _attrs) do
+    with {:ok, game} <-
+           update(game, :set_flow_state, %{flow_state: :setup_choosing_opening_bench}),
+         {:ok, event} <- write_event(game, :setup_bench_choices_opened, nil, %{}),
+         {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do
+      {:ok, game}
+    end
+  end
+
+  def choose_setup_bench(%Context{game: %Game{} = game} = context, attrs) do
+    player_id = Map.fetch!(attrs, :player_id)
+    card_instance_id = Map.fetch!(attrs, :card_instance_id)
+
+    with :ok <- require_player(context, player_id),
+         :ok <- require_setup_player_not_ready(context, player_id),
+         :ok <- require_player_has_active(game.id, player_id),
+         {:ok, card} <- get_card(game.id, card_instance_id),
+         :ok <- require_card_owned_by_player(card, player_id),
+         :ok <- require_card_zone(card, :hand),
+         :ok <- require_basic_pokemon(card.card_id),
+         {:ok, position} <- next_bench_position(game.id, player_id),
+         {:ok, _card} <-
+           update(card, :play_to_bench, %{position: position, turn_entered_play: 0}),
+         {:ok, game} <-
+           update(game, :set_flow_state, %{flow_state: :setup_choosing_opening_bench}),
+         {:ok, event} <-
+           write_event(game, :setup_bench_chosen, player_id, %{
+             card_instance_id: card.id,
+             position: position
+           }),
+         {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do
+      {:ok, game}
+    end
+  end
+
+  def finish_setup_choices(%Context{game: %Game{} = game} = context, attrs) do
+    player_id = Map.fetch!(attrs, :player_id)
+
+    with :ok <- require_player(context, player_id),
+         :ok <- require_setup_player_not_ready(context, player_id),
+         :ok <- require_player_has_active(game.id, player_id),
+         %GamePlayer{} = player <- player(context, player_id),
+         {:ok, _player} <- update(player, :mark_setup_ready, %{}),
+         {:ok, game} <-
+           update(game, :set_flow_state, %{flow_state: :setup_choosing_opening_bench}),
+         {:ok, event} <- write_event(game, :setup_player_ready, player_id, %{}),
+         {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do
+      {:ok, game}
+    end
+  end
+
+  def place_setup_prizes(%Context{game: %Game{} = game}, _attrs) do
+    with {:ok, setup} <- SetupStore.get_setup(game.id),
+         :ok <- require_all_players_have_active(game.id),
+         :ok <- require_no_prizes_placed(game.id),
+         {:ok, setup} <- update(setup, :place_prizes, %{}),
+         {:ok, _cards} <- GameSetup.place_prize_cards(game.id),
+         {:ok, game} <- update(game, :set_flow_state, %{flow_state: :setup_completing_setup}),
+         {:ok, event} <- write_event(game, :prizes_placed, nil, %{setup_id: setup.id}),
+         {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do
+      {:ok, game}
+    end
+  end
+
+  def complete_setup(%Context{game: %Game{} = game}, _attrs) do
+    with {:ok, setup} <- SetupStore.get_setup(game.id),
+         :ok <- require_all_players_have_active(game.id),
+         :ok <- require_all_players_have_prizes(game.id, 6),
+         {:ok, setup} <- update(setup, :complete_setup, %{}),
+         {:ok, game} <- update(game, :complete_setup, %{}),
+         {:ok, game} <- update(game, :set_flow_state, %{flow_state: :turn_starting_turn}),
+         {:ok, event} <- write_event(game, :setup_completed, nil, %{setup_id: setup.id}),
+         {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do
+      {:ok, game}
+    end
+  end
+
+  def start_turn(%Context{game: %Game{} = game}, _attrs) do
+    with {:ok, next_player_id} <- next_turn_player_id(game),
+         {:ok, turn_number} <- next_turn_number(game.id),
+         {:ok, next_player} <- get_context_player(game.id, next_player_id),
+         {:ok, _player} <- update(next_player, :reset_turn_flags, %{}),
+         {:ok, game} <- update(game, :set_active_player, %{active_player_id: next_player_id}),
+         {:ok, turn} <-
+           create(Turn, :create, %{
+             game_id: game.id,
+             turn_number: turn_number,
+             active_player_id: next_player_id
+           }),
+         {:ok, game} <- update(game, :set_flow_state, %{flow_state: :turn_drawing_for_turn}),
+         {:ok, event} <- write_event(game, :turn_started, next_player_id, %{turn_id: turn.id}),
+         {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do
+      {:ok, game}
+    end
+  end
+
+  def draw_for_turn(%Context{game: %Game{} = game}, _attrs) do
+    with {:ok, turn} <- current_turn(game.id),
+         {:ok, turn} <- update(turn, :draw_for_turn, %{}) do
+      case draw_one_for_turn(game.id, turn.active_player_id) do
+        {:ok, _card} ->
+          with {:ok, game} <-
+                 update(game, :set_flow_state, %{flow_state: :turn_opening_action_window}),
+               {:ok, event} <-
+                 write_event(game, :turn_card_drawn, turn.active_player_id, %{turn_id: turn.id}),
+               {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do
+            {:ok, game}
+          end
+
+        {:error, :cannot_draw_from_empty_deck} ->
+          with {:ok, winner_player_id} <- opponent_player_id(game.id, turn.active_player_id),
+               {:ok, game} <- update(game, :finish, %{winner_player_id: winner_player_id}),
+               {:ok, game} <- update(game, :set_flow_state, %{flow_state: :finished}),
+               {:ok, event} <-
+                 write_event(game, :deck_out, turn.active_player_id, %{
+                   turn_id: turn.id,
+                   winner_player_id: winner_player_id
+                 }),
+               {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do
+            {:ok, game}
+          end
+
+        {:error, reason} ->
+          {:error, reason}
+      end
+    end
+  end
+
+  def open_action_window(%Context{game: %Game{} = game}, _attrs) do
+    with {:ok, turn} <- current_turn(game.id),
+         {:ok, turn} <- update(turn, :open_action_window, %{}),
+         {:ok, game} <- update(game, :set_flow_state, %{flow_state: :turn_action_window}),
+         {:ok, event} <-
+           write_event(game, :action_window_opened, turn.active_player_id, %{turn_id: turn.id}),
+         {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do
+      {:ok, game}
+    end
+  end
+
   defp normalize_coin_face(face) when face in @coin_faces, do: {:ok, face}
   defp normalize_coin_face("heads"), do: {:ok, :heads}
   defp normalize_coin_face("tails"), do: {:ok, :tails}
@@ -105,6 +320,33 @@ defmodule Prizmo.TcgEngine.Flow.Actions do
 
   defp require_player(%Context{} = context, player_id) do
     if Context.player?(context, player_id), do: :ok, else: {:error, :player_not_found}
+  end
+
+  defp require_setup_player_not_ready(%Context{} = context, player_id) do
+    case player(context, player_id) do
+      %GamePlayer{setup_ready?: false} -> :ok
+      %GamePlayer{setup_ready?: true} -> {:error, :setup_player_already_ready}
+      nil -> {:error, :player_not_found}
+    end
+  end
+
+  defp require_player_has_active(game_id, player_id) do
+    case require_no_active(game_id, player_id) do
+      {:error, :active_already_chosen} -> :ok
+      :ok -> {:error, :setup_active_required}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp player(%Context{players: players}, player_id) do
+    Enum.find(players, &(&1.player_id == player_id))
+  end
+
+  defp get_context_player(game_id, player_id) do
+    case Prizmo.TcgEngine.PlayerStore.get_player(game_id, player_id) do
+      {:ok, %GamePlayer{} = player} -> {:ok, player}
+      {:error, reason} -> {:error, reason}
+    end
   end
 
   defp require_no_coin_toss(%Game{coin_toss_result: nil}), do: :ok

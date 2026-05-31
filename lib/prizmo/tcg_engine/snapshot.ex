@@ -108,7 +108,8 @@ defmodule Prizmo.TcgEngine.Snapshot do
       "energy_attached_this_turn?" => player.energy_attached_this_turn?,
       "supporter_played_this_turn?" => player.supporter_played_this_turn?,
       "retreated_this_turn?" => player.retreated_this_turn?,
-      "ace_spec_played_this_game?" => player.ace_spec_played_this_game?
+      "ace_spec_played_this_game?" => player.ace_spec_played_this_game?,
+      "setup_ready?" => player.setup_ready?
     }
   end
 

@@ -90,7 +90,8 @@ defmodule Prizmo.TcgEngine.SnapshotRestorer do
           energy_attached_this_turn?: Map.fetch!(data, "energy_attached_this_turn?"),
           supporter_played_this_turn?: Map.fetch!(data, "supporter_played_this_turn?"),
           retreated_this_turn?: Map.fetch!(data, "retreated_this_turn?"),
-          ace_spec_played_this_game?: Map.fetch!(data, "ace_spec_played_this_game?")
+          ace_spec_played_this_game?: Map.fetch!(data, "ace_spec_played_this_game?"),
+          setup_ready?: Map.get(data, "setup_ready?", false)
         })
       end)
       |> collect_results()

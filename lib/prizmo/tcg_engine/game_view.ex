@@ -221,6 +221,7 @@ defmodule Prizmo.TcgEngine.GameView do
         supporter_played_this_turn: player.supporter_played_this_turn?,
         retreated_this_turn: player.retreated_this_turn?,
         ace_spec_played_this_game: player.ace_spec_played_this_game?,
+        setup_ready: player.setup_ready?,
         deck_count: zone_count(player_cards, :deck),
         hand_count: zone_count(player_cards, :hand),
         prize_count: zone_count(player_cards, :prize),

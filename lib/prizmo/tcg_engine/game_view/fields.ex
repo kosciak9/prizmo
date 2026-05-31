@@ -75,6 +75,7 @@ defmodule Prizmo.TcgEngine.GameView.Fields do
     supporter_played_this_turn: [type: :boolean, allow_nil?: false],
     retreated_this_turn: [type: :boolean, allow_nil?: false],
     ace_spec_played_this_game: [type: :boolean, allow_nil?: false],
+    setup_ready: [type: :boolean, allow_nil?: false],
     deck_count: [type: :integer, allow_nil?: false],
     hand_count: [type: :integer, allow_nil?: false],
     prize_count: [type: :integer, allow_nil?: false],

@@ -163,6 +163,7 @@ const GAME_STATE_FIELDS = [
       'supporterPlayedThisTurn',
       'retreatedThisTurn',
       'aceSpecPlayedThisGame',
+      'setupReady',
       'deckCount',
       'handCount',
       'prizeCount',
@@ -284,6 +285,7 @@ type PlayerView = {
   supporterPlayedThisTurn: boolean
   retreatedThisTurn: boolean
   aceSpecPlayedThisGame: boolean
+  setupReady: boolean
   deckCount: number
   handCount: number
   prizeCount: number

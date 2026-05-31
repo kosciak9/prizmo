@@ -139,6 +139,24 @@ defmodule Prizmo.TcgEngine.Game.ActionCommands do
       end
     end
 
+    action :finish_setup_choices_command, :struct do
+      description "Mark a player done with setup Bench choices through the game-flow machine."
+
+      constraints instance_of: Game
+
+      argument :game_id, :uuid do
+        allow_nil? false
+      end
+
+      argument :player_id, :string do
+        allow_nil? false
+      end
+
+      run fn input, _context ->
+        Mechanics.finish_setup_choices(input.arguments.game_id, input.arguments.player_id)
+      end
+    end
+
     action :place_prizes_command, :struct do
       description "Place setup Prize cards for a persisted TCG engine game through the mechanics layer."
 
