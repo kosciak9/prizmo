@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-31] iteration 127 | Player 1 turn-5 action-window landing
+- Task attempted: continued the Web UI polish pass from the verified post-event-51 Player 1 turn-5 start state by clicking `Draw for player 1`, verifying the drawn landing and Player 2 owner-tab open-action guidance, then opening Player 1's action window.
+- Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.
+- Validation: Tidewave precheck confirmed game `d608a1f1-6db6-4f23-a8d0-4a7d27641993` was at event #51 with `Turn 5, start`, active Player 1, no awaiting prompts, and no legal actions; browser smoke on `http://localhost:4003` as Player 1 clicked `Draw for player 1`, confirmed `Turn 5, drawn`, event #52 `draw_for_turn`, Player 1 hand count 5, refined owner copy `Use this player 1 tab to open the action window`, switched to Player 2 and confirmed disabled `Use player 1 tab to open actions`; switched back to Player 1, clicked `Open action window`, confirmed event #53 `open_action_window`, `Turn 5, action_window`, and visible Player 1 actions; browser console reported no warnings or errors; Tidewave postcheck confirmed both viewers at cursor `53 of 53`, Player 1 has 4 action affordances, Player 2 has 0, and no awaiting prompts; `mix format`, `mix assets.build`, and `mix check --no-test` passed.
+- Remaining/blocking notes: no code blocker for this Player 1 turn-5 draw/open-action landing slice. Further polish should continue from the post-event-53 Player 1 action-window state by verifying one live action-window choice, preferably the visible Retreat branch or another battle/Trainer branch, without repeating the draw/open-action path.
+
 ## [2026-05-31] iteration 126 | Player 1 turn-5 start landing
 - Task attempted: continued the Web UI polish pass from the verified post-event-50 Player 2 ended-turn state by clicking `Start player 1's turn`, verifying the persisted turn-5 start landing from both seats, and tightening owner/non-owner draw-timing copy for the start-state guide.
 - Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.

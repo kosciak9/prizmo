@@ -2380,7 +2380,7 @@ function TurnStepGuide({
       ? `Use this ${turnOwnerLabel} tab to draw a card, or skip only when the fixture scenario calls for it.`
       : `Draw timing belongs to ${turnOwnerLabel}. Use the ${turnOwnerLabel} tab, then refresh here.`
   } else if (drawStepResolved) {
-    drawDetail = 'Draw-step timing is resolved for this turn.'
+    drawDetail = `Draw-step timing is resolved for ${turnOwnerLabel}.`
   } else if (currentTurn) {
     drawDetail = 'Finish the current attack or prompt flow before the next draw step.'
   }
@@ -2397,7 +2397,7 @@ function TurnStepGuide({
       : `Use the ${turnOwnerLabel} tab to finish draw timing before opening actions, then refresh here.`
   } else if (currentTurn?.status === 'drawn') {
     actionWindowDetail = viewerOwnsTurn
-      ? 'Open the action window so hand, board, retreat, attack, and end-turn actions can appear below.'
+      ? `Use this ${turnOwnerLabel} tab to open the action window so hand, board, retreat, attack, and end-turn actions can appear below.`
       : `Draw timing is resolved for ${turnOwnerLabel}. Use the ${turnOwnerLabel} tab to open the action window, then refresh here.`
   } else if (activeWindowOpen) {
     actionWindowDetail = `Action decisions are live for ${turnOwnerLabel}. Use Available actions below.`
