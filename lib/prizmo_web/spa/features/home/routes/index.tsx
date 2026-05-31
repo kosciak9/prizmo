@@ -2641,8 +2641,9 @@ function completedSetupTurnDetail({
     const nextTurnOwnerId = players.find(player => player.playerId !== currentTurn.activePlayerId)?.playerId ?? firstPlayerId
     const nextTurnOwnerLabel = formatPlayerId(nextTurnOwnerId)
     const nextTurnOwnerTabLabel = `the ${nextTurnOwnerLabel} tab`
+    const nextTurnOwnerTabDirection = nextTurnOwnerId === viewerPlayerId ? 'this tab' : nextTurnOwnerTabLabel
 
-    return `Opening choices are locked. Use Turn step to start ${nextTurnOwnerLabel}'s next turn, resolve draw timing from ${nextTurnOwnerTabLabel}, and reopen legal actions.`
+    return `Opening choices are locked. Use Turn step to start ${nextTurnOwnerLabel}'s next turn, resolve draw timing from ${nextTurnOwnerTabDirection}, and reopen legal actions.`
   }
 
   if (currentTurn.status === 'start') {

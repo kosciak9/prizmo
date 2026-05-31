@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-31] iteration 142 | Player 2 ended-turn landing
+- Task attempted: continued from the verified post-event-99 Player 2 action-window state by clicking `End player 2's turn`, verifying the persisted ended-turn/Player 1 next-turn landing from both seats, and tightening the completed-setup copy so the Player 1 owner tab says to resolve draw timing from `this tab` while non-owner Player 2 still points to the Player 1 tab.
+- Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.
+- Validation: Tidewave precheck confirmed game `d608a1f1-6db6-4f23-a8d0-4a7d27641993` at cursor `99 of 99` with `Turn 8, action_window`, active Player 2, no prompts, Player 2 only `End turn`, and Player 1 with no actions; browser smoke on `http://localhost:4003` switched to Player 2, clicked `End player 2's turn`, confirmed cursor `100 of 100`, `Turn 8, ended`, latest event #100 `end_turn`, Player 2 guidance pointing to the Player 1 tab, then switched to Player 1 and confirmed Table setup plus Turn step copy resolve draw timing from `this tab`; browser console reported no warnings or errors; Tidewave postcheck confirmed both viewers at cursor `100 of 100`, latest event #100 `end_turn`, no prompts, and no legal actions; `mix format`, `mix assets.build`, and `mix check --no-test` passed.
+- Remaining/blocking notes: no code blocker for this ended-turn landing slice. Further polish should continue from the post-event-100 ended state by switching/using Player 1, clicking `Start player 1's turn`, verifying the turn-9 start landing and owner-tab draw guidance from both seats, and avoiding the already-verified Player 2 End Turn branch.
+
 ## [2026-05-31] iteration 141 | Player 2 draw/open-action landing
 - Task attempted: continued from the post-event-97 Player 2 turn-start state by drawing for Player 2, opening Player 2's action window, verifying the persisted turn-8 action-window landing from both seats, and tightening completed-setup/turn-path copy so owner and non-owner tabs point to the right Available actions seat.
 - Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.
