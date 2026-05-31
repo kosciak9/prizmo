@@ -292,6 +292,21 @@ type ActionGroup = {
   actions: ActionAffordance[]
 }
 
+type EvolutionCommandOption = {
+  key: string
+  evolutionCardInstanceId: string
+  targetCardInstanceId: string
+  evolutionCard: CardSummary | undefined
+  targetCard: CardSummary | undefined
+  baseLabel: string
+}
+
+type ActionRenderEntry = {
+  key: string
+  action: ActionAffordance
+  evolutionOptions?: EvolutionCommandOption[]
+}
+
 const ACTION_GROUPS: Array<Omit<ActionGroup, 'actions'>> = [
   {
     id: 'required',
@@ -3964,17 +3979,18 @@ function ActionAffordancesPanel({
               </div>
 
               <ul className="space-y-1.5">
-                {group.actions.map(action => (
+                {actionRenderEntries(group.actions, cardsById).map(entry => (
                   <ActionAffordanceCard
-                    action={action}
+                    action={entry.action}
                     actionCommandPending={actionCommandPending}
                     attachEnergyPendingKey={attachEnergyPendingKey}
                     cardsById={cardsById}
                     chooseReplacementActivePendingCardId={chooseReplacementActivePendingCardId}
                     declareAttackPendingKey={declareAttackPendingKey}
                     endTurnPendingPlayerId={endTurnPendingPlayerId}
+                    evolutionOptions={entry.evolutionOptions}
                     evolveFromHandPendingKey={evolveFromHandPendingKey}
-                    key={actionKey(action)}
+                    key={entry.key}
                     onAttachEnergy={onAttachEnergy}
                     onChooseReplacementActive={onChooseReplacementActive}
                     onDeclareAttack={onDeclareAttack}
@@ -4150,6 +4166,7 @@ function ActionWindowGuide({
   const handGroup = actionGroups.find(group => group.id === 'hand')
   const battleGroup = actionGroups.find(group => group.id === 'battle')
   const turnGroup = actionGroups.find(group => group.id === 'turn')
+  const evolutionAction = handGroup?.actions.find(action => action.key === 'evolve_from_hand')
   const turnOwnerId = currentTurn?.activePlayerId ?? viewerPlayerId
   const turnOwnerLabel = formatPlayerId(turnOwnerId)
   const viewerLabel = formatPlayerId(viewerPlayerId)
@@ -4161,7 +4178,9 @@ function ActionWindowGuide({
       } on Bench.`
     : `${turnOwnerLabel} owns this action window. This tab is ${viewerLabel}; use the matching seat for commands.`
   const handDetail = handGroup
-    ? `${handGroup.actions.length} hand or board command${handGroup.actions.length === 1 ? '' : 's'} available. Bench Basics, attach Energy, or play a Trainer before committing to battle.`
+    ? evolutionAction
+      ? `${handGroup.actions.length} hand or board command${handGroup.actions.length === 1 ? '' : 's'} available. Evolution is legal now; use the Active/Bench labels on duplicate rows to choose exactly which Pokémon changes before committing to battle.`
+      : `${handGroup.actions.length} hand or board command${handGroup.actions.length === 1 ? '' : 's'} available. Bench Basics, attach Energy, or play a Trainer before committing to battle.`
     : 'No hand or board command is legal from this view. Move to battle decisions or turn flow.'
   const battleDetail = battleGroup
     ? turnGroup
@@ -4268,6 +4287,7 @@ function ActionAffordanceCard({
   chooseReplacementActivePendingCardId,
   declareAttackPendingKey,
   endTurnPendingPlayerId,
+  evolutionOptions: providedEvolutionOptions,
   evolveFromHandPendingKey,
   onAttachEnergy,
   onChooseReplacementActive,
@@ -4291,6 +4311,7 @@ function ActionAffordanceCard({
   chooseReplacementActivePendingCardId: string | null
   declareAttackPendingKey: string | null
   endTurnPendingPlayerId: string | null
+  evolutionOptions?: EvolutionCommandOption[]
   evolveFromHandPendingKey: string | null
   onAttachEnergy: (input: AttachEnergyCommand) => void
   onChooseReplacementActive: (input: ChooseReplacementActiveCommand) => void
@@ -4310,6 +4331,8 @@ function ActionAffordanceCard({
   const canRunAction = !actionCommandPending && isPlayerId(action.playerId)
   const isPostSearchEndTurnAction = isPlayerId(action.playerId) && postSearchEndTurnPlayerIds.includes(action.playerId)
   const playCardPromptGuide = ultraBallPlayCardPromptGuide(action, cardsById)
+  const evolutionOptions = providedEvolutionOptions ?? evolutionCommandOptions(action, cardsById)
+  const repeatedEvolutionLabels = repeatedEvolutionBaseLabels(evolutionOptions)
 
   return (
     <li className={`rounded-xl border px-3 py-2.5 text-sm ${actionSurfaceClassName(action)}`}>
@@ -4387,36 +4410,30 @@ function ActionAffordanceCard({
         </div>
       ) : null}
 
-      {action.key === 'evolve_from_hand' && action.sourceCardInstanceIds.length > 0 && action.targetCardInstanceIds.length > 0 ? (
+      {evolutionOptions.length > 0 ? (
         <div className="mt-2 space-y-1.5">
-          {action.sourceCardInstanceIds.flatMap(evolutionCardInstanceId =>
-            action.targetCardInstanceIds.map(targetCardInstanceId => {
-              const evolutionCard = cardsById.get(evolutionCardInstanceId)
-              const targetCard = cardsById.get(targetCardInstanceId)
-              const evolutionActionKey = evolveKey(evolutionCardInstanceId, targetCardInstanceId)
-              const isPending = evolveFromHandPendingKey === evolutionActionKey
+          <EvolutionChoiceGuide options={evolutionOptions} />
 
-              return (
-                <ActionCommandButton
-                  disabled={!canRunAction}
-                  key={evolutionActionKey}
-                  onClick={() =>
-                    onEvolveFromHand({
-                      playerId: action.playerId,
-                      evolutionCardInstanceId,
-                      targetCardInstanceId
-                    })
-                  }
-                >
-                  {isPending
-                    ? `Evolving ${targetCard?.name ?? 'Pokémon'}...`
-                    : `Evolve ${targetCard?.name ?? formatCardInstanceId(targetCardInstanceId)} into ${
-                        evolutionCard?.name ?? formatCardInstanceId(evolutionCardInstanceId)
-                      }`}
-                </ActionCommandButton>
-              )
-            })
-          )}
+          {evolutionOptions.map(option => {
+            const isPending = evolveFromHandPendingKey === option.key
+            const needsSourceCopyLabel = repeatedEvolutionLabels.has(option.baseLabel)
+
+            return (
+              <ActionCommandButton
+                disabled={!canRunAction}
+                key={option.key}
+                onClick={() =>
+                  onEvolveFromHand({
+                    playerId: action.playerId,
+                    evolutionCardInstanceId: option.evolutionCardInstanceId,
+                    targetCardInstanceId: option.targetCardInstanceId
+                  })
+                }
+              >
+                {isPending ? evolutionPendingLabel(option) : evolutionButtonLabel(option, needsSourceCopyLabel)}
+              </ActionCommandButton>
+            )
+          })}
         </div>
       ) : null}
 
@@ -4539,6 +4556,33 @@ function ActionAffordanceCard({
   )
 }
 
+function EvolutionChoiceGuide({ options }: { options: EvolutionCommandOption[] }) {
+  const targetCount = new Set(options.map(option => option.targetCardInstanceId)).size
+  const sourceCount = new Set(options.map(option => option.evolutionCardInstanceId)).size
+  const duplicatedBaseLabelCount = repeatedEvolutionBaseLabels(options).size
+  const detail = duplicatedBaseLabelCount > 0
+    ? 'Repeated names are separate legal choices. Buttons now show the in-play target location and, when needed, the hand copy so the chosen evolution is unambiguous.'
+    : targetCount > 1
+      ? 'Choose which in-play Pokémon evolves. Buttons name Active or Bench position so identical Basics stay distinguishable.'
+      : sourceCount > 1
+        ? 'Multiple evolution cards can evolve the same target. Choose the hand copy you want to play.'
+        : 'One legal evolution is ready from the current hand and board.'
+
+  return (
+    <div className="rounded-lg border border-violet-200 bg-violet-50/70 px-3 py-2 text-xs leading-5 text-violet-950">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <p className="font-semibold uppercase tracking-[0.14em] text-violet-800">Evolution choice</p>
+          <p className="mt-0.5 text-violet-900/80">{detail}</p>
+        </div>
+        <StatusBadge tone="warning">
+          {options.length} {options.length === 1 ? 'choice' : 'choices'}
+        </StatusBadge>
+      </div>
+    </div>
+  )
+}
+
 function ActionCommandButton({
   children,
   className = '',
@@ -4612,6 +4656,91 @@ function actionSummary(action: ActionAffordance) {
   }
 }
 
+function evolutionCommandOptions(
+  action: ActionAffordance,
+  cardsById: Map<string, CardSummary>
+): EvolutionCommandOption[] {
+  if (action.key !== 'evolve_from_hand') {
+    return []
+  }
+
+  return action.sourceCardInstanceIds.flatMap(evolutionCardInstanceId =>
+    action.targetCardInstanceIds.map(targetCardInstanceId => {
+      const evolutionCard = cardsById.get(evolutionCardInstanceId)
+      const targetCard = cardsById.get(targetCardInstanceId)
+
+      return {
+        key: evolveKey(evolutionCardInstanceId, targetCardInstanceId),
+        evolutionCardInstanceId,
+        targetCardInstanceId,
+        evolutionCard,
+        targetCard,
+        baseLabel: evolutionBaseLabel(evolutionCard, evolutionCardInstanceId, targetCard, targetCardInstanceId)
+      }
+    })
+  )
+}
+
+function repeatedEvolutionBaseLabels(options: EvolutionCommandOption[]) {
+  const labelCounts = new Map<string, number>()
+
+  for (const option of options) {
+    labelCounts.set(option.baseLabel, (labelCounts.get(option.baseLabel) ?? 0) + 1)
+  }
+
+  return new Set([...labelCounts.entries()].filter(([, count]) => count > 1).map(([label]) => label))
+}
+
+function evolutionBaseLabel(
+  evolutionCard: CardSummary | undefined,
+  evolutionCardInstanceId: string,
+  targetCard: CardSummary | undefined,
+  targetCardInstanceId: string
+) {
+  return `${targetCard?.name ?? formatCardInstanceId(targetCardInstanceId)}:${
+    evolutionCard?.name ?? formatCardInstanceId(evolutionCardInstanceId)
+  }`
+}
+
+function evolutionPendingLabel(option: EvolutionCommandOption) {
+  return `Evolving ${evolutionTargetLabel(option.targetCard, option.targetCardInstanceId)}...`
+}
+
+function evolutionButtonLabel(option: EvolutionCommandOption, includeSourceCopyLabel: boolean) {
+  const sourceName = option.evolutionCard?.name ?? formatCardInstanceId(option.evolutionCardInstanceId)
+  const sourceCopyLabel = includeSourceCopyLabel ? ` from ${cardLocationLabel(option.evolutionCard, 'hand')}` : ''
+
+  return `Evolve ${evolutionTargetLabel(option.targetCard, option.targetCardInstanceId)} into ${sourceName}${sourceCopyLabel}`
+}
+
+function evolutionTargetLabel(card: CardSummary | undefined, cardInstanceId: string) {
+  if (!card) {
+    return formatCardInstanceId(cardInstanceId)
+  }
+
+  return `${cardLocationLabel(card, 'in play')} ${card.name}`
+}
+
+function cardLocationLabel(card: CardSummary | undefined, fallback: string) {
+  if (!card) {
+    return fallback
+  }
+
+  if (card.zone === 'active') {
+    return 'Active'
+  }
+
+  if (card.zone === 'bench') {
+    return Number.isFinite(card.position) ? `Bench ${card.position + 1}` : 'Bench'
+  }
+
+  if (card.zone === 'hand') {
+    return Number.isFinite(card.position) ? `hand slot ${card.position + 1}` : 'hand'
+  }
+
+  return formatEventType(card.zone)
+}
+
 function actionCountLabel(count: number, singular: string, plural = `${singular}s`) {
   return `${count} ${count === 1 ? singular : plural}`
 }
@@ -4653,6 +4782,76 @@ function actionHasMetadata(action: ActionAffordance) {
     action.promptIds.length > 0 ||
     action.choiceKeys.length > 0
   )
+}
+
+function actionRenderEntries(actions: ActionAffordance[], cardsById: Map<string, CardSummary>): ActionRenderEntry[] {
+  const entries: ActionRenderEntry[] = []
+  let pendingEvolutionActions: ActionAffordance[] = []
+
+  function flushEvolutionActions() {
+    const entry = mergedEvolutionRenderEntry(pendingEvolutionActions, cardsById)
+
+    if (entry) {
+      entries.push(entry)
+    }
+
+    pendingEvolutionActions = []
+  }
+
+  for (const action of actions) {
+    if (action.key === 'evolve_from_hand') {
+      pendingEvolutionActions.push(action)
+    } else {
+      flushEvolutionActions()
+      entries.push({ key: actionKey(action), action })
+    }
+  }
+
+  flushEvolutionActions()
+
+  return entries
+}
+
+function mergedEvolutionRenderEntry(
+  actions: ActionAffordance[],
+  cardsById: Map<string, CardSummary>
+): ActionRenderEntry | null {
+  const firstAction = actions[0]
+
+  if (!firstAction) {
+    return null
+  }
+
+  const options = uniqueEvolutionOptions(actions.flatMap(action => evolutionCommandOptions(action, cardsById)))
+  const sourceCardInstanceIds = uniqueStrings(options.map(option => option.evolutionCardInstanceId))
+  const targetCardInstanceIds = uniqueStrings(options.map(option => option.targetCardInstanceId))
+  const mergedAction: ActionAffordance = {
+    ...firstAction,
+    sourceCardInstanceIds,
+    targetCardInstanceIds,
+    promptIds: uniqueStrings(actions.flatMap(action => action.promptIds)),
+    choiceKeys: uniqueStrings(actions.flatMap(action => action.choiceKeys))
+  }
+
+  return {
+    key: ['evolve_from_hand', firstAction.playerId, ...options.map(option => option.key)].join(':'),
+    action: mergedAction,
+    evolutionOptions: options
+  }
+}
+
+function uniqueEvolutionOptions(options: EvolutionCommandOption[]) {
+  const optionsByKey = new Map<string, EvolutionCommandOption>()
+
+  for (const option of options) {
+    optionsByKey.set(option.key, option)
+  }
+
+  return [...optionsByKey.values()]
+}
+
+function uniqueStrings(values: string[]) {
+  return [...new Set(values)]
 }
 
 function groupActionAffordances(actions: ActionAffordance[]): ActionGroup[] {

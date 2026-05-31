@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-31] iteration 106 | Player 2 evolution choice clarity
+- Task attempted: continued the Web UI polish pass in the Player 2 turn-2 action window by consolidating repeated evolution affordance cards and disambiguating duplicate `Evolve Abra into Kadabra` choices with in-play target location plus hand-copy labels.
+- Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.
+- Validation: `mix format && mix assets.build` passed; browser smoke on `http://localhost:4003` resumed game `d608a1f1-6db6-4f23-a8d0-4a7d27641993` as Player 2 on turn 2 action window, confirmed `Action window plan` now explains evolution labels, the three Kadabra copies render as one `Evolution choice` card with `3 choices`, and buttons read `Evolve Active Abra into Kadabra from hand slot 6/7/8`; browser console reported no warnings or errors; `mix check --no-test` passed.
+- Remaining/blocking notes: no code blocker for this first-decision clarity slice. Further polish can disambiguate repeated Basic bench rows such as multiple `Bench Abra` buttons, then rerun the formal two-browser/manual-tester milestone once isolated contexts are guaranteed.
+
 ## [2026-05-31] iteration 105 | Player 2 next-turn owner tab
 - Task attempted: continued the Web UI polish pass by verifying the post-search pass/end-turn next-player path and aligning turn-step command availability with the current turn owner's tab, so non-owner tabs now point players to the correct seat for draw timing and opening the action window.
 - Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.
