@@ -189,6 +189,12 @@ type PromptFlowGuide = {
   steps: PromptFlowStep[]
 }
 
+type UltraBallPostSearchHandoff = {
+  gameId: string
+  playerId: PlayerId
+  selectedCardInstanceIds: string[]
+}
+
 type PlaytestSession = {
   gameId: string
   viewerPlayerId: PlayerId
@@ -454,12 +460,14 @@ type ChoosePromptInput = {
   playerId: PlayerId
   promptId: string
   selectedCardInstanceIds: string[]
+  choiceKey?: string
 }
 
 type ChoosePromptCommand = {
   playerId: string
   promptId: string
   selectedCardInstanceIds: string[]
+  choiceKey?: string
 }
 
 type SetupCardCommand = {
@@ -527,6 +535,8 @@ export function HomeRoute() {
   const [session, setSession] = useState<PlaytestSession>(readStoredSession)
   const [playerOneDeckKey, setPlayerOneDeckKey] = useState('')
   const [playerTwoDeckKey, setPlayerTwoDeckKey] = useState('')
+  const [ultraBallPostSearchHandoff, setUltraBallPostSearchHandoff] =
+    useState<UltraBallPostSearchHandoff | null>(null)
 
   useEffect(() => {
     setStoredSession(session)
@@ -541,6 +551,20 @@ export function HomeRoute() {
   const selectedPlayerOneDeckKey = playerOneDeckKey || decks[0]?.deckKey || ''
   const selectedPlayerTwoDeckKey = playerTwoDeckKey || decks[1]?.deckKey || decks[0]?.deckKey || ''
   const normalisedGameId = session.gameId.trim()
+
+  useEffect(() => {
+    setUltraBallPostSearchHandoff(currentHandoff => {
+      if (!currentHandoff) {
+        return null
+      }
+
+      if (currentHandoff.gameId !== normalisedGameId || currentHandoff.playerId !== session.viewerPlayerId) {
+        return null
+      }
+
+      return currentHandoff
+    })
+  }, [normalisedGameId, session.viewerPlayerId])
 
   const gameStateQuery = useQuery({
     queryKey: ['tcg-engine', 'game-state', normalisedGameId, session.viewerPlayerId] as const,
@@ -712,7 +736,17 @@ export function HomeRoute() {
 
   const choosePromptMutation = useMutation({
     mutationFn: (input: ChoosePromptInput) => choosePrompt(input),
-    onSuccess: async () => {
+    onSuccess: async (_game, input) => {
+      if (input.choiceKey === 'search_deck_for_pokemon') {
+        setUltraBallPostSearchHandoff({
+          gameId: input.gameId,
+          playerId: input.playerId,
+          selectedCardInstanceIds: input.selectedCardInstanceIds
+        })
+      } else {
+        setUltraBallPostSearchHandoff(null)
+      }
+
       await queryClient.invalidateQueries({ queryKey: ['tcg-engine', 'game-state'] })
     }
   })
@@ -1053,6 +1087,7 @@ export function HomeRoute() {
                 flowCommandError={flowCommandError}
                 gameState={gameState}
                 promptCommandError={promptCommandError}
+                ultraBallPostSearchHandoff={ultraBallPostSearchHandoff}
                 viewerPlayerId={session.viewerPlayerId}
                 onStartSetup={() => startSetupMutation.mutate(normalisedGameId)}
                 onDrawOpeningHand={() => drawOpeningHandMutation.mutate(normalisedGameId)}
@@ -1097,13 +1132,14 @@ export function HomeRoute() {
                     })
                   }
                 }}
-                onChoosePrompt={({ playerId, promptId, selectedCardInstanceIds }) => {
+                onChoosePrompt={({ playerId, promptId, selectedCardInstanceIds, choiceKey }) => {
                   if (isPlayerId(playerId)) {
                     choosePromptMutation.mutate({
                       gameId: normalisedGameId,
                       playerId,
                       promptId,
-                      selectedCardInstanceIds
+                      selectedCardInstanceIds,
+                      choiceKey
                     })
                   }
                 }}
@@ -1617,9 +1653,9 @@ async function chooseReplacementActive(input: ChooseReplacementActiveInput): Pro
   return result.data as CreatedGame
 }
 
-async function choosePrompt(input: ChoosePromptInput): Promise<CreatedGame> {
+async function choosePrompt({ gameId, playerId, promptId, selectedCardInstanceIds }: ChoosePromptInput): Promise<CreatedGame> {
   const result = await runChooseTcgEnginePrompt({
-    input,
+    input: { gameId, playerId, promptId, selectedCardInstanceIds },
     fields: GAME_RESOURCE_FIELDS,
     headers: buildAshRpcHeaders()
   })
@@ -1639,6 +1675,7 @@ function GameStateWorkbench({
   viewerPlayerId,
   deckNamesByKey,
   promptCommandError,
+  ultraBallPostSearchHandoff,
   onChooseSetupActive,
   onChooseSetupBench,
   onChoosePrompt,
@@ -1689,6 +1726,7 @@ function GameStateWorkbench({
   viewerPlayerId: PlayerId
   deckNamesByKey: Map<string, string>
   promptCommandError: CommandErrorNotice | null
+  ultraBallPostSearchHandoff: UltraBallPostSearchHandoff | null
   onChooseSetupActive: (input: SetupCardCommand) => void
   onChooseSetupBench: (input: SetupCardCommand) => void
   onChoosePrompt: (input: ChoosePromptCommand) => void
@@ -1839,6 +1877,7 @@ function GameStateWorkbench({
             playBasicToBenchPendingCardId={playBasicToBenchPendingCardId}
             playCardPendingCardId={playCardPendingCardId}
             retreatPendingKey={retreatPendingKey}
+            ultraBallPostSearchHandoff={ultraBallPostSearchHandoff}
             viewerPlayerId={viewerPlayerId}
           />
         </aside>
@@ -2592,7 +2631,8 @@ function PromptChoiceCard({
               onChoosePrompt({
                 playerId: prompt.playerId,
                 promptId: prompt.id,
-                selectedCardInstanceIds
+                selectedCardInstanceIds,
+                choiceKey
               })
             }
             type="button"
@@ -3768,6 +3808,7 @@ function ActionAffordancesPanel({
   playBasicToBenchPendingCardId,
   playCardPendingCardId,
   retreatPendingKey,
+  ultraBallPostSearchHandoff,
   viewerPlayerId
 }: {
   actions: ActionAffordance[]
@@ -3790,6 +3831,7 @@ function ActionAffordancesPanel({
   playBasicToBenchPendingCardId: string | null
   playCardPendingCardId: string | null
   retreatPendingKey: string | null
+  ultraBallPostSearchHandoff: UltraBallPostSearchHandoff | null
   viewerPlayerId: PlayerId
 }) {
   const actionCommandPending = Boolean(
@@ -3805,6 +3847,13 @@ function ActionAffordancesPanel({
   const actionGroups = useMemo(() => groupActionAffordances(actions), [actions])
   const primaryActionGroup = actionGroups[0]
   const primaryActionGroupId = primaryActionGroup?.id
+  const postSearchHandoff = ultraBallPostSearchHandoffPlan(
+    gameState,
+    viewerPlayerId,
+    ultraBallPostSearchHandoff,
+    cardsById,
+    actionGroups
+  )
   const showActionWindowGuide = Boolean(gameState.currentTurn?.status === 'action_window' && primaryActionGroup)
 
   if (actionGroups.length === 0 && !commandError) {
@@ -3819,7 +3868,9 @@ function ActionAffordancesPanel({
       <div className="space-y-4">
         {commandError ? <CommandErrorCard notice={commandError} /> : null}
 
-        {primaryActionGroup && showActionWindowGuide ? (
+        {postSearchHandoff ? (
+          <UltraBallPostSearchHandoffCard handoff={postSearchHandoff} />
+        ) : primaryActionGroup && showActionWindowGuide ? (
           <ActionWindowGuide
             actionGroups={actionGroups}
             currentTurn={gameState.currentTurn}
@@ -3894,6 +3945,113 @@ function ActionAffordancesPanel({
         )}
       </div>
     </Panel>
+  )
+}
+
+type UltraBallPostSearchHandoffPlan = {
+  selectedCardNames: string
+  handDetail: string
+  battleDetail: string
+  turnDetail: string
+  nextLabel: string
+}
+
+function ultraBallPostSearchHandoffPlan(
+  gameState: GameState,
+  viewerPlayerId: PlayerId,
+  handoff: UltraBallPostSearchHandoff | null,
+  cardsById: Map<string, CardSummary>,
+  actionGroups: ActionGroup[]
+): UltraBallPostSearchHandoffPlan | null {
+  if (!handoff || handoff.gameId !== gameState.gameId || handoff.playerId !== viewerPlayerId) {
+    return null
+  }
+
+  if (gameState.currentTurn?.status !== 'action_window' || gameState.prompts.length > 0) {
+    return null
+  }
+
+  const latestEvent = gameState.events[gameState.events.length - 1]
+
+  if (latestEvent?.type !== 'card_play_completed' || latestEvent.playerId !== viewerPlayerId) {
+    return null
+  }
+
+  const selectedCards = handoff.selectedCardInstanceIds.map(cardInstanceId => cardsById.get(cardInstanceId))
+  const selectedCardNames = selectedCards
+    .map(card => card?.name)
+    .filter((name): name is string => Boolean(name))
+    .join(', ')
+  const handGroup = actionGroups.find(group => group.id === 'hand')
+  const battleGroup = actionGroups.find(group => group.id === 'battle')
+  const turnGroup = actionGroups.find(group => group.id === 'turn')
+  const benchableSearchedCards = handGroup
+    ? handGroup.actions.flatMap(action =>
+        action.key === 'play_basic_to_bench'
+          ? handoff.selectedCardInstanceIds.filter(cardInstanceId => action.sourceCardInstanceIds.includes(cardInstanceId))
+          : []
+      )
+    : []
+  const benchableNames = benchableSearchedCards
+    .map(cardInstanceId => cardsById.get(cardInstanceId)?.name)
+    .filter((name): name is string => Boolean(name))
+    .join(', ')
+
+  return {
+    selectedCardNames: selectedCardNames || 'The selected Pokémon',
+    handDetail: benchableSearchedCards.length
+      ? `Bench ${benchableNames || 'the searched Basic Pokémon'} from Hand and board if it improves the board now.`
+      : handGroup
+        ? 'The searched Pokémon is in hand. Use any remaining Hand and board actions before committing to battle.'
+        : 'No Hand and board action remains from this state. Move directly to battle or turn flow.',
+    battleDetail: battleGroup
+      ? 'Battle decisions are available again; declare an attack or retreat if that is the stronger line.'
+      : 'No battle decision is legal yet from the refreshed action window.',
+    turnDetail: turnGroup
+      ? 'End Turn is available when you are done developing the board.'
+      : 'Turn flow will appear once required battle or board decisions are cleared.',
+    nextLabel: benchableSearchedCards.length ? 'bench' : handGroup ? 'review' : 'clear'
+  }
+}
+
+function UltraBallPostSearchHandoffCard({ handoff }: { handoff: UltraBallPostSearchHandoffPlan }) {
+  return (
+    <div className="rounded-xl border border-emerald-200 bg-[oklch(0.982_0.018_155)] p-3 text-xs leading-5 text-emerald-950">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-800">
+            Trainer complete
+          </h3>
+          <p className="mt-1 font-medium text-stone-950">Ultra Ball returned you to the action window</p>
+          <p className="mt-1 text-stone-600">
+            {handoff.selectedCardNames} moved from deck to hand and the deck shuffled. Continue from the legal
+            actions below.
+          </p>
+        </div>
+        <StatusBadge tone="active">search done</StatusBadge>
+      </div>
+
+      <div className="mt-3 space-y-2">
+        <ActionWindowGuideStep
+          detail="The required discard and deck-search prompts are resolved, so the engine has released priority back to this player."
+          label="done"
+          title="Trainer resolved"
+          tone="clear"
+        />
+        <ActionWindowGuideStep
+          detail={handoff.handDetail}
+          label={handoff.nextLabel}
+          title="Use the searched card if it helps now"
+          tone="focus"
+        />
+        <ActionWindowGuideStep
+          detail={`${handoff.battleDetail} ${handoff.turnDetail}`}
+          label="then"
+          title="Return to battle or turn flow"
+          tone="available"
+        />
+      </div>
+    </div>
   )
 }
 

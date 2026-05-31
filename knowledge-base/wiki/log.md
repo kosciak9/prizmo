@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-31] iteration 101 | Ultra Ball post-search handoff
+- Task attempted: continued the Web UI polish pass by adding a post-search Ultra Ball completion handoff that appears after the Pokémon search prompt resolves, names the selected Pokémon, and points the active player back to Bench, Battle, or End Turn decisions in the action rail.
+- Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.
+- Validation: `mix format && mix assets.build` passed; browser smoke on `http://localhost:4003` loaded existing game `7ea2441d-746c-4d55-a540-d3769e1636e1`, selected `Munkidori` from the guided Ultra Ball search prompt, submitted `Add Pokémon to hand`, confirmed the new `Trainer complete` handoff with Bench/Battle/Turn-flow guidance and no browser warnings or errors; `mix check --no-test` passed.
+- Remaining/blocking notes: no code blocker for this post-search handoff slice. Further polish should confirm the next action from the handoff, such as benching the searched Pokémon or choosing battle/turn flow, clears the handoff cleanly before rerunning the formal two-browser/manual-tester milestone.
+
 ## [2026-05-31] iteration 100 | Ultra Ball prompt handoff
 - Task attempted: continued the Web UI polish pass by bridging the Ultra Ball legal action into guided prompt resolution, adding a Trainer prompt path preview to the play-card action row and step guides for the discard-cost and deck-search prompts with task-specific submit labels.
 - Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.
