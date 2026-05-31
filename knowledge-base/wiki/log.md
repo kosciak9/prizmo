@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-31] iteration 124 | Player 2 final evolution landing
+- Task attempted: continued the Web UI polish pass from the verified post-event-48 Player 2 turn-4 action-window state by executing one final Kadabra evolution choice and refining the true turn-flow-only guide so it no longer mentions unavailable battle decisions.
+- Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.
+- Validation: Tidewave precheck confirmed game `d608a1f1-6db6-4f23-a8d0-4a7d27641993` was at cursor `48 of 48` with `Turn 4, action_window`, no awaiting prompts, Player 2 hand count 1, and 2 `evolve_from_hand` actions plus End Turn; browser smoke on `http://localhost:4003` as Player 2 clicked `Evolve Bench 3 Abra into Kadabra from hand slot 8`, confirmed cursor `49 of 49`, event #49 `evolve from hand`, Player 2 hand count 0, only End Turn remaining, and refreshed/HMR copy `No hand or board command is legal from this view. Only turn flow remains.`; browser console reported no warnings or errors; Tidewave postcheck confirmed event #49, Player 2 active in `action_window`, no awaiting prompts, Player 1 has 0 legal actions, Player 2 has only `end_turn`, and the new Bench Kadabra stack; `mix format`, `mix assets.build`, and `mix check --no-test` passed.
+- Remaining/blocking notes: no code blocker for this final-evolution landing slice. Further polish should continue from the post-event-49 Player 2 action-window state by clicking `End player 2's turn`, verifying the persisted ended-turn/next-owner landing, and refining only unclear next-turn copy without repeating the final Kadabra branch.
+
 ## [2026-05-31] iteration 123 | Player 2 repeated Kadabra landing
 - Task attempted: continued the Web UI polish pass from the verified post-event-47 Player 2 turn-4 action-window state by executing one remaining repeated Kadabra evolution choice and refining the post-evolution guide for the one-hand-copy/multiple-Bench-target shape.
 - Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.

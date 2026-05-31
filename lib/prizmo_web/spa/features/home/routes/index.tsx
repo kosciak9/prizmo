@@ -4234,7 +4234,11 @@ function ActionWindowGuide({
         hasBattleActions: Boolean(battleGroup),
         hasTurnFlow: Boolean(turnGroup)
       })
-    : 'No hand or board command is legal from this view. Move to battle decisions or turn flow.'
+    : battleGroup
+      ? 'No hand or board command is legal from this view. Review battle decisions before turn flow.'
+      : turnGroup
+        ? 'No hand or board command is legal from this view. Only turn flow remains.'
+        : 'No hand or board command is legal from this view. Finish the required choice before more actions appear.'
   const battleDetail = battleGroup
     ? turnGroup
       ? 'Battle decisions and End Turn are both legal. Attack when the board is set, otherwise pass the turn.'
