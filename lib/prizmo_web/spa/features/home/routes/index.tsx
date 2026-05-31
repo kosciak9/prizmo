@@ -2372,7 +2372,7 @@ function TurnStepGuide({
   if (endedTurn) {
     drawDetail = viewerOwnsTurn
       ? `Start ${turnOwnerLabel}'s next turn, then resolve draw timing from this tab.`
-      : `Start ${turnOwnerLabel}'s next turn, then use that player tab for draw timing.`
+      : `Start ${turnOwnerLabel}'s next turn, then use the ${turnOwnerLabel} tab for draw timing.`
   } else if (currentTurn?.status === 'start') {
     drawDetail = viewerOwnsTurn
       ? `Draw a card for ${turnOwnerLabel}, or skip only when the fixture scenario calls for it.`

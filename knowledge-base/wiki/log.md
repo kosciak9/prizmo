@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-31] iteration 119 | Player 1 finish-attack landing
+- Task attempted: continued the Web UI polish pass from the verified post-event-42 Player 1 attack-resolving state by clicking `Finish attack and end turn`, verifying the persisted ended-turn landing, and refining the non-owner next-turn draw guidance to explicitly name the Player 2 tab.
+- Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.
+- Validation: browser smoke on `http://localhost:4003` as Player 1 clicked `Finish attack and end turn`, confirmed cursor `43 of 43`, event #43 `finish attack`, `Turn 3, ended`, `Next-turn path`, `Start player 2's turn`, and refreshed draw guidance `use the player 2 tab for draw timing`; browser console reported no warnings or errors; Tidewave postcheck confirmed both viewers see event #43 `finish_attack`, no awaiting prompts, no action affordances, Moltres at 0 damage, and Kadabra at 20 damage; `mix format && mix assets.build && mix check --no-test` passed.
+- Remaining/blocking notes: no code blocker for this finish-attack landing slice. Further polish should continue from the post-event-43 state by switching to Player 2, clicking `Start player 2's turn`, and verifying Player 2 turn-4 start/draw guidance without repeating the attack finish branch.
+
 ## [2026-05-31] iteration 118 | Player 1 attack-resolving landing
 - Task attempted: continued the Web UI polish pass from the verified post-event-41 Player 1 attack-declared state by clicking `Resolve Fighting Wings`, verifying the persisted damage/attack-resolving landing, and refining the Attack resolution rail so the resolved state explicitly says damage was recorded before the finish CTA.
 - Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.
