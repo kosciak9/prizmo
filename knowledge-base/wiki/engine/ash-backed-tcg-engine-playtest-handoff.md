@@ -2,6 +2,14 @@
 
 Updated: 2026-05-31
 
+## Iteration 141 handoff
+
+- Current state: game `d608a1f1-6db6-4f23-a8d0-4a7d27641993` is verified at post-event-99 with `Turn 8, action_window`; latest event is #99 `open_action_window`, active player is Player 2, Player 1 has Munkidori Active with Moltres plus Budew on Bench and one hidden hand card, Player 2 has Kadabra Active with four Benched Pokémon and two cards in hand, Player 2 has only `end_turn` legal, Player 1 has no legal actions, and completed-setup/turn-path copy now points the owner to Available actions in this tab and the non-owner to the Player 2 tab.
+- Last commit at iteration start: `fa0fdaf feat(spa): clarify tcg turn-eight start guidance`.
+- Remaining tasks: continue the substantial Web UI polish/playtest path without repeating the verified Player 2 draw/open-action branch; broader north-star work still includes the formal two-independent-browser milestone, more persisted mechanics/card behavior slices, and the Electric Streams spike.
+- Blockers: no code blocker for the draw/open-action landing slice; the documented manual-tester milestone remains blocked by unreliable manual-tester browser/session isolation.
+- Recommended next atomic task: from the post-event-99 Player 2 action-window state, click `End player 2's turn`, verify the persisted ended-turn/Player 1 next-turn landing from both seats, then refine only unclear ended-turn or next-turn copy.
+
 ## Iteration 140 handoff
 
 - Current state: game `d608a1f1-6db6-4f23-a8d0-4a7d27641993` is verified at post-event-97 with `Turn 8, start`; latest event is #97 `start_next_turn`, active player is Player 2, Player 1 has Munkidori Active with Moltres plus Budew on Bench and one hidden hand card, Player 2 has Kadabra Active with four Benched Pokémon and one card in hand, Player 2 can draw or skip from the owner tab, Player 1 sees disabled draw/open-action controls that point to the Player 2 tab, and the non-owner draw guide now says to use the Player 2 tab to draw or skip before refreshing.

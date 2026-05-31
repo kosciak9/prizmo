@@ -2046,13 +2046,13 @@ function GameFlowPanel({
     ? (gameState.players.find(player => player.playerId !== gameState.currentTurn?.activePlayerId)?.playerId ?? gameState.activePlayerId)
     : null
   const nextTurnOwnerLabel = nextTurnOwnerId ? formatPlayerId(nextTurnOwnerId) : null
-  const nextTurnOwnerTabLabel = nextTurnOwnerLabel ? `the ${nextTurnOwnerLabel} tab` : 'the next player tab'
   const tableSetupDetail = setupCompleted
-    ? gameState.currentTurn?.status === 'ended'
-      ? `Opening choices are locked. Use Turn step to start ${nextTurnOwnerLabel ?? 'the next player'}'s next turn, then resolve draw timing from ${nextTurnOwnerTabLabel}.`
-      : gameState.currentTurn?.status === 'start'
-        ? `Opening choices are locked. Turn ${gameState.currentTurn.turnNumber} belongs to ${currentTurnActivePlayerLabel}; resolve draw timing from the ${currentTurnActivePlayerLabel} tab before actions reopen.`
-      : 'Opening choices are locked. Use Turn step for the live turn path.'
+    ? completedSetupTurnDetail({
+        currentTurn: gameState.currentTurn,
+        firstPlayerId: gameState.firstPlayerId,
+        players: gameState.players,
+        viewerPlayerId
+      })
     : 'Build the opening board from the viewer hand, then move into the first turn.'
   const canStartSetup = !gameState.setup && !startSetupPending
   const canDrawOpeningHand = gameState.setup?.status === 'waiting_to_draw' && !drawOpeningHandPending
@@ -2140,6 +2140,7 @@ function GameFlowPanel({
               currentTurn={gameState.currentTurn}
               firstPlayerId={gameState.firstPlayerId}
               players={gameState.players}
+              viewerPlayerId={viewerPlayerId}
             />
           ) : (
             <>
@@ -2433,7 +2434,9 @@ function TurnStepGuide({
       ? `Use this ${turnOwnerLabel} tab to open the action window so hand, board, retreat, attack, and end-turn actions can appear below.`
       : `Draw timing is resolved for ${turnOwnerLabel}. Use the ${turnOwnerLabel} tab to open the action window, then refresh here.`
   } else if (activeWindowOpen) {
-    actionWindowDetail = `Action decisions are live for ${turnOwnerLabel}. Use Available actions below.`
+    actionWindowDetail = viewerOwnsTurn
+      ? `Action decisions are live for ${turnOwnerLabel}. Use Available actions below.`
+      : `Action decisions are live for ${turnOwnerLabel}. Use the ${turnOwnerLabel} tab for Available actions, then refresh here.`
   } else if (currentTurn) {
     actionWindowDetail = 'Resolve the current battle or prompt step before opening new actions.'
   }
@@ -2572,25 +2575,15 @@ function SetupPathGuide({
 function CompletedSetupSummary({
   currentTurn,
   firstPlayerId,
-  players
+  players,
+  viewerPlayerId
 }: {
   currentTurn: GameState['currentTurn']
   firstPlayerId: string
   players: PlayerView[]
+  viewerPlayerId: PlayerId
 }) {
-  const turnOwnerLabel = formatPlayerId(currentTurn?.activePlayerId ?? firstPlayerId)
-  const nextTurnOwnerId = currentTurn?.status === 'ended'
-    ? (players.find(player => player.playerId !== currentTurn.activePlayerId)?.playerId ?? firstPlayerId)
-    : null
-  const nextTurnOwnerLabel = nextTurnOwnerId ? formatPlayerId(nextTurnOwnerId) : null
-  const nextTurnOwnerTabLabel = nextTurnOwnerLabel ? `the ${nextTurnOwnerLabel} tab` : 'the turn owner tab'
-  const setupDetail = currentTurn
-    ? currentTurn.status === 'ended'
-      ? `Opening choices are locked. Use Turn step to start ${nextTurnOwnerLabel ?? 'the next player'}'s next turn, resolve draw timing from ${nextTurnOwnerTabLabel}, and reopen legal actions.`
-      : currentTurn.status === 'start'
-        ? `Opening choices are locked. Turn ${currentTurn.turnNumber} belongs to ${turnOwnerLabel}; resolve draw timing from the ${turnOwnerLabel} tab before legal actions reopen.`
-      : 'Opening choices are locked. Use Turn step to track this turn, draw timing, and live legal actions.'
-    : 'Opening choices are locked. Use Turn step to start turn one, resolve draw timing, and open legal actions.'
+  const setupDetail = completedSetupTurnDetail({ currentTurn, firstPlayerId, players, viewerPlayerId })
 
   return (
     <div className="mt-3 space-y-3">
@@ -2622,6 +2615,53 @@ function CompletedSetupSummary({
       </dl>
     </div>
   )
+}
+
+function completedSetupTurnDetail({
+  currentTurn,
+  firstPlayerId,
+  players,
+  viewerPlayerId
+}: {
+  currentTurn: GameState['currentTurn']
+  firstPlayerId: string
+  players: PlayerView[]
+  viewerPlayerId: PlayerId
+}) {
+  if (!currentTurn) {
+    return 'Opening choices are locked. Use Turn step to start turn one, resolve draw timing, and open legal actions.'
+  }
+
+  const turnOwnerLabel = formatPlayerId(currentTurn.activePlayerId ?? firstPlayerId)
+  const turnOwnerTabLabel = `the ${turnOwnerLabel} tab`
+  const viewerOwnsTurn = currentTurn.activePlayerId === viewerPlayerId
+  const ownerTabDirection = viewerOwnsTurn ? 'this tab' : turnOwnerTabLabel
+
+  if (currentTurn.status === 'ended') {
+    const nextTurnOwnerId = players.find(player => player.playerId !== currentTurn.activePlayerId)?.playerId ?? firstPlayerId
+    const nextTurnOwnerLabel = formatPlayerId(nextTurnOwnerId)
+    const nextTurnOwnerTabLabel = `the ${nextTurnOwnerLabel} tab`
+
+    return `Opening choices are locked. Use Turn step to start ${nextTurnOwnerLabel}'s next turn, resolve draw timing from ${nextTurnOwnerTabLabel}, and reopen legal actions.`
+  }
+
+  if (currentTurn.status === 'start') {
+    return `Opening choices are locked. Turn ${currentTurn.turnNumber} belongs to ${turnOwnerLabel}; resolve draw timing from ${ownerTabDirection} before actions reopen.`
+  }
+
+  if (currentTurn.status === 'drawn') {
+    return `Opening choices are locked. Draw timing is resolved for ${turnOwnerLabel}; open legal actions from ${ownerTabDirection}.`
+  }
+
+  if (currentTurn.status === 'action_window') {
+    return `Opening choices are locked. The action window is live for ${turnOwnerLabel}; continue in Available actions from ${ownerTabDirection}.`
+  }
+
+  if (currentTurn.status === 'attack_declared' || currentTurn.status === 'attack_resolving') {
+    return `Opening choices are locked. ${turnOwnerLabel} is resolving an attack; finish the battle lane before the next turn path.`
+  }
+
+  return 'Opening choices are locked. Use Turn step to track this turn, draw timing, and live legal actions.'
 }
 
 function ViewerPromptsPanel({
