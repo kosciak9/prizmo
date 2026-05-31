@@ -35,6 +35,9 @@ prizmo-*.tar
 npm-debug.log
 /node_modules/
 
+# Generated AshTypescript RPC/types output. Regenerate with `mix ash_typescript.codegen`.
+/lib/prizmo_web/spa/lib/ash/generated/
+
 .env
 .env.local
 .server.port

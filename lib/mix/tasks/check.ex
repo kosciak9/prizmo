@@ -23,7 +23,8 @@ defmodule Mix.Tasks.Check do
     {"Xref", ["xref", "graph", "--label", "compile-connected", "--fail-above", "50"]},
     {"Filenames", ["check.filenames"]},
     {"Service Images", ["check.service_images"]},
-    {"Ash TS", ["ash_typescript.codegen", "--check"]},
+    {"Ash TS Gen", ["ash_typescript.codegen"]},
+    {"Ash TS Check", ["ash_typescript.codegen", "--check"]},
     {"Credo", ["credo", "--strict"]},
     {"Dialyzer", ["dialyzer"]}
   ]

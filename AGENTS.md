@@ -33,10 +33,11 @@ with other active worktrees if you kill the wrong process.
 5. `mix xref graph --label compile-connected --fail-above 50`
 6. `mix check.filenames`
 7. `mix check.service_images`
-8. `mix ash_typescript.codegen --check`
-9. `mix credo --strict`
-10. `mix dialyzer`
-11. `mix test`
+8. `mix ash_typescript.codegen`
+9. `mix ash_typescript.codegen --check`
+10. `mix credo --strict`
+11. `mix dialyzer`
+12. `mix test`
 
 Use `mix check --no-test` only when tests are being run separately. Use
 `mix check --verbose` when you need full output for debugging.
@@ -53,7 +54,9 @@ Use `mix check --no-test` only when tests are being run separately. Use
 - Product UI lives in the Volt React SPA under `lib/prizmo_web/spa/`.
 - Root JavaScript/TypeScript configuration lives at the repository root.
 - Use `npm ci` via `mix assets.setup`; do not add a second package manager workflow.
-- Generated AshTypescript files live under `lib/prizmo_web/spa/lib/ash/generated/` and must stay in sync with Ash resources.
+- Generated AshTypescript files live under `lib/prizmo_web/spa/lib/ash/generated/` and are intentionally gitignored to keep diffs clean.
+- Run `mix ash_typescript.codegen` after changing Ash resources, actions, or RPC-facing fields, and before SPA builds/checks in a fresh checkout or worktree.
+- Use `mix ash_typescript.codegen --check` to verify the ignored generated files are up to date.
 
 ## Ash migrations
 

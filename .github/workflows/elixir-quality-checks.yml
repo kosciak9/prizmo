@@ -60,6 +60,7 @@ jobs:
       - run: mix xref graph --label compile-connected --fail-above 50
       - run: mix check.filenames
       - run: mix check.service_images
+      - run: mix ash_typescript.codegen
       - run: mix ash_typescript.codegen --check
       - run: mix sobelow --config --compact --private
       - run: mix credo --strict
