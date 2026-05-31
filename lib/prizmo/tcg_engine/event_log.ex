@@ -1,7 +1,7 @@
 defmodule Prizmo.TcgEngine.EventLog do
   @moduledoc false
 
-  import Prizmo.TcgEngine.Operation, only: [create: 3, update: 3]
+  import Prizmo.TcgEngine.Operation, only: [bulk_destroy: 3, create: 3, update: 3]
 
   alias Prizmo.TcgEngine
   alias Prizmo.TcgEngine.Game
@@ -9,8 +9,11 @@ defmodule Prizmo.TcgEngine.EventLog do
   alias Prizmo.TcgEngine.GameSnapshot
   alias Prizmo.TcgEngine.Snapshot
 
+  require Ash.Query
+
   def write_event(%Game{} = game, type, player_id, payload) do
     with {:ok, current_game} <- get_game(game.id),
+         :ok <- truncate_future_branch(current_game),
          index = current_game.cursor_index + 1,
          {:ok, event} <-
            create(GameEvent, :create, %{
@@ -46,6 +49,32 @@ defmodule Prizmo.TcgEngine.EventLog do
         snapshot: snapshot
       })
     end
+  end
+
+  defp truncate_future_branch(%Game{
+         id: game_id,
+         cursor_index: cursor_index,
+         latest_event_index: latest_event_index
+       })
+       when cursor_index < latest_event_index do
+    with {:ok, :destroyed} <- destroy_future_snapshots(game_id, cursor_index),
+         {:ok, :destroyed} <- destroy_future_events(game_id, cursor_index) do
+      :ok
+    end
+  end
+
+  defp truncate_future_branch(%Game{}), do: :ok
+
+  defp destroy_future_snapshots(game_id, cursor_index) do
+    GameSnapshot
+    |> Ash.Query.filter(game_id == ^game_id and index > ^cursor_index)
+    |> bulk_destroy(:destroy, %{})
+  end
+
+  defp destroy_future_events(game_id, cursor_index) do
+    GameEvent
+    |> Ash.Query.filter(game_id == ^game_id and index > ^cursor_index)
+    |> bulk_destroy(:destroy, %{})
   end
 
   defp get_game(game_id) do

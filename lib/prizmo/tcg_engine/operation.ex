@@ -46,10 +46,28 @@ defmodule Prizmo.TcgEngine.Operation do
     |> unpack_write_result()
   end
 
+  def bulk_destroy(query, action, input \\ %{}) do
+    query
+    |> Ash.bulk_destroy(action, input, return_notifications?: true)
+    |> unpack_bulk_destroy_result()
+  end
+
   defp unpack_write_result({:ok, value, notifications}) do
     Process.put(@notifications_key, [notifications | Process.get(@notifications_key, [])])
     {:ok, value}
   end
 
   defp unpack_write_result({:error, reason}), do: {:error, reason}
+
+  defp unpack_bulk_destroy_result(%Ash.BulkResult{status: :success, notifications: notifications}) do
+    Process.put(@notifications_key, [
+      List.wrap(notifications) | Process.get(@notifications_key, [])
+    ])
+
+    {:ok, :destroyed}
+  end
+
+  defp unpack_bulk_destroy_result(%Ash.BulkResult{errors: errors}) do
+    {:error, errors}
+  end
 end

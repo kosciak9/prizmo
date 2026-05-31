@@ -2,6 +2,14 @@
 
 Updated: 2026-05-31
 
+## Iteration 147 handoff
+
+- Current state: `Prizmo.TcgEngine.EventLog.write_event/4` now treats appending from an undone cursor as branch replacement. When `cursor_index < latest_event_index`, it destroys future `GameSnapshot` rows first and then future `GameEvent` rows through internal Ash destroy actions before creating the new event at `cursor_index + 1`; redo history remains available until a new event is appended. The documented game `d608a1f1-6db6-4f23-a8d0-4a7d27641993` was checked read-only and is still at cursor `103`, latest `107`, with future event/snapshot indexes `[104, 105, 106, 107]` plus cancelled prompt/pending-effect rows.
+- Last commit at iteration start: `1e93570 fix(tcg-engine): restore prompt continuations from snapshots`.
+- Remaining tasks: advance the repaired post-event-103 playtest branch, continue the Web UI polish/playtest path, eventually rerun the formal two-independent-browser milestone, and continue broader persisted mechanics/card behavior and Electric Streams spike work from the north-star plan.
+- Blockers: no code blocker for branch-safe append replacement. The old future rows are intentionally still present until the next persisted event append; do not manually delete them unless a new append unexpectedly fails.
+- Recommended next atomic task: from the repaired post-event-103 Player 1 action-window state, click `End player 1's turn` (or call the same persisted command through the UI path), verify old future rows `104`-`107` are pruned and replacement event `104` is `end_turn`, then check the Player 2 next-turn landing from both seats without repeating the already-verified Ultra Ball branch.
+
 ## Iteration 146 handoff
 
 - Current state: snapshot restoration now includes `pending_effects` and `prompts`; resources absent from a restored snapshot are marked `cancelled` through restore actions so undo hides obsolete continuations and redo can revive prompt/effect state when the target snapshot contains it. The documented game `d608a1f1-6db6-4f23-a8d0-4a7d27641993` was restored to cursor `103` with latest event `107`; all old prompt rows are `cancelled`, all old pending-effect rows are `cancelled`, Player 1 has no prompts and only `end_turn`, and Player 2 has no prompts/actions.

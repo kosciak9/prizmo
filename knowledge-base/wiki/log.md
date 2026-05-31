@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-31] iteration 147 | Branch-safe event truncation
+- Task attempted: implemented branch-safe replacement after undo so appending a new event from an earlier cursor deletes future `GameSnapshot` rows first, then future `GameEvent` rows, before writing the replacement event at `cursor_index + 1`.
+- Files changed: updated `lib/prizmo/tcg_engine/event_log.ex`, `lib/prizmo/tcg_engine/game_event.ex`, `lib/prizmo/tcg_engine/game_snapshot.ex`, `lib/prizmo/tcg_engine/operation.ex`, this log, and the TCG engine playtest handoff.
+- Validation: `mix format`, `mix compile --warnings-as-errors`, `mix test test/prizmo/tcg_engine/mechanics_test.exs`, and `mix check --no-test` passed; an initial `mix check --no-test` run failed Credo because the new Ash destroy actions lacked code-interface definitions, then passed after adding them; Tidewave rollback smoke created a throwaway setup game, drew opening hands, undid to cursor `1`/latest `2`, redrew, and confirmed exactly one replacement event and snapshot at index `2` with changed IDs plus cursor/latest `2`; read-only Tidewave check confirmed documented game `d608a1f1-6db6-4f23-a8d0-4a7d27641993` remains at cursor `103`, latest `107`, with future event/snapshot rows `[104, 105, 106, 107]` waiting to be pruned on the next append.
+- Remaining/blocking notes: no code blocker remains for branch replacement; the documented playtest game has not been advanced in this iteration, so the next append from cursor `103` should prune old future rows and write replacement event `104`.
+
 ## [2026-05-31] iteration 146 | Prompt snapshot restore
 - Task attempted: implemented prompt and pending-effect snapshot persistence/restoration so undoing before a prompt no longer leaves active prompt continuations behind; restored the documented blocked playtest game back to cursor 103 with the new restorer.
 - Files changed: updated `lib/prizmo/tcg_engine/prompt.ex`, `lib/prizmo/tcg_engine/snapshot.ex`, `lib/prizmo/tcg_engine/snapshot_restorer.ex`, this log, and the TCG engine playtest handoff.

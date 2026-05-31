@@ -14,6 +14,7 @@ defmodule Prizmo.TcgEngine.GameSnapshot do
 
   code_interface do
     define :create
+    define :destroy
     define :read
   end
 
@@ -24,6 +25,10 @@ defmodule Prizmo.TcgEngine.GameSnapshot do
       primary? true
       accept [:game_id, :game_event_id, :index, :snapshot]
     end
+
+    destroy :destroy do
+      primary? true
+    end
   end
 
   policies do
@@ -32,6 +37,10 @@ defmodule Prizmo.TcgEngine.GameSnapshot do
     end
 
     policy action_type(:create) do
+      authorize_if always()
+    end
+
+    policy action_type(:destroy) do
       authorize_if always()
     end
   end
