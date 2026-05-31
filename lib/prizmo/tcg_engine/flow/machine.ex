@@ -31,6 +31,11 @@ defmodule Prizmo.TcgEngine.Flow.Machine do
       from: :turn_action_window,
       action: :pass_turn,
       target: :turn_ending_turn
+    },
+    declare_attack: %{
+      from: :turn_action_window,
+      action: :declare_attack,
+      target: :turn_attack_declared
     }
   }
 
@@ -88,6 +93,20 @@ defmodule Prizmo.TcgEngine.Flow.Machine do
       %{
         guard: :can_end_turn?,
         action: :end_turn,
+        target: :turn_starting_turn
+      }
+    ],
+    turn_attack_declared: [
+      %{
+        guard: :can_resolve_declared_attack?,
+        action: :resolve_declared_attack,
+        target: :turn_attack_resolving
+      }
+    ],
+    turn_attack_resolving: [
+      %{
+        guard: :can_finish_attack?,
+        action: :finish_attack,
         target: :turn_starting_turn
       }
     ]

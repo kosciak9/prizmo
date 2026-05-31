@@ -36,6 +36,7 @@ defmodule Prizmo.TcgEngine.Flow.Actions do
   alias Prizmo.TcgEngine.Game
   alias Prizmo.TcgEngine.GamePlayer
   alias Prizmo.TcgEngine.GameSetup
+  alias Prizmo.TcgEngine.Mechanics
   alias Prizmo.TcgEngine.Setup
   alias Prizmo.TcgEngine.SetupStore
   alias Prizmo.TcgEngine.Turn
@@ -81,6 +82,25 @@ defmodule Prizmo.TcgEngine.Flow.Actions do
     case current_turn(game.id) do
       {:ok, %Turn{status: :action_window}} -> true
       _other -> false
+    end
+  end
+
+  def can_resolve_declared_attack?(%Context{game: %Game{} = game}, _attrs) do
+    case current_turn(game.id) do
+      {:ok, %Turn{status: :attack_declared}} -> true
+      _other -> false
+    end
+  end
+
+  def can_finish_attack?(%Context{game: %Game{} = game}, _attrs) do
+    case current_turn(game.id) do
+      {:ok, %Turn{status: :attack_resolving, active_player_id: active_player_id}} ->
+        Prizmo.TcgEngine.CardPlay.require_no_awaiting_pending_effect(game.id) == :ok and
+          require_all_players_have_active(game.id) == :ok and
+          game.active_player_id == active_player_id
+
+      _other ->
+        false
     end
   end
 
@@ -329,6 +349,33 @@ defmodule Prizmo.TcgEngine.Flow.Actions do
     with {:ok, turn} <- current_turn(game.id),
          :ok <- require_turn_status(turn, :action_window),
          {:ok, turn} <- update(turn, :pass, %{}),
+         {:ok, game} <- update(game, :set_flow_state, %{flow_state: :turn_starting_turn}),
+         {:ok, event} <-
+           write_event(game, :turn_ended, turn.active_player_id, %{turn_id: turn.id}),
+         {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do
+      {:ok, game}
+    end
+  end
+
+  def declare_attack(%Context{game: %Game{} = game}, attrs) do
+    player_id = Map.fetch!(attrs, :player_id)
+    attack_id = Map.fetch!(attrs, :attack_id)
+
+    with {:ok, game} <- Mechanics.declare_attack_legacy(game, player_id, attack_id) do
+      update(game, :set_flow_state, %{flow_state: :turn_attack_declared})
+    end
+  end
+
+  def resolve_declared_attack(%Context{game: %Game{} = game}, _attrs) do
+    with {:ok, turn} <- current_turn(game.id),
+         {:ok, game} <- Mechanics.resolve_declared_attack(game, turn.active_player_id, %{}) do
+      update(game, :set_flow_state, %{flow_state: :turn_attack_resolving})
+    end
+  end
+
+  def finish_attack(%Context{game: %Game{} = game}, _attrs) do
+    with {:ok, turn} <- current_turn(game.id),
+         {:ok, game} <- Mechanics.finish_attack(game, turn.active_player_id),
          {:ok, game} <- update(game, :set_flow_state, %{flow_state: :turn_starting_turn}),
          {:ok, event} <-
            write_event(game, :turn_ended, turn.active_player_id, %{turn_id: turn.id}),

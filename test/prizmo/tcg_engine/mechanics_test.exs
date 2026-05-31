@@ -121,6 +121,37 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
                "action_window_opened"
              ]
     end
+
+    test "declaring an attack automatically resolves, finishes, and opens the opponent action window" do
+      {:ok, game} = create_flow_action_window_game(player_1_active_card_id: "JTG-120")
+
+      attacker = active_card(game.id, "player_1")
+      energy = deck_card(game.id, "player_1", "MEE-005")
+
+      {:ok, energy} = ash_update(energy, :draw_to_hand, %{position: 99})
+      {:ok, game} = Mechanics.attach_energy(game, "player_1", energy.id, attacker.id)
+
+      assert {:ok, game} = Mechanics.declare_attack(game, "player_1", :trading_places)
+
+      assert game.status == :in_progress
+      assert game.flow_state == :turn_action_window
+      assert game.active_player_id == "player_2"
+      assert counts_by_zone(game.id) == %{active: 2, attached: 1, deck: 90, hand: 15, prize: 12}
+
+      assert [turn_1, turn_2] = turns(game.id)
+      assert %Turn{turn_number: 1, active_player_id: "player_1", status: :ended} = turn_1
+      assert %Turn{turn_number: 2, active_player_id: "player_2", status: :action_window} = turn_2
+
+      assert game.id |> event_types() |> Enum.slice(-7, 7) == [
+               "declare_attack",
+               "resolve_declared_attack",
+               "finish_attack",
+               "turn_ended",
+               "turn_started",
+               "turn_card_drawn",
+               "action_window_opened"
+             ]
+    end
   end
 
   describe "setup flow" do
@@ -269,12 +300,12 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
     ])
   end
 
-  defp create_flow_action_window_game do
+  defp create_flow_action_window_game(opts \\ []) do
     with {:ok, game} <- create_game(),
          {:ok, game} <- Mechanics.call_coin_toss(game, "player_1", :heads),
          {:ok, game} <-
            Mechanics.choose_starting_player(game, game.coin_toss_winner_player_id, "player_1"),
-         player_1_active = hand_basic_card(game.id, "player_1"),
+         player_1_active = setup_active_card(game.id, "player_1", opts[:player_1_active_card_id]),
          player_2_active = hand_basic_card(game.id, "player_2"),
          {:ok, game} <- Mechanics.choose_active_from_hand(game, "player_1", player_1_active.id),
          {:ok, game} <- Mechanics.choose_active_from_hand(game, "player_2", player_2_active.id),
@@ -352,6 +383,20 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
     |> Ash.Query.sort(position: :asc)
     |> Ash.read!()
     |> Enum.find(&CardCatalog.basic_pokemon?(&1.card_id))
+  end
+
+  defp setup_active_card(game_id, player_id, nil), do: hand_basic_card(game_id, player_id)
+
+  defp setup_active_card(game_id, player_id, card_id) do
+    card = deck_card(game_id, player_id, card_id)
+    {:ok, card} = ash_update(card, :draw_to_hand, %{position: 99})
+    card
+  end
+
+  defp active_card(game_id, player_id) do
+    CardInstance
+    |> Ash.Query.filter(game_id == ^game_id and owner_player_id == ^player_id and zone == :active)
+    |> Ash.read_one!()
   end
 
   defp current_turn(game_id) do

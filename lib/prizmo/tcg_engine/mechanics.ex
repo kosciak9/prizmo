@@ -1153,6 +1153,24 @@ defmodule Prizmo.TcgEngine.Mechanics do
           {:ok, Game.t()} | {:error, term()}
   def declare_attack(game_or_id, player_id, attack_id)
       when is_binary(player_id) and (is_atom(attack_id) or is_binary(attack_id)) do
+    case get_game(game_or_id) do
+      {:ok, %Game{flow_state: :turn_action_window} = game} ->
+        FlowInterpreter.dispatch(game, :declare_attack, %{
+          player_id: player_id,
+          attack_id: attack_id
+        })
+
+      {:ok, %Game{} = game} ->
+        declare_attack_legacy(game, player_id, attack_id)
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  @doc false
+  def declare_attack_legacy(game_or_id, player_id, attack_id)
+      when is_binary(player_id) and (is_atom(attack_id) or is_binary(attack_id)) do
     transaction(fn ->
       with {:ok, game} <- get_game(game_or_id),
            {:ok, turn} <- require_action_window_for_player(game, player_id),
