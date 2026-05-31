@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-31] iteration 102 | Ultra Ball next-action handoff clear
+- Task attempted: continued the Web UI polish pass by making the first post-search Ultra Ball follow-up action explicit, highlighting the searched Basic Pokémon Bench CTA and clearing the `Trainer complete` handoff immediately after a successful follow-up action mutates the board.
+- Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.
+- Validation: `mix format && mix assets.build` passed; browser smoke on `http://localhost:4003` loaded game `7ea2441d-746c-4d55-a540-d3769e1636e1`, played Ultra Ball, discarded Drakloak and Fire Energy, searched Munkidori, confirmed the post-search handoff showed `Bench searched Munkidori`, clicked it, confirmed Munkidori moved to Bench and the handoff cleared back to the normal action-window guide with no browser warnings or errors; `mix check --no-test` passed.
+- Remaining/blocking notes: no code blocker for the searched-card Bench follow-up slice. Further polish can verify the battle/turn-flow branch from the post-search handoff, such as declaring an attack or ending the turn after search, before rerunning the formal two-browser/manual-tester milestone.
+
 ## [2026-05-31] iteration 101 | Ultra Ball post-search handoff
 - Task attempted: continued the Web UI polish pass by adding a post-search Ultra Ball completion handoff that appears after the Pokémon search prompt resolves, names the selected Pokémon, and points the active player back to Bench, Battle, or End Turn decisions in the action rail.
 - Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.

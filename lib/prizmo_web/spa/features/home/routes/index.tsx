@@ -666,49 +666,56 @@ export function HomeRoute() {
 
   const playCardMutation = useMutation({
     mutationFn: (input: PlayCardInput) => playCard(input),
-    onSuccess: async () => {
+    onSuccess: async (_game, input) => {
+      clearUltraBallPostSearchHandoff(input.gameId, input.playerId)
       await queryClient.invalidateQueries({ queryKey: ['tcg-engine', 'game-state'] })
     }
   })
 
   const playBasicToBenchMutation = useMutation({
     mutationFn: (input: PlayBasicToBenchInput) => playBasicToBench(input),
-    onSuccess: async () => {
+    onSuccess: async (_game, input) => {
+      clearUltraBallPostSearchHandoff(input.gameId, input.playerId)
       await queryClient.invalidateQueries({ queryKey: ['tcg-engine', 'game-state'] })
     }
   })
 
   const evolveFromHandMutation = useMutation({
     mutationFn: (input: EvolveFromHandInput) => evolveFromHand(input),
-    onSuccess: async () => {
+    onSuccess: async (_game, input) => {
+      clearUltraBallPostSearchHandoff(input.gameId, input.playerId)
       await queryClient.invalidateQueries({ queryKey: ['tcg-engine', 'game-state'] })
     }
   })
 
   const attachEnergyMutation = useMutation({
     mutationFn: (input: AttachEnergyInput) => attachEnergy(input),
-    onSuccess: async () => {
+    onSuccess: async (_game, input) => {
+      clearUltraBallPostSearchHandoff(input.gameId, input.playerId)
       await queryClient.invalidateQueries({ queryKey: ['tcg-engine', 'game-state'] })
     }
   })
 
   const endTurnMutation = useMutation({
     mutationFn: (input: EndTurnInput) => endTurn(input),
-    onSuccess: async () => {
+    onSuccess: async (_game, input) => {
+      clearUltraBallPostSearchHandoff(input.gameId, input.playerId)
       await queryClient.invalidateQueries({ queryKey: ['tcg-engine', 'game-state'] })
     }
   })
 
   const retreatMutation = useMutation({
     mutationFn: (input: RetreatInput) => retreat(input),
-    onSuccess: async () => {
+    onSuccess: async (_game, input) => {
+      clearUltraBallPostSearchHandoff(input.gameId, input.playerId)
       await queryClient.invalidateQueries({ queryKey: ['tcg-engine', 'game-state'] })
     }
   })
 
   const declareAttackMutation = useMutation({
     mutationFn: (input: DeclareAttackInput) => declareAttack(input),
-    onSuccess: async () => {
+    onSuccess: async (_game, input) => {
+      clearUltraBallPostSearchHandoff(input.gameId, input.playerId)
       await queryClient.invalidateQueries({ queryKey: ['tcg-engine', 'game-state'] })
     }
   })
@@ -886,6 +893,12 @@ export function HomeRoute() {
   function clearGame() {
     updateSession(currentSession => ({ ...currentSession, gameId: '' }))
     queryClient.removeQueries({ queryKey: ['tcg-engine', 'game-state'] })
+  }
+
+  function clearUltraBallPostSearchHandoff(gameId: string, playerId: PlayerId) {
+    setUltraBallPostSearchHandoff(currentHandoff =>
+      currentHandoff?.gameId === gameId && currentHandoff.playerId === playerId ? null : currentHandoff
+    )
   }
 
   return (
@@ -3931,6 +3944,7 @@ function ActionAffordancesPanel({
                     onRetreat={onRetreat}
                     playBasicToBenchPendingCardId={playBasicToBenchPendingCardId}
                     playCardPendingCardId={playCardPendingCardId}
+                    postSearchBenchCardInstanceIds={postSearchHandoff?.benchableCardInstanceIds ?? []}
                     retreatPendingKey={retreatPendingKey}
                   />
                 ))}
@@ -3950,6 +3964,7 @@ function ActionAffordancesPanel({
 
 type UltraBallPostSearchHandoffPlan = {
   selectedCardNames: string
+  benchableCardInstanceIds: string[]
   handDetail: string
   battleDetail: string
   turnDetail: string
@@ -3999,6 +4014,7 @@ function ultraBallPostSearchHandoffPlan(
 
   return {
     selectedCardNames: selectedCardNames || 'The selected Pokémon',
+    benchableCardInstanceIds: benchableSearchedCards,
     handDetail: benchableSearchedCards.length
       ? `Bench ${benchableNames || 'the searched Basic Pokémon'} from Hand and board if it improves the board now.`
       : handGroup
@@ -4200,6 +4216,7 @@ function ActionAffordanceCard({
   onRetreat,
   playBasicToBenchPendingCardId,
   playCardPendingCardId,
+  postSearchBenchCardInstanceIds,
   retreatPendingKey
 }: {
   action: ActionAffordance
@@ -4220,6 +4237,7 @@ function ActionAffordanceCard({
   onRetreat: (input: RetreatCommand) => void
   playBasicToBenchPendingCardId: string | null
   playCardPendingCardId: string | null
+  postSearchBenchCardInstanceIds: string[]
   retreatPendingKey: string | null
 }) {
   const canRunAction = !actionCommandPending && isPlayerId(action.playerId)
@@ -4283,16 +4301,18 @@ function ActionAffordanceCard({
           {action.sourceCardInstanceIds.map(cardInstanceId => {
             const card = cardsById.get(cardInstanceId)
             const isPending = playBasicToBenchPendingCardId === cardInstanceId
+            const isPostSearchBenchTarget = postSearchBenchCardInstanceIds.includes(cardInstanceId)
 
             return (
               <ActionCommandButton
                 disabled={!canRunAction}
                 key={cardInstanceId}
                 onClick={() => onPlayBasicToBench({ playerId: action.playerId, cardInstanceId })}
+                tone={isPostSearchBenchTarget ? 'primary' : 'secondary'}
               >
                 {isPending
                   ? `Benching ${card?.name ?? 'Pokémon'}...`
-                  : `Bench ${card?.name ?? formatCardInstanceId(cardInstanceId)}`}
+                  : `${isPostSearchBenchTarget ? 'Bench searched ' : 'Bench '}${card?.name ?? formatCardInstanceId(cardInstanceId)}`}
               </ActionCommandButton>
             )
           })}
