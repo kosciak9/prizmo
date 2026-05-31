@@ -189,6 +189,21 @@ type PromptFlowGuide = {
   steps: PromptFlowStep[]
 }
 
+type PromptChoiceLabel = {
+  id: string
+  label: string
+  detail?: string | null
+}
+
+type PromptChoiceRow = {
+  cardInstanceId: string
+  card: CardSummary | undefined
+  choiceLabel: PromptChoiceLabel | undefined
+  detail: string
+  includesCopyLabel: boolean
+  label: string
+}
+
 type UltraBallPostSearchHandoff = {
   gameId: string
   playerId: PlayerId
@@ -2681,6 +2696,8 @@ function PromptChoiceCard({
   const choiceKey = promptChoiceKey(prompt.payload)
   const promptFlowGuide = ultraBallPromptFlowGuide(choiceKey, min, max, legalChoiceIds.length)
   const promptGuidance = promptGuidanceMessages(prompt, min, max, legalChoiceIds.length)
+  const promptChoiceRows = promptChoiceButtonRows(legalChoiceIds, legalChoiceCardsById, cardsById, legalChoiceLabelsById)
+  const hasDisambiguatedPromptChoices = promptChoiceRows.some(row => row.includesCopyLabel)
 
   function toggleChoice(cardInstanceId: string) {
     setSelectedCardInstanceIds(current => {
@@ -2719,11 +2736,16 @@ function PromptChoiceCard({
         </div>
       ) : null}
 
+      {hasDisambiguatedPromptChoices ? (
+        <p className="mt-3 rounded-lg border border-emerald-200 bg-stone-50 px-3 py-2 text-xs leading-5 text-emerald-900">
+          Repeated hand choices are separate cards. Labels include the hand slot, with copy numbers only when two rows
+          still share a slot.
+        </p>
+      ) : null}
+
       {legalChoiceIds.length > 0 ? (
         <div className="mt-3 space-y-2">
-          {legalChoiceIds.map(cardInstanceId => {
-            const card = legalChoiceCardsById.get(cardInstanceId) ?? cardsById.get(cardInstanceId)
-            const choiceLabel = legalChoiceLabelsById.get(cardInstanceId)
+          {promptChoiceRows.map(({ cardInstanceId, detail, label }) => {
             const selected = selectedCardInstanceIds.includes(cardInstanceId)
 
             return (
@@ -2738,12 +2760,8 @@ function PromptChoiceCard({
                 onClick={() => toggleChoice(cardInstanceId)}
                 type="button"
               >
-                <span className="block font-semibold">
-                  {card?.name ?? choiceLabel?.label ?? formatCardInstanceId(cardInstanceId)}
-                </span>
-                <span className="mt-0.5 block text-xs text-stone-500">
-                  {promptChoiceCardDetail(card, cardInstanceId, choiceLabel)}
-                </span>
+                <span className="block font-semibold">{label}</span>
+                <span className="mt-0.5 block text-xs text-stone-500">{detail}</span>
               </button>
             )
           })}
@@ -6394,7 +6412,7 @@ function promptLegalChoiceLabels(payload: Record<string, unknown>) {
   return value.filter(isPromptChoiceLabel)
 }
 
-function isPromptChoiceLabel(value: unknown): value is { id: string; label: string; detail?: string | null } {
+function isPromptChoiceLabel(value: unknown): value is PromptChoiceLabel {
   if (!value || typeof value !== 'object') {
     return false
   }
@@ -6625,6 +6643,86 @@ function promptChoiceKey(payload: Record<string, unknown>) {
   const value = payload.choice_key
 
   return typeof value === 'string' ? value : 'prompt_choice'
+}
+
+function promptChoiceButtonRows(
+  cardInstanceIds: string[],
+  legalChoiceCardsById: Map<string, CardSummary>,
+  cardsById: Map<string, CardSummary>,
+  legalChoiceLabelsById: Map<string, PromptChoiceLabel>
+): PromptChoiceRow[] {
+  const baseRows = cardInstanceIds.map(cardInstanceId => {
+    const card = legalChoiceCardsById.get(cardInstanceId) ?? cardsById.get(cardInstanceId)
+    const choiceLabel = legalChoiceLabelsById.get(cardInstanceId)
+    const baseLabel = card?.name ?? choiceLabel?.label ?? formatCardInstanceId(cardInstanceId)
+
+    return {
+      baseLabel,
+      card,
+      cardInstanceId,
+      choiceLabel,
+      duplicateKey: promptChoiceDuplicateKey(card, baseLabel)
+    }
+  })
+  const duplicateCounts = new Map<string, number>()
+
+  for (const row of baseRows) {
+    duplicateCounts.set(row.duplicateKey, (duplicateCounts.get(row.duplicateKey) ?? 0) + 1)
+  }
+
+  const rows = baseRows.map(row => {
+    const copyLabel = promptChoiceCopyLabel(row.card)
+    const includesCopyLabel = Boolean(copyLabel && (duplicateCounts.get(row.duplicateKey) ?? 0) > 1)
+    const label = includesCopyLabel ? `${row.baseLabel} from ${copyLabel}` : row.baseLabel
+
+    return {
+      cardInstanceId: row.cardInstanceId,
+      card: row.card,
+      choiceLabel: row.choiceLabel,
+      detail: promptChoiceCardDetail(row.card, row.cardInstanceId, row.choiceLabel),
+      includesCopyLabel,
+      label
+    }
+  })
+  const labelCounts = new Map<string, number>()
+
+  for (const row of rows) {
+    labelCounts.set(row.label, (labelCounts.get(row.label) ?? 0) + 1)
+  }
+
+  const labelIndexes = new Map<string, number>()
+
+  return rows.map(row => {
+    const labelCount = labelCounts.get(row.label) ?? 0
+
+    if (labelCount <= 1) {
+      return row
+    }
+
+    const copyNumber = (labelIndexes.get(row.label) ?? 0) + 1
+    labelIndexes.set(row.label, copyNumber)
+
+    return {
+      ...row,
+      label: `${row.label}, copy ${copyNumber} of ${labelCount}`
+    }
+  })
+}
+
+function promptChoiceDuplicateKey(card: CardSummary | undefined, fallbackLabel: string) {
+  return card ? `${card.name}:${card.zone}` : fallbackLabel
+}
+
+function promptChoiceCopyLabel(card: CardSummary | undefined) {
+  if (!card) {
+    return null
+  }
+
+  if (card.zone === 'active' || card.zone === 'bench' || card.zone === 'hand') {
+    return cardLocationLabel(card, formatEventType(card.zone))
+  }
+
+  return null
 }
 
 function promptChoiceCardDetail(

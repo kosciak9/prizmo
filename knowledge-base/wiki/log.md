@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-31] iteration 135 | Ultra Ball discard choice labels
+- Task attempted: continued the Web UI polish pass from the verified post-event-62 Player 1 action-window state by choosing `Play Ultra Ball from hand slot 4`, verifying the persisted Ultra Ball cost prompt landing, and disambiguating repeated discard choices in Viewer prompts.
+- Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.
+- Validation: Tidewave precheck confirmed game `d608a1f1-6db6-4f23-a8d0-4a7d27641993` was at cursor `62 of 62` with `Turn 7, action_window`, active Player 1, no prompts, Player 1 legal actions `play_card` and `end_turn`, and Player 2 no legal actions; browser smoke on `http://localhost:4003` as Player 1 clicked `Play Ultra Ball from hand slot 4`, confirmed cursor `66 of 66`, latest event #66 `prompt_created`, `discard_two_from_hand` prompt with 5 legal choices, and Required choices blocking optional actions; prompt payload inspection showed duplicate Drakloak choices sharing a hand position, so the UI now labels them `Drakloak from hand slot 6, copy 1 of 2` and `Drakloak from hand slot 6, copy 2 of 2` while Ultra Ball copies show `hand slot 5/6`; browser console reported no warnings or errors; Tidewave postcheck confirmed Player 1 has one `choose_prompt` action and Player 2 sees no prompt details; `mix format`, `mix assets.build`, and `mix check --no-test` passed.
+- Remaining/blocking notes: no code blocker for this discard-choice label slice. Further polish should continue from the post-event-66 Player 1 Ultra Ball cost prompt by selecting two discard choices, verifying the cost-paid/search-prompt landing and any repeated search-choice labels, and avoiding the already-verified play-Ultra-Ball branch.
+
 ## [2026-05-31] iteration 134 | Repeated Trainer hand-slot labels
 - Task attempted: continued the Web UI polish pass from the verified post-event-60 Player 1 turn-start state by drawing for Player 1, verifying Player 2's owner-tab open-action guidance, opening Player 1's action window, and disambiguating repeated playable Trainer choices with hand-slot labels.
 - Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.
