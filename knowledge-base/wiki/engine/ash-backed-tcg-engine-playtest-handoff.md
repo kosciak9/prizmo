@@ -1,6 +1,14 @@
 # Ash-backed TCG Engine Playtest Handoff
 
-Updated: 2026-05-31
+Updated: 2026-06-01
+
+## North-star reset handoff
+
+- Current direction: follow the canonical [Open-Deck RNG TCG Engine and Card-First Playtest UI North Star](ash-backed-tcg-engine-playtest-north-star.md). The north star is the product target, not a ban on fixture-backed engine validation.
+- Selection rule for loopers: game `f6df7025-7d0f-4d9b-9bc2-31c864de1d4e`, preseeded fixtures, deterministic seeds, and narrow scripted scenarios remain valid when they prove engine correctness, prevent regressions, or validate a UI path. They should not be mistaken for the finished product experience.
+- Highest-value feasible batches to prefer when available: open-deck game creation and catalog-backed deck validation; engine-owned persisted RNG for shuffle, opening hands, prizes, and draws; safe setup for arbitrary loaded decks with explicit unsupported-card behavior; TCG layout benchmark notes followed by card-front/card-back board improvements; compact experienced-player action and prompt surfaces; then broader generic mechanics and card behavior. If another fixture-backed mechanic slice is the highest-value feasible step, do it and record how it protects correctness or advances the north star.
+- UI batches must benchmark Pokémon TCG and at least one other TCG layout before substantial layout changes, then record what Prizmo adopts or rejects in the wiki/log for the batch.
+- Keep raw payloads, IDs, debug counters, and tutorial copy out of the normal play path. The product target is a serious, dense card table for players who already know Pokémon TCG.
 
 ## Iteration 182 handoff
 

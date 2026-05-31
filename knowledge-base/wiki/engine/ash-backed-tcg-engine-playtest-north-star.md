@@ -1,12 +1,12 @@
-# Ash-backed TCG Engine and Playtest UI North Star
+# Open-Deck RNG TCG Engine and Card-First Playtest UI North Star
 
-Updated: 2026-05-30
+Updated: 2026-06-01
 
 ## Scope
 
-This is the current north star for Prizmo's Pokémon TCG work: an Ash-backed, server-authoritative rules engine plus a Pokémon TCG Live (PTCGL)-adjacent browser UI for two-human playtesting.
+This is the current north star for Prizmo's Pokémon TCG work: an Ash-backed, server-authoritative rules engine where two humans can start from arbitrary supported decklists, use persisted RNG for setup, shuffles, prizes, and draws, and play through a card-first browser UI built for experienced Pokémon TCG players.
 
-The goal is not yet a complete Standard simulator, AI opponent, exact PTCGL clone, or post-game coach. The near-term goal is a tight loop where supported card behavior can be implemented, played through a product-shaped browser UI that feels much closer to PTCGL than a test bench, observed as events, and corrected quickly.
+The goal is not yet complete Standard card-effect coverage, an AI opponent, an exact PTCGL clone, or post-game coaching. The near-term goal is a real playtest loop: players bring decklists, the engine performs normal random setup without preseeded draws, unsupported card effects are surfaced explicitly, and the UI feels like a dense competitive card table rather than a tutorial, test bench, or white-space-heavy debug surface.
 
 ## Current baseline
 
@@ -16,25 +16,55 @@ The goal is not yet a complete Standard simulator, AI opponent, exact PTCGL clon
 - `Prizmo.TcgEngine.CardCatalog` now owns the engine catalog boundary. It builds catalog records from committed TCGdex metadata plus authored behavior manifests instead of delegating to `Prizmo.Tcg.Sim.CardRegistry`.
 - The temporary Phoenix channel and temporary TCG SPA route were removed.
 - The old `Prizmo.Tcg.Sim` reducer still exists as legacy/reference code and still has tests, but it is no longer the canonical engine target.
+- Recent iterations have repeatedly advanced one long-lived preseeded playtest game. That game remains useful for engine-correctness validation, regression checks, UI smoke tests, and incremental mechanic work. It is not the final product target by itself. North-star work should keep moving the system toward open-deck, RNG-backed game creation plus card-first UI density, while still using fixtures whenever they are the best way to prove correctness.
 
 ## Product north star
 
-The first playable product surface should be a PTCGL-adjacent React SPA game client over the Ash-backed engine, not a debug-first test harness.
+The first playable product surface should be an experienced-player React SPA game client over the Ash-backed engine, not a debug-first test harness or rules tutorial.
 
 It should let two humans:
 
-1. create or join a game with supported deck fixtures;
-2. complete setup;
-3. see each player's public board, discard, prizes remaining, turn state, and legal action affordances;
-4. see the current player's private hand and prompts;
+1. create or join a game from decklists rather than only hand-picked fixtures;
+2. complete normal RNG-backed setup, including shuffling, opening hands, prizes, mulligan-relevant state, and initial Active or Bench choices where supported;
+3. see each player's public board, discard, prizes remaining, deck count, turn state, and legal action affordances;
+4. see the current player's private hand and prompts with compact card imagery;
 5. submit commands through Phoenix/Ash actions;
 6. resolve prompts and pending effects;
-7. watch a chronological event log;
-8. refresh or reconnect without losing the game state.
+7. watch a chronological event log without raw payload noise in the normal play path;
+8. refresh or reconnect without losing game state or the random sequence history.
 
-This UI is for playtesting engine correctness first, but handoff is blocked until the Web UI is substantially closer to a real digital card-game client than an internal test bench. Use PTCGL as the interaction-quality reference: spatial player sides, card-like battlefield objects, obvious Active/Bench/Prize/Deck/Discard zones, readable hand presentation, guided legal actions, styled prompt resolution, clear turn ownership, and product-quality errors and empty states. Raw payloads, debug counters, and diagnostic controls must be removed from or isolated outside the normal play path. Advanced animation, foil, tilt, and 3D renderer choices remain optional; product-grade layout, affordance clarity, and responsive desktop play are part of the milestone.
+### Open-deck and RNG expectations
 
-Validation target: the playable loop should be testable by two independent manual-tester subagents, each controlling a separate Playwright browser instance as one player. A milestone is not considered playtest-ready until those two browser sessions can complete the target scenario through the UI without direct database, IEx, or test-helper intervention.
+- The normal product path should accept arbitrary decklists that can be resolved through the committed card catalog. Fixture-only game creation remains valid for tests, regression, demos, and narrow mechanic validation, but it is not sufficient as the final product path.
+- "Playable by any deck" means any valid decklist should load, validate, shuffle, set prizes, draw opening hands, and enter normal setup or play without crashes. Complete executable behavior for every card remains incremental. Unsupported effects must be visible as unsupported or unavailable actions, never silent no-ops.
+- Setup and draws must use engine-owned RNG. Preseeded hands, scripted prize maps, and manually ordered draws are only acceptable in explicit tests, demos, or replay fixtures.
+- RNG must be persisted enough for trust and replay. Store the game seed or equivalent random source metadata, record shuffle and random-choice domain facts, and make seeded test runs deterministic while production-like games default to fresh randomness.
+- The database remains the source of truth. Clients never pick hidden-zone order, prize placement, or random outcomes locally.
+
+### Experienced-player card table expectations
+
+The UI should assume users know Pokémon TCG. It should show what they can do, not explain the game at length. Keep teaching copy, raw IDs, debug counters, payloads, and diagnostic controls out of the normal play path.
+
+Use card imagery aggressively and efficiently:
+
+- Card fronts for visible hand cards, Active, Bench, discard top, revealed cards, selected prompt options, and detail previews.
+- Pokémon card backs for face-down prizes, decks, hidden opponent hand cards, unrevealed search results, and any other hidden physical card representation.
+- Compact, high-density hand presentation that avoids large empty scroll regions. Large hands should fan, overlap, scale, wrap, or open a focused tray instead of wasting vertical space.
+- Zones should be spatial and instantly legible: opponent side, player side, Active, Bench, Stadium, prizes, deck, discard, Lost Zone if added, and action/prompt rail.
+- Legal actions should be compact affordances attached to the relevant cards or zones where possible. A separate action list is acceptable as a fallback, not as the dominant board.
+- The layout should be visually appealing and serious, aligned with [The Tournament Instrument](../../../DESIGN.md), but not a PTCGL clone. PTCGL is a useful interaction-quality reference, while Prizmo should stay denser, calmer, and more useful for competitive practice.
+
+### UI benchmark requirement
+
+Before a substantial UI layout or polish batch, perform and record a short benchmark pass in the wiki or the batch log. The benchmark should inspect at least:
+
+1. one Pokémon-specific digital reference such as PTCGL;
+2. one physical or tabletop Pokémon TCG layout reference such as tournament table coverage, Limitless-style deck/play records, or high-quality gameplay videos;
+3. one other digital TCG reference such as Magic Arena, Hearthstone, Yu-Gi-Oh Master Duel, Marvel Snap, or another relevant client.
+
+Extract concrete layout lessons: board geometry, hand density, card scale, face-down card treatment, action affordance placement, prompt presentation, opponent information, and how much explanatory copy is present. Then state what Prizmo will adopt or reject before editing the UI.
+
+Validation target: the playable loop should be testable by two independent browser sessions, each controlling one player. A milestone is not considered playtest-ready until those two browser sessions can create an RNG-backed game from decklists, complete the supported setup path, perform supported actions through the UI, and recover after refresh without direct database, IEx, or test-helper intervention.
 
 ## Engine principles
 
@@ -47,6 +77,8 @@ Validation target: the playable loop should be testable by two independent manua
 - Static metadata comes from the committed TCGdex cache; executable behavior is Prizmo-authored.
 - Effects should remain data-first with explicit module/function fallback for unusual cards.
 - Hooks should use explicit `{Module, function}` callbacks and phase-specific contexts.
+- Randomness is engine-owned, persisted, and replayable. Tests can provide seeds, but product play should not depend on pre-arranged draws.
+- Deck support expands from generic setup and generic mechanics outward. Unsupported card effects should block or degrade explicitly instead of preventing deck loading.
 
 ## Stream north star: Electric Streams as a candidate game-data feed
 
@@ -96,23 +128,39 @@ Important boundary: Electric should be a delivery and replay layer, not the rule
 
 ## Immediate implementation plan
 
-### 1. Remove remaining legacy coupling from engine tests
+### 1. Keep the north star distinct from the next step
 
-- Move supported deck fixtures out of `Prizmo.Tcg.Sim.Decks` into an engine-owned or shared deck namespace.
-- Update `test/prizmo/tcg_engine/mechanics_test.exs` to stop aliasing `Prizmo.Tcg.Sim.Decks.*`.
-- Decide whether old simulator tests are kept as historical reference, quarantined, or ported scenario-by-scenario.
+- The north star describes the target product experience, not a ban on fixture-driven or scripted validation work.
+- Preseeded fixtures, deterministic seeds, current-game handoffs, and narrow scenario tests are allowed and often desirable when they prove engine correctness, prevent regressions, or validate a UI path.
+- When choosing between similarly feasible tasks, prefer coherent batches that advance arbitrary deck loading, RNG-backed setup, card-front/card-back rendering, hand density, benchmarked board layout, or generic mechanics that make arbitrary decks safer.
+- If the highest-value feasible step is another fixture-backed mechanic or current-game validation, do it, but record why it moves the north star or protects correctness.
 
-### 2. Build the minimal playable loop
+### 2. Build open-deck RNG game creation
 
-- Expose game creation from supported deck fixtures.
-- Expose setup commands through Ash/Phoenix endpoints.
-- Expose legal action affordances from engine state and prompt state.
-- Implement choose-prompt UI for pending effects.
-- Render a PTCGL-adjacent public board with spatial player sides, Active/Bench/Prize/Deck/Discard zones, hand presentation, current turn state, guided legal actions, and event history.
-- Prioritize correctness and debuggability over animation, while preserving a polished normal play path.
-- Run a substantial Web UI polish pass before handoff: move the experience away from a test bench and toward a real digital card-game client by refining board composition, card surfaces, layout rhythm, visual hierarchy, prompt/action copy, empty/error states, desktop responsiveness, and removal or containment of debug noise.
+- Add or harden decklist ingestion for normal game creation. Decks should resolve through `Prizmo.TcgEngine.CardCatalog` and report unresolved cards clearly.
+- Validate deck shape enough for supported play: deck size, recognizable card records, Basic Pokémon availability for setup, and copy-limit warnings or errors as appropriate.
+- Add game creation inputs for player decklists and an optional explicit RNG seed for tests and reproducible dev runs.
+- Persist the seed or equivalent RNG metadata and record shuffle/setup domain facts.
+- Replace product-path preseeded hands and scripted prize maps with engine-owned shuffle, opening hand draw, prize placement, and top-deck order.
+- Validate that different fresh seeds produce different opening hands/prizes, while the same explicit seed is deterministic.
 
-### 3. Expand core engine mechanics
+### 3. Make any loaded deck safe to start
+
+- Allow decklists with incomplete card behavior to enter setup when their metadata is known.
+- Keep generic mechanics available across decks: draw for turn, bench Basic Pokémon, attach Energy, evolve when metadata supports it, retreat, pass, damage, KO, prize-taking, and replacement Active.
+- Track unsupported actions explicitly in legal affordances, logs, and card detail views. Unsupported behavior should be a visible product state, not a crash or silent fallback.
+- Expand behavior manifests card-by-card after the generic arbitrary-deck path is trustworthy.
+
+### 4. Benchmark and rebuild the card table UI
+
+- Before changing layout, record a short benchmark pass as described above.
+- Replace text-heavy zone placeholders with reusable card-surface components using real card fronts and Pokémon card backs.
+- Rework prizes, deck, discard, opponent hand, player hand, Active, and Bench to use card scale and spatial hierarchy efficiently.
+- Fix hand density so large hands remain playable without long scrolling through white space.
+- Move explanatory copy out of the main board. Use compact labels, icons, hover/focus detail, and card-attached actions for players who already know the game.
+- Keep diagnostics available outside the normal play path for agents and debugging.
+
+### 5. Expand core engine mechanics
 
 Port or reimplement the old simulator's valuable rules into `Prizmo.TcgEngine` in small verified slices:
 
@@ -123,16 +171,17 @@ Port or reimplement the old simulator's valuable rules into `Prizmo.TcgEngine` i
 - retreat and switch;
 - attack declaration, cost validation, damage, KO, prizes, and replacement Active;
 - end turn and turn start effects;
+- mulligan handling and setup edge cases for arbitrary decklists;
 - undo/debug support through snapshots, not client-side state mutation.
 
-### 4. Migrate card behavior to engine definitions
+### 6. Migrate card behavior to engine definitions
 
 - Keep `Prizmo.TcgEngine.Cards.Registry` as the behavior registry for engine-playable cards.
 - Use the catalog only for static metadata and metadata-backed predicates.
 - Convert old simulator-specific card actions into generic costs, effects, operations, prompts, and hooks.
 - Track unsupported behavior explicitly instead of silently falling back.
 
-### 5. Spike Electric Streams
+### 7. Spike Electric Streams
 
 - Run a local durable-streams server in development.
 - Publish committed `GameEvent` records for one game into a JSON stream.
@@ -143,16 +192,22 @@ Port or reimplement the old simulator's valuable rules into `Prizmo.TcgEngine` i
 
 ## First milestone definition of done
 
-The first milestone is complete when two humans can play a narrow supported scenario through the browser UI without touching IEx or tests:
+The first milestone is complete when two humans can create and play a supported slice from decklists through the browser UI without touching IEx or tests:
 
-- game setup completes;
-- both players can see correct public/private views;
-- at least one generic Trainer prompt flow works end-to-end;
+- each player can provide or select a decklist that is not a hand-ordered draw fixture;
+- game creation persists player decklists and engine-owned RNG metadata;
+- setup uses RNG-backed shuffle, opening hands, prize placement, and setup choices where supported;
+- repeated fresh games can produce different hands/prizes, and explicit seeded games are reproducible for tests;
+- both players can see correct public/private views with card fronts and card backs for the major physical card zones;
+- loaded decks with unsupported card behavior do not crash setup or generic play. Unsupported actions are clearly blocked or marked;
+- core generic actions work through the UI for supported cards and states;
+- legal actions are compact and visible without tutorial-style explanations dominating the board;
+- hand, prize, deck, discard, Active, and Bench layout is benchmarked and space-efficient enough for real play;
 - turn transitions and command blocking are enforced;
 - events and snapshots are persisted;
 - the UI can reconnect and recover current state;
-- validation can be run by two subagents playing as separate players in two Playwright browser instances;
-- the Web UI polish pass is complete enough that two humans experience the browser surface as a PTCGL-adjacent game client, not a test bench, and can understand state, legal actions, prompts, errors, and turn ownership without reading debug payloads;
+- validation can be run by two browser sessions playing as separate players;
+- the normal browser surface reads as a competitive card table, not a debug bench;
 - `mix check` passes.
 
 ## Non-goals for the first milestone
@@ -163,11 +218,14 @@ The first milestone is complete when two humans can play a narrow supported scen
 - Production-grade card animation, foil, tilt, or 3D renderer effects.
 - PTCGL log import/replay.
 - Replacing Ash/Postgres persistence with streams.
+- Full executable behavior for every card in arbitrary imported decklists.
+- Teaching new players how Pokémon TCG works inside the main play surface.
 
 ## Key decisions captured
 
 - Canonical rules engine: `lib/prizmo/tcg_engine/`.
-- Near-term product target: PTCGL-adjacent React SPA playtest UI, closer to a real digital card-game client than an internal test bench.
+- Near-term product target: arbitrary decklist game creation with engine-owned persisted RNG, plus a card-first experienced-player React SPA playtest UI.
 - Stream direction: explore Electric Streams for durable event delivery/replay, with Ash/Postgres remaining authoritative.
 - Legacy simulator: reference only until useful scenarios are ported or deleted.
 - UI transport: do not revive the temporary Phoenix channel unless Electric or plain HTTP/SSE spikes fail.
+- UI layout work must benchmark Pokémon TCG and other TCG table layouts before substantial polish batches.

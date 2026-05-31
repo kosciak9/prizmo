@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-06-01] north-star reset | Open-deck RNG and card-first play surface
+- Task attempted: reset the canonical TCG north star so looped agents understand the target product experience: arbitrary decklist game creation, engine-owned persisted RNG, and a dense card-first play surface for experienced Pokémon TCG players. Clarified that this is a direction, not a ban on fixture-backed engine validation.
+- Files changed: updated the canonical north-star article, the wiki index summary, this log, and the TCG engine playtest handoff selector guidance.
+- Validation: docs-only update; reviewed the resulting wiki diff and ran `git diff --check`.
+- Next work: prioritize open-deck game creation with catalog-backed validation and optional deterministic test seed when feasible, then replace preseeded product-path setup with persisted RNG-backed shuffle, opening hands, prizes, and draws. Fixture-backed mechanics, deterministic scenarios, and current-game handoffs remain valid when they are the best way to prove correctness or prevent regressions. For UI work, record a Pokémon TCG and cross-TCG layout benchmark before changing board layout, then improve card-front/card-back surfaces, hand density, and compact experienced-player affordances.
+
 ## [2026-05-31] iteration 182 | Playtest board comprehension polish
 - Task attempted: advanced the Ash-backed TCG engine playtest north-star UI path with a coherent normal-play-surface polish batch instead of another handoff-only game action.
 - Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, accepted the Ash setup/codegen-aligned `undo_command` exposure in `lib/prizmo/tcg_engine.ex`, `lib/prizmo/tcg_engine/game.ex`, `lib/prizmo/tcg_engine/game/action_commands.ex`, and `lib/prizmo_web/spa/lib/ash/client.ts`, updated this log and the TCG engine playtest handoff, and left the pre-existing `AGENTS.md` worktree change untouched.
