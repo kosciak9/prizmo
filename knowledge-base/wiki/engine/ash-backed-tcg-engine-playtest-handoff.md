@@ -2,6 +2,14 @@
 
 Updated: 2026-05-31
 
+## Iteration 149 handoff
+
+- Current state: the documented playtest game `d608a1f1-6db6-4f23-a8d0-4a7d27641993` has advanced from the repaired post-event-104 ended-turn state. Clicking `Start player 2's turn` through the SPA as Player 2 wrote event/snapshot `105`; the game is now cursor/latest `105`, `Turn 10, start`, active Player 2, latest event `start_next_turn`, with no prompts and no legal action affordances yet. Player 2 sees enabled `Draw for player 2` and `Skip draw for player 2` controls with owner-tab guidance; Player 1 sees disabled draw/open-action controls pointing back to the Player 2 tab.
+- Last commit at iteration start: `970bc8b docs(wiki): capture tcg branch replacement handoff`.
+- Remaining tasks: continue the substantial Web UI polish/playtest path from post-event-105, eventually rerun the formal two-independent-browser milestone, and continue broader persisted mechanics/card behavior plus Electric Streams spike work from the north-star plan.
+- Blockers: no code blocker for continuing this repaired branch; the documented manual-tester milestone remains blocked until separate browser contexts can be guaranteed.
+- Recommended next atomic task: from the post-event-105 Player 2 start state, click `Draw for player 2`, verify the persisted drawn landing and Player 1 non-owner open-action guidance, then open Player 2's action window and refine only unclear draw/open-action copy without repeating the already-verified start-turn branch.
+
 ## Iteration 148 handoff
 
 - Current state: the documented playtest game `d608a1f1-6db6-4f23-a8d0-4a7d27641993` has advanced through the repaired branch replacement path. Clicking `End player 1's turn` from cursor `103` through the SPA pruned the stale future Ultra Ball events/snapshots `104`-`107` and wrote replacement event/snapshot `104`; the game is now cursor/latest `104`, `Turn 9, ended`, latest event `end_turn`, with both viewers seeing no prompts and no legal actions. Player 1 copy points to the Player 2 tab for the next-turn path; Player 2 copy enables `Start player 2's turn` and says draw timing resolves from this tab.

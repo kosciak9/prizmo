@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-31] iteration 149 | Player 2 turn-10 start landing
+- Task attempted: continued from the repaired post-event-104 ended-turn state by switching to the Player 2 seat, clicking `Start player 2's turn` through the React SPA, and verifying the persisted turn-10 start landing from both seats.
+- Files changed: updated this log and the TCG engine playtest handoff; no product source changed.
+- Validation: Tidewave precheck confirmed game `d608a1f1-6db6-4f23-a8d0-4a7d27641993` at cursor/latest `104`, latest event `#104 end_turn`, `Turn 9, ended`, no prompts, and no legal actions for either viewer; browser smoke on `http://localhost:4003` switched to Player 2, clicked `Start player 2's turn`, confirmed cursor `105 of 105`, `Turn 10, start`, latest event `#105 start_next_turn`, active Player 2, and enabled `Draw for player 2`/`Skip draw for player 2`; switching to Player 1 confirmed disabled draw/open-action controls point back to the Player 2 tab; browser console reported no warnings or errors; Tidewave postcheck confirmed cursor/latest `105`, current turn `%{turn_number: 10, status: "start", active_player_id: "player_2"}`, latest event `start_next_turn`, and no prompts or legal actions for either viewer.
+- Remaining/blocking notes: no code blocker for this turn-10 start landing slice. Further polish should continue from the post-event-105 Player 2 start state by clicking `Draw for player 2`, verifying the drawn landing and Player 1 open-action owner-tab guidance, then opening Player 2's action window without repeating the already-verified start-turn branch.
+
 ## [2026-05-31] iteration 148 | Branch replacement UI end-turn landing
 - Task attempted: advanced the repaired documented playtest branch from the post-event-103 Player 1 action-window state by clicking `End player 1's turn` through the React SPA, validating that branch-safe append pruning replaces the stale future Ultra Ball branch with a clean end-turn event.
 - Files changed: updated this log and the TCG engine playtest handoff; no product source changed.
