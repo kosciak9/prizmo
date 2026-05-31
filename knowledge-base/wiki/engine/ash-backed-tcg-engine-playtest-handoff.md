@@ -2,13 +2,13 @@
 
 Updated: 2026-05-31
 
-## Iteration 135 handoff
+## Iteration 136 handoff
 
-- Current state: game `d608a1f1-6db6-4f23-a8d0-4a7d27641993` is verified at post-event-66 with Player 1 in `Turn 7, action_window`; latest event is #66 `prompt_created`, Player 1 is awaiting the Ultra Ball `discard_two_from_hand` prompt with 5 legal hand choices, Player 1 has one `choose_prompt` action, Player 2 has no legal actions or prompt details, and repeated discard rows now render as `Drakloak from hand slot 6, copy 1 of 2` / `copy 2 of 2` when hand positions collide.
-- Last commit at iteration start: `54e5dca feat(spa): label repeated tcg trainer choices`.
-- Remaining tasks: continue the substantial Web UI polish/playtest path without repeating the already verified post-event-62 play-Ultra-Ball branch; broader north-star work still includes the formal two-independent-browser milestone, more persisted mechanics/card behavior slices, and the Electric Streams spike.
-- Blockers: no code blocker for the discard-choice label slice; the documented manual-tester milestone remains blocked by unreliable manual-tester browser/session isolation.
-- Recommended next atomic task: from the post-event-66 Player 1 Ultra Ball cost prompt, select two discard choices, verify the cost-paid/search-prompt landing and any repeated search-choice labels, then refine only unclear prompt/search copy without replaying the Ultra Ball start.
+- Current state: game `d608a1f1-6db6-4f23-a8d0-4a7d27641993` is verified at post-event-73 with Player 1 in `Turn 7, action_window`; latest event is #73 `prompt_created`, Player 1 is awaiting the Ultra Ball `search_deck_for_pokemon` prompt with seven legal Pokémon choices, Player 1 has one `choose_prompt` action, Player 2 has no prompt/action visibility, and duplicate deck rows now show `Dragapult ex, copy 1 of 2` / `copy 2 of 2` and `Budew, copy 1 of 2` / `copy 2 of 2` with zone-aware deck-copy guidance.
+- Last commit at iteration start: `4058625 feat(spa): disambiguate tcg prompt choices`.
+- Remaining tasks: continue the substantial Web UI polish/playtest path without repeating the already verified discard-to-search branch; broader north-star work still includes the formal two-independent-browser milestone, more persisted mechanics/card behavior slices, and the Electric Streams spike.
+- Blockers: no code blocker for the deck-copy prompt guidance slice; the documented manual-tester milestone remains blocked by unreliable manual-tester browser/session isolation.
+- Recommended next atomic task: from the post-event-73 Player 1 Ultra Ball search prompt, select one Pokémon, verify the card-to-hand/search-complete landing and post-search action-window copy, then refine only unclear post-search guidance without replaying the discard branch.
 
 ## Current state
 

@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-31] iteration 136 | Ultra Ball deck-copy prompt guidance
+- Task attempted: continued the Web UI polish path from the verified post-event-66 Player 1 Ultra Ball discard prompt by selecting the two duplicated Drakloak discard choices, verifying the persisted search-prompt landing, and making repeated deck-search copy guidance zone-aware.
+- Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.
+- Validation: Tidewave precheck confirmed game `d608a1f1-6db6-4f23-a8d0-4a7d27641993` was at cursor `66 of 66` with Player 1 awaiting a `discard_two_from_hand` prompt and only one `choose_prompt` action while Player 2 had no prompt/action visibility; browser smoke on `http://localhost:4003` as Player 1 selected `Drakloak from hand slot 6, copy 1 of 2` and `copy 2 of 2`, clicked `Discard selected cards 2/2`, and confirmed cursor `73 of 73`, latest event #73 `prompt_created`, the `search_deck_for_pokemon` prompt with seven legal Pokémon choices, duplicate `Dragapult ex`/`Budew` rows labeled `copy 1 of 2` / `copy 2 of 2`, and refreshed guidance `Repeated deck choices are separate deck copies`; browser console reported no warnings or errors; Tidewave postcheck confirmed Player 1 has one `choose_prompt` action for the search prompt and Player 2 has no prompts or actions; `mix format`, `mix assets.build`, and `mix check --no-test` passed.
+- Remaining/blocking notes: no code blocker for this deck-copy prompt guidance slice. Further polish should continue from the post-event-73 Player 1 Ultra Ball search prompt by selecting one Pokémon, verifying the card-to-hand/search-complete landing and post-search action-window copy, and avoiding the already-verified discard-to-search branch.
+
 ## [2026-05-31] iteration 135 | Ultra Ball discard choice labels
 - Task attempted: continued the Web UI polish pass from the verified post-event-62 Player 1 action-window state by choosing `Play Ultra Ball from hand slot 4`, verifying the persisted Ultra Ball cost prompt landing, and disambiguating repeated discard choices in Viewer prompts.
 - Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.

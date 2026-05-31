@@ -2697,7 +2697,7 @@ function PromptChoiceCard({
   const promptFlowGuide = ultraBallPromptFlowGuide(choiceKey, min, max, legalChoiceIds.length)
   const promptGuidance = promptGuidanceMessages(prompt, min, max, legalChoiceIds.length)
   const promptChoiceRows = promptChoiceButtonRows(legalChoiceIds, legalChoiceCardsById, cardsById, legalChoiceLabelsById)
-  const hasDisambiguatedPromptChoices = promptChoiceRows.some(row => row.includesCopyLabel)
+  const promptChoiceDisambiguation = promptChoiceDisambiguationMessage(promptChoiceRows)
 
   function toggleChoice(cardInstanceId: string) {
     setSelectedCardInstanceIds(current => {
@@ -2736,10 +2736,9 @@ function PromptChoiceCard({
         </div>
       ) : null}
 
-      {hasDisambiguatedPromptChoices ? (
+      {promptChoiceDisambiguation ? (
         <p className="mt-3 rounded-lg border border-emerald-200 bg-stone-50 px-3 py-2 text-xs leading-5 text-emerald-900">
-          Repeated hand choices are separate cards. Labels include the hand slot, with copy numbers only when two rows
-          still share a slot.
+          {promptChoiceDisambiguation}
         </p>
       ) : null}
 
@@ -6707,6 +6706,35 @@ function promptChoiceButtonRows(
       label: `${row.label}, copy ${copyNumber} of ${labelCount}`
     }
   })
+}
+
+function promptChoiceDisambiguationMessage(rows: PromptChoiceRow[]) {
+  const disambiguatedRows = rows.filter(row => row.includesCopyLabel || promptChoiceHasOrdinalCopyLabel(row.label))
+
+  if (disambiguatedRows.length === 0) {
+    return null
+  }
+
+  const zones = new Set(disambiguatedRows.map(row => row.card?.zone).filter(Boolean))
+  const hasOrdinalCopyLabels = disambiguatedRows.some(row => promptChoiceHasOrdinalCopyLabel(row.label))
+
+  if (zones.has('deck') && zones.size === 1) {
+    return 'Repeated deck choices are separate deck copies. Copy numbers distinguish identical Pokémon before the chosen card is added to hand.'
+  }
+
+  if (zones.has('hand') && zones.size === 1) {
+    return hasOrdinalCopyLabels
+      ? 'Repeated hand choices are separate cards. Labels include the hand slot, with copy numbers only when two rows still share a slot.'
+      : 'Repeated hand choices are separate cards. Labels include the hand slot so you can choose the exact copy.'
+  }
+
+  return hasOrdinalCopyLabels
+    ? 'Repeated choices are separate cards. Location labels and copy numbers distinguish identical choices.'
+    : 'Repeated choices are separate cards. Location labels distinguish identical choices.'
+}
+
+function promptChoiceHasOrdinalCopyLabel(label: string) {
+  return /, copy \d+ of \d+$/.test(label)
 }
 
 function promptChoiceDuplicateKey(card: CardSummary | undefined, fallbackLabel: string) {
