@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-06-01] iteration 185 | SPA open-deck game creation
+- Task attempted: advanced the open-deck north-star path by wiring the React SPA create/reconnect rail to catalog-backed arbitrary decklist creation with client-side decklist parsing and optional deterministic seed support.
+- Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, the canonical north-star article, this log, and the TCG engine playtest handoff.
+- Validation: `node_modules/.bin/tsc --noEmit --ignoreDeprecations 6.0` passed; browser smoke pasted two 60-card catalog-ID decklists and explicit seed `spa-ui-seed`, clicked `Create RNG open-deck board`, and landed on new game `cb58f7c5-c821-46b6-b0b0-049a003b1e3c`; Tidewave SQL confirmed explicit RNG metadata, two `deck_shuffled` events, open-deck game-player keys, and 60 deck-zone cards per player, then the smoke game was deleted and confirmed gone; `mix assets.build` passed; final `mix check` passed.
+- Remaining/blocking notes: the browser can now create an RNG-backed open-deck game, but the next validation slice still needs to drive that newly created game through setup from the UI flow rail: coin toss, opening hands, Active/setup Bench choices, prizes, setup completion, first action window, and refresh recovery.
+
 ## [2026-06-01] iteration 184 | Open-deck RNG shuffle metadata
 - Task attempted: advanced the open-deck north-star path by adding engine-owned seed metadata and deterministic server-side deck shuffle for arbitrary catalog-backed decklist game creation, while preserving fixture deck order for existing regression/playtest handoffs.
 - Files changed: added `lib/prizmo/tcg_engine/rng.ex`; updated `lib/prizmo/tcg_engine/decklists.ex`, `lib/prizmo/tcg_engine/game_setup.ex`, `lib/prizmo/tcg_engine/mechanics.ex`, `lib/prizmo/tcg_engine/game.ex`, `lib/prizmo/tcg_engine.ex`, `lib/prizmo/tcg_engine/card_instance.ex`, `lib/prizmo/tcg_engine/snapshot.ex`, and `lib/prizmo/tcg_engine/snapshot_restorer.ex`; added Ash migration/snapshot `20260531233504_add_tcg_rng_metadata.exs` / `20260531233505.json`; updated the north-star article, this log, and the TCG engine playtest handoff.

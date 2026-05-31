@@ -12,6 +12,7 @@ import {
   runChooseTcgEngineSetupBenchFromHand,
   runChooseTcgEngineStartingPlayer,
   runCompleteTcgEngineSetup,
+  runCreateOpenDeckTcgEngineGame,
   runCreateTcgEngineGame,
   runDeclareTcgEngineAttack,
   runDrawTcgEngineCardForTurn,
@@ -33,6 +34,7 @@ import {
   runStartNextTcgEngineTurn,
   runStartTcgEngineSetup,
   runUndoTcgEngineGame,
+  type CreateOpenDeckTcgEngineGameFields,
   type CreateTcgEngineGameFields,
   type GetTcgEngineGameStateFields,
   type ListTcgEngineGamesFields,
@@ -51,6 +53,10 @@ const SHUFFLE_ATTACHED_ENERGY_INTO_DECK_THEN_DAMAGE_OPPONENT_BENCH_EFFECT =
 const COPY_OPPONENT_ACTIVE_TERA_POKEMON_ATTACK_EFFECT = 'copy_opponent_active_tera_pokemon_attack'
 const ULTRA_BALL_CARD_ID = 'MEG-131'
 const BENCH_SLOT_COUNT = 5
+const EXPECTED_OPEN_DECK_CARD_COUNT = 60
+const OPEN_DECK_CARD_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_.:-]*$/
+const PLAYER_ONE_OPEN_DECK_KEY = 'player-1-open-deck'
+const PLAYER_TWO_OPEN_DECK_KEY = 'player-2-open-deck'
 
 const SUPPORTED_DECK_FIELDS: ListSupportedTcgDecksFields = [
   'deckKey',
@@ -75,6 +81,8 @@ const GAME_RESOURCE_FIELDS: CreateTcgEngineGameFields = [
   'cursorIndex',
   'latestEventIndex'
 ]
+
+const OPEN_DECK_GAME_RESOURCE_FIELDS = GAME_RESOURCE_FIELDS as CreateOpenDeckTcgEngineGameFields
 
 const GAME_LIST_FIELDS: ListTcgEngineGamesFields = [
   'id',
@@ -198,6 +206,7 @@ type PlayerId = (typeof PLAYER_IDS)[number]
 type CoinResult = 'heads' | 'tails'
 type ResolutionChecklistTone = 'blocked' | 'ready' | 'waiting'
 type SetupGuideState = 'done' | 'needed' | 'next' | 'ready'
+type GameCreationMode = 'open-deck' | 'fixture'
 
 type ResolutionChecklistItem = {
   label: string
@@ -256,6 +265,24 @@ type SupportedDeck = {
   name: string
   sourceUrl: string
   cardCount: number
+  uniqueCardCount: number
+}
+
+type OpenDeckCardCount = {
+  cardId: string
+  count: number
+}
+
+type OpenDeckParseError = {
+  lineNumber: number
+  line: string
+  message: string
+}
+
+type ParsedOpenDeck = {
+  cards: OpenDeckCardCount[]
+  errors: OpenDeckParseError[]
+  totalCount: number
   uniqueCardCount: number
 }
 
@@ -665,8 +692,12 @@ export function HomeRoute() {
   const navigate = useNavigate({ from: '/' })
   const search = useSearch({ from: '/' })
   const queryClient = useQueryClient()
+  const [gameCreationMode, setGameCreationMode] = useState<GameCreationMode>('open-deck')
   const [playerOneDeckKey, setPlayerOneDeckKey] = useState('')
   const [playerTwoDeckKey, setPlayerTwoDeckKey] = useState('')
+  const [playerOneOpenDeckText, setPlayerOneOpenDeckText] = useState('')
+  const [playerTwoOpenDeckText, setPlayerTwoOpenDeckText] = useState('')
+  const [openDeckRngSeed, setOpenDeckRngSeed] = useState('')
   const [ultraBallPostSearchHandoff, setUltraBallPostSearchHandoff] =
     useState<UltraBallPostSearchHandoff | null>(readStoredUltraBallPostSearchHandoff)
 
@@ -695,6 +726,9 @@ export function HomeRoute() {
   const selectedPlayerOneDeckKey = playerOneDeckKey || decks[0]?.deckKey || ''
   const selectedPlayerTwoDeckKey = playerTwoDeckKey || decks[1]?.deckKey || decks[0]?.deckKey || ''
   const normalisedGameId = session.gameId.trim()
+  const parsedPlayerOneOpenDeck = useMemo(() => parseOpenDeckText(playerOneOpenDeckText), [playerOneOpenDeckText])
+  const parsedPlayerTwoOpenDeck = useMemo(() => parseOpenDeckText(playerTwoOpenDeckText), [playerTwoOpenDeckText])
+  const openDeckRngSeedValue = openDeckRngSeed.trim()
 
   useEffect(() => {
     setUltraBallPostSearchHandoff(currentHandoff => {
@@ -723,10 +757,16 @@ export function HomeRoute() {
 
   const createGameMutation = useMutation({
     mutationFn: () =>
-      createGame({
-        playerOneDeckKey: selectedPlayerOneDeckKey,
-        playerTwoDeckKey: selectedPlayerTwoDeckKey
-      }),
+      gameCreationMode === 'open-deck'
+        ? createOpenDeckGame({
+            playerOneCards: parsedPlayerOneOpenDeck.cards,
+            playerTwoCards: parsedPlayerTwoOpenDeck.cards,
+            rngSeed: openDeckRngSeedValue.length > 0 ? openDeckRngSeedValue : null
+          })
+        : createFixtureGame({
+            playerOneDeckKey: selectedPlayerOneDeckKey,
+            playerTwoDeckKey: selectedPlayerTwoDeckKey
+          }),
     onSuccess: async game => {
       updateSession(currentSession => ({
         ...currentSession,
@@ -950,8 +990,18 @@ export function HomeRoute() {
     () => decks.find(deck => deck.deckKey === selectedPlayerTwoDeckKey) ?? null,
     [decks, selectedPlayerTwoDeckKey]
   )
-  const canCreateGame =
-    Boolean(selectedPlayerOneDeckKey && selectedPlayerTwoDeckKey) && !createGameMutation.isPending
+  const fixtureLoadoutsReady = Boolean(selectedPlayerOneDeckKey && selectedPlayerTwoDeckKey)
+  const openDeckLoadoutsReady = isOpenDeckReady(parsedPlayerOneOpenDeck) && isOpenDeckReady(parsedPlayerTwoOpenDeck)
+  const loadoutsReady = gameCreationMode === 'open-deck' ? openDeckLoadoutsReady : fixtureLoadoutsReady
+  const loadoutDetail =
+    gameCreationMode === 'open-deck'
+      ? openDeckLoadoutDetail(parsedPlayerOneOpenDeck, parsedPlayerTwoOpenDeck, openDeckRngSeedValue)
+      : selectedPlayerOneDeck && selectedPlayerTwoDeck
+        ? `${selectedPlayerOneDeck.name} vs ${selectedPlayerTwoDeck.name}`
+        : decks.length > 0
+          ? 'Choose one supported fixture for each player.'
+          : 'Waiting for the engine-owned fixture catalog.'
+  const canCreateGame = loadoutsReady && !createGameMutation.isPending
   const promptCommandError = commandErrorNotice(
     choosePromptMutation.error,
     'Prompt choice failed',
@@ -1142,34 +1192,72 @@ export function HomeRoute() {
 
                 {!normalisedGameId ? (
                   <>
-                    {decksQuery.isPending ? <SkeletonLines count={3} /> : null}
+                    <GameCreationModeSelect value={gameCreationMode} onChange={setGameCreationMode} />
 
-                    {decksQuery.error ? (
-                      <InlineNotice tone="error" title="Deck fixtures did not load">
-                        {errorMessage(decksQuery.error)} Refresh before creating a table.
-                      </InlineNotice>
-                    ) : null}
+                    {gameCreationMode === 'open-deck' ? (
+                      <>
+                        <OpenDeckTextArea
+                          label="Player 1 decklist"
+                          parsedDeck={parsedPlayerOneOpenDeck}
+                          playerId={PLAYER_ONE_ID}
+                          value={playerOneOpenDeckText}
+                          onChange={setPlayerOneOpenDeckText}
+                        />
+                        <OpenDeckTextArea
+                          label="Player 2 decklist"
+                          parsedDeck={parsedPlayerTwoOpenDeck}
+                          playerId={PLAYER_TWO_ID}
+                          value={playerTwoOpenDeckText}
+                          onChange={setPlayerTwoOpenDeckText}
+                        />
+                        <label className="block space-y-2 rounded-2xl bg-secondary/55 p-3">
+                          <span className="flex items-center justify-between gap-3">
+                            <span className="text-sm font-medium text-foreground">Deterministic seed</span>
+                            <StatusBadge tone={openDeckRngSeedValue ? 'warning' : 'neutral'}>
+                              {openDeckRngSeedValue ? 'explicit' : 'fresh RNG'}
+                            </StatusBadge>
+                          </span>
+                          <input
+                            className="w-full rounded-xl border border-input bg-input/40 px-3 py-2 font-mono text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring/30"
+                            onChange={event => setOpenDeckRngSeed(event.currentTarget.value)}
+                            placeholder="Optional seed for reproducible dev games"
+                            type="text"
+                            value={openDeckRngSeed}
+                          />
+                        </label>
+                      </>
+                    ) : (
+                      <>
+                        {decksQuery.isPending ? <SkeletonLines count={3} /> : null}
 
-                    {!decksQuery.isPending && decks.length === 0 ? (
-                      <InlineNotice tone="info" title="No supported decks exposed yet">
-                        The engine RPC returned an empty fixture list.
-                      </InlineNotice>
-                    ) : null}
+                        {decksQuery.error ? (
+                          <InlineNotice tone="error" title="Deck fixtures did not load">
+                            {errorMessage(decksQuery.error)} Refresh before creating a table.
+                          </InlineNotice>
+                        ) : null}
 
-                    <DeckSelect
-                      label="Player 1 loadout"
-                      playerId={PLAYER_ONE_ID}
-                      value={selectedPlayerOneDeckKey}
-                      decks={decks}
-                      onChange={setPlayerOneDeckKey}
-                    />
-                    <DeckSelect
-                      label="Player 2 loadout"
-                      playerId={PLAYER_TWO_ID}
-                      value={selectedPlayerTwoDeckKey}
-                      decks={decks}
-                      onChange={setPlayerTwoDeckKey}
-                    />
+                        {!decksQuery.isPending && decks.length === 0 ? (
+                          <InlineNotice tone="info" title="No supported decks exposed yet">
+                            The engine RPC returned an empty fixture list.
+                          </InlineNotice>
+                        ) : null}
+
+                        <DeckSelect
+                          label="Player 1 loadout"
+                          playerId={PLAYER_ONE_ID}
+                          value={selectedPlayerOneDeckKey}
+                          decks={decks}
+                          onChange={setPlayerOneDeckKey}
+                        />
+                        <DeckSelect
+                          label="Player 2 loadout"
+                          playerId={PLAYER_TWO_ID}
+                          value={selectedPlayerTwoDeckKey}
+                          decks={decks}
+                          onChange={setPlayerTwoDeckKey}
+                        />
+                      </>
+                    )}
                   </>
                 ) : null}
 
@@ -1206,24 +1294,30 @@ export function HomeRoute() {
                     onClick={() => createGameMutation.mutate()}
                     type="button"
                   >
-                    {createGameMutation.isPending ? 'Creating table...' : 'Create game board'}
+                    {createGameMutation.isPending
+                      ? 'Creating table...'
+                      : gameCreationMode === 'open-deck'
+                        ? 'Create RNG open-deck board'
+                        : 'Create fixture board'}
                   </button>
                 ) : null}
 
                 {!normalisedGameId ? (
                   <FirstRunSetupGuide
-                    deckCount={decks.length}
                     hasGame={Boolean(normalisedGameId)}
-                    selectedPlayerOneDeck={selectedPlayerOneDeck}
-                    selectedPlayerTwoDeck={selectedPlayerTwoDeck}
+                    loadoutDetail={loadoutDetail}
+                    loadoutsReady={loadoutsReady}
+                    sourceTitle={gameCreationMode === 'open-deck' ? 'Paste open decklists' : 'Pick fixture loadouts'}
                     viewerPlayerId={session.viewerPlayerId}
                   />
                 ) : null}
 
                 {createGameMutation.error ? (
                   <InlineNotice tone="error" title="Game creation failed">
-                    {errorMessage(createGameMutation.error)} No table was created. Confirm both fixture
-                    decks are still available, then try again.
+                    {errorMessage(createGameMutation.error)}{' '}
+                    {gameCreationMode === 'open-deck'
+                      ? 'No table was created. Confirm both lists use catalog card IDs, include 60 cards, and contain at least one Basic Pokémon.'
+                      : 'No table was created. Confirm both fixture decks are still available, then try again.'}
                   </InlineNotice>
                 ) : null}
 
@@ -1281,7 +1375,7 @@ export function HomeRoute() {
               </div>
             </Panel>
 
-            {!normalisedGameId ? (
+            {!normalisedGameId && gameCreationMode === 'fixture' ? (
               <Panel
                 title="Fixture catalog"
                 trailing={<StatusBadge tone={decks.length > 0 ? 'active' : 'neutral'}>{decks.length} decks</StatusBadge>}
@@ -1589,7 +1683,122 @@ async function listAvailableGames(): Promise<AvailableGame[]> {
   return games as AvailableGame[]
 }
 
-async function createGame(input: {
+function parseOpenDeckText(text: string): ParsedOpenDeck {
+  const countsByCardId = new Map<string, number>()
+  const cardIdOrder: string[] = []
+  const errors: OpenDeckParseError[] = []
+
+  for (const [index, rawLine] of text.split(/\r?\n/).entries()) {
+    const trimmedLine = rawLine.trim()
+
+    if (!trimmedLine || trimmedLine.startsWith('#') || trimmedLine.startsWith('//')) {
+      continue
+    }
+
+    const line = trimmedLine.replace(/\s+(?:#|\/\/).*$/, '').trim()
+    const parsedLine = parseOpenDeckLine(line)
+
+    if ('message' in parsedLine) {
+      errors.push({ lineNumber: index + 1, line: trimmedLine, message: parsedLine.message })
+      continue
+    }
+
+    if (!countsByCardId.has(parsedLine.cardId)) {
+      cardIdOrder.push(parsedLine.cardId)
+    }
+
+    countsByCardId.set(parsedLine.cardId, (countsByCardId.get(parsedLine.cardId) ?? 0) + parsedLine.count)
+  }
+
+  const cards = cardIdOrder.map(cardId => ({ cardId, count: countsByCardId.get(cardId) ?? 0 }))
+  const totalCount = cards.reduce((total, card) => total + card.count, 0)
+
+  if (totalCount > 0 && totalCount !== EXPECTED_OPEN_DECK_CARD_COUNT) {
+    errors.push({
+      lineNumber: 0,
+      line: 'deck total',
+      message: `Deck must contain ${EXPECTED_OPEN_DECK_CARD_COUNT} cards; parsed ${totalCount}.`
+    })
+  }
+
+  return {
+    cards,
+    errors,
+    totalCount,
+    uniqueCardCount: cards.length
+  }
+}
+
+function parseOpenDeckLine(line: string): OpenDeckCardCount | { message: string } {
+  const compactCountFirstMatch = line.match(/^(\d+)x(.+)$/i)
+  const countFirstMatch = line.match(/^(\d+)\s*x?\s+(.+)$/i)
+  const countLastMatch = line.match(/^(.+?)\s+x?\s*(\d+)$/i)
+  const count = Number(compactCountFirstMatch?.[1] ?? countFirstMatch?.[1] ?? countLastMatch?.[2] ?? 1)
+  const cardId = (compactCountFirstMatch?.[2] ?? countFirstMatch?.[2] ?? countLastMatch?.[1] ?? line).trim()
+
+  if (!Number.isSafeInteger(count) || count < 1) {
+    return { message: 'Count must be a positive whole number.' }
+  }
+
+  if (!cardId) {
+    return { message: 'Missing catalog card ID.' }
+  }
+
+  if (!OPEN_DECK_CARD_ID_PATTERN.test(cardId)) {
+    return { message: 'Use catalog card IDs like MEG-131, not card names or section headings.' }
+  }
+
+  return { cardId, count }
+}
+
+function isOpenDeckReady(parsedDeck: ParsedOpenDeck) {
+  return parsedDeck.errors.length === 0 && parsedDeck.totalCount === EXPECTED_OPEN_DECK_CARD_COUNT
+}
+
+function openDeckLoadoutDetail(
+  playerOneDeck: ParsedOpenDeck,
+  playerTwoDeck: ParsedOpenDeck,
+  rngSeed: string
+) {
+  if (isOpenDeckReady(playerOneDeck) && isOpenDeckReady(playerTwoDeck)) {
+    const seedDetail = rngSeed ? ` explicit seed ${rngSeed}` : ' fresh RNG seed'
+
+    return `P1 ${playerOneDeck.uniqueCardCount} unique / P2 ${playerTwoDeck.uniqueCardCount} unique with${seedDetail}.`
+  }
+
+  if (playerOneDeck.errors.length > 0 || playerTwoDeck.errors.length > 0) {
+    return 'Fix decklist format, total count, or catalog ID issues before creating the board.'
+  }
+
+  return `Paste ${EXPECTED_OPEN_DECK_CARD_COUNT}-card catalog-backed lists for both players.`
+}
+
+async function createOpenDeckGame(input: {
+  playerOneCards: OpenDeckCardCount[]
+  playerTwoCards: OpenDeckCardCount[]
+  rngSeed: string | null
+}): Promise<CreatedGame> {
+  const result = await runCreateOpenDeckTcgEngineGame({
+    input: {
+      activePlayerId: PLAYER_ONE_ID,
+      ...(input.rngSeed ? { rngSeed: input.rngSeed } : {}),
+      players: [
+        { playerId: PLAYER_ONE_ID, deckKey: PLAYER_ONE_OPEN_DECK_KEY, cards: input.playerOneCards },
+        { playerId: PLAYER_TWO_ID, deckKey: PLAYER_TWO_OPEN_DECK_KEY, cards: input.playerTwoCards }
+      ]
+    },
+    fields: OPEN_DECK_GAME_RESOURCE_FIELDS,
+    headers: buildAshRpcHeaders()
+  })
+
+  if (!result.success) {
+    throw new Error(rpcErrorMessage(result.errors))
+  }
+
+  return result.data as CreatedGame
+}
+
+async function createFixtureGame(input: {
   playerOneDeckKey: string
   playerTwoDeckKey: string
 }): Promise<CreatedGame> {
@@ -6449,6 +6658,118 @@ function Panel({
   )
 }
 
+function GameCreationModeSelect({
+  value,
+  onChange
+}: {
+  value: GameCreationMode
+  onChange: (value: GameCreationMode) => void
+}) {
+  const options: Array<{ value: GameCreationMode; title: string; detail: string }> = [
+    {
+      value: 'open-deck',
+      title: 'Open decklists',
+      detail: 'Paste catalog card IDs. The engine validates, seeds, and shuffles the table.'
+    },
+    {
+      value: 'fixture',
+      title: 'Fixture shortcut',
+      detail: 'Use committed regression fixtures for known playtest scenarios.'
+    }
+  ]
+
+  return (
+    <fieldset className="space-y-2">
+      <legend className="text-sm font-medium text-foreground">Game source</legend>
+      <div className="grid gap-2">
+        {options.map(option => (
+          <label
+            className="flex cursor-pointer items-start justify-between gap-3 rounded-2xl bg-secondary/70 px-3 py-2.5 text-sm text-muted-foreground transition hover:bg-accent hover:text-accent-foreground has-[:checked]:bg-primary/12 has-[:checked]:text-primary"
+            key={option.value}
+          >
+            <span>
+              <span className="block font-medium text-foreground">{option.title}</span>
+              <span className="mt-1 block text-xs leading-5 text-muted-foreground">{option.detail}</span>
+            </span>
+            <input
+              checked={value === option.value}
+              className="mt-1 h-4 w-4 shrink-0 accent-primary"
+              name="game-creation-mode"
+              onChange={() => onChange(option.value)}
+              type="radio"
+            />
+          </label>
+        ))}
+      </div>
+    </fieldset>
+  )
+}
+
+function OpenDeckTextArea({
+  label,
+  parsedDeck,
+  playerId,
+  value,
+  onChange
+}: {
+  label: string
+  parsedDeck: ParsedOpenDeck
+  playerId: PlayerId
+  value: string
+  onChange: (value: string) => void
+}) {
+  const ready = isOpenDeckReady(parsedDeck)
+  const hasInput = value.trim().length > 0
+  const statusTone = ready ? 'active' : parsedDeck.errors.length > 0 || hasInput ? 'warning' : 'neutral'
+  const statusLabel = ready
+    ? 'ready'
+    : parsedDeck.errors.length > 0
+      ? `${parsedDeck.errors.length} ${parsedDeck.errors.length === 1 ? 'issue' : 'issues'}`
+      : `${parsedDeck.totalCount}/${EXPECTED_OPEN_DECK_CARD_COUNT}`
+
+  return (
+    <div className="prizmo-soft-surface rounded-2xl p-3">
+      <label className="block space-y-2">
+        <span className="flex items-center justify-between gap-3">
+          <span className="text-sm font-medium text-foreground">{label}</span>
+          <span className="flex items-center gap-1.5">
+            <StatusBadge tone={statusTone}>{statusLabel}</StatusBadge>
+            <StatusBadge tone="neutral">{formatPlayerId(playerId)}</StatusBadge>
+          </span>
+        </span>
+        <textarea
+          className="min-h-44 w-full resize-y rounded-xl border border-input bg-input/40 px-3 py-2 font-mono text-xs leading-5 text-foreground outline-none transition placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring/30"
+          onChange={event => onChange(event.currentTarget.value)}
+          placeholder={'4 MEG-131\n3 MEG-132\nMEG-133 x2\n# one catalog card ID per row; counts default to 1'}
+          spellCheck={false}
+          value={value}
+        />
+      </label>
+
+      <div className="mt-3 flex flex-wrap gap-1.5 text-xs font-medium text-muted-foreground">
+        <span className="rounded-full bg-muted px-2 py-1">
+          {parsedDeck.totalCount}/{EXPECTED_OPEN_DECK_CARD_COUNT} cards
+        </span>
+        <span className="rounded-full bg-muted px-2 py-1">{parsedDeck.uniqueCardCount} unique</span>
+        <span className="rounded-full bg-muted px-2 py-1">catalog IDs only</span>
+      </div>
+
+      {parsedDeck.errors.length > 0 ? (
+        <div className="mt-3 rounded-xl bg-attention/10 px-3 py-2 text-xs leading-5 text-attention">
+          <p className="font-semibold">Fix decklist format before creating the board.</p>
+          <ul className="mt-1 list-disc space-y-1 pl-4">
+            {parsedDeck.errors.slice(0, 3).map(error => (
+              <li key={`${error.lineNumber}-${error.message}`}>
+                {error.lineNumber > 0 ? `Line ${error.lineNumber}` : 'Deck total'}: {error.message}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
 function DeckSelect({
   label,
   playerId,
@@ -6517,26 +6838,18 @@ function DeckSelect({
 }
 
 function FirstRunSetupGuide({
-  deckCount,
   hasGame,
-  selectedPlayerOneDeck,
-  selectedPlayerTwoDeck,
+  loadoutDetail,
+  loadoutsReady,
+  sourceTitle,
   viewerPlayerId
 }: {
-  deckCount: number
   hasGame: boolean
-  selectedPlayerOneDeck: SupportedDeck | null
-  selectedPlayerTwoDeck: SupportedDeck | null
+  loadoutDetail: string
+  loadoutsReady: boolean
+  sourceTitle: string
   viewerPlayerId: PlayerId
 }) {
-  const loadoutsReady = Boolean(selectedPlayerOneDeck && selectedPlayerTwoDeck)
-  const loadoutDetail =
-    selectedPlayerOneDeck && selectedPlayerTwoDeck
-      ? `${selectedPlayerOneDeck.name} vs ${selectedPlayerTwoDeck.name}`
-      : deckCount > 0
-        ? 'Choose one supported fixture for each player.'
-        : 'Waiting for the engine-owned fixture catalog.'
-
   return (
     <section className="rounded-2xl bg-accent-mint/10 p-3">
       <div className="flex items-start justify-between gap-3">
@@ -6556,7 +6869,7 @@ function FirstRunSetupGuide({
           detail={loadoutDetail}
           number="1"
           state={loadoutsReady ? 'ready' : 'needed'}
-          title="Pick player loadouts"
+          title={sourceTitle}
         />
         <SetupGuideRow
           detail={hasGame ? 'This tab is connected to a persisted game.' : 'Create a board when both loadouts are ready.'}
@@ -7199,7 +7512,7 @@ function EmptyWorkbench() {
           Create a game board or open one from the list
         </h2>
         <p className="mt-3 text-sm leading-6 text-muted-foreground">
-          Choose two fixture loadouts in the left rail, then create a persisted board. Existing boards appear here whenever the server still has them.
+          Paste two catalog-backed decklists or switch to a fixture shortcut, then create a persisted board. Existing boards appear here whenever the server still has them.
         </p>
         <div className="mt-6 rounded-2xl bg-secondary/65 px-4 py-3 text-left text-sm text-muted-foreground">
           <p className="font-medium text-foreground">Next action</p>
