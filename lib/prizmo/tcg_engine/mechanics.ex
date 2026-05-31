@@ -536,8 +536,9 @@ defmodule Prizmo.TcgEngine.Mechanics do
              winner_player_id: game.winner_player_id
            }),
          {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index),
-         {:ok, game} <- get_game(game.id) do
-      maybe_create_queued_knockout_prize_selection(game, pending_effect)
+         {:ok, game} <- get_game(game.id),
+         {:ok, game} <- maybe_create_queued_knockout_prize_selection(game, pending_effect) do
+      stabilize_flow(game)
     end
   end
 
@@ -1086,8 +1087,9 @@ defmodule Prizmo.TcgEngine.Mechanics do
              write_event(game, :choose_replacement_active, player_id, %{
                bench_card_instance_id: bench_card.id
              }),
-           {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do
-        get_game(game.id)
+           {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index),
+           {:ok, game} <- get_game(game.id) do
+        stabilize_flow(game)
       end
     end)
   end
@@ -1654,6 +1656,10 @@ defmodule Prizmo.TcgEngine.Mechanics do
         end
     end
   end
+
+  defp stabilize_flow(%Game{status: :finished} = game), do: {:ok, game}
+
+  defp stabilize_flow(%Game{} = game), do: FlowInterpreter.stabilize(game)
 
   defp total_knockout_prize_count(prize_records) do
     Enum.reduce(prize_records, 0, &(&1.prize_count + &2))

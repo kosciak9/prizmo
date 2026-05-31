@@ -18,14 +18,20 @@ defmodule Prizmo.TcgEngine.Flow.Interpreter do
            :ok <- require_source_state(context.game, transition.from),
            {:ok, game} <- run_action(transition.action, context, attrs),
            :ok <- require_target_state(game, transition.target) do
-        stabilize(game.id, @max_microsteps)
+        stabilize_steps(game.id, @max_microsteps)
       end
     end)
   end
 
-  defp stabilize(_game_id, 0), do: {:error, :flow_microstep_limit_exceeded}
+  def stabilize(game_or_id) do
+    with {:ok, game} <- GameStore.get_game(game_or_id) do
+      stabilize_steps(game.id, @max_microsteps)
+    end
+  end
 
-  defp stabilize(game_id, remaining_steps) do
+  defp stabilize_steps(_game_id, 0), do: {:error, :flow_microstep_limit_exceeded}
+
+  defp stabilize_steps(game_id, remaining_steps) do
     with {:ok, context} <- Context.load(game_id) do
       case next_always_transition(context) do
         nil ->
@@ -34,7 +40,7 @@ defmodule Prizmo.TcgEngine.Flow.Interpreter do
         transition ->
           with {:ok, game} <- run_action(transition.action, context, %{}),
                :ok <- require_target_state(game, transition.target) do
-            stabilize(game.id, remaining_steps - 1)
+            stabilize_steps(game.id, remaining_steps - 1)
           end
       end
     end
