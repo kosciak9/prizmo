@@ -2411,7 +2411,7 @@ function TurnStepGuide({
   } else if (currentTurn?.status === 'start') {
     drawDetail = viewerOwnsTurn
       ? `Use this ${turnOwnerLabel} tab to draw a card, or skip only when the fixture scenario calls for it.`
-      : `Draw timing belongs to ${turnOwnerLabel}. Use the ${turnOwnerLabel} tab, then refresh here.`
+      : `Draw timing belongs to ${turnOwnerLabel}. Use the ${turnOwnerLabel} tab to draw or skip, then refresh here.`
   } else if (drawStepResolved) {
     drawDetail = `Draw-step timing is resolved for ${turnOwnerLabel}.`
   } else if (currentTurn) {

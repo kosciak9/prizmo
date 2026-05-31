@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-31] iteration 140 | Player 2 turn-8 start landing
+- Task attempted: continued from the post-event-96 ended-turn state by switching to the Player 2 seat, clicking `Start player 2's turn`, verifying the persisted turn-8 start landing from both seats, and tightening the non-owner draw-timing guide so it explicitly says to draw or skip from the Player 2 tab.
+- Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.
+- Validation: Tidewave precheck confirmed game `d608a1f1-6db6-4f23-a8d0-4a7d27641993` at cursor `96 of 96` with `Turn 7, ended` and latest event #96 `end_turn`; browser smoke on `http://localhost:4003` switched to Player 2, clicked `Start player 2's turn`, confirmed cursor `97 of 97`, latest event #97 `start_next_turn`, `Turn 8, start`, enabled `Draw for player 2` and `Skip draw for player 2`, then switched to Player 1 and confirmed disabled controls point to the Player 2 tab plus refreshed copy `Use the player 2 tab to draw or skip, then refresh here`; browser console reported no warnings or errors; Tidewave postcheck confirmed cursor `97 of 97`, Player 2 active on turn 8 start, latest event #97 `start_next_turn`, and no awaiting prompts or pending effects; `mix format`, `mix assets.build`, and `mix check --no-test` passed.
+- Remaining/blocking notes: no code blocker for this turn-8 start landing slice. Further polish should continue from the post-event-97 Player 2 start state by clicking `Draw for player 2`, verifying the drawn landing and Player 1 open-action owner-tab guidance, then opening Player 2's action window without repeating the start-turn branch.
+
 ## [2026-05-31] iteration 139 | Player 1 ended-turn landing
 - Task attempted: continued from the verified post-event-95 Player 1 action-window state by clicking `End player 1's turn`, verifying the persisted ended-turn/Player 2 next-turn landing from both seats, and tightening the Table setup copy so the ended state names the Player 2 tab for draw timing.
 - Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.
