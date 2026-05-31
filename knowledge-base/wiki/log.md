@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-31] iteration 99 | First action-window onboarding
+- Task attempted: continued the Web UI polish pass by replacing the generic live-action priority notice with a compact `First action window` guide that names the viewer board state, explains the highlighted priority lane, and coaches turn-one hand/board decisions before battle or end-turn choices.
+- Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.
+- Validation: `mix format` passed; `mix assets.build` passed; browser smoke on `http://localhost:4003` loaded existing game `7ea2441d-746c-4d55-a540-d3769e1636e1`, confirmed the new guide appeared in the action window, attached Fire Energy to Moltres through one legal action, confirmed the guide updated priority to Battle decisions, and reported no browser warnings or errors; `mix check --no-test` passed.
+- Remaining/blocking notes: no code blocker for this action-window onboarding slice. Further Web UI polish should refine the Trainer/prompt handoff from legal actions into guided prompt resolution before rerunning the formal two-browser/manual-tester milestone.
+
 ## [2026-05-31] iteration 98 | First-turn timing guidance
 - Task attempted: continued the Web UI polish pass by refining the post-setup `Turn step` rail with a compact first-turn path guide for starting turn one, resolving draw timing, and opening the action window with viewer-seat and turn-owner copy.
 - Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.

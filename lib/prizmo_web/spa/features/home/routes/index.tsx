@@ -1808,6 +1808,7 @@ function GameStateWorkbench({
             cardsById={cardsById}
             commandError={actionCommandError}
             chooseReplacementActivePendingCardId={chooseReplacementActivePendingCardId}
+            gameState={gameState}
             onAttachEnergy={onAttachEnergy}
             onChooseReplacementActive={onChooseReplacementActive}
             onDeclareAttack={onDeclareAttack}
@@ -1823,6 +1824,7 @@ function GameStateWorkbench({
             playBasicToBenchPendingCardId={playBasicToBenchPendingCardId}
             playCardPendingCardId={playCardPendingCardId}
             retreatPendingKey={retreatPendingKey}
+            viewerPlayerId={viewerPlayerId}
           />
         </aside>
       </div>
@@ -3694,6 +3696,7 @@ function ActionAffordancesPanel({
   cardsById,
   commandError,
   chooseReplacementActivePendingCardId,
+  gameState,
   onAttachEnergy,
   onChooseReplacementActive,
   onDeclareAttack,
@@ -3708,12 +3711,14 @@ function ActionAffordancesPanel({
   evolveFromHandPendingKey,
   playBasicToBenchPendingCardId,
   playCardPendingCardId,
-  retreatPendingKey
+  retreatPendingKey,
+  viewerPlayerId
 }: {
   actions: ActionAffordance[]
   cardsById: Map<string, CardSummary>
   commandError: CommandErrorNotice | null
   chooseReplacementActivePendingCardId: string | null
+  gameState: GameState
   onAttachEnergy: (input: AttachEnergyCommand) => void
   onChooseReplacementActive: (input: ChooseReplacementActiveCommand) => void
   onDeclareAttack: (input: DeclareAttackCommand) => void
@@ -3729,6 +3734,7 @@ function ActionAffordancesPanel({
   playBasicToBenchPendingCardId: string | null
   playCardPendingCardId: string | null
   retreatPendingKey: string | null
+  viewerPlayerId: PlayerId
 }) {
   const actionCommandPending = Boolean(
     playCardPendingCardId ||
@@ -3743,6 +3749,7 @@ function ActionAffordancesPanel({
   const actionGroups = useMemo(() => groupActionAffordances(actions), [actions])
   const primaryActionGroup = actionGroups[0]
   const primaryActionGroupId = primaryActionGroup?.id
+  const showActionWindowGuide = Boolean(gameState.currentTurn?.status === 'action_window' && primaryActionGroup)
 
   if (actionGroups.length === 0 && !commandError) {
     return null
@@ -3756,7 +3763,15 @@ function ActionAffordancesPanel({
       <div className="space-y-4">
         {commandError ? <CommandErrorCard notice={commandError} /> : null}
 
-        {primaryActionGroup ? (
+        {primaryActionGroup && showActionWindowGuide ? (
+          <ActionWindowGuide
+            actionGroups={actionGroups}
+            currentTurn={gameState.currentTurn}
+            primaryActionGroup={primaryActionGroup}
+            viewerPlayer={gameState.players.find(player => player.playerId === viewerPlayerId) ?? null}
+            viewerPlayerId={viewerPlayerId}
+          />
+        ) : primaryActionGroup ? (
           <div className="rounded-xl border border-emerald-200 bg-emerald-50/80 px-3 py-2 text-xs leading-5 text-emerald-950">
             <span className="font-semibold uppercase tracking-[0.14em] text-emerald-800">Current priority</span>
             <span className="mt-0.5 block">
@@ -3824,6 +3839,132 @@ function ActionAffordancesPanel({
       </div>
     </Panel>
   )
+}
+
+function ActionWindowGuide({
+  actionGroups,
+  currentTurn,
+  primaryActionGroup,
+  viewerPlayer,
+  viewerPlayerId
+}: {
+  actionGroups: ActionGroup[]
+  currentTurn: GameState['currentTurn']
+  primaryActionGroup: ActionGroup
+  viewerPlayer: PlayerView | null
+  viewerPlayerId: PlayerId
+}) {
+  const handGroup = actionGroups.find(group => group.id === 'hand')
+  const battleGroup = actionGroups.find(group => group.id === 'battle')
+  const turnGroup = actionGroups.find(group => group.id === 'turn')
+  const turnOwnerId = currentTurn?.activePlayerId ?? viewerPlayerId
+  const turnOwnerLabel = formatPlayerId(turnOwnerId)
+  const viewerLabel = formatPlayerId(viewerPlayerId)
+  const viewerOwnsTurn = turnOwnerId === viewerPlayerId
+  const activeName = viewerPlayer?.active?.name ?? 'the Active Pokémon'
+  const viewerBoardDetail = viewerOwnsTurn
+    ? `${viewerLabel} has ${activeName} Active, ${viewerPlayer?.handCount ?? 0} cards in hand, and ${
+        viewerPlayer?.bench.length ?? 0
+      } on Bench.`
+    : `${turnOwnerLabel} owns this action window. This tab is ${viewerLabel}; use the matching seat for commands.`
+  const handDetail = handGroup
+    ? `${handGroup.actions.length} hand or board command${handGroup.actions.length === 1 ? '' : 's'} available. Bench Basics, attach Energy, or play a Trainer before committing to battle.`
+    : 'No hand or board command is legal from this view. Move to battle decisions or turn flow.'
+  const battleDetail = battleGroup
+    ? turnGroup
+      ? 'Battle decisions and End Turn are both legal. Attack when the board is set, otherwise pass the turn.'
+      : 'Battle decisions are available. Review retreat and paid attacks before leaving the window.'
+    : turnGroup
+      ? 'Only turn flow remains. End the turn after confirming hand, Bench, and attached Energy.'
+      : 'Finish the required choice before battle or turn-flow actions appear.'
+  const guideTitle = currentTurn?.turnNumber === 1 ? 'First action window' : 'Action window plan'
+
+  return (
+    <div className="rounded-xl border border-emerald-200 bg-[oklch(0.982_0.018_155)] p-3 text-xs leading-5 text-emerald-950">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-800">
+            {guideTitle}
+          </h3>
+          <p className="mt-1 text-stone-600">{viewerBoardDetail}</p>
+        </div>
+        <StatusBadge tone="active">actions live</StatusBadge>
+      </div>
+
+      <div className="mt-3 space-y-2">
+        <ActionWindowGuideStep
+          detail={priorityInstruction(primaryActionGroup)}
+          label="focus"
+          title={`Follow ${primaryActionGroup.title}`}
+          tone="focus"
+        />
+        <ActionWindowGuideStep
+          detail={handDetail}
+          label={handGroup ? 'available' : 'clear'}
+          title="Check hand and board"
+          tone={primaryActionGroup.id === 'hand' ? 'focus' : handGroup ? 'available' : 'clear'}
+        />
+        <ActionWindowGuideStep
+          detail={battleDetail}
+          label={battleGroup ? 'ready' : turnGroup ? 'pass' : 'blocked'}
+          title="Commit or pass"
+          tone={primaryActionGroup.id === 'battle' || primaryActionGroup.id === 'turn' ? 'focus' : battleGroup || turnGroup ? 'available' : 'clear'}
+        />
+      </div>
+    </div>
+  )
+}
+
+function ActionWindowGuideStep({
+  detail,
+  label,
+  title,
+  tone
+}: {
+  detail: string
+  label: string
+  title: string
+  tone: 'available' | 'clear' | 'focus'
+}) {
+  const className =
+    tone === 'focus'
+      ? 'border-emerald-200 bg-white text-emerald-950'
+      : tone === 'available'
+        ? 'border-stone-200 bg-white text-stone-700'
+        : 'border-stone-200 bg-[oklch(0.99_0.004_155)] text-stone-500'
+  const badgeClassName =
+    tone === 'focus'
+      ? 'bg-emerald-100 text-emerald-800'
+      : tone === 'available'
+        ? 'bg-stone-200 text-stone-700'
+        : 'bg-stone-100 text-stone-500'
+
+  return (
+    <div className={`rounded-lg border px-3 py-2 ${className}`}>
+      <div className="flex items-center justify-between gap-2">
+        <p className="font-medium text-stone-950">{title}</p>
+        <span className={`rounded-full px-2 py-0.5 text-[0.68rem] font-semibold uppercase tracking-[0.12em] ${badgeClassName}`}>
+          {label}
+        </span>
+      </div>
+      <p className="mt-1 text-xs leading-5">{detail}</p>
+    </div>
+  )
+}
+
+function priorityInstruction(group: ActionGroup) {
+  switch (group.id) {
+    case 'required':
+      return 'A required choice is blocking progress. Resolve it before optional actions.'
+    case 'battle':
+      return 'Battle decisions are most consequential now. Review retreat and paid attacks first.'
+    case 'hand':
+      return 'Hand and board actions are the safest first pass. Improve the board before attacking or ending.'
+    case 'turn':
+      return 'No higher-priority move is available. End the turn after confirming the board state.'
+    default:
+      return 'Use the engine action exposed first, then refresh the board if the next step is unclear.'
+  }
 }
 
 function ActionAffordanceCard({
