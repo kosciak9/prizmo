@@ -2,6 +2,14 @@
 
 Updated: 2026-05-31
 
+## Iteration 146 handoff
+
+- Current state: snapshot restoration now includes `pending_effects` and `prompts`; resources absent from a restored snapshot are marked `cancelled` through restore actions so undo hides obsolete continuations and redo can revive prompt/effect state when the target snapshot contains it. The documented game `d608a1f1-6db6-4f23-a8d0-4a7d27641993` was restored to cursor `103` with latest event `107`; all old prompt rows are `cancelled`, all old pending-effect rows are `cancelled`, Player 1 has no prompts and only `end_turn`, and Player 2 has no prompts/actions.
+- Last commit at iteration start: `ea34a23 fix(tcg-engine): block unpayable card prompts`.
+- Remaining tasks: decide whether to continue the long-running playtest game by adding future-branch pruning/replacement before appending after undo, or start a fresh playtest branch; broader north-star work still includes the formal two-independent-browser milestone, more persisted mechanics/card behavior slices, and the Electric Streams spike.
+- Blockers: the prompt/pending-effect leak is cleared, but the current playtest game still has invalid future events/snapshots at indexes `104`-`107` while the cursor is `103`. `Prizmo.TcgEngine.EventLog.write_event/4` writes the next event at `cursor_index + 1`, and `Prizmo.TcgEngine.GameEvent` has a unique `{game_id, index}` identity, so appending a replacement event at `104` on this game likely needs explicit future event/snapshot pruning or superseding first.
+- Recommended next atomic task: implement and validate branch-safe event/snapshot truncation (or choose/document a fresh playtest game) before clicking `End player 1's turn` from the repaired post-event-103 state.
+
 ## Iteration 145 handoff
 
 - Current state: game `d608a1f1-6db6-4f23-a8d0-4a7d27641993` was restored with persisted undo from the invalid post-click cursor `107` back to cursor `103 of 107`; latest visible event is #103 `open_action_window`, active player is Player 1 on `Turn 9, action_window`, but Player 1 still sees one leaked `choose_prompt` affordance for the old Ultra Ball `discard_two_from_hand` prompt requiring 2 cards with only one legal Dragapult ex choice. Player 2 sees no prompt details and no actions. The source fix now prevents future unpayable Ultra Ball plays from creating this state, but snapshots do not currently restore/clear prompt and pending-effect rows.

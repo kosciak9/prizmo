@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-31] iteration 146 | Prompt snapshot restore
+- Task attempted: implemented prompt and pending-effect snapshot persistence/restoration so undoing before a prompt no longer leaves active prompt continuations behind; restored the documented blocked playtest game back to cursor 103 with the new restorer.
+- Files changed: updated `lib/prizmo/tcg_engine/prompt.ex`, `lib/prizmo/tcg_engine/snapshot.ex`, `lib/prizmo/tcg_engine/snapshot_restorer.ex`, this log, and the TCG engine playtest handoff.
+- Validation: `mix format`, `mix compile --warnings-as-errors`, `mix test test/prizmo/tcg_engine/mechanics_test.exs`, and `mix check --no-test` passed; Tidewave postcheck on game `d608a1f1-6db6-4f23-a8d0-4a7d27641993` after `SnapshotRestorer.restore(game_id, 103)` confirmed cursor `103`, latest `107`, prompt statuses `%{cancelled: 7}`, pending-effect statuses `%{cancelled: 4}`, Player 1 prompt count `0` with actions `["end_turn"]`, and Player 2 prompt/action counts `0`; Tidewave throwaway game `70eb6762-1956-474a-9785-a1911793440c` verified newly written snapshots include `pending_effects`/`prompts`, undoing a prompted Ultra Ball branch cancels them, and redo restores `awaiting_prompt`/`awaiting_choice` plus one `choose_prompt` affordance.
+- Remaining/blocking notes: the stale prompt leak is fixed, but the long-running playtest game still has future invalid events/snapshots at indexes `104`-`107` while the cursor is `103`; because `GameEvent` enforces unique `{game_id, index}`, continuing that same undone branch likely needs explicit future-branch pruning/replacement before appending a new event at `104`, or a fresh playtest game should be started.
+
 ## [2026-05-31] iteration 145 | Unpayable Ultra Ball guard
 - Task attempted: continued from the post-event-103 Player 1 action-window state by clicking `Play Ultra Ball`, found the engine/UI allowed Ultra Ball with only one discardable hand card, and implemented a persisted guard so unpayable generic card plays are rejected and hidden before an unsatisfiable prompt can be created.
 - Files changed: updated `lib/prizmo/tcg_engine/card_play.ex`, `lib/prizmo/tcg_engine/mechanics.ex`, `lib/prizmo/tcg_engine/game_view/action_affordances.ex`, this log, and the TCG engine playtest handoff.

@@ -31,6 +31,7 @@ defmodule Prizmo.TcgEngine.Prompt do
     define :validate_choice
     define :resolve
     define :cancel
+    define :restore
   end
 
   actions do
@@ -52,6 +53,10 @@ defmodule Prizmo.TcgEngine.Prompt do
 
     update :cancel do
       change transition_state(:cancelled)
+    end
+
+    update :restore do
+      accept [:status, :payload]
     end
   end
 

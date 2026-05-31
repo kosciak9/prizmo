@@ -5,6 +5,8 @@ defmodule Prizmo.TcgEngine.Snapshot do
   alias Prizmo.TcgEngine.CardInstance
   alias Prizmo.TcgEngine.Game
   alias Prizmo.TcgEngine.GamePlayer
+  alias Prizmo.TcgEngine.PendingEffect
+  alias Prizmo.TcgEngine.Prompt
   alias Prizmo.TcgEngine.Setup
   alias Prizmo.TcgEngine.Turn
 
@@ -15,14 +17,18 @@ defmodule Prizmo.TcgEngine.Snapshot do
          {:ok, players} <- list_players(game_id),
          {:ok, setup} <- maybe_get_setup(game_id),
          {:ok, turns} <- list_turns(game_id),
-         {:ok, cards} <- list_cards(game_id) do
+         {:ok, cards} <- list_cards(game_id),
+         {:ok, pending_effects} <- list_pending_effects(game_id),
+         {:ok, prompts} <- list_prompts(game_id) do
       {:ok,
        %{
          "game" => game_snapshot(game),
          "players" => Enum.map(players, &player_snapshot/1),
          "setup" => if(setup, do: setup_snapshot(setup)),
          "turns" => Enum.map(turns, &turn_snapshot/1),
-         "cards" => Enum.map(cards, &card_snapshot/1)
+         "cards" => Enum.map(cards, &card_snapshot/1),
+         "pending_effects" => Enum.map(pending_effects, &pending_effect_snapshot/1),
+         "prompts" => Enum.map(prompts, &prompt_snapshot/1)
        }}
     end
   end
@@ -59,6 +65,20 @@ defmodule Prizmo.TcgEngine.Snapshot do
     CardInstance
     |> Ash.Query.filter(game_id == ^game_id)
     |> Ash.Query.sort(owner_player_id: :asc, zone: :asc, position: :asc, instance_id: :asc)
+    |> Ash.read()
+  end
+
+  defp list_pending_effects(game_id) do
+    PendingEffect
+    |> Ash.Query.filter(game_id == ^game_id)
+    |> Ash.Query.sort(created_at: :asc)
+    |> Ash.read()
+  end
+
+  defp list_prompts(game_id) do
+    Prompt
+    |> Ash.Query.filter(game_id == ^game_id)
+    |> Ash.Query.sort(created_at: :asc)
     |> Ash.read()
   end
 
@@ -119,6 +139,34 @@ defmodule Prizmo.TcgEngine.Snapshot do
       "attached_to_card_instance_id" => card.attached_to_card_instance_id,
       "evolves_from_card_instance_id" => card.evolves_from_card_instance_id,
       "turn_entered_play" => card.turn_entered_play
+    }
+  end
+
+  defp pending_effect_snapshot(%PendingEffect{} = pending_effect) do
+    %{
+      "id" => pending_effect.id,
+      "source_type" => Atom.to_string(pending_effect.source_type),
+      "source_card_instance_id" => pending_effect.source_card_instance_id,
+      "source_card_id" => pending_effect.source_card_id,
+      "controller_player_id" => pending_effect.controller_player_id,
+      "current_player_id" => pending_effect.current_player_id,
+      "effect_key" =>
+        if(pending_effect.effect_key, do: Atom.to_string(pending_effect.effect_key)),
+      "step" => pending_effect.step,
+      "state" => pending_effect.state,
+      "status" => Atom.to_string(pending_effect.status)
+    }
+  end
+
+  defp prompt_snapshot(%Prompt{} = prompt) do
+    %{
+      "id" => prompt.id,
+      "turn_id" => prompt.turn_id,
+      "pending_effect_id" => prompt.pending_effect_id,
+      "prompt_type" => prompt.prompt_type,
+      "player_id" => prompt.player_id,
+      "payload" => prompt.payload,
+      "status" => Atom.to_string(prompt.status)
     }
   end
 end

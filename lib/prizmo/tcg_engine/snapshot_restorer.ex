@@ -7,7 +7,9 @@ defmodule Prizmo.TcgEngine.SnapshotRestorer do
   alias Prizmo.TcgEngine.CardStore
   alias Prizmo.TcgEngine.Game
   alias Prizmo.TcgEngine.GameSnapshot
+  alias Prizmo.TcgEngine.PendingEffect
   alias Prizmo.TcgEngine.PlayerStore
+  alias Prizmo.TcgEngine.Prompt
   alias Prizmo.TcgEngine.Setup
   alias Prizmo.TcgEngine.TurnStore
 
@@ -21,7 +23,9 @@ defmodule Prizmo.TcgEngine.SnapshotRestorer do
          :ok <- restore_players(game_id, Map.fetch!(snapshot_data, "players")),
          :ok <- restore_setup(game_id, Map.get(snapshot_data, "setup")),
          :ok <- restore_turns(game_id, Map.get(snapshot_data, "turns", [])),
-         :ok <- restore_cards(game_id, Map.fetch!(snapshot_data, "cards")) do
+         :ok <- restore_cards(game_id, Map.fetch!(snapshot_data, "cards")),
+         :ok <- restore_pending_effects(game_id, Map.get(snapshot_data, "pending_effects", [])),
+         :ok <- restore_prompts(game_id, Map.get(snapshot_data, "prompts", [])) do
       get_game(game_id)
     end
   end
@@ -154,6 +158,97 @@ defmodule Prizmo.TcgEngine.SnapshotRestorer do
     end
   end
 
+  defp restore_pending_effects(game_id, pending_effect_snapshots) do
+    with {:ok, pending_effects} <- list_pending_effects(game_id) do
+      pending_effects_by_id = Map.new(pending_effects, &{&1.id, &1})
+      snapshot_pending_effect_ids = MapSet.new(pending_effect_snapshots, &Map.fetch!(&1, "id"))
+
+      restore_snapshot_pending_effects =
+        Enum.map(pending_effect_snapshots, fn data ->
+          case Map.fetch(pending_effects_by_id, Map.fetch!(data, "id")) do
+            {:ok, pending_effect} ->
+              restore_pending_effect(pending_effect, data)
+
+            :error ->
+              {:ok, :snapshot_references_deleted_pending_effect}
+          end
+        end)
+
+      cancel_future_pending_effects =
+        pending_effects
+        |> Enum.reject(&MapSet.member?(snapshot_pending_effect_ids, &1.id))
+        |> Enum.map(fn pending_effect ->
+          restore_pending_effect(pending_effect, %{
+            "status" => "cancelled",
+            "current_player_id" => pending_effect.current_player_id,
+            "effect_key" =>
+              if(pending_effect.effect_key, do: Atom.to_string(pending_effect.effect_key)),
+            "step" => pending_effect.step,
+            "state" => pending_effect.state
+          })
+        end)
+
+      (restore_snapshot_pending_effects ++ cancel_future_pending_effects)
+      |> collect_results()
+      |> case do
+        {:ok, _pending_effects} -> :ok
+        {:error, reason} -> {:error, reason}
+      end
+    end
+  end
+
+  defp restore_pending_effect(%PendingEffect{} = pending_effect, data) do
+    update(pending_effect, :restore, %{
+      status: string_to_existing_atom(Map.fetch!(data, "status")),
+      current_player_id: Map.get(data, "current_player_id"),
+      effect_key: maybe_string_to_existing_atom(Map.get(data, "effect_key")),
+      step: Map.fetch!(data, "step"),
+      state: Map.fetch!(data, "state")
+    })
+  end
+
+  defp restore_prompts(game_id, prompt_snapshots) do
+    with {:ok, prompts} <- list_prompts(game_id) do
+      prompts_by_id = Map.new(prompts, &{&1.id, &1})
+      snapshot_prompt_ids = MapSet.new(prompt_snapshots, &Map.fetch!(&1, "id"))
+
+      restore_snapshot_prompts =
+        Enum.map(prompt_snapshots, fn data ->
+          case Map.fetch(prompts_by_id, Map.fetch!(data, "id")) do
+            {:ok, prompt} ->
+              restore_prompt(prompt, data)
+
+            :error ->
+              {:ok, :snapshot_references_deleted_prompt}
+          end
+        end)
+
+      cancel_future_prompts =
+        prompts
+        |> Enum.reject(&MapSet.member?(snapshot_prompt_ids, &1.id))
+        |> Enum.map(fn prompt ->
+          restore_prompt(prompt, %{
+            "status" => "cancelled",
+            "payload" => prompt.payload
+          })
+        end)
+
+      (restore_snapshot_prompts ++ cancel_future_prompts)
+      |> collect_results()
+      |> case do
+        {:ok, _prompts} -> :ok
+        {:error, reason} -> {:error, reason}
+      end
+    end
+  end
+
+  defp restore_prompt(%Prompt{} = prompt, data) do
+    update(prompt, :restore, %{
+      status: string_to_existing_atom(Map.fetch!(data, "status")),
+      payload: Map.fetch!(data, "payload")
+    })
+  end
+
   defp get_setup(game_id) do
     case maybe_get_setup(game_id) do
       {:ok, %Setup{} = setup} -> {:ok, setup}
@@ -166,6 +261,20 @@ defmodule Prizmo.TcgEngine.SnapshotRestorer do
     Setup
     |> Ash.Query.filter(game_id == ^game_id)
     |> Ash.read_one()
+  end
+
+  defp list_pending_effects(game_id) do
+    PendingEffect
+    |> Ash.Query.filter(game_id == ^game_id)
+    |> Ash.Query.sort(created_at: :asc)
+    |> Ash.read()
+  end
+
+  defp list_prompts(game_id) do
+    Prompt
+    |> Ash.Query.filter(game_id == ^game_id)
+    |> Ash.Query.sort(created_at: :asc)
+    |> Ash.read()
   end
 
   defp collect_results(results) do
