@@ -3992,7 +3992,7 @@ function ActionAffordancesPanel({
           <div className="rounded-xl border border-emerald-200 bg-emerald-50/80 px-3 py-2 text-xs leading-5 text-emerald-950">
             <span className="font-semibold uppercase tracking-[0.14em] text-emerald-800">Current priority</span>
             <span className="mt-0.5 block">
-              {primaryActionGroup.title}: {primaryActionGroup.description}
+              {primaryActionGroup.title}: {actionGroupDescription(primaryActionGroup, actionGroups)}
             </span>
           </div>
         ) : null}
@@ -4005,7 +4005,9 @@ function ActionAffordancesPanel({
                   <h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">
                     {group.title}
                   </h3>
-                  <p className="mt-1 text-xs leading-5 text-stone-500">{group.description}</p>
+                  <p className="mt-1 text-xs leading-5 text-stone-500">
+                    {actionGroupDescription(group, actionGroups)}
+                  </p>
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
                   {group.id === primaryActionGroupId ? (
@@ -4287,6 +4289,30 @@ function ActionWindowGuide({
   )
 }
 
+function actionGroupDescription(group: ActionGroup, actionGroups: ActionGroup[]) {
+  if (group.id !== 'hand') {
+    return group.description
+  }
+
+  const commandPhrases = [
+    group.actions.some(action => action.key === 'play_card') ? 'play engine-defined cards' : null,
+    group.actions.some(action => action.key === 'play_basic_to_bench') ? 'Bench Basic Pokémon' : null,
+    group.actions.some(action => action.key === 'evolve_from_hand') ? 'evolve eligible Pokémon' : null,
+    group.actions.some(action => action.key === 'attach_energy') ? 'attach Energy' : null
+  ].filter((phrase): phrase is string => Boolean(phrase))
+
+  if (commandPhrases.length === 0) {
+    return group.description
+  }
+
+  const followUpPhrase = handActionFollowUpPhrase({
+    hasBattleActions: actionGroups.some(actionGroup => actionGroup.id === 'battle'),
+    hasTurnFlow: actionGroups.some(actionGroup => actionGroup.id === 'turn')
+  })
+
+  return `${capitalizeSentence(formatPhraseList(commandPhrases))} ${followUpPhrase}.`
+}
+
 function handActionGuideDetail(
   handGroup: ActionGroup,
   basicBenchOptions: BasicBenchCommandOption[],
@@ -4356,6 +4382,22 @@ function handActionFollowUpPhrase({
   }
 
   return 'before the next engine decision'
+}
+
+function formatPhraseList(phrases: string[]) {
+  if (phrases.length === 0) {
+    return ''
+  }
+
+  if (phrases.length === 1) {
+    return phrases[0]
+  }
+
+  return `${phrases.slice(0, -1).join(', ')} and ${phrases[phrases.length - 1]}`
+}
+
+function capitalizeSentence(sentence: string) {
+  return sentence ? `${sentence.slice(0, 1).toUpperCase()}${sentence.slice(1)}` : sentence
 }
 
 function handActionChoiceCount(handGroup: ActionGroup, cardsById: Map<string, CardSummary>) {
