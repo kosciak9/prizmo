@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-31] iteration 94 | Command error recovery states
+- Task attempted: continued the Web UI polish pass by replacing terse command rail error notices with command-specific recovery cards, adding compact prompt/action no-follow-up empty states after failed commands, and refreshing the no-game empty workbench copy to describe persisted games plus tab-scoped viewer seats.
+- Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.
+- Validation: `mix format && mix assets.build` passed; browser smoke on `http://localhost:4003` loaded an existing persisted game, rendered the command rail, and reported no browser warnings or errors; `mix check --no-test` passed.
+- Remaining/blocking notes: no code blocker for this command error/empty-state polish slice. Further Web UI polish should refine top-level create/reconnect, stale viewer, loading, and game-state error/empty states before rerunning the formal two-browser playtest milestone.
+
 ## [2026-05-31] iteration 93 | Attack-resolution requirement summary
 - Task attempted: continued the Web UI polish pass by adding a compact `Resolve requirements` summary to the attack-resolution rail, condensing copied-attack, coin, heads-count, switch, Energy, Bench-target, and Bench-counter inputs into ready/needed/blocked rows before the detailed controls.
 - Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.

@@ -258,6 +258,7 @@ type ActionAffordance = {
 type CommandErrorNotice = {
   title: string
   message: string
+  recovery: string
 }
 
 type ActionGroupId = 'required' | 'hand' | 'battle' | 'turn' | 'other'
@@ -711,30 +712,114 @@ export function HomeRoute() {
   )
   const canCreateGame =
     Boolean(selectedPlayerOneDeckKey && selectedPlayerTwoDeckKey) && !createGameMutation.isPending
-  const promptCommandError = commandErrorNotice(choosePromptMutation.error, 'Prompt choice failed')
+  const promptCommandError = commandErrorNotice(
+    choosePromptMutation.error,
+    'Prompt choice failed',
+    'No prompt choice was saved. Confirm this tab is viewing the prompted player, refresh state, then choose again.'
+  )
   const attackCommandError =
-    commandErrorNotice(resolveDeclaredAttackMutation.error, 'Attack resolution failed') ??
-    commandErrorNotice(finishAttackMutation.error, 'Finish attack failed')
+    commandErrorNotice(
+      resolveDeclaredAttackMutation.error,
+      'Attack resolution failed',
+      'The attack was not advanced. Check the resolve requirements above, confirm the active player is viewing this tab, then retry.'
+    ) ??
+    commandErrorNotice(
+      finishAttackMutation.error,
+      'Finish attack failed',
+      'The turn was not advanced. Resolve any Prize, prompt, or replacement Active blocker, then retry finishing the attack.'
+    )
   const flowCommandError =
-    commandErrorNotice(startSetupMutation.error, 'Setup start failed') ??
-    commandErrorNotice(drawOpeningHandMutation.error, 'Opening hand failed') ??
-    commandErrorNotice(chooseActiveMutation.error, 'Setup Active choice failed') ??
-    commandErrorNotice(chooseSetupBenchMutation.error, 'Setup Bench choice failed') ??
-    commandErrorNotice(placePrizesMutation.error, 'Prize placement failed') ??
-    commandErrorNotice(completeSetupMutation.error, 'Setup completion failed') ??
-    commandErrorNotice(startNextTurnMutation.error, 'Turn start failed') ??
-    commandErrorNotice(drawForTurnMutation.error, 'Draw for turn failed') ??
-    commandErrorNotice(skipDrawForTurnMutation.error, 'Skip draw failed') ??
-    commandErrorNotice(openActionWindowMutation.error, 'Open action window failed')
+    commandErrorNotice(
+      startSetupMutation.error,
+      'Setup start failed',
+      'Setup was not started. Refresh state and retry only if the table still has no setup record.'
+    ) ??
+    commandErrorNotice(
+      drawOpeningHandMutation.error,
+      'Opening hand failed',
+      'Opening hands were not changed. Refresh state and retry only while setup is waiting to draw.'
+    ) ??
+    commandErrorNotice(
+      chooseActiveMutation.error,
+      'Setup Active choice failed',
+      'No Active Pokémon was chosen. Confirm the selected card is still a visible Basic in this viewer hand, then retry.'
+    ) ??
+    commandErrorNotice(
+      chooseSetupBenchMutation.error,
+      'Setup Bench choice failed',
+      'No setup Bench Pokémon was added. Confirm this viewer has an Active Pokémon and an open Bench slot, then retry.'
+    ) ??
+    commandErrorNotice(
+      placePrizesMutation.error,
+      'Prize placement failed',
+      'Prizes were not placed. Confirm both players have an Active Pokémon, refresh state, then retry.'
+    ) ??
+    commandErrorNotice(
+      completeSetupMutation.error,
+      'Setup completion failed',
+      'Setup was not completed. Confirm Prizes are placed and no setup choice is still pending, then retry.'
+    ) ??
+    commandErrorNotice(
+      startNextTurnMutation.error,
+      'Turn start failed',
+      'No new turn was started. Refresh state and retry only when setup is complete and the prior turn is ended.'
+    ) ??
+    commandErrorNotice(
+      drawForTurnMutation.error,
+      'Draw for turn failed',
+      'The draw step was not advanced. Confirm the current turn is still at start and the active player has priority.'
+    ) ??
+    commandErrorNotice(
+      skipDrawForTurnMutation.error,
+      'Skip draw failed',
+      'The draw step was not skipped. Confirm the current turn is still at start, then retry.'
+    ) ??
+    commandErrorNotice(
+      openActionWindowMutation.error,
+      'Open action window failed',
+      'The action window was not opened. Confirm the draw step is resolved, refresh state, then retry.'
+    )
   const actionCommandError =
-    commandErrorNotice(playCardMutation.error, 'Play card failed') ??
-    commandErrorNotice(playBasicToBenchMutation.error, 'Bench Basic failed') ??
-    commandErrorNotice(evolveFromHandMutation.error, 'Evolution failed') ??
-    commandErrorNotice(attachEnergyMutation.error, 'Attach Energy failed') ??
-    commandErrorNotice(retreatMutation.error, 'Retreat failed') ??
-    commandErrorNotice(declareAttackMutation.error, 'Attack declaration failed') ??
-    commandErrorNotice(chooseReplacementActiveMutation.error, 'Replacement Active failed') ??
-    commandErrorNotice(endTurnMutation.error, 'End turn failed')
+    commandErrorNotice(
+      playCardMutation.error,
+      'Play card failed',
+      'The card stayed in place. Refresh state and confirm the card is still playable from this viewer hand.'
+    ) ??
+    commandErrorNotice(
+      playBasicToBenchMutation.error,
+      'Bench Basic failed',
+      'No Pokémon was Benched. Confirm the card is a visible Basic and this viewer has an open Bench slot.'
+    ) ??
+    commandErrorNotice(
+      evolveFromHandMutation.error,
+      'Evolution failed',
+      'No evolution was applied. Confirm turn timing, target eligibility, and this viewer hand before retrying.'
+    ) ??
+    commandErrorNotice(
+      attachEnergyMutation.error,
+      'Attach Energy failed',
+      'Energy was not attached. Confirm this player has not already attached Energy this turn, then retry.'
+    ) ??
+    commandErrorNotice(
+      retreatMutation.error,
+      'Retreat failed',
+      'The Active Pokémon did not retreat. Confirm retreat cost, target Bench Pokémon, and turn restrictions.'
+    ) ??
+    commandErrorNotice(
+      declareAttackMutation.error,
+      'Attack declaration failed',
+      'No attack was declared. Confirm the Active Pokémon can pay the cost and is not blocked by a marker.'
+    ) ??
+    commandErrorNotice(
+      chooseReplacementActiveMutation.error,
+      'Replacement Active failed',
+      'No replacement was promoted. Confirm this viewer owns the required choice and the Bench target is still present.'
+    ) ??
+    commandErrorNotice(
+      endTurnMutation.error,
+      'End turn failed',
+      'The turn stayed open. Refresh state and confirm no required prompt, attack, or replacement choice is blocking.'
+    )
 
   function updateSession(updater: (currentSession: PlaytestSession) => PlaytestSession) {
     setSession(currentSession => updater(currentSession))
@@ -1869,7 +1954,7 @@ function GameFlowPanel({
   return (
     <Panel title="Game flow" trailing={<StatusBadge tone={gameState.setup ? 'active' : 'neutral'}>{flowStatus}</StatusBadge>}>
       <div className="space-y-4">
-        {commandError ? <InlineNotice tone="error" title={commandError.title}>{commandError.message}</InlineNotice> : null}
+        {commandError ? <CommandErrorCard notice={commandError} /> : null}
 
         <section className={setupCompleted ? 'rounded-xl border border-emerald-100 bg-emerald-50/70 p-3' : 'rounded-xl border border-stone-200 bg-white p-3'}>
           <div className="flex items-start justify-between gap-3">
@@ -2152,7 +2237,7 @@ function ViewerPromptsPanel({
   return (
     <Panel title="Viewer prompts">
       <div className="space-y-3">
-        {commandError ? <InlineNotice tone="error" title={commandError.title}>{commandError.message}</InlineNotice> : null}
+        {commandError ? <CommandErrorCard notice={commandError} /> : null}
 
         {prompts.length > 0 ? (
           <div className="space-y-3">
@@ -2168,9 +2253,10 @@ function ViewerPromptsPanel({
             ))}
           </div>
         ) : (
-          <EmptyState title="No prompt is awaiting this viewer">
-            Cost, search, and Prize prompts appear here only for the player who must choose.
-          </EmptyState>
+          <RailEmptyState title="No prompt is open for this viewer">
+            The failed prompt command above did not leave a selectable prompt here. Refresh state, or switch viewers if
+            the engine is waiting on the other player.
+          </RailEmptyState>
         )}
       </div>
     </Panel>
@@ -2843,7 +2929,7 @@ function AttackProgressPanel({
           attack and ends the turn after resolution.
         </p>
 
-        {commandError ? <InlineNotice tone="error" title={commandError.title}>{commandError.message}</InlineNotice> : null}
+        {commandError ? <CommandErrorCard notice={commandError} /> : null}
 
         {resolutionChecklistItems.length > 0 ? (
           <div className="rounded-xl border border-stone-200 bg-stone-50/80 p-3">
@@ -3462,7 +3548,7 @@ function ActionAffordancesPanel({
       trailing={<StatusBadge tone={actions.length > 0 ? 'active' : 'neutral'}>{actions.length}</StatusBadge>}
     >
       <div className="space-y-4">
-        {commandError ? <InlineNotice tone="error" title={commandError.title}>{commandError.message}</InlineNotice> : null}
+        {commandError ? <CommandErrorCard notice={commandError} /> : null}
 
         {primaryActionGroup ? (
           <div className="rounded-xl border border-emerald-200 bg-emerald-50/80 px-3 py-2 text-xs leading-5 text-emerald-950">
@@ -3524,10 +3610,10 @@ function ActionAffordancesPanel({
             </section>
           ))
         ) : (
-          <EmptyState title="No viewer action available">
-            Hand, board, battle, and end-turn actions appear here for the active viewer. Prompts and forced replacement
-            choices appear when the engine asks this player to choose.
-          </EmptyState>
+          <RailEmptyState title="No legal action returned for this viewer">
+            The command error above did not expose a follow-up action. Refresh state, confirm turn ownership, or switch
+            to the player currently asked to act.
+          </RailEmptyState>
         )}
       </div>
     </Panel>
@@ -4383,6 +4469,23 @@ function InlineNotice({
   )
 }
 
+function CommandErrorCard({ notice }: { notice: CommandErrorNotice }) {
+  return (
+    <div className="rounded-2xl border border-red-200 bg-red-50 p-3 text-red-950" role="alert">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold">{notice.title}</p>
+          <p className="mt-1 text-sm leading-6 text-red-900">{notice.message}</p>
+        </div>
+        <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-800">not applied</span>
+      </div>
+      <div className="mt-3 rounded-xl border border-red-100 bg-stone-50 px-3 py-2 text-xs leading-5 text-stone-700">
+        <span className="font-semibold text-stone-950">Next step:</span> {notice.recovery}
+      </div>
+    </div>
+  )
+}
+
 function EmptyWorkbench() {
   return (
     <div className="grid min-h-[32rem] place-items-center rounded-3xl border border-dashed border-stone-300 bg-stone-100/60 p-8 text-center">
@@ -4392,10 +4495,19 @@ function EmptyWorkbench() {
           Create a fixture game or reconnect by ID
         </h2>
         <p className="mt-3 text-sm leading-6 text-stone-600">
-          This first shell is read-only after creation. Setup action buttons can build on the same RPC
-          state refresh path.
+          Choose fixture decks to start a persisted game, or paste a game ID to rejoin one. Viewer identity is stored per
+          tab so separate browser sessions can safely sit in different player seats.
         </p>
       </div>
+    </div>
+  )
+}
+
+function RailEmptyState({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="rounded-xl border border-dashed border-stone-300 bg-stone-50/80 px-3 py-4">
+      <p className="text-sm font-medium text-stone-800">{title}</p>
+      <p className="mt-2 text-sm leading-6 text-stone-500">{children}</p>
     </div>
   )
 }
@@ -4764,12 +4876,12 @@ function errorMessage(error: unknown) {
   return String(error)
 }
 
-function commandErrorNotice(error: unknown, title: string): CommandErrorNotice | null {
+function commandErrorNotice(error: unknown, title: string, recovery: string): CommandErrorNotice | null {
   if (!error) {
     return null
   }
 
-  return { title, message: errorMessage(error) }
+  return { title, message: errorMessage(error), recovery }
 }
 
 function formatPlayerId(playerId: string) {
