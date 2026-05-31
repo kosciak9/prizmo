@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-31] iteration 158 | Player 2 pass handoff
+- Task attempted: continued from current playtest game `f6df7025-7d0f-4d9b-9bc2-31c864de1d4e` at Player 2's post-event-97 action window by executing the same Ash domain command behind the SPA `Pass` control.
+- Files changed: updated this log and the TCG engine playtest handoff; no product source changed.
+- Validation: precheck confirmed game `f6df7025-7d0f-4d9b-9bc2-31c864de1d4e` was cursor/latest `97`, `Turn 12, action_window`, active Player 2, setup completed, no prompts, Player 1 with no legal actions, and Player 2 with only `Pass`; the MCP browser profile was still locked (`mcp-chrome-88a2ee9`), so the browser smoke could not be run through the available Playwright tool; `Prizmo.TcgEngine.pass_turn_for_game/2` advanced the persisted flow to cursor/latest `102`; SQL postcheck confirmed events/snapshots `98`-`102` exist with `turn_passed`, `turn_ended`, `turn_started`, `turn_card_drawn`, and `action_window_opened`; Tidewave postcheck confirmed both viewers at `Turn 13, action_window`, active Player 1, no prompts, Player 1 legal actions `Play engine-defined card`, `Bench Basic Pokémon`, `Attach Energy`, `Declare Fighting Wings`, and `Pass`, and Player 2 no legal actions; `mix test test/prizmo/tcg_engine/mechanics_test.exs` passed with 9 tests and no failures; Tidewave error log check returned no errors.
+- Remaining/blocking notes: the shared MCP browser profile remained locked during this iteration, so a true UI click still needs confirmation when a browser context is available. Continue from the current post-event-102 Player 1 action-window state with one Player 1 legal action, preferably `Attach Energy`, `Declare Fighting Wings`, or `Pass`, in an isolated/browser-available SPA context if possible, and avoid repeating the already-validated Player 2 `Pass` branch.
+
 ## [2026-05-31] iteration 157 | Player 2 Rabsca evolution handoff
 - Task attempted: continued from current playtest game `f6df7025-7d0f-4d9b-9bc2-31c864de1d4e` at Player 2's post-event-96 action window by executing the same Ash domain command behind the SPA `Evolve Pokémon` control.
 - Files changed: updated this log and the TCG engine playtest handoff; no product source changed.
