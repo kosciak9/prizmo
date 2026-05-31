@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-31] iteration 122 | Player 2 Dunsparce evolution landing
+- Task attempted: continued the Web UI polish pass from the verified post-event-46 Player 2 turn-4 action-window state by executing the unique `Evolve Bench 4 Dunsparce into Dudunsparce` choice, verifying the persisted post-evolution landing, and refining the evolution-only guide so Bench-only follow-up choices no longer mention Active targets.
+- Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.
+- Validation: Tidewave precheck confirmed game `d608a1f1-6db6-4f23-a8d0-4a7d27641993` was at event #46 with `Turn 4, action_window`, Player 2 active, no prompts, and 8 legal actions; browser smoke on `http://localhost:4003` as Player 2 clicked `Evolve Bench 4 Dunsparce into Dudunsparce`, confirmed cursor `47 of 47`, event #47 `evolve from hand`, Player 2 hand count 2, Dudunsparce on Bench with Dunsparce under `Evolution stack`, and 6 remaining Bench-only Kadabra evolution choices plus End Turn; refreshed browser confirmed the guide says `Evolution choices name each Bench target and the hand copy`; browser console reported no warnings or errors; Tidewave postcheck confirmed event #47, Player 2 active in `action_window`, no awaiting prompts, 7 Player 2 legal actions, Dudunsparce's evolved-under Dunsparce stack, `mix format`, `mix assets.build`, and `mix check --no-test` passed.
+- Remaining/blocking notes: no code blocker for this Dunsparce evolution landing slice. Further polish should continue from the post-event-47 Player 2 action-window state by verifying one remaining repeated Kadabra evolution choice end-to-end, then checking the resulting evolution-choice guidance without repeating the Dunsparce branch.
+
 ## [2026-05-31] iteration 121 | Player 2 draw/open-action landing
 - Task attempted: continued the Web UI polish pass from the verified post-event-44 Player 2 turn-4 start state by drawing for Player 2, verifying the drawn landing plus Player 1 non-owner open-action guidance, opening Player 2's action window, and refining the Hand and board group description so an evolution-only state no longer mentions unavailable play/attach commands.
 - Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.

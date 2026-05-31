@@ -4328,6 +4328,7 @@ function handActionGuideDetail(
   const hasAttachEnergyChoice = handGroup.actions.some(action => action.key === 'attach_energy')
   const hasTrainerChoice = handGroup.actions.some(action => action.key === 'play_card')
   const followUpPhrase = handActionFollowUpPhrase(followUp)
+  const evolutionTargetScope = evolutionTargetScopeLabel(evolutionOptions)
 
   if (hasBasicBenchChoices && hasEvolutionChoices) {
     return hasRepeatedBenchChoices || hasRepeatedEvolutionChoices
@@ -4337,8 +4338,8 @@ function handActionGuideDetail(
 
   if (hasEvolutionChoices) {
     return hasRepeatedEvolutionChoices
-      ? `${choiceLabel} visible. Evolution choices name the Active or Bench target and the hand copy, so choose the exact Pokémon stack ${followUpPhrase}.`
-      : `${choiceLabel} visible. Evolution is legal now; choose the stack that improves the board ${followUpPhrase}.`
+      ? `${choiceLabel} visible. Evolution choices name ${evolutionTargetScope} and the hand copy, so choose the exact Pokémon stack ${followUpPhrase}.`
+      : `${choiceLabel} visible. Evolution is legal now; choose the Pokémon stack that improves the board ${followUpPhrase}.`
   }
 
   if (hasBasicBenchChoices) {
@@ -4360,6 +4361,26 @@ function handActionGuideDetail(
   }
 
   return `${choiceLabel} visible. Resolve the remaining hand or board choice ${followUpPhrase}.`
+}
+
+function evolutionTargetScopeLabel(evolutionOptions: EvolutionCommandOption[]) {
+  const targetZones = new Set(evolutionOptions.map(option => option.targetCard?.zone).filter(Boolean))
+  const hasActiveTarget = targetZones.has('active')
+  const hasBenchTarget = targetZones.has('bench')
+
+  if (hasActiveTarget && hasBenchTarget) {
+    return 'the Active or Bench target'
+  }
+
+  if (hasBenchTarget) {
+    return 'each Bench target'
+  }
+
+  if (hasActiveTarget) {
+    return 'the Active target'
+  }
+
+  return 'the in-play target'
 }
 
 function handActionFollowUpPhrase({
