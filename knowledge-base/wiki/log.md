@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-31] iteration 107 | Player 2 Basic Bench choice clarity
+- Task attempted: continued the Web UI polish pass in the Player 2 turn-2 action window by consolidating repeated Basic Bench affordance rendering and disambiguating duplicate `Bench Abra` choices with hand-copy labels.
+- Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.
+- Validation: `mix format && mix assets.build` passed; browser smoke on `http://localhost:4003` resumed game `d608a1f1-6db6-4f23-a8d0-4a7d27641993` as Player 2 on turn 2 action window, confirmed the `Basic Bench choice` guide, `Bench Abra from hand slot 3/4/5` labels, concise `Bench Dunsparce`, existing Kadabra evolution labels, and no browser console warnings or errors; `mix check --no-test` passed.
+- Remaining/blocking notes: no code blocker for this Basic Bench choice clarity slice. Further polish can verify one labeled Basic Bench command end-to-end and refine any resulting post-bench action priority/copy before rerunning the formal two-browser/manual-tester milestone once isolated contexts are guaranteed.
+
 ## [2026-05-31] iteration 106 | Player 2 evolution choice clarity
 - Task attempted: continued the Web UI polish pass in the Player 2 turn-2 action window by consolidating repeated evolution affordance cards and disambiguating duplicate `Evolve Abra into Kadabra` choices with in-play target location plus hand-copy labels.
 - Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.

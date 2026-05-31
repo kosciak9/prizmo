@@ -301,9 +301,17 @@ type EvolutionCommandOption = {
   baseLabel: string
 }
 
+type BasicBenchCommandOption = {
+  key: string
+  cardInstanceId: string
+  card: CardSummary | undefined
+  baseLabel: string
+}
+
 type ActionRenderEntry = {
   key: string
   action: ActionAffordance
+  benchOptions?: BasicBenchCommandOption[]
   evolutionOptions?: EvolutionCommandOption[]
 }
 
@@ -3942,6 +3950,7 @@ function ActionAffordancesPanel({
         ) : primaryActionGroup && showActionWindowGuide ? (
           <ActionWindowGuide
             actionGroups={actionGroups}
+            cardsById={cardsById}
             currentTurn={gameState.currentTurn}
             primaryActionGroup={primaryActionGroup}
             viewerPlayer={gameState.players.find(player => player.playerId === viewerPlayerId) ?? null}
@@ -3984,6 +3993,7 @@ function ActionAffordancesPanel({
                     action={entry.action}
                     actionCommandPending={actionCommandPending}
                     attachEnergyPendingKey={attachEnergyPendingKey}
+                    benchOptions={entry.benchOptions}
                     cardsById={cardsById}
                     chooseReplacementActivePendingCardId={chooseReplacementActivePendingCardId}
                     declareAttackPendingKey={declareAttackPendingKey}
@@ -4152,12 +4162,14 @@ function UltraBallPostSearchHandoffCard({ handoff }: { handoff: UltraBallPostSea
 
 function ActionWindowGuide({
   actionGroups,
+  cardsById,
   currentTurn,
   primaryActionGroup,
   viewerPlayer,
   viewerPlayerId
 }: {
   actionGroups: ActionGroup[]
+  cardsById: Map<string, CardSummary>
   currentTurn: GameState['currentTurn']
   primaryActionGroup: ActionGroup
   viewerPlayer: PlayerView | null
@@ -4166,6 +4178,10 @@ function ActionWindowGuide({
   const handGroup = actionGroups.find(group => group.id === 'hand')
   const battleGroup = actionGroups.find(group => group.id === 'battle')
   const turnGroup = actionGroups.find(group => group.id === 'turn')
+  const basicBenchOptions = handGroup
+    ? uniqueBasicBenchOptions(handGroup.actions.flatMap(action => basicBenchCommandOptions(action, cardsById)))
+    : []
+  const repeatedBasicBenchLabelCount = repeatedBasicBenchBaseLabels(basicBenchOptions).size
   const evolutionAction = handGroup?.actions.find(action => action.key === 'evolve_from_hand')
   const turnOwnerId = currentTurn?.activePlayerId ?? viewerPlayerId
   const turnOwnerLabel = formatPlayerId(turnOwnerId)
@@ -4180,7 +4196,9 @@ function ActionWindowGuide({
   const handDetail = handGroup
     ? evolutionAction
       ? `${handGroup.actions.length} hand or board command${handGroup.actions.length === 1 ? '' : 's'} available. Evolution is legal now; use the Active/Bench labels on duplicate rows to choose exactly which Pokémon changes before committing to battle.`
-      : `${handGroup.actions.length} hand or board command${handGroup.actions.length === 1 ? '' : 's'} available. Bench Basics, attach Energy, or play a Trainer before committing to battle.`
+      : repeatedBasicBenchLabelCount > 0
+        ? `${handGroup.actions.length} hand or board command${handGroup.actions.length === 1 ? '' : 's'} available. Repeated Basic Pokémon now show hand-slot labels, so choose the exact copy to Bench before committing to battle.`
+        : `${handGroup.actions.length} hand or board command${handGroup.actions.length === 1 ? '' : 's'} available. Bench Basics, attach Energy, or play a Trainer before committing to battle.`
     : 'No hand or board command is legal from this view. Move to battle decisions or turn flow.'
   const battleDetail = battleGroup
     ? turnGroup
@@ -4283,6 +4301,7 @@ function ActionAffordanceCard({
   action,
   actionCommandPending,
   attachEnergyPendingKey,
+  benchOptions: providedBenchOptions,
   cardsById,
   chooseReplacementActivePendingCardId,
   declareAttackPendingKey,
@@ -4307,6 +4326,7 @@ function ActionAffordanceCard({
   action: ActionAffordance
   actionCommandPending: boolean
   attachEnergyPendingKey: string | null
+  benchOptions?: BasicBenchCommandOption[]
   cardsById: Map<string, CardSummary>
   chooseReplacementActivePendingCardId: string | null
   declareAttackPendingKey: string | null
@@ -4331,6 +4351,8 @@ function ActionAffordanceCard({
   const canRunAction = !actionCommandPending && isPlayerId(action.playerId)
   const isPostSearchEndTurnAction = isPlayerId(action.playerId) && postSearchEndTurnPlayerIds.includes(action.playerId)
   const playCardPromptGuide = ultraBallPlayCardPromptGuide(action, cardsById)
+  const benchOptions = providedBenchOptions ?? basicBenchCommandOptions(action, cardsById)
+  const repeatedBenchLabels = repeatedBasicBenchBaseLabels(benchOptions)
   const evolutionOptions = providedEvolutionOptions ?? evolutionCommandOptions(action, cardsById)
   const repeatedEvolutionLabels = repeatedEvolutionBaseLabels(evolutionOptions)
 
@@ -4387,23 +4409,25 @@ function ActionAffordanceCard({
         </div>
       ) : null}
 
-      {action.key === 'play_basic_to_bench' && action.sourceCardInstanceIds.length > 0 ? (
+      {benchOptions.length > 0 ? (
         <div className="mt-2 space-y-1.5">
-          {action.sourceCardInstanceIds.map(cardInstanceId => {
-            const card = cardsById.get(cardInstanceId)
-            const isPending = playBasicToBenchPendingCardId === cardInstanceId
-            const isPostSearchBenchTarget = postSearchBenchCardInstanceIds.includes(cardInstanceId)
+          {benchOptions.length > 1 ? <BasicBenchChoiceGuide options={benchOptions} /> : null}
+
+          {benchOptions.map(option => {
+            const isPending = playBasicToBenchPendingCardId === option.cardInstanceId
+            const isPostSearchBenchTarget = postSearchBenchCardInstanceIds.includes(option.cardInstanceId)
+            const needsSourceCopyLabel = repeatedBenchLabels.has(option.baseLabel)
 
             return (
               <ActionCommandButton
                 disabled={!canRunAction}
-                key={cardInstanceId}
-                onClick={() => onPlayBasicToBench({ playerId: action.playerId, cardInstanceId })}
+                key={option.key}
+                onClick={() => onPlayBasicToBench({ playerId: action.playerId, cardInstanceId: option.cardInstanceId })}
                 tone={isPostSearchBenchTarget ? 'primary' : 'secondary'}
               >
                 {isPending
-                  ? `Benching ${card?.name ?? 'Pokémon'}...`
-                  : `${isPostSearchBenchTarget ? 'Bench searched ' : 'Bench '}${card?.name ?? formatCardInstanceId(cardInstanceId)}`}
+                  ? basicBenchPendingLabel(option)
+                  : basicBenchButtonLabel(option, needsSourceCopyLabel, isPostSearchBenchTarget)}
               </ActionCommandButton>
             )
           })}
@@ -4556,6 +4580,29 @@ function ActionAffordanceCard({
   )
 }
 
+function BasicBenchChoiceGuide({ options }: { options: BasicBenchCommandOption[] }) {
+  const duplicatedBaseLabelCount = repeatedBasicBenchBaseLabels(options).size
+  const detail = duplicatedBaseLabelCount > 0
+    ? 'Repeated Basic names are separate cards in hand. Buttons include the hand slot so the chosen copy is unambiguous.'
+    : options.length > 1
+      ? 'Choose which Basic Pokémon moves from hand to the next Bench space. The engine uses the exact card you choose.'
+      : 'One Basic Pokémon can move from hand to the next Bench space.'
+
+  return (
+    <div className="rounded-lg border border-emerald-200 bg-emerald-50/70 px-3 py-2 text-xs leading-5 text-emerald-950">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <p className="font-semibold uppercase tracking-[0.14em] text-emerald-800">Basic Bench choice</p>
+          <p className="mt-0.5 text-emerald-900/80">{detail}</p>
+        </div>
+        <StatusBadge tone="active">
+          {options.length} {options.length === 1 ? 'choice' : 'choices'}
+        </StatusBadge>
+      </div>
+    </div>
+  )
+}
+
 function EvolutionChoiceGuide({ options }: { options: EvolutionCommandOption[] }) {
   const targetCount = new Set(options.map(option => option.targetCardInstanceId)).size
   const sourceCount = new Set(options.map(option => option.evolutionCardInstanceId)).size
@@ -4681,6 +4728,51 @@ function evolutionCommandOptions(
   )
 }
 
+function basicBenchCommandOptions(
+  action: ActionAffordance,
+  cardsById: Map<string, CardSummary>
+): BasicBenchCommandOption[] {
+  if (action.key !== 'play_basic_to_bench') {
+    return []
+  }
+
+  return action.sourceCardInstanceIds.map(cardInstanceId => {
+    const card = cardsById.get(cardInstanceId)
+
+    return {
+      key: cardInstanceId,
+      cardInstanceId,
+      card,
+      baseLabel: card?.name ?? formatCardInstanceId(cardInstanceId)
+    }
+  })
+}
+
+function repeatedBasicBenchBaseLabels(options: BasicBenchCommandOption[]) {
+  const labelCounts = new Map<string, number>()
+
+  for (const option of options) {
+    labelCounts.set(option.baseLabel, (labelCounts.get(option.baseLabel) ?? 0) + 1)
+  }
+
+  return new Set([...labelCounts.entries()].filter(([, count]) => count > 1).map(([label]) => label))
+}
+
+function basicBenchPendingLabel(option: BasicBenchCommandOption) {
+  return `Benching ${option.card?.name ?? 'Pokémon'}...`
+}
+
+function basicBenchButtonLabel(
+  option: BasicBenchCommandOption,
+  includeSourceCopyLabel: boolean,
+  isPostSearchBenchTarget: boolean
+) {
+  const cardName = option.card?.name ?? formatCardInstanceId(option.cardInstanceId)
+  const sourceCopyLabel = includeSourceCopyLabel ? ` from ${cardLocationLabel(option.card, 'hand')}` : ''
+
+  return `${isPostSearchBenchTarget ? 'Bench searched ' : 'Bench '}${cardName}${sourceCopyLabel}`
+}
+
 function repeatedEvolutionBaseLabels(options: EvolutionCommandOption[]) {
   const labelCounts = new Map<string, number>()
 
@@ -4786,7 +4878,18 @@ function actionHasMetadata(action: ActionAffordance) {
 
 function actionRenderEntries(actions: ActionAffordance[], cardsById: Map<string, CardSummary>): ActionRenderEntry[] {
   const entries: ActionRenderEntry[] = []
+  let pendingBasicBenchActions: ActionAffordance[] = []
   let pendingEvolutionActions: ActionAffordance[] = []
+
+  function flushBasicBenchActions() {
+    const entry = mergedBasicBenchRenderEntry(pendingBasicBenchActions, cardsById)
+
+    if (entry) {
+      entries.push(entry)
+    }
+
+    pendingBasicBenchActions = []
+  }
 
   function flushEvolutionActions() {
     const entry = mergedEvolutionRenderEntry(pendingEvolutionActions, cardsById)
@@ -4799,17 +4902,50 @@ function actionRenderEntries(actions: ActionAffordance[], cardsById: Map<string,
   }
 
   for (const action of actions) {
-    if (action.key === 'evolve_from_hand') {
+    if (action.key === 'play_basic_to_bench') {
+      flushEvolutionActions()
+      pendingBasicBenchActions.push(action)
+    } else if (action.key === 'evolve_from_hand') {
+      flushBasicBenchActions()
       pendingEvolutionActions.push(action)
     } else {
+      flushBasicBenchActions()
       flushEvolutionActions()
       entries.push({ key: actionKey(action), action })
     }
   }
 
+  flushBasicBenchActions()
   flushEvolutionActions()
 
   return entries
+}
+
+function mergedBasicBenchRenderEntry(
+  actions: ActionAffordance[],
+  cardsById: Map<string, CardSummary>
+): ActionRenderEntry | null {
+  const firstAction = actions[0]
+
+  if (!firstAction) {
+    return null
+  }
+
+  const options = uniqueBasicBenchOptions(actions.flatMap(action => basicBenchCommandOptions(action, cardsById)))
+  const sourceCardInstanceIds = uniqueStrings(options.map(option => option.cardInstanceId))
+  const mergedAction: ActionAffordance = {
+    ...firstAction,
+    sourceCardInstanceIds,
+    targetCardInstanceIds: uniqueStrings(actions.flatMap(action => action.targetCardInstanceIds)),
+    promptIds: uniqueStrings(actions.flatMap(action => action.promptIds)),
+    choiceKeys: uniqueStrings(actions.flatMap(action => action.choiceKeys))
+  }
+
+  return {
+    key: ['play_basic_to_bench', firstAction.playerId, ...sourceCardInstanceIds].join(':'),
+    action: mergedAction,
+    benchOptions: options
+  }
 }
 
 function mergedEvolutionRenderEntry(
@@ -4842,6 +4978,16 @@ function mergedEvolutionRenderEntry(
 
 function uniqueEvolutionOptions(options: EvolutionCommandOption[]) {
   const optionsByKey = new Map<string, EvolutionCommandOption>()
+
+  for (const option of options) {
+    optionsByKey.set(option.key, option)
+  }
+
+  return [...optionsByKey.values()]
+}
+
+function uniqueBasicBenchOptions(options: BasicBenchCommandOption[]) {
+  const optionsByKey = new Map<string, BasicBenchCommandOption>()
 
   for (const option of options) {
     optionsByKey.set(option.key, option)
