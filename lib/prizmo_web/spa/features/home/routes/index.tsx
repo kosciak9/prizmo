@@ -166,6 +166,7 @@ const GAME_STATE_FIELDS = [
 type PlayerId = (typeof PLAYER_IDS)[number]
 type CoinResult = 'heads' | 'tails'
 type ResolutionChecklistTone = 'blocked' | 'ready' | 'waiting'
+type SetupGuideState = 'done' | 'needed' | 'next' | 'ready'
 
 type ResolutionChecklistItem = {
   label: string
@@ -1999,6 +2000,8 @@ function GameFlowPanel({
             <CompletedSetupSummary firstPlayerId={gameState.firstPlayerId} players={gameState.players} />
           ) : (
             <>
+              <SetupPathGuide gameState={gameState} viewerPlayerId={viewerPlayerId} />
+
               <div className="mt-3 space-y-2">
                 <ActionCommandButton disabled={!canStartSetup} onClick={onStartSetup} tone={gameState.setup ? 'secondary' : 'primary'}>
                   {startSetupPending ? 'Starting setup...' : gameState.setup ? 'Setup already started' : 'Start setup'}
@@ -2202,6 +2205,99 @@ function GameFlowPanel({
         </section>
       </div>
     </Panel>
+  )
+}
+
+function SetupPathGuide({
+  gameState,
+  viewerPlayerId
+}: {
+  gameState: GameState
+  viewerPlayerId: PlayerId
+}) {
+  const setupStatus = gameState.setup?.status ?? 'not_started'
+  const setupStarted = Boolean(gameState.setup)
+  const openingHandsDrawn = ['hands_drawn', 'prizes_placed', 'completed'].includes(setupStatus)
+  const setupLocked = setupStatus === 'prizes_placed' || setupStatus === 'completed'
+  const viewerPlayer = gameState.players.find(player => player.playerId === viewerPlayerId)
+  const playersMissingActive = gameState.players.filter(player => !player.active)
+  const allPlayersHaveSetupActive = playersMissingActive.length === 0
+  const activeSummary = gameState.players
+    .map(player => `${formatPlayerId(player.playerId)}: ${player.active?.name ?? 'needs Active'}`)
+    .join(', ')
+  const missingActiveSummary = playersMissingActive.map(player => formatPlayerId(player.playerId)).join(', ')
+  const benchCountSummary = gameState.players
+    .map(player => `${formatPlayerId(player.playerId)} ${player.bench.length}/5`)
+    .join(', ')
+
+  const activeDetail = allPlayersHaveSetupActive
+    ? activeSummary
+    : openingHandsDrawn
+      ? viewerPlayer?.active
+        ? `${viewerPlayer.active.name} is ready here. ${missingActiveSummary} still needs an Active.`
+        : `${formatPlayerId(viewerPlayerId)} chooses a visible Basic Pokémon from this hand.`
+      : 'Opening hands must be drawn before either player can choose an Active Pokémon.'
+
+  const benchDetail = setupLocked
+    ? `Opening Bench choices are locked: ${benchCountSummary}.`
+    : openingHandsDrawn && allPlayersHaveSetupActive
+      ? `Optional before Prizes: ${formatPlayerId(viewerPlayerId)} can Bench visible Basics or move on.`
+      : 'Bench choices open after both players have an Active Pokémon.'
+
+  const lockDetail =
+    setupStatus === 'prizes_placed'
+      ? 'Prizes are down. Complete setup, then start the first turn.'
+      : openingHandsDrawn && allPlayersHaveSetupActive
+        ? 'When both seats are ready, place face-down Prizes and lock setup.'
+        : 'Finish opening Active choices before Prizes can be placed.'
+
+  return (
+    <div className="mt-3 rounded-xl border border-emerald-100 bg-[oklch(0.985_0.012_155)] p-3">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h4 className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-800">Setup path</h4>
+          <p className="mt-1 text-xs leading-5 text-stone-600">
+            Follow these table steps after creating a board. This tab is {formatPlayerId(viewerPlayerId)}.
+          </p>
+        </div>
+        <StatusBadge tone={setupStarted ? 'warning' : 'neutral'}>
+          {setupStarted ? formatEventType(setupStatus) : 'next'}
+        </StatusBadge>
+      </div>
+
+      <div className="mt-3 space-y-2">
+        <SetupGuideRow
+          detail={setupStarted ? 'The persisted setup record is ready.' : 'Start setup to prepare the opening table.'}
+          number="1"
+          state={setupStarted ? 'done' : 'next'}
+          title="Start setup"
+        />
+        <SetupGuideRow
+          detail={openingHandsDrawn ? 'Both players have opening hands.' : 'Draw hidden opening hands for both players.'}
+          number="2"
+          state={!setupStarted ? 'needed' : openingHandsDrawn ? 'done' : 'next'}
+          title="Draw opening hands"
+        />
+        <SetupGuideRow
+          detail={activeDetail}
+          number="3"
+          state={!openingHandsDrawn ? 'needed' : allPlayersHaveSetupActive ? 'done' : 'next'}
+          title="Choose Active Pokémon"
+        />
+        <SetupGuideRow
+          detail={benchDetail}
+          number="4"
+          state={!openingHandsDrawn || !allPlayersHaveSetupActive ? 'needed' : setupLocked ? 'done' : 'ready'}
+          title="Optional Bench"
+        />
+        <SetupGuideRow
+          detail={lockDetail}
+          number="5"
+          state={setupStatus === 'prizes_placed' ? 'next' : openingHandsDrawn && allPlayersHaveSetupActive ? 'ready' : 'needed'}
+          title="Place Prizes, then complete"
+        />
+      </div>
+    </div>
   )
 }
 
@@ -4497,7 +4593,7 @@ function SetupGuideRow({
   number: string
   title: string
   detail: string
-  state: 'done' | 'needed' | 'next' | 'ready'
+  state: SetupGuideState
 }) {
   const badgeTone = state === 'done' || state === 'ready' ? 'active' : state === 'next' ? 'warning' : 'neutral'
   const badgeLabel = state === 'done' ? 'done' : state === 'ready' ? 'ready' : state === 'next' ? 'next' : 'needed'

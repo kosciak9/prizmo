@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-31] iteration 97 | Post-create setup path guidance
+- Task attempted: continued the Web UI polish pass by adding a compact post-create `Setup path` guide inside the `Game flow` rail, showing the next setup step for start setup, opening hands, Active choices, optional Bench, Prize placement, and setup completion with viewer-seat-aware copy.
+- Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.
+- Validation: `mix format && mix assets.build` passed; fresh browser setup walkthrough on `http://localhost:4003` created game `fa8de8c3-8232-439e-8b3e-b4eb8d76bdf6`, started setup, drew opening hands, chose Player 1 Moltres and Player 2 Abra as Active, placed Prizes, completed setup, started the first turn, and reported no browser warnings or errors; `mix check --no-test` passed.
+- Remaining/blocking notes: no code blocker for this setup guidance slice. Further Web UI polish should refine first-turn draw/action-window guidance and run a fresh turn-one browser walkthrough before rerunning the formal two-browser/manual-tester milestone.
+
 ## [2026-05-31] iteration 96 | Deck setup sidebar polish
 - Task attempted: continued the Web UI polish pass by refining the supported-deck/deck-selection sidebar and first-run setup guidance, replacing plain deck selects with player loadout cards, adding a first-table checklist, marking selected fixtures in a fixture catalog, and aligning the no-game empty state with the setup path.
 - Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.
