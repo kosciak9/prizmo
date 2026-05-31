@@ -116,10 +116,13 @@ defmodule Prizmo.TcgEngine.CardStore do
 
   def next_bench_position(game_id, player_id) do
     with {:ok, bench} <- cards_in_zone(game_id, player_id, :bench) do
-      if length(bench) < 5 do
-        {:ok, length(bench) + 1}
-      else
-        {:error, :bench_full}
+      occupied_positions = MapSet.new(bench, & &1.position)
+
+      1..5
+      |> Enum.find(&(not MapSet.member?(occupied_positions, &1)))
+      |> case do
+        nil -> {:error, :bench_full}
+        position -> {:ok, position}
       end
     end
   end
