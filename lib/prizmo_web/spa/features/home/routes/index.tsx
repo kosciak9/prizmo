@@ -4226,10 +4226,11 @@ function ActionWindowGuide({
   const viewerLabel = formatPlayerId(viewerPlayerId)
   const viewerOwnsTurn = turnOwnerId === viewerPlayerId
   const activeName = viewerPlayer?.active?.name ?? 'the Active Pokémon'
+  const hasRetreatedThisTurn = viewerOwnsTurn && Boolean(viewerPlayer?.retreatedThisTurn)
   const viewerBoardDetail = viewerOwnsTurn
-    ? `${viewerLabel} has ${activeName} Active, ${viewerPlayer?.handCount ?? 0} cards in hand, and ${
-        viewerPlayer?.bench.length ?? 0
-      } on Bench.`
+    ? `${viewerLabel} has ${activeName} Active${hasRetreatedThisTurn ? ' after retreating this turn' : ''}, ${
+        viewerPlayer?.handCount ?? 0
+      } cards in hand, and ${viewerPlayer?.bench.length ?? 0} on Bench.`
     : `${turnOwnerLabel} owns this action window. This tab is ${viewerLabel}; use the matching seat for commands.`
   const handDetail = handGroup
     ? handActionGuideDetail(handGroup, basicBenchOptions, evolutionOptions, handChoiceCount, {
@@ -4252,7 +4253,9 @@ function ActionWindowGuide({
       : 'Finish the required choice before battle or turn-flow actions appear.'
   const guideTitle = currentTurn?.turnNumber === 1 ? 'First action window' : 'Action window plan'
   const priorityTitle =
-    primaryActionGroup.id === 'battle' && handGroup
+    hasRetreatedThisTurn && primaryActionGroup.id === 'hand'
+      ? 'Retreat complete; hand choices remain'
+      : primaryActionGroup.id === 'battle' && handGroup
       ? 'Battle ready, board still open'
       : `Follow ${primaryActionGroup.title}`
 
@@ -4272,7 +4275,8 @@ function ActionWindowGuide({
         <ActionWindowGuideStep
           detail={priorityInstruction(primaryActionGroup, {
             hasHandActions: Boolean(handGroup),
-            hasTurnFlow: Boolean(turnGroup)
+            hasTurnFlow: Boolean(turnGroup),
+            retreatedThisTurn: hasRetreatedThisTurn
           })}
           label="focus"
           title={priorityTitle}
@@ -4506,7 +4510,7 @@ function ActionWindowGuideStep({
 
 function priorityInstruction(
   group: ActionGroup,
-  context: { hasHandActions?: boolean; hasTurnFlow?: boolean } = {}
+  context: { hasHandActions?: boolean; hasTurnFlow?: boolean; retreatedThisTurn?: boolean } = {}
 ) {
   switch (group.id) {
     case 'required':
@@ -4522,6 +4526,10 @@ function priorityInstruction(
 
       return 'Battle decisions are most consequential now. Review retreat and paid attacks first.'
     case 'hand':
+      if (context.retreatedThisTurn && context.hasTurnFlow) {
+        return 'Retreat is complete and battle choices are no longer live from this Active. Use remaining hand and board actions now, then end the turn.'
+      }
+
       return 'Hand and board actions are the safest first pass. Improve the board before attacking or ending.'
     case 'turn':
       return 'No higher-priority move is available. End the turn after confirming the board state.'

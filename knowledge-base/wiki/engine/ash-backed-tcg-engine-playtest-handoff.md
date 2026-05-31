@@ -2,6 +2,14 @@
 
 Updated: 2026-05-31
 
+## Iteration 128 handoff
+
+- Current state: game `d608a1f1-6db6-4f23-a8d0-4a7d27641993` is verified at post-event-54 with Player 1 in `Turn 5, action_window`; Player 1 retreated from Moltres into Munkidori, discarded the attached Fire Energy, has Moltres on Bench, and only Ultra Ball plus End Turn remain visible to Player 1.
+- Last commit at iteration start: `65438e4 feat(spa): clarify tcg player-one action-window landing`.
+- Remaining tasks: continue the substantial Web UI polish/playtest path without repeating already verified turn-5 draw/open-action or Retreat branches; broader north-star work still includes the formal two-independent-browser milestone, more persisted mechanics/card behavior slices, and the Electric Streams spike.
+- Blockers: no code blocker for the Retreat landing slice; the documented manual-tester milestone remains blocked by unreliable manual-tester browser/session isolation.
+- Recommended next atomic task: from the post-event-54 Player 1 action-window state, click `End player 1's turn`, verify the persisted ended-turn/next-owner landing and Player 2 turn-start guidance, and refine only unclear copy.
+
 ## Current state
 
 - Iteration 1 moved supported deck fixtures into shared `Prizmo.Tcg.Decks.*` modules backed by the new shared `Prizmo.Tcg.Decklist` macro.
@@ -550,6 +558,7 @@ Updated: 2026-05-31
 - The Player 2 turn-4 end-turn landing is now verified and clearer: clicking `End player 2's turn` persisted event #50, moved the game to `Turn 4, ended`, cleared legal actions for both viewers, and changed the next-owner action-window step so the Player 2 tab tells players to use the Player 1 tab to open actions after draw timing.
 - The Player 1 turn-5 start landing is now verified and clearer: clicking `Start player 1's turn` persisted event #51, moved the game to `Turn 5, start`, enabled Player 1 draw/skip controls, and changed the start-state guide so Player 1 is told to use this tab for draw timing while Player 2 is told that draw timing belongs to the Player 1 tab.
 - The Player 1 turn-5 draw/open-action landing is now verified and clearer: clicking `Draw for player 1` persisted event #52 and moved the game to `Turn 5, drawn`; Player 2's non-owner tab now explicitly says to use the Player 1 tab to open actions; clicking `Open action window` from Player 1 persisted event #53 and exposed Retreat, `Fighting Wings`, Ultra Ball, and End Turn choices for Player 1.
+- The Player 1 turn-5 Retreat landing is now verified and clearer: clicking `Retreat to Munkidori, discarding Fire Energy` persisted event #54, moved Munkidori Active, moved Moltres to Bench, discarded the attached Fire Energy, collapsed Player 1 actions to Ultra Ball plus End Turn, and the action-window guide now names `Munkidori Active after retreating this turn` with `Retreat complete; hand choices remain`.
 - Evolution from hand is now callable from the browser for valid turn-2+ evolution pairs; pre-existing attached cards are reparented to the evolved Pokémon, damage counters move to the new top, and special conditions are cleared so attack/retreat cost checks still work for evolved attackers. Broader evolution work should still verify multi-stage stack presentation, marker handling, and longer KO/replacement/prize browser flows.
 - Authored Tera Pokémon now prevent attack damage while Benched through `Prizmo.TcgEngine.TeraBenchProtection`; damage-counter effects are intentionally not treated as damage for this rule.
 - Rabsca `TEF-024` `Psychic` is now executable in the persisted engine and deals 10 plus 30 more damage per Energy card attached to the opponent's Active Pokémon.
@@ -587,4 +596,4 @@ Updated: 2026-05-31
 
 ## Recommended next atomic task
 
-- Continue the substantial Web UI polish pass with one narrow slice from the verified post-event-53 Player 1 action-window state: verify one live action-window choice end-to-end, preferably `Retreat to Munkidori, discarding Fire Energy` if that branch is still visible, while avoiding the already-verified turn-5 draw/open-action path.
+- Continue the substantial Web UI polish pass with one narrow slice from the verified post-event-54 Player 1 action-window state: click `End player 1's turn`, verify the persisted ended-turn/next-owner landing and Player 2 turn-start guidance, and avoid repeating the already-verified turn-5 draw/open-action and Retreat branches.

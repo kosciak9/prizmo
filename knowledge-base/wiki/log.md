@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-31] iteration 128 | Player 1 retreat landing
+- Task attempted: continued the Web UI polish pass from the verified post-event-53 Player 1 turn-5 action-window state by clicking `Retreat to Munkidori, discarding Fire Energy`, verifying the persisted post-retreat landing, and refining the action-window guide so it names the completed retreat state.
+- Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.
+- Validation: Tidewave precheck confirmed game `d608a1f1-6db6-4f23-a8d0-4a7d27641993` was at cursor `53 of 53` with `Turn 5, action_window`, Player 1 active, no awaiting prompts, and a visible Retreat affordance paid by attached Fire Energy targeting Munkidori; browser smoke on `http://localhost:4003` as Player 1 clicked `Retreat to Munkidori, discarding Fire Energy`, confirmed event #54 `retreat`, Player 1 Active became Munkidori, Moltres moved to Bench, Fire Energy was discarded, remaining actions collapsed to Ultra Ball plus End Turn, and refreshed copy says `Munkidori Active after retreating this turn` plus `Retreat complete; hand choices remain`; browser console reported no warnings or errors; Tidewave postcheck confirmed cursor `54 of 54`, `Turn 5, action_window`, Player 1 action keys `play_card` and `end_turn`, Player 2 no actions, no awaiting prompts, Munkidori Active, Moltres on Bench, and Player 1 discard count 4; `mix format`, `mix assets.build`, and `mix check --no-test` passed.
+- Remaining/blocking notes: no code blocker for this Retreat landing slice. Further polish should continue from the post-event-54 Player 1 action-window state by clicking `End player 1's turn`, verifying the persisted ended-turn/next-owner landing, and avoiding the already-verified Retreat branch.
+
 ## [2026-05-31] iteration 127 | Player 1 turn-5 action-window landing
 - Task attempted: continued the Web UI polish pass from the verified post-event-51 Player 1 turn-5 start state by clicking `Draw for player 1`, verifying the drawn landing and Player 2 owner-tab open-action guidance, then opening Player 1's action window.
 - Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.
