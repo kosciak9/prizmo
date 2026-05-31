@@ -4329,6 +4329,8 @@ function handActionGuideDetail(
   const hasTrainerChoice = handGroup.actions.some(action => action.key === 'play_card')
   const followUpPhrase = handActionFollowUpPhrase(followUp)
   const evolutionTargetScope = evolutionTargetScopeLabel(evolutionOptions)
+  const evolutionSourceCount = new Set(evolutionOptions.map(option => option.evolutionCardInstanceId)).size
+  const evolutionTargetCount = new Set(evolutionOptions.map(option => option.targetCardInstanceId)).size
 
   if (hasBasicBenchChoices && hasEvolutionChoices) {
     return hasRepeatedBenchChoices || hasRepeatedEvolutionChoices
@@ -4337,6 +4339,12 @@ function handActionGuideDetail(
   }
 
   if (hasEvolutionChoices) {
+    if (hasRepeatedEvolutionChoices && evolutionSourceCount === 1 && evolutionTargetCount > 1) {
+      return `${choiceLabel} visible. The same hand copy can evolve ${evolutionTargetCountLabel(
+        evolutionOptions
+      )}; use the target label to choose the exact Pokémon stack ${followUpPhrase}.`
+    }
+
     return hasRepeatedEvolutionChoices
       ? `${choiceLabel} visible. Evolution choices name ${evolutionTargetScope} and the hand copy, so choose the exact Pokémon stack ${followUpPhrase}.`
       : `${choiceLabel} visible. Evolution is legal now; choose the Pokémon stack that improves the board ${followUpPhrase}.`
@@ -4381,6 +4389,21 @@ function evolutionTargetScopeLabel(evolutionOptions: EvolutionCommandOption[]) {
   }
 
   return 'the in-play target'
+}
+
+function evolutionTargetCountLabel(evolutionOptions: EvolutionCommandOption[]) {
+  const targetCount = new Set(evolutionOptions.map(option => option.targetCardInstanceId)).size
+  const targetZones = new Set(evolutionOptions.map(option => option.targetCard?.zone).filter(Boolean))
+
+  if (targetZones.size === 1 && targetZones.has('bench')) {
+    return actionCountLabel(targetCount, 'Bench target')
+  }
+
+  if (targetZones.size === 1 && targetZones.has('active')) {
+    return actionCountLabel(targetCount, 'Active target')
+  }
+
+  return actionCountLabel(targetCount, 'target')
 }
 
 function handActionFollowUpPhrase({
@@ -4812,7 +4835,11 @@ function EvolutionChoiceGuide({ options }: { options: EvolutionCommandOption[] }
   const sourceCount = new Set(options.map(option => option.evolutionCardInstanceId)).size
   const duplicatedBaseLabelCount = repeatedEvolutionBaseLabels(options).size
   const detail = duplicatedBaseLabelCount > 0
-    ? 'Repeated names are separate legal choices. Buttons now show the in-play target location and, when needed, the hand copy so the chosen evolution is unambiguous.'
+    ? sourceCount === 1 && targetCount > 1
+      ? `The same hand copy can evolve ${evolutionTargetCountLabel(
+          options
+        )}. Buttons name each target location so the chosen stack is unambiguous.`
+      : 'Repeated names are separate legal choices. Buttons now show the in-play target location and, when needed, the hand copy so the chosen evolution is unambiguous.'
     : targetCount > 1
       ? 'Choose which in-play Pokémon evolves. Buttons name Active or Bench position so identical Basics stay distinguishable.'
       : sourceCount > 1

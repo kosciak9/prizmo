@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-31] iteration 123 | Player 2 repeated Kadabra landing
+- Task attempted: continued the Web UI polish pass from the verified post-event-47 Player 2 turn-4 action-window state by executing one remaining repeated Kadabra evolution choice and refining the post-evolution guide for the one-hand-copy/multiple-Bench-target shape.
+- Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.
+- Validation: Tidewave precheck confirmed game `d608a1f1-6db6-4f23-a8d0-4a7d27641993` was at event #47 with `Turn 4, action_window`, Player 2 active, no prompts, and 7 legal actions; browser smoke on `http://localhost:4003` as Player 2 clicked `Evolve Bench 2 Abra into Kadabra from hand slot 7`, confirmed cursor `48 of 48`, event #48 `evolve from hand`, Player 2 hand count 1, Kadabra on Bench with Abra under `Evolution stack`, and 2 remaining Bench-only Kadabra evolution choices plus End Turn; refreshed/HMR browser copy now says `The same hand copy can evolve 2 Bench targets` in both the action-window guide and Evolution choice card; browser console reported no warnings or errors; Tidewave postcheck confirmed event #48, Player 2 active in `action_window`, no awaiting prompts, 3 Player 2 legal actions, and the new Bench Kadabra stack; `mix format`, `mix assets.build`, and `mix check --no-test` passed.
+- Remaining/blocking notes: no code blocker for this repeated-Kadabra evolution landing slice. Further polish should continue from the post-event-48 Player 2 action-window state by verifying one of the final two Kadabra evolution choices end-to-end, then checking the true turn-flow-only landing after the last evolution without repeating this Bench 2 branch.
+
 ## [2026-05-31] iteration 122 | Player 2 Dunsparce evolution landing
 - Task attempted: continued the Web UI polish pass from the verified post-event-46 Player 2 turn-4 action-window state by executing the unique `Evolve Bench 4 Dunsparce into Dudunsparce` choice, verifying the persisted post-evolution landing, and refining the evolution-only guide so Bench-only follow-up choices no longer mention Active targets.
 - Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.
