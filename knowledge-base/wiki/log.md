@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-31] iteration 117 | Player 1 attack-declared landing
+- Task attempted: continued the Web UI polish pass from the verified post-event-40 Player 1 action window by declaring `Fighting Wings`, verifying the persisted attack-declared landing, and refining attack-resolution fallback labels so the normal path shows the product-facing attack name instead of raw attack-id copy.
+- Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.
+- Validation: Tidewave precheck confirmed game `d608a1f1-6db6-4f23-a8d0-4a7d27641993` was at event #40 with Player 1 in `Turn 3, action_window` and legal actions for Ultra Ball, Retreat, `Declare Fighting Wings`, and End Turn; browser smoke on `http://localhost:4003` as Player 1 clicked `Declare Fighting Wings for fire (20 damage)`, confirmed cursor `41 of 41`, event #41 `declare attack`, and `Turn 3, attack_declared`; refreshed attack-resolution copy now shows `Attack: Fighting Wings` and `Resolve Fighting Wings`; browser console reported no warnings or errors; Tidewave postcheck confirmed pending attack `fighting_wings`, attacker Moltres, defender Kadabra, and effect type `bonus_damage_if_defender_pokemon_ex`; `mix format && mix assets.build` passed; `mix check --no-test` passed.
+- Remaining/blocking notes: no code blocker for this attack-declared landing slice. Further polish should continue from the post-event-41 attack-resolution state by clicking `Resolve Fighting Wings`, verifying the damage/attack-resolving landing and follow-up finish guidance, and avoiding repeating the declare branch.
+
 ## [2026-05-31] iteration 116 | Player 1 post-bench Trainer copy
 - Task attempted: continued the Web UI polish pass from the verified post-event-39 Player 1 action window by clicking the safe `Bench Munkidori` follow-up, verifying the persisted post-bench state, and refining the hand/board guide so a Trainer-only state no longer mentions attaching Energy.
 - Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.

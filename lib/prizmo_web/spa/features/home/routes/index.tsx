@@ -3037,7 +3037,7 @@ function AttackProgressPanel({
 
   const attacker = turn.pendingAttackerCardInstanceId ? cardsById.get(turn.pendingAttackerCardInstanceId) : null
   const defender = turn.pendingDefenderCardInstanceId ? cardsById.get(turn.pendingDefenderCardInstanceId) : null
-  const attackLabel = turn.pendingAttackId ? formatEventType(turn.pendingAttackId) : 'declared attack'
+  const attackLabel = turn.pendingAttackId ? formatAttackId(turn.pendingAttackId) : 'declared attack'
   const viewerCanAdvanceAttack = viewerPlayerId === turn.activePlayerId && isPlayerId(turn.activePlayerId)
   const commandPending = Boolean(resolveDeclaredAttackPendingPlayerId || finishAttackPendingPlayerId)
   const copiedAttackUnavailable = turn.pendingAttackRequiresCopiedAttack && copiedAttackOptions.length === 0
@@ -4115,7 +4115,7 @@ function ultraBallPostSearchHandoffPlan(
   const battleActionLabel = battleAction?.attackName
     ? `Declare ${battleAction.attackName}`
     : battleAction?.attackId
-      ? `Declare ${formatEventType(battleAction.attackId)}`
+      ? `Declare ${formatAttackId(battleAction.attackId)}`
       : null
   const turnActionLabel = turnAction ? `End ${formatPlayerId(turnAction.playerId)}'s turn` : null
 
@@ -4690,7 +4690,7 @@ function ActionAffordanceCard({
           {declareAttackPendingKey === attackKey(action.playerId, action.attackId)
             ? `Declaring ${action.attackName ?? 'attack'}...`
             : `${postSearchBattleAttackIds.includes(action.attackId) ? 'Attack after search — ' : ''}Declare ${
-                action.attackName ?? formatEventType(action.attackId)
+                action.attackName ?? formatAttackId(action.attackId)
               }${attackCostLabel(action.attackCost)}${attackDamageLabel(action.attackDamage)}`}
         </ActionCommandButton>
       ) : null}
@@ -4824,9 +4824,9 @@ function actionSummary(action: ActionAffordance) {
         action.requiredSourceCount
       )}.`
     case 'declare_attack':
-      return `${action.attackName ?? 'Attack'}: ${attackCostSummary(action.attackCost)}, ${attackDamageSummary(
-        action.attackDamage
-      )}.`
+      return `${action.attackName ?? (action.attackId ? formatAttackId(action.attackId) : 'Attack')}: ${attackCostSummary(
+        action.attackCost
+      )}, ${attackDamageSummary(action.attackDamage)}.`
     case 'end_turn':
       return `End the action window for ${formatPlayerId(action.playerId)}.`
     default:
@@ -6581,4 +6581,13 @@ function formatPlayerList(playerIds: string[]) {
 
 function formatEventType(type: string) {
   return type.replaceAll('_', ' ')
+}
+
+function formatAttackId(attackId: string) {
+  return attackId
+    .replaceAll('_', ' ')
+    .split(' ')
+    .filter(Boolean)
+    .map(word => `${word.slice(0, 1).toUpperCase()}${word.slice(1)}`)
+    .join(' ')
 }
