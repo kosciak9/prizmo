@@ -2137,6 +2137,8 @@ function GameFlowPanel({
             <StatusBadge tone={gameState.currentTurn ? 'active' : 'neutral'}>{turnStatus}</StatusBadge>
           </div>
 
+          {setupCompleted ? <TurnStepGuide gameState={gameState} viewerPlayerId={viewerPlayerId} /> : null}
+
           <div className="mt-3 space-y-2">
             <ActionCommandButton disabled={!canStartNextTurn} onClick={onStartNextTurn} tone="primary">
               {startNextTurnPending
@@ -2205,6 +2207,88 @@ function GameFlowPanel({
         </section>
       </div>
     </Panel>
+  )
+}
+
+function TurnStepGuide({
+  gameState,
+  viewerPlayerId
+}: {
+  gameState: GameState
+  viewerPlayerId: PlayerId
+}) {
+  const currentTurn = gameState.currentTurn
+  const turnOwnerId = currentTurn?.activePlayerId ?? gameState.firstPlayerId
+  const turnOwnerLabel = formatPlayerId(turnOwnerId)
+  const viewerLabel = formatPlayerId(viewerPlayerId)
+  const viewerOwnsTurn = turnOwnerId === viewerPlayerId
+  const activeWindowOpen = currentTurn?.status === 'action_window'
+  const drawStepResolved = currentTurn ? ['drawn', 'action_window', 'attack_declared', 'attack_resolving', 'ended'].includes(currentTurn.status) : false
+
+  const startDetail = currentTurn
+    ? `Turn ${currentTurn.turnNumber} belongs to ${turnOwnerLabel}. This tab is ${viewerLabel}.`
+    : `Start turn one for ${turnOwnerLabel}. This tab is ${viewerLabel}.`
+  let drawDetail = 'After the turn starts, draw for turn or skip the draw when a fixture scenario calls for it.'
+
+  if (currentTurn?.status === 'start') {
+    drawDetail = viewerOwnsTurn
+      ? `Draw a card for ${turnOwnerLabel}, or skip only when the fixture scenario calls for it.`
+      : `${turnOwnerLabel} is the turn owner. Use that player tab for table-faithful play, then refresh here.`
+  } else if (drawStepResolved) {
+    drawDetail = 'Draw-step timing is resolved for this turn.'
+  } else if (currentTurn) {
+    drawDetail = 'Finish the current attack or prompt flow before the next draw step.'
+  }
+
+  let actionWindowDetail = 'The action window opens after draw timing resolves.'
+
+  if (currentTurn?.status === 'start') {
+    actionWindowDetail = 'Draw for turn or skip draw before opening actions.'
+  } else if (currentTurn?.status === 'drawn') {
+    actionWindowDetail = 'Open the action window so hand, board, retreat, attack, and end-turn actions can appear below.'
+  } else if (activeWindowOpen) {
+    actionWindowDetail = `Action decisions are live for ${turnOwnerLabel}. Use Available actions below.`
+  } else if (currentTurn?.status === 'ended') {
+    actionWindowDetail = 'This turn is closed. Start the next turn to continue the table loop.'
+  } else if (currentTurn) {
+    actionWindowDetail = 'Resolve the current battle or prompt step before opening new actions.'
+  }
+
+  return (
+    <div className="mt-3 rounded-xl border border-amber-100 bg-[oklch(0.985_0.018_90)] p-3">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h4 className="text-xs font-semibold uppercase tracking-[0.14em] text-amber-800">First-turn path</h4>
+          <p className="mt-1 text-xs leading-5 text-stone-600">
+            Use this timing lane after setup locks. Legal actions stay hidden until the action window opens.
+          </p>
+        </div>
+        <StatusBadge tone={activeWindowOpen ? 'active' : 'warning'}>
+          {activeWindowOpen ? 'actions live' : currentTurn ? formatEventType(currentTurn.status) : 'next'}
+        </StatusBadge>
+      </div>
+
+      <div className="mt-3 space-y-2">
+        <SetupGuideRow
+          detail={startDetail}
+          number="1"
+          state={currentTurn ? 'done' : 'next'}
+          title="Start the first turn"
+        />
+        <SetupGuideRow
+          detail={drawDetail}
+          number="2"
+          state={!currentTurn ? 'needed' : drawStepResolved ? 'done' : currentTurn.status === 'start' ? 'next' : 'needed'}
+          title="Resolve draw timing"
+        />
+        <SetupGuideRow
+          detail={actionWindowDetail}
+          number="3"
+          state={activeWindowOpen ? 'done' : currentTurn?.status === 'drawn' ? 'next' : currentTurn?.status === 'ended' ? 'ready' : 'needed'}
+          title="Open the action window"
+        />
+      </div>
+    </div>
   )
 }
 
@@ -2311,7 +2395,7 @@ function CompletedSetupSummary({
   return (
     <div className="mt-3 space-y-3">
       <p className="text-xs leading-5 text-emerald-900">
-        Opening choices are locked. Continue through Turn step, prompts, and legal actions below.
+        Opening choices are locked. Use Turn step to start turn one, resolve draw timing, and open legal actions.
       </p>
 
       <dl className="grid gap-2">

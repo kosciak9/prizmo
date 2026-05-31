@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-31] iteration 98 | First-turn timing guidance
+- Task attempted: continued the Web UI polish pass by refining the post-setup `Turn step` rail with a compact first-turn path guide for starting turn one, resolving draw timing, and opening the action window with viewer-seat and turn-owner copy.
+- Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.
+- Validation: `mix format && mix assets.build` passed; fresh browser walkthrough on `http://localhost:4003` created game `7ea2441d-746c-4d55-a540-d3769e1636e1`, completed setup with Player 1 Moltres and Player 2 Abra, started turn 1, drew for Player 1, opened the action window, confirmed the guide advanced to `actions live`, and reported no browser warnings or errors; `mix check --no-test` passed.
+- Remaining/blocking notes: no code blocker for this timing-guidance slice. Further Web UI polish should refine the first action-window onboarding around legal action priority and turn-one hand/board decisions before rerunning the formal two-browser/manual-tester milestone.
+
 ## [2026-05-31] iteration 97 | Post-create setup path guidance
 - Task attempted: continued the Web UI polish pass by adding a compact post-create `Setup path` guide inside the `Game flow` rail, showing the next setup step for start setup, opening hands, Active choices, optional Bench, Prize placement, and setup completion with viewer-seat-aware copy.
 - Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.
