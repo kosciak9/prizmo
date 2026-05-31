@@ -384,6 +384,13 @@ defmodule Prizmo.TcgEngine.Mechanics do
            {:ok, metadata} <-
              CardPlay.require_playable_trainer_definition(player, card, player_id, definition),
            {:ok, choices} <- ChoiceValidator.normalize_payload(opts, definition),
+           :ok <-
+             CardPlay.require_required_choices_available(
+               game.id,
+               player_id,
+               card.id,
+               definition
+             ),
            {:ok, _event} <-
              write_event_and_snapshot(game.id, :card_play_started, player_id, %{
                turn_id: turn.id,

@@ -69,6 +69,32 @@ defmodule Prizmo.TcgEngine.CardPlay do
     end
   end
 
+  def required_choices_available?(cards, %CardInstance{} = action_card, definition)
+      when is_list(cards) do
+    Enum.all?(choice_steps(definition), fn choice_step ->
+      case legal_choice_ids(cards, action_card.owner_player_id, action_card.id, choice_step) do
+        {:ok, legal_choice_ids} ->
+          required_choice_count_available?(legal_choice_ids, definition, choice_step.key)
+
+        {:error, _reason} ->
+          false
+      end
+    end)
+  end
+
+  def require_required_choices_available(game_id, player_id, action_card_id, definition)
+      when is_binary(game_id) and is_binary(player_id) and is_binary(action_card_id) do
+    Enum.reduce_while(choice_steps(definition), :ok, fn choice_step, :ok ->
+      with {:ok, legal_choice_ids} <-
+             legal_choice_ids(game_id, player_id, action_card_id, definition, choice_step.key),
+           :ok <- require_required_choice_count(legal_choice_ids, definition, choice_step.key) do
+        {:cont, :ok}
+      else
+        {:error, reason} -> {:halt, {:error, reason}}
+      end
+    end)
+  end
+
   def resolve_play_card_costs(game, turn, player, card, metadata, definition, choices) do
     with {:ok, cost} <- CostRunner.first_cost(definition),
          {:ok, _event} <-
@@ -258,6 +284,7 @@ defmodule Prizmo.TcgEngine.CardPlay do
        ) do
     with {:ok, legal_choice_ids} <-
            legal_choice_ids(game.id, player.player_id, card.id, definition, choice_key),
+         :ok <- require_required_choice_count(legal_choice_ids, definition, choice_key),
          {:ok, pending_effect} <-
            PendingEffects.upsert_awaiting(
              game,
@@ -339,6 +366,49 @@ defmodule Prizmo.TcgEngine.CardPlay do
         {:error, {:unknown_choice_key, choice_key}}
     end
   end
+
+  defp legal_choice_ids(cards, player_id, action_card_id, choice_step) do
+    case choice_step.type do
+      :discard_from_hand ->
+        cards
+        |> Enum.filter(&(&1.owner_player_id == player_id and &1.zone == :hand))
+        |> Enum.reject(&(&1.id == action_card_id))
+        |> Enum.map(& &1.id)
+        |> then(&{:ok, &1})
+
+      :search_deck ->
+        cards
+        |> Enum.filter(&(&1.owner_player_id == player_id and &1.zone == :deck))
+        |> Enum.filter(&matches_search_filter?(&1, choice_step.params.filter))
+        |> Enum.map(& &1.id)
+        |> then(&{:ok, &1})
+
+      _other ->
+        {:error, {:unsupported_choice_step, choice_step.key, choice_step.type}}
+    end
+  end
+
+  defp choice_steps(definition), do: definition.costs ++ definition.effects
+
+  defp require_required_choice_count(legal_choice_ids, definition, choice_key) do
+    if required_choice_count_available?(legal_choice_ids, definition, choice_key) do
+      :ok
+    else
+      {:error,
+       {:not_enough_legal_choices, choice_key, ChoiceValidator.count_for(definition, choice_key),
+        length(legal_choice_ids)}}
+    end
+  end
+
+  defp required_choice_count_available?(legal_choice_ids, definition, choice_key) do
+    length(legal_choice_ids) >= ChoiceValidator.count_for(definition, choice_key)
+  end
+
+  defp matches_search_filter?(%CardInstance{} = card, %{kind: :pokemon}) do
+    require_pokemon_card(card.card_id) == :ok
+  end
+
+  defp matches_search_filter?(_card, _filter), do: false
 
   defp maybe_write_deck_shuffled(
          game_id,

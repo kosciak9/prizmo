@@ -7,6 +7,7 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
   alias Prizmo.TcgEngine.AttackRequirements
   alias Prizmo.TcgEngine.CardCatalog
   alias Prizmo.TcgEngine.CardInstance
+  alias Prizmo.TcgEngine.CardPlay
   alias Prizmo.TcgEngine.Cards.Registry, as: EngineCardRegistry
   alias Prizmo.TcgEngine.Game
   alias Prizmo.TcgEngine.GamePlayer
@@ -117,7 +118,7 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
     source_ids =
       cards
       |> hand_cards()
-      |> Enum.filter(&engine_playable_card?/1)
+      |> Enum.filter(&engine_playable_card?(&1, cards))
       |> card_ids()
 
     if Enum.empty?(source_ids) do
@@ -421,11 +422,16 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
     do:
       "Discard #{retreat_cost} Energy attached to the Active Pokémon, then switch it with a Benched Pokémon."
 
-  defp engine_playable_card?(%CardInstance{card_id: card_id}) do
+  defp engine_playable_card?(%CardInstance{card_id: card_id} = card, cards) do
     case EngineCardRegistry.fetch(card_id) do
-      {:ok, %{play_window: :action_window}} -> true
-      {:ok, _definition} -> false
-      {:error, _reason} -> false
+      {:ok, %{play_window: :action_window} = definition} ->
+        CardPlay.required_choices_available?(cards, card, definition)
+
+      {:ok, _definition} ->
+        false
+
+      {:error, _reason} ->
+        false
     end
   end
 

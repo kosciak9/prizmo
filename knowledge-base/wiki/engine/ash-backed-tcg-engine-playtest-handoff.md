@@ -2,6 +2,14 @@
 
 Updated: 2026-05-31
 
+## Iteration 145 handoff
+
+- Current state: game `d608a1f1-6db6-4f23-a8d0-4a7d27641993` was restored with persisted undo from the invalid post-click cursor `107` back to cursor `103 of 107`; latest visible event is #103 `open_action_window`, active player is Player 1 on `Turn 9, action_window`, but Player 1 still sees one leaked `choose_prompt` affordance for the old Ultra Ball `discard_two_from_hand` prompt requiring 2 cards with only one legal Dragapult ex choice. Player 2 sees no prompt details and no actions. The source fix now prevents future unpayable Ultra Ball plays from creating this state, but snapshots do not currently restore/clear prompt and pending-effect rows.
+- Last commit at iteration start: `a0d47b9 docs(wiki): capture tcg draw open-action handoff`.
+- Remaining tasks: fix prompt/pending-effect snapshot restoration or intentionally start a fresh playtest path before continuing the Web UI polish loop; broader north-star work still includes the formal two-independent-browser milestone, more persisted mechanics/card behavior slices, and the Electric Streams spike.
+- Blockers: the long-running playtest game remains blocked by leaked prompt/pending-effect state after undo because `Prizmo.TcgEngine.Snapshot`/`SnapshotRestorer` only cover game, players, setup, turns, and cards. Do not continue clicking through `d608a1f1-6db6-4f23-a8d0-4a7d27641993` until this is repaired or a fresh game branch is chosen.
+- Recommended next atomic task: teach snapshots/restores to include or hide prompt and pending-effect state across undo/redo, then restore `d608a1f1-6db6-4f23-a8d0-4a7d27641993` to cursor 103 and verify Player 1 sees only legal actions under the new guard (likely `End player 1's turn`, with unpayable Ultra Ball hidden) while Player 2 remains hidden.
+
 ## Iteration 144 handoff
 
 - Current state: game `d608a1f1-6db6-4f23-a8d0-4a7d27641993` is verified at post-event-103 with `Turn 9, action_window`; latest event is #103 `open_action_window`, active player is Player 1, Player 1 has Munkidori Active with Moltres plus Budew on Bench and two cards in hand, Player 2 has Kadabra Active with four Benched Pokémon and two cards in hand, no prompts or pending effects are open, Player 1 sees `Play Ultra Ball` plus `End player 1's turn`, and Player 2 sees no Available actions plus copy pointing back to the Player 1 tab.
