@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-31] iteration 112 | Player 2 end-turn landing
+- Task attempted: continued the Web UI polish pass from the Player 2 post-event-35 state by clicking `End player 2's turn`, verifying the persisted ended-turn transition, and refining the next-turn landing so it names Player 1's upcoming turn instead of stale first-turn or ambiguous next-player copy.
+- Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.
+- Validation: browser smoke on `http://localhost:4003` resumed game `d608a1f1-6db6-4f23-a8d0-4a7d27641993` as Player 2, clicked `End player 2's turn`, confirmed event #36 persisted as `end turn`, cursor advanced to `36 of 36`, and current turn became `Turn 2, ended`; after the copy refinement, refreshed the same state and confirmed the completed setup summary points to the live turn path, `Next-turn path` says `Start turn 3 for player 1`, the CTA reads `Start player 1's turn`, the draw/open-action guidance names Player 1, and no browser console warnings or errors were reported; `mix format && mix assets.build` passed; `mix check --no-test` passed.
+- Remaining/blocking notes: no code blocker for this ended-turn landing slice. Further polish can continue from the post-event-36 state by switching to Player 1, clicking `Start player 1's turn`, then verifying draw/open-action owner-tab guidance before rerunning the formal two-browser/manual-tester milestone once isolated contexts are guaranteed.
+
 ## [2026-05-31] iteration 111 | Player 2 final Bench transition
 - Task attempted: continued the Web UI polish pass from the Player 2 post-event-33 state by clicking the unique `Bench Dunsparce` choice, verifying it moved to Bench while Kadabra kept Abra under `Evolution stack`, then refining the hand/board guide so the last Bench choice points toward ending the turn when no battle action is available.
 - Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.

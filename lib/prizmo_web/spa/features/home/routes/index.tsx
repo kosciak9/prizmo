@@ -2015,6 +2015,10 @@ function GameFlowPanel({
     ? `turn ${gameState.currentTurn.turnNumber}: ${formatEventType(gameState.currentTurn.status)}`
     : 'no turn'
   const flowStatus = setupCompleted ? turnStatus : setupStatus
+  const nextTurnOwnerId = gameState.currentTurn?.status === 'ended'
+    ? (gameState.players.find(player => player.playerId !== gameState.currentTurn?.activePlayerId)?.playerId ?? gameState.activePlayerId)
+    : null
+  const nextTurnOwnerLabel = nextTurnOwnerId ? formatPlayerId(nextTurnOwnerId) : null
   const canStartSetup = !gameState.setup && !startSetupPending
   const canDrawOpeningHand = gameState.setup?.status === 'waiting_to_draw' && !drawOpeningHandPending
   const canChooseSetupActive = Boolean(
@@ -2088,7 +2092,9 @@ function GameFlowPanel({
             <div>
               <h3 className="text-sm font-semibold text-stone-950">Table setup</h3>
               <p className="mt-1 text-xs leading-5 text-stone-500">
-                Build the opening board from the viewer hand, then move into the first turn.
+                {setupCompleted
+                  ? 'Opening choices are locked. Use Turn step for the live turn path.'
+                  : 'Build the opening board from the viewer hand, then move into the first turn.'}
               </p>
             </div>
             <StatusBadge tone={gameState.setup?.status === 'completed' ? 'active' : 'warning'}>
@@ -2097,7 +2103,11 @@ function GameFlowPanel({
           </div>
 
           {setupCompleted ? (
-            <CompletedSetupSummary firstPlayerId={gameState.firstPlayerId} players={gameState.players} />
+            <CompletedSetupSummary
+              currentTurn={gameState.currentTurn}
+              firstPlayerId={gameState.firstPlayerId}
+              players={gameState.players}
+            />
           ) : (
             <>
               <SetupPathGuide gameState={gameState} viewerPlayerId={viewerPlayerId} />
@@ -2244,7 +2254,9 @@ function GameFlowPanel({
               {startNextTurnPending
                 ? 'Starting turn...'
                 : gameState.currentTurn?.status === 'ended'
-                  ? 'Start next turn'
+                  ? nextTurnOwnerLabel
+                    ? `Start ${nextTurnOwnerLabel}'s turn`
+                    : 'Start next turn'
                   : gameState.currentTurn
                     ? `Turn ${gameState.currentTurn.turnNumber} in progress`
                     : gameState.setup?.status === 'completed'
@@ -2359,7 +2371,7 @@ function TurnStepGuide({
 
   if (endedTurn) {
     drawDetail = viewerOwnsTurn
-      ? `Start your next turn, then resolve ${turnOwnerLabel}'s draw step from this tab.`
+      ? `Start ${turnOwnerLabel}'s next turn, then resolve draw timing from this tab.`
       : `Start ${turnOwnerLabel}'s next turn, then use that player tab for draw timing.`
   } else if (currentTurn?.status === 'start') {
     drawDetail = viewerOwnsTurn
@@ -2374,7 +2386,7 @@ function TurnStepGuide({
   let actionWindowDetail = 'The action window opens after draw timing resolves.'
 
   if (endedTurn) {
-    actionWindowDetail = `After ${turnOwnerLabel}'s draw timing, open the action window for the next player's hand, board, battle, and end-turn choices.`
+    actionWindowDetail = `After ${turnOwnerLabel}'s draw timing, open ${turnOwnerLabel}'s action window for hand, board, battle, and end-turn choices.`
   } else if (currentTurn?.status === 'start') {
     actionWindowDetail = 'Draw for turn or skip draw before opening actions.'
   } else if (currentTurn?.status === 'drawn') {
@@ -2519,16 +2531,24 @@ function SetupPathGuide({
 }
 
 function CompletedSetupSummary({
+  currentTurn,
   firstPlayerId,
   players
 }: {
+  currentTurn: GameState['currentTurn']
   firstPlayerId: string
   players: PlayerView[]
 }) {
+  const setupDetail = currentTurn
+    ? currentTurn.status === 'ended'
+      ? 'Opening choices are locked. Use Turn step to start the next turn, resolve draw timing from the turn owner tab, and reopen legal actions.'
+      : 'Opening choices are locked. Use Turn step to track this turn, draw timing, and live legal actions.'
+    : 'Opening choices are locked. Use Turn step to start turn one, resolve draw timing, and open legal actions.'
+
   return (
     <div className="mt-3 space-y-3">
       <p className="text-xs leading-5 text-emerald-900">
-        Opening choices are locked. Use Turn step to start turn one, resolve draw timing, and open legal actions.
+        {setupDetail}
       </p>
 
       <dl className="grid gap-2">
