@@ -9,6 +9,7 @@ defmodule Prizmo.TcgEngine.Game do
     authorizers: [Ash.Policy.Authorizer],
     extensions: [AshStateMachine, AshTypescript.Resource]
 
+  alias Prizmo.TcgEngine.Decklists
   alias Prizmo.TcgEngine.Game
   alias Prizmo.TcgEngine.GameView
   alias Prizmo.TcgEngine.GameView.Fields, as: GameViewFields
@@ -25,6 +26,21 @@ defmodule Prizmo.TcgEngine.Game do
   @player_deck_selection_fields [
     player_id: [type: :string, allow_nil?: false],
     deck_key: [type: :string, allow_nil?: false]
+  ]
+
+  @open_deck_card_fields [
+    card_id: [type: :string, allow_nil?: false],
+    count: [type: :integer, allow_nil?: false]
+  ]
+
+  @open_deck_player_fields [
+    player_id: [type: :string, allow_nil?: false],
+    deck_key: [type: :string, allow_nil?: false],
+    cards: [
+      type: {:array, :map},
+      allow_nil?: false,
+      constraints: [items: [fields: @open_deck_card_fields]]
+    ]
   ]
 
   postgres do
@@ -54,6 +70,7 @@ defmodule Prizmo.TcgEngine.Game do
     define :read
     define :list_supported_decks
     define :create_from_supported_decks, args: [:players]
+    define :create_from_decklists, args: [:players]
     define :start_setup_command, args: [:game_id]
     define :call_coin_toss_command, args: [:game_id, :player_id, :call]
 
@@ -120,6 +137,29 @@ defmodule Prizmo.TcgEngine.Game do
           end
 
         SupportedDecks.create_game(input.arguments.players, opts)
+      end
+    end
+
+    action :create_from_decklists, :struct do
+      description "Create a TCG engine game from arbitrary catalog-backed deck payloads."
+
+      constraints instance_of: Game
+
+      argument :players, {:array, :map} do
+        allow_nil? false
+        constraints items: [fields: @open_deck_player_fields]
+      end
+
+      argument :active_player_id, :string
+
+      run fn input, _context ->
+        opts =
+          case Map.get(input.arguments, :active_player_id) do
+            nil -> []
+            active_player_id -> [active_player_id: active_player_id]
+          end
+
+        Decklists.create_game(input.arguments.players, opts)
       end
     end
 

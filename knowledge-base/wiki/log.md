@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-06-01] iteration 183 | Catalog-backed open deck creation
+- Task attempted: advanced the open-deck north-star path with a backend/API slice that creates persisted TCG engine games from arbitrary catalog-backed deck payloads instead of only supported fixture keys.
+- Files changed: added `lib/prizmo/tcg_engine/decklists.ex`, updated `lib/prizmo/tcg_engine/game_setup.ex`, `lib/prizmo/tcg_engine/mechanics.ex`, `lib/prizmo/tcg_engine/game.ex`, `lib/prizmo/tcg_engine.ex`, `lib/prizmo_web/spa/lib/ash/client.ts`, the north-star article, this log, and the TCG engine playtest handoff.
+- Validation: rollback Tidewave/project eval confirmed valid arbitrary deck payloads create a game with two custom deck keys and 120 deck-zone cards; rollback/domain-interface eval confirmed `Prizmo.TcgEngine.create_open_deck_game/1`; validation eval confirmed clear errors for unresolved card IDs, invalid deck size, duplicate rows, missing Basic Pokémon, and non-string tuple card IDs; `mix format`, `mix compile --warnings-as-errors`, `mix ash_typescript.codegen`, `mix test test/prizmo/tcg_engine/mechanics_test.exs`, `node_modules/.bin/tsc --noEmit --ignoreDeprecations 6.0`, `mix ash_typescript.codegen --check`, and final `mix check` passed.
+- Remaining/blocking notes: this is an API/backend step only. The next highest-value open-deck slice is persisted engine-owned RNG shuffle/seed metadata plus shuffle/setup domain facts, followed by a minimal SPA decklist-entry game creation surface. Current-game browser smoke from iteration 182 is still pending when an isolated browser profile is available.
+
 ## [2026-06-01] codebase update | Prizmo llm-wiki maintenance rules
 - Task attempted: aligned the local `llm-wiki` opencode skill and `AGENTS.md` with Prizmo's canonical `knowledge-base/` layout so future agents update wiki/log handoffs correctly during implementation work.
 - Files changed: updated `.opencode/skill/llm-wiki/SKILL.md`, added the skill reference templates, updated `AGENTS.md`, added the missing playtest handoff index entry, normalized wiki article metadata for engine handoff/north-star pages, and normalized multi-source raw research headers.

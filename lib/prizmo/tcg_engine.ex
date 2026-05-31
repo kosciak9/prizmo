@@ -16,6 +16,7 @@ defmodule Prizmo.TcgEngine do
       rpc_action :list_tcg_engine_games, :read
       rpc_action :list_supported_tcg_decks, :list_supported_decks
       rpc_action :create_tcg_engine_game, :create_from_supported_decks
+      rpc_action :create_open_deck_tcg_engine_game, :create_from_decklists
       rpc_action :get_tcg_engine_game_state, :get_state
       rpc_action :call_tcg_engine_coin_toss, :call_coin_toss_command
       rpc_action :choose_tcg_engine_starting_player, :choose_starting_player_command
@@ -54,6 +55,7 @@ defmodule Prizmo.TcgEngine do
       define :list_games, action: :read
       define :list_supported_decks, action: :list_supported_decks
       define :create_supported_game, action: :create_from_supported_decks, args: [:players]
+      define :create_open_deck_game, action: :create_from_decklists, args: [:players]
       define :get_game_state, action: :get_state, args: [:game_id, :viewer_player_id]
 
       define :call_coin_toss_for_game,

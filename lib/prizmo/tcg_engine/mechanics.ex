@@ -92,7 +92,9 @@ defmodule Prizmo.TcgEngine.Mechanics do
 
   require Ash.Query
 
-  @type player_deck :: {String.t(), module()}
+  @type player_deck_source ::
+          module() | %{required(:id) => String.t(), required(:card_ids) => [String.t()]}
+  @type player_deck :: {String.t(), player_deck_source()}
 
   @spec create_game([player_deck()], keyword()) :: {:ok, Game.t()} | {:error, term()}
   def create_game(player_decks, opts \\ []) when is_list(player_decks) do

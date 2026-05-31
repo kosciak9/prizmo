@@ -9,7 +9,7 @@ defmodule Prizmo.TcgEngine.GameSetup do
   alias Prizmo.TcgEngine.GamePlayer
   alias Prizmo.TcgEngine.PlayerStore
 
-  def first_player_id([{player_id, _deck_module} | _rest]), do: player_id
+  def first_player_id([{player_id, _deck} | _rest]), do: player_id
   def first_player_id([]), do: nil
 
   def require_two_players(player_decks) do
@@ -29,14 +29,14 @@ defmodule Prizmo.TcgEngine.GameSetup do
 
   def create_players_and_cards(%Game{} = game, player_decks) do
     player_decks
-    |> Enum.map(fn {player_id, deck_module} ->
+    |> Enum.map(fn {player_id, deck} ->
       with {:ok, player} <-
              create(GamePlayer, :create, %{
                game_id: game.id,
                player_id: player_id,
-               deck_key: deck_module.id()
+               deck_key: deck_id(deck)
              }) do
-        create_deck_cards(game, player, deck_module)
+        create_deck_cards(game, player, deck)
       end
     end)
     |> collect_results()
@@ -78,8 +78,9 @@ defmodule Prizmo.TcgEngine.GameSetup do
     end)
   end
 
-  defp create_deck_cards(%Game{} = game, %GamePlayer{} = player, deck_module) do
-    deck_module.card_ids()
+  defp create_deck_cards(%Game{} = game, %GamePlayer{} = player, deck) do
+    deck
+    |> deck_card_ids()
     |> Enum.with_index(1)
     |> Enum.map(fn {card_id, position} ->
       create(CardInstance, :create, %{
@@ -93,6 +94,12 @@ defmodule Prizmo.TcgEngine.GameSetup do
     end)
     |> collect_results()
   end
+
+  defp deck_id(deck_module) when is_atom(deck_module), do: deck_module.id()
+  defp deck_id(%{id: deck_id}) when is_binary(deck_id), do: deck_id
+
+  defp deck_card_ids(deck_module) when is_atom(deck_module), do: deck_module.card_ids()
+  defp deck_card_ids(%{card_ids: card_ids}) when is_list(card_ids), do: card_ids
 
   defp draw_opening_cards_for_player(%GamePlayer{} = player) do
     with {:ok, cards} <- CardStore.deck_cards_for_player(player.id, 7) do
