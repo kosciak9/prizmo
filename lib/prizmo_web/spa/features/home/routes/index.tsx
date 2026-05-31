@@ -3944,7 +3944,9 @@ function ActionAffordancesPanel({
                     onRetreat={onRetreat}
                     playBasicToBenchPendingCardId={playBasicToBenchPendingCardId}
                     playCardPendingCardId={playCardPendingCardId}
+                    postSearchBattleAttackIds={postSearchHandoff?.battleAttackIds ?? []}
                     postSearchBenchCardInstanceIds={postSearchHandoff?.benchableCardInstanceIds ?? []}
+                    postSearchEndTurnPlayerIds={postSearchHandoff?.endTurnPlayerIds ?? []}
                     retreatPendingKey={retreatPendingKey}
                   />
                 ))}
@@ -3965,6 +3967,8 @@ function ActionAffordancesPanel({
 type UltraBallPostSearchHandoffPlan = {
   selectedCardNames: string
   benchableCardInstanceIds: string[]
+  battleAttackIds: string[]
+  endTurnPlayerIds: PlayerId[]
   handDetail: string
   battleDetail: string
   turnDetail: string
@@ -4000,6 +4004,8 @@ function ultraBallPostSearchHandoffPlan(
   const handGroup = actionGroups.find(group => group.id === 'hand')
   const battleGroup = actionGroups.find(group => group.id === 'battle')
   const turnGroup = actionGroups.find(group => group.id === 'turn')
+  const battleAction = battleGroup?.actions.find(action => action.key === 'declare_attack')
+  const turnAction = turnGroup?.actions.find(action => action.key === 'end_turn')
   const benchableSearchedCards = handGroup
     ? handGroup.actions.flatMap(action =>
         action.key === 'play_basic_to_bench'
@@ -4011,22 +4017,38 @@ function ultraBallPostSearchHandoffPlan(
     .map(cardInstanceId => cardsById.get(cardInstanceId)?.name)
     .filter((name): name is string => Boolean(name))
     .join(', ')
+  const battleAttackIds =
+    battleGroup?.actions.flatMap(action =>
+      action.key === 'declare_attack' && action.attackId ? [action.attackId] : []
+    ) ?? []
+  const endTurnPlayerIds =
+    turnGroup?.actions.flatMap(action => (action.key === 'end_turn' && isPlayerId(action.playerId) ? [action.playerId] : [])) ?? []
+  const battleActionLabel = battleAction?.attackName
+    ? `Declare ${battleAction.attackName}`
+    : battleAction?.attackId
+      ? `Declare ${formatEventType(battleAction.attackId)}`
+      : null
+  const turnActionLabel = turnAction ? `End ${formatPlayerId(turnAction.playerId)}'s turn` : null
 
   return {
     selectedCardNames: selectedCardNames || 'The selected Pokémon',
     benchableCardInstanceIds: benchableSearchedCards,
+    battleAttackIds,
+    endTurnPlayerIds,
     handDetail: benchableSearchedCards.length
       ? `Bench ${benchableNames || 'the searched Basic Pokémon'} from Hand and board if it improves the board now.`
       : handGroup
         ? 'The searched Pokémon is in hand. Use any remaining Hand and board actions before committing to battle.'
         : 'No Hand and board action remains from this state. Move directly to battle or turn flow.',
-    battleDetail: battleGroup
-      ? 'Battle decisions are available again; declare an attack or retreat if that is the stronger line.'
-      : 'No battle decision is legal yet from the refreshed action window.',
-    turnDetail: turnGroup
-      ? 'End Turn is available when you are done developing the board.'
+    battleDetail: battleActionLabel
+      ? `${battleActionLabel} is live in Battle decisions; choosing it clears this handoff and advances into attack resolution.`
+      : battleGroup
+        ? 'Battle decisions are available again; retreat or pick the stronger battle line before passing.'
+        : 'No battle decision is legal yet from the refreshed action window.',
+    turnDetail: turnActionLabel
+      ? `${turnActionLabel} is live if you want to pass; choosing it clears this handoff and advances the persisted turn.`
       : 'Turn flow will appear once required battle or board decisions are cleared.',
-    nextLabel: benchableSearchedCards.length ? 'bench' : handGroup ? 'review' : 'clear'
+    nextLabel: benchableSearchedCards.length ? 'bench' : battleActionLabel ? 'battle' : turnActionLabel ? 'pass' : handGroup ? 'review' : 'clear'
   }
 }
 
@@ -4216,7 +4238,9 @@ function ActionAffordanceCard({
   onRetreat,
   playBasicToBenchPendingCardId,
   playCardPendingCardId,
+  postSearchBattleAttackIds,
   postSearchBenchCardInstanceIds,
+  postSearchEndTurnPlayerIds,
   retreatPendingKey
 }: {
   action: ActionAffordance
@@ -4237,10 +4261,13 @@ function ActionAffordanceCard({
   onRetreat: (input: RetreatCommand) => void
   playBasicToBenchPendingCardId: string | null
   playCardPendingCardId: string | null
+  postSearchBattleAttackIds: string[]
   postSearchBenchCardInstanceIds: string[]
+  postSearchEndTurnPlayerIds: PlayerId[]
   retreatPendingKey: string | null
 }) {
   const canRunAction = !actionCommandPending && isPlayerId(action.playerId)
+  const isPostSearchEndTurnAction = isPlayerId(action.playerId) && postSearchEndTurnPlayerIds.includes(action.playerId)
   const playCardPromptGuide = ultraBallPlayCardPromptGuide(action, cardsById)
 
   return (
@@ -4449,9 +4476,9 @@ function ActionAffordanceCard({
         >
           {declareAttackPendingKey === attackKey(action.playerId, action.attackId)
             ? `Declaring ${action.attackName ?? 'attack'}...`
-            : `Declare ${action.attackName ?? formatEventType(action.attackId)}${attackCostLabel(
-                action.attackCost
-              )}${attackDamageLabel(action.attackDamage)}`}
+            : `${postSearchBattleAttackIds.includes(action.attackId) ? 'Attack after search — ' : ''}Declare ${
+                action.attackName ?? formatEventType(action.attackId)
+              }${attackCostLabel(action.attackCost)}${attackDamageLabel(action.attackDamage)}`}
         </ActionCommandButton>
       ) : null}
 
@@ -4464,7 +4491,7 @@ function ActionAffordanceCard({
         >
           {endTurnPendingPlayerId === action.playerId
             ? `Ending ${formatPlayerId(action.playerId)}'s turn...`
-            : `End ${formatPlayerId(action.playerId)}'s turn`}
+            : `${isPostSearchEndTurnAction ? 'Pass after search — ' : ''}End ${formatPlayerId(action.playerId)}'s turn`}
         </ActionCommandButton>
       ) : null}
     </li>

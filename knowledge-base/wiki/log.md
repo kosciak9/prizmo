@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-31] iteration 103 | Ultra Ball post-search battle branch
+- Task attempted: continued the Web UI polish pass by making the post-search Ultra Ball battle/pass follow-up explicit, adding `Attack after search` and `Pass after search` action labels plus handoff copy that confirms those commands clear the Trainer handoff and advance the persisted step.
+- Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.
+- Validation: `mix format` passed; `mix assets.build` passed; browser smoke on `http://localhost:4003` created game `69cee74d-e7ea-4b75-aa43-cc203d7839f8`, completed setup, attached Fire Energy, played Ultra Ball, discarded Drakloak and Fire Energy, searched Munkidori, confirmed the handoff showed `Declare Fighting Wings`/`End player 1's turn` branch copy plus `Attack after search — Declare Fighting Wings` and `Pass after search — End player 1's turn`, clicked the attack branch, confirmed `Trainer complete` cleared and the rail advanced to `attack_declared`/Attack resolution with no browser warnings or errors; `mix check --no-test` passed.
+- Remaining/blocking notes: no code blocker for the post-search battle branch slice. Further polish can explicitly verify the post-search pass/end-turn branch, confirming it clears the handoff and points Player 2 into the next persisted turn step.
+
 ## [2026-05-31] iteration 102 | Ultra Ball next-action handoff clear
 - Task attempted: continued the Web UI polish pass by making the first post-search Ultra Ball follow-up action explicit, highlighting the searched Basic Pokémon Bench CTA and clearing the `Trainer complete` handoff immediately after a successful follow-up action mutates the board.
 - Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.
