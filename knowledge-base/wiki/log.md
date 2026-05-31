@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-31] iteration 118 | Player 1 attack-resolving landing
+- Task attempted: continued the Web UI polish pass from the verified post-event-41 Player 1 attack-declared state by clicking `Resolve Fighting Wings`, verifying the persisted damage/attack-resolving landing, and refining the Attack resolution rail so the resolved state explicitly says damage was recorded before the finish CTA.
+- Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.
+- Validation: Tidewave precheck confirmed game `d608a1f1-6db6-4f23-a8d0-4a7d27641993` was at event #41 with `Turn 3, attack_declared`, pending attack `fighting_wings`, no prompts, and Player 1 as the active player; browser smoke on `http://localhost:4003` as Player 1 clicked `Resolve Fighting Wings`, confirmed cursor `42 of 42`, event #42 `resolve_declared_attack`, `Turn 3, attack_resolving`, visible `Damage recorded` guide, `Kadabra now has 20 damage`, and `Finish attack and end turn`; browser console reported no warnings or errors; Tidewave postcheck confirmed Kadabra damage 20, no awaiting prompts, and pending attack effect type `bonus_damage_if_defender_pokemon_ex`; `mix format && mix assets.build && mix check --no-test` passed.
+- Remaining/blocking notes: no code blocker for this attack-resolving landing slice. Further polish should continue from the post-event-42 state by clicking `Finish attack and end turn`, verifying the ended-turn/next-owner landing, and avoiding repeating the resolve branch.
+
 ## [2026-05-31] iteration 117 | Player 1 attack-declared landing
 - Task attempted: continued the Web UI polish pass from the verified post-event-40 Player 1 action window by declaring `Fighting Wings`, verifying the persisted attack-declared landing, and refining attack-resolution fallback labels so the normal path shows the product-facing attack name instead of raw attack-id copy.
 - Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, this log, and the TCG engine playtest handoff.

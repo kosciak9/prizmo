@@ -3145,6 +3145,12 @@ function AttackProgressPanel({
                           : headsCountRequired
                             ? `Enter a heads count for ${attackLabel}`
                             : `Resolve ${attackLabel}`
+  const attackProgressGuideTitle = turn.status === 'attack_resolving' ? 'Damage recorded' : 'Attack declared'
+  const attackProgressGuideDetail = turn.status === 'attack_resolving'
+    ? `${attackLabel} has resolved. ${
+        defender ? `${defender.name} now has ${defender.damage} damage.` : 'Damage and effects are recorded.'
+      } Finish the attack to end ${formatPlayerId(turn.activePlayerId)}'s turn.`
+    : `Resolve ${attackLabel} to apply its persisted damage and any authored effect before ending the turn.`
   const resolutionChecklistItems: ResolutionChecklistItem[] = []
 
   if (turn.pendingAttackRequiresCopiedAttack) {
@@ -3327,10 +3333,12 @@ function AttackProgressPanel({
           <StateRow label="Defender" value={defender?.name ?? formatNullableCardId(turn.pendingDefenderCardInstanceId)} />
         </div>
 
-        <p className="text-xs leading-5 text-stone-500">
-          Resolve applies the declared attack's currently executable damage/effect behavior. Finish closes the
-          attack and ends the turn after resolution.
-        </p>
+        <div className="rounded-xl border border-stone-200 bg-stone-50/80 px-3 py-2">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-stone-600">
+            {attackProgressGuideTitle}
+          </p>
+          <p className="mt-1 text-xs leading-5 text-stone-600">{attackProgressGuideDetail}</p>
+        </div>
 
         {commandError ? <CommandErrorCard notice={commandError} /> : null}
 
