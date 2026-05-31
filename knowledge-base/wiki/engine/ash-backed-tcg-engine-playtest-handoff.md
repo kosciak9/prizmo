@@ -2,6 +2,14 @@
 
 Updated: 2026-05-31
 
+## Iteration 157 handoff
+
+- Current state: the current playtest game `f6df7025-7d0f-4d9b-9bc2-31c864de1d4e` advanced from cursor/latest `96`, `turn_action_window`, active Player 2, by executing the same Ash domain command behind the SPA `Evolve Pokémon` action. The available MCP browser profile was still locked, so this could not be clicked through the SPA. The command appended event/snapshot `97`: `evolve_from_hand` for Rabsca card instance `d5e07653-164a-446b-b2ea-6719dd95fd31` evolving from Rellor card instance `05fe0929-e0d2-49e1-9037-8ccf760dae22` on Player 2's Bench slot `4`. The game is now cursor/latest `97`, `turn_action_window`, `Turn 12, action_window`, active Player 2, with no prompts. Player 1 sees no legal actions; Player 2 sees only `Pass`.
+- Last commit at iteration start: `9981ccd docs(wiki): capture tcg turn twelve handoff`.
+- Remaining tasks: continue the substantial Web UI polish/playtest path on the current game state, rerun a true browser/UI smoke when an isolated Playwright or browser context is available, eventually rerun the formal two-independent-browser milestone, and continue broader persisted mechanics/card behavior plus Electric Streams spike work from the north-star plan.
+- Blockers: the MCP browser profile remained locked during this iteration, so the Player 2 `Evolve Pokémon` action was validated through the Ash domain command and database/read-model checks rather than an actual SPA click.
+- Recommended next atomic task: from current game `f6df7025-7d0f-4d9b-9bc2-31c864de1d4e` at post-event-97 Player 2 action window, use an isolated/browser-available SPA context to execute `Pass` if possible, then verify the persisted auto-continue landing from both seats without repeating the already-validated Player 2 `Evolve Pokémon` branch.
+
 ## Iteration 156 handoff
 
 - Current state: the current playtest game `f6df7025-7d0f-4d9b-9bc2-31c864de1d4e` advanced from cursor/latest `89`, `turn_action_window`, active Player 1, by executing the same Ash domain command behind the SPA `Declare Fighting Wings` action. The available MCP browser profile was still locked, so this could not be clicked through the SPA. The command appended events/snapshots `90`-`96`: `declare_attack`, `resolve_declared_attack` for 20 damage and 40 resulting damage on Player 2 Active Abra, `finish_attack`, `turn_ended`, `turn_started`, `turn_card_drawn`, and `action_window_opened`. The game is now cursor/latest `96`, `turn_action_window`, `Turn 12, action_window`, active Player 2, with no prompts. Player 1 sees no legal actions; Player 2 sees legal actions `evolve_from_hand` (`Evolve Pokémon`) and `pass`.

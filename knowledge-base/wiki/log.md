@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-31] iteration 157 | Player 2 Rabsca evolution handoff
+- Task attempted: continued from current playtest game `f6df7025-7d0f-4d9b-9bc2-31c864de1d4e` at Player 2's post-event-96 action window by executing the same Ash domain command behind the SPA `Evolve Pokémon` control.
+- Files changed: updated this log and the TCG engine playtest handoff; no product source changed.
+- Validation: precheck confirmed game `f6df7025-7d0f-4d9b-9bc2-31c864de1d4e` was cursor/latest `96`, `Turn 12, action_window`, active Player 2, setup completed, no prompts, Player 1 with no legal actions, and Player 2 with legal actions `Evolve Pokémon` and `Pass`; the MCP browser profile was still locked (`mcp-chrome-88a2ee9`), so the browser smoke could not be run through the available Playwright tool; `Prizmo.TcgEngine.evolve_from_hand_for_game/4` evolved Rabsca card instance `d5e07653-164a-446b-b2ea-6719dd95fd31` from Rellor card instance `05fe0929-e0d2-49e1-9037-8ccf760dae22` and advanced the persisted flow to cursor/latest `97`; SQL postcheck confirmed event `97` is `evolve_from_hand` with the expected source/target payload and snapshot `97` exists; Tidewave postcheck confirmed both viewers at `Turn 12, action_window`, active Player 2, no prompts, Player 1 no legal actions, Player 2 only `Pass`, Player 2 hand count `2`, and Player 2 Bench slot `4` is Rabsca evolved from Rellor; `mix test test/prizmo/tcg_engine/mechanics_test.exs` passed with 9 tests and no failures; Tidewave error log check returned no errors.
+- Remaining/blocking notes: the shared MCP browser profile remained locked during this iteration, so a true UI click still needs confirmation when a browser context is available. Continue from the current post-event-97 Player 2 action-window state by executing `Pass` in an isolated/browser-available SPA context if possible, and avoid repeating the already-validated Player 2 `Evolve Pokémon` branch.
+
 ## [2026-05-31] iteration 156 | Player 1 Fighting Wings handoff
 - Task attempted: continued from current playtest game `f6df7025-7d0f-4d9b-9bc2-31c864de1d4e` at Player 1's post-event-89 action window by executing the same Ash domain command behind the SPA `Declare Fighting Wings` control.
 - Files changed: updated this log and the TCG engine playtest handoff; no product source changed.
