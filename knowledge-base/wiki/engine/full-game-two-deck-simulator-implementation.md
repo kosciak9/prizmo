@@ -1,6 +1,8 @@
 # Full-Game Two-Deck Simulator Implementation
 
-Updated: 2026-05-28
+- Updated: 2026-05-28
+- Sources: Project codebase; local validation
+- Raw: N/A — codebase update
 
 ## Scope
 
@@ -209,3 +211,9 @@ Full project validation also passed via `mix check`: 69 tests, 0 failures.
 - Continue replacing scripted draw/recovery effects with card-specific Supporter/Item implementations.
 - Add replacement Active prompt handling rather than direct action-only replacement.
 - Decide when repeated hard-coded card behavior should be extracted into macros or a DSL.
+
+## See Also
+
+- [Open-Deck RNG TCG Engine and Card-First Playtest UI North Star](ash-backed-tcg-engine-playtest-north-star.md)
+- [Card Engine Authoring Models](card-engine-authoring-models.md)
+- [Meta Deck, TCGdex, Card DSL, and LiveView Play North Star](meta-deck-card-dsl-north-star.md)

@@ -1,6 +1,8 @@
 # Card Engine Authoring Models
 
-Updated: 2026-05-27
+- Updated: 2026-05-27
+- Sources: Project research synthesis; external card engine repository research
+- Raw: N/A — codebase update
 
 ## Scope
 
@@ -196,3 +198,9 @@ For a future exact Standard-only Pokémon TCG simulator, the most promising auth
 - narrow typed effect DSLs only where they reduce repetition without hiding rules semantics.
 
 This remains a research stance, not an implementation decision.
+
+## See Also
+
+- [Open-Deck RNG TCG Engine and Card-First Playtest UI North Star](ash-backed-tcg-engine-playtest-north-star.md)
+- [Meta Deck, TCGdex, Card DSL, and LiveView Play North Star](meta-deck-card-dsl-north-star.md)
+- [Cross-Platform TCG Client Architecture](cross-platform-tcg-client-architecture.md)

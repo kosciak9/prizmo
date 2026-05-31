@@ -1,6 +1,8 @@
 # Meta Deck, TCGdex, Card DSL, and LiveView Play North Star
 
-Updated: 2026-05-30
+- Updated: 2026-05-30
+- Sources: Project codebase; Limitless deck lists; TCGdex API; local validation
+- Raw: N/A — codebase update
 
 Status: historical. This note captured the simulator-era north star. The current north star is [Ash-backed TCG Engine and Playtest UI North Star](ash-backed-tcg-engine-playtest-north-star.md), which makes `lib/prizmo/tcg_engine/` canonical and targets a playable React SPA playtest UI with an Electric Streams data-feed spike.
 
@@ -474,3 +476,9 @@ TCGdex API references:
 
 - https://api.tcgdex.net/v2/en/sets
 - `https://api.tcgdex.net/v2/en/cards/{tcgdex-card-id}` such as `https://api.tcgdex.net/v2/en/cards/sv05-123`
+
+## See Also
+
+- [Open-Deck RNG TCG Engine and Card-First Playtest UI North Star](ash-backed-tcg-engine-playtest-north-star.md)
+- [Full-Game Two-Deck Simulator Implementation](full-game-two-deck-simulator-implementation.md)
+- [Card Engine Authoring Models](card-engine-authoring-models.md)

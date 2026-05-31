@@ -1,6 +1,8 @@
 # Electric Streams documentation notes
 
+- Source: Multiple Electric documentation pages listed below
 - Collected: 2026-05-30
+- Published: Unknown
 - Type: direct documentation review
 - Scope: candidate durable game-data stream for a server-authoritative TCG engine and browser playtest UI
 

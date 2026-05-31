@@ -1,6 +1,8 @@
 # Open-Deck RNG TCG Engine and Card-First Playtest UI North Star
 
-Updated: 2026-06-01
+- Updated: 2026-06-01
+- Sources: Project codebase; local validation; wiki log; Electric documentation (2026-05-30)
+- Raw: [Electric Streams documentation notes](../../raw/engine/2026-05-30-electric-streams-docs.md)
 
 ## Scope
 
@@ -229,3 +231,10 @@ The first milestone is complete when two humans can create and play a supported 
 - Legacy simulator: reference only until useful scenarios are ported or deleted.
 - UI transport: do not revive the temporary Phoenix channel unless Electric or plain HTTP/SSE spikes fail.
 - UI layout work must benchmark Pokémon TCG and other TCG table layouts before substantial polish batches.
+
+## See Also
+
+- [Ash-backed TCG Engine Playtest Handoff](ash-backed-tcg-engine-playtest-handoff.md)
+- [Meta Deck, TCGdex, Card DSL, and LiveView Play North Star](meta-deck-card-dsl-north-star.md)
+- [Full-Game Two-Deck Simulator Implementation](full-game-two-deck-simulator-implementation.md)
+- [TCG Client Renderer Options](tcg-client-renderer-options.md)

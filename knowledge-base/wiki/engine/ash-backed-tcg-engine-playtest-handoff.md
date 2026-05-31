@@ -1,6 +1,8 @@
 # Ash-backed TCG Engine Playtest Handoff
 
-Updated: 2026-06-01
+- Updated: 2026-06-01
+- Sources: Project codebase; local validation; wiki log
+- Raw: N/A — operational handoff
 
 ## North-star reset handoff
 

@@ -1,6 +1,8 @@
 # Embedded Godot research for React web and React Native
 
+- Source: Multiple sources listed below
 - Collected: 2026-05-28
+- Published: Unknown
 - Type: direct source review plus explorer-agent synthesis
 - Scope: embedding Godot 4.x/GDScript as a renderer inside React web and React Native iOS/Android host apps
 

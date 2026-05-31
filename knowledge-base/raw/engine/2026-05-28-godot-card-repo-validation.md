@@ -1,6 +1,8 @@
 # Godot card repository validation
 
+- Source: Multiple sources listed below
 - Collected: 2026-05-28
+- Published: Unknown
 - Type: explorer-agent direct repo validation plus selected source checks
 - Scope: Godot card-game repos useful for a touch-first Pokémon-like renderer with existing server authority
 

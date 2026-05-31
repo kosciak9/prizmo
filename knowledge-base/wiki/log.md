@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-06-01] codebase update | Prizmo llm-wiki maintenance rules
+- Task attempted: aligned the local `llm-wiki` opencode skill and `AGENTS.md` with Prizmo's canonical `knowledge-base/` layout so future agents update wiki/log handoffs correctly during implementation work.
+- Files changed: updated `.opencode/skill/llm-wiki/SKILL.md`, added the skill reference templates, updated `AGENTS.md`, added the missing playtest handoff index entry, normalized wiki article metadata for engine handoff/north-star pages, and normalized multi-source raw research headers.
+- Validation: local wiki structure/link script passed for 20 indexed articles, article metadata, raw headers, skill template references, and wiki links; `git diff --check` passed; full `mix check` passed.
+- Remaining/blocking notes: future agents should use `knowledge-base/raw/`, `knowledge-base/wiki/`, and `knowledge-base/battle-logs/`; never create repo-root `raw/` or `wiki/` directories.
+
 ## [2026-06-01] north-star reset | Open-deck RNG and card-first play surface
 - Task attempted: reset the canonical TCG north star so looped agents understand the target product experience: arbitrary decklist game creation, engine-owned persisted RNG, and a dense card-first play surface for experienced Pokémon TCG players. Clarified that this is a direction, not a ban on fixture-backed engine validation.
 - Files changed: updated the canonical north-star article, the wiki index summary, this log, and the TCG engine playtest handoff selector guidance.

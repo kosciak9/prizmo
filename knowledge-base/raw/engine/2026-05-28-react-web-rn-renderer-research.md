@@ -1,6 +1,8 @@
 # React web and React Native renderer research
 
+- Source: Multiple sources listed below
 - Collected: 2026-05-28
+- Published: Unknown
 - Type: direct source review plus explorer-agent synthesis
 - Scope: renderer options for a server-authoritative Pokémon-like TCG with React web and React Native iOS/Android targets
 

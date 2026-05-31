@@ -22,6 +22,7 @@ Research notes for possible future rules-engine, simulator, replay, and card-beh
 | Article | Summary | Updated |
 | --- | --- | --- |
 | [Open-Deck RNG TCG Engine and Card-First Playtest UI North Star](engine/ash-backed-tcg-engine-playtest-north-star.md) | Current north-star plan for arbitrary decklist game creation, persisted engine-owned RNG, an experienced-player card-table React UI, required TCG layout benchmarking, and the later Electric Streams game-data feed spike. | 2026-06-01 |
+| [Ash-backed TCG Engine Playtest Handoff](engine/ash-backed-tcg-engine-playtest-handoff.md) | Current operational handoff for the long-lived Ash-backed TCG playtest game, including resume state, validation status, blockers, and the recommended next atomic task. | 2026-06-01 |
 | [Card Engine Authoring Models](engine/card-engine-authoring-models.md) | Comparison of code-first, generated-stub, Elixir macro DSL, hybrid metadata/behavior, and coverage-tooling patterns for exact Standard-only PTCG card behavior. | 2026-05-27 |
 | [Cross-Platform TCG Client Architecture](engine/cross-platform-tcg-client-architecture.md) | React web/RN app-shell architecture with embedded Godot as the shared gameplay renderer, including web, Android, and iOS integration risks. | 2026-05-28 |
 | [Full-Game Two-Deck Simulator Implementation](engine/full-game-two-deck-simulator-implementation.md) | Implementation notes for the ExUnit-first state-machine simulator slice, including undo/redo snapshots and fixed Dragapult vs Alakazam deck skeletons. | 2026-05-28 |
