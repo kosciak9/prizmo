@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-06-01] iteration 191 | Seeded setup randomness facts
+- Task attempted: closed part of the richer random/setup fact gap by making seeded coin tosses deterministic from persisted game RNG metadata and by recording hidden card-move payloads for opening hands, prize placement, and turn draws.
+- Files changed: updated `lib/prizmo/tcg_engine/rng.ex`, `lib/prizmo/tcg_engine/event_payloads.ex`, `lib/prizmo/tcg_engine/game_setup.ex`, `lib/prizmo/tcg_engine/flow/actions.ex`, `lib/prizmo/tcg_engine/mechanics.ex`, `test/prizmo/tcg_engine/mechanics_test.exs`, the canonical north-star article, this log, and the TCG engine playtest handoff.
+- Validation: `mix format`, `mix test test/prizmo/tcg_engine/mechanics_test.exs`, `mix compile --warnings-as-errors`, a Tidewave rollback eval, and final `mix check` passed. The rollback eval confirmed seeded coin-toss payloads include RNG context/algorithm/source but not `rng_seed`, and viewer-scoped `GameView` events still omit payloads.
+- Remaining/blocking notes: this improves replay/debug trust for seeded setup without changing public visibility. Remaining north-star gaps include mulligan/setup edge cases for arbitrary loaded decks, broader generic mechanics/card behavior, and benchmarked card-table UI density/polish.
+
 ## [2026-06-01] iteration 190 | Two-browser open-deck setup/action validation
 - Task attempted: validated the open-deck north-star path in two independent browser contexts instead of a single context or second tab, carrying a newly created explicit-seed game through setup, first action window, one UI `Pass`, reload recovery, and Player 2 Turn 2 priority.
 - Files changed: updated the canonical north-star article, this log, and the TCG engine playtest handoff; no product source changed.

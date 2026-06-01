@@ -32,11 +32,13 @@ defmodule Prizmo.TcgEngine.Flow.Actions do
 
   import Prizmo.TcgEngine.TurnStore, only: [current_turn: 1]
 
+  alias Prizmo.TcgEngine.EventPayloads
   alias Prizmo.TcgEngine.Flow.Context
   alias Prizmo.TcgEngine.Game
   alias Prizmo.TcgEngine.GamePlayer
   alias Prizmo.TcgEngine.GameSetup
   alias Prizmo.TcgEngine.Mechanics
+  alias Prizmo.TcgEngine.Rng
   alias Prizmo.TcgEngine.Setup
   alias Prizmo.TcgEngine.SetupStore
   alias Prizmo.TcgEngine.Turn
@@ -111,7 +113,7 @@ defmodule Prizmo.TcgEngine.Flow.Actions do
     with {:ok, call} <- call,
          :ok <- require_player(context, player_id),
          :ok <- require_no_coin_toss(context.game),
-         result = random_coin_face(),
+         {:ok, result} <- random_coin_face(context.game, player_id, call),
          winner_player_id = coin_toss_winner(context, player_id, call, result),
          {:ok, game} <-
            update(context.game, :record_coin_toss, %{
@@ -122,11 +124,12 @@ defmodule Prizmo.TcgEngine.Flow.Actions do
              coin_toss_winner_player_id: winner_player_id
            }),
          {:ok, event} <-
-           write_event(game, :coin_toss_resolved, player_id, %{
-             call: Atom.to_string(call),
-             result: Atom.to_string(result),
-             winner_player_id: winner_player_id
-           }),
+           write_event(
+             game,
+             :coin_toss_resolved,
+             player_id,
+             coin_toss_payload(game, player_id, call, result, winner_player_id)
+           ),
          {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do
       {:ok, game}
     end
@@ -160,11 +163,17 @@ defmodule Prizmo.TcgEngine.Flow.Actions do
     with {:ok, setup} <- SetupStore.get_setup(game.id),
          {:ok, setup} <- update(setup, :draw_opening_hand, %{}),
          :ok <- GameSetup.require_no_setup_cards_moved(game.id),
-         {:ok, _cards} <- GameSetup.draw_opening_cards(game.id),
+         {:ok, player_hand_facts} <- GameSetup.draw_opening_cards(game.id),
          :ok <- require_no_prizes_placed(game.id),
          {:ok, game} <-
            update(game, :set_flow_state, %{flow_state: :setup_choosing_opening_active}),
-         {:ok, event} <- write_event(game, :opening_hands_drawn, nil, %{setup_id: setup.id}),
+         {:ok, event} <-
+           write_event(
+             game,
+             :opening_hands_drawn,
+             nil,
+             setup_move_payload(setup, player_hand_facts)
+           ),
          {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do
       {:ok, game}
     end
@@ -247,9 +256,10 @@ defmodule Prizmo.TcgEngine.Flow.Actions do
          :ok <- require_all_players_have_active(game.id),
          :ok <- require_no_prizes_placed(game.id),
          {:ok, setup} <- update(setup, :place_prizes, %{}),
-         {:ok, _cards} <- GameSetup.place_prize_cards(game.id),
+         {:ok, player_prize_facts} <- GameSetup.place_prize_cards(game.id),
          {:ok, game} <- update(game, :set_flow_state, %{flow_state: :setup_completing_setup}),
-         {:ok, event} <- write_event(game, :prizes_placed, nil, %{setup_id: setup.id}),
+         {:ok, event} <-
+           write_event(game, :prizes_placed, nil, setup_move_payload(setup, player_prize_facts)),
          {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do
       {:ok, game}
     end
@@ -291,11 +301,14 @@ defmodule Prizmo.TcgEngine.Flow.Actions do
     with {:ok, turn} <- current_turn(game.id),
          {:ok, turn} <- update(turn, :draw_for_turn, %{}) do
       case draw_one_for_turn(game.id, turn.active_player_id) do
-        {:ok, _card} ->
+        {:ok, drawn_card} ->
           with {:ok, game} <-
                  update(game, :set_flow_state, %{flow_state: :turn_opening_action_window}),
                {:ok, event} <-
-                 write_event(game, :turn_card_drawn, turn.active_player_id, %{turn_id: turn.id}),
+                 write_event(game, :turn_card_drawn, turn.active_player_id, %{
+                   turn_id: turn.id,
+                   card: [drawn_card] |> EventPayloads.moved_cards(:deck, :hand) |> List.first()
+                 }),
                {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do
             {:ok, game}
           end
@@ -389,9 +402,44 @@ defmodule Prizmo.TcgEngine.Flow.Actions do
   defp normalize_coin_face("tails"), do: {:ok, :tails}
   defp normalize_coin_face(face), do: {:error, {:invalid_coin_call, face}}
 
-  defp random_coin_face do
-    Enum.random(@coin_faces)
+  defp random_coin_face(%Game{rng_seed: seed}, player_id, call) when is_binary(seed) do
+    Rng.choice(@coin_faces, seed, coin_toss_rng_context(player_id, call))
   end
+
+  defp random_coin_face(%Game{}, _player_id, _call) do
+    {:ok, Enum.random(@coin_faces)}
+  end
+
+  defp coin_toss_payload(%Game{} = game, player_id, call, result, winner_player_id) do
+    payload = %{
+      call: Atom.to_string(call),
+      result: Atom.to_string(result),
+      winner_player_id: winner_player_id
+    }
+
+    case game.rng_seed do
+      seed when is_binary(seed) ->
+        Map.merge(payload, %{
+          rng_algorithm: game.rng_algorithm || Rng.algorithm(),
+          rng_context: coin_toss_rng_context_label(player_id, call),
+          rng_seed_source: game.rng_seed_source
+        })
+
+      _seed ->
+        payload
+    end
+  end
+
+  defp setup_move_payload(%Setup{} = setup, player_facts) do
+    %{
+      setup_id: setup.id,
+      players: player_facts
+    }
+  end
+
+  defp coin_toss_rng_context(player_id, call), do: {:coin_toss, player_id, call}
+
+  defp coin_toss_rng_context_label(player_id, call), do: "coin_toss:#{player_id}:#{call}"
 
   defp coin_toss_winner(%Context{} = context, calling_player_id, call, result) do
     if call == result do

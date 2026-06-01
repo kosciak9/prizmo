@@ -24,6 +24,14 @@ defmodule Prizmo.TcgEngine.Rng do
 
   def normalize_seed(seed), do: {:error, {:invalid_rng_seed, seed}}
 
+  def choice([], _seed, _context), do: {:error, :empty_random_choice}
+
+  def choice(items, seed, context) when is_list(items) and is_binary(seed) do
+    {index, _state} = :rand.uniform_s(length(items), seed_state(seed, context))
+
+    {:ok, Enum.at(items, index - 1)}
+  end
+
   def shuffle(items, seed, context) when is_list(items) and is_binary(seed) do
     {shuffled, _state} =
       Enum.reduce(items, {[], seed_state(seed, context)}, fn item, {acc, state} ->

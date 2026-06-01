@@ -7,6 +7,7 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
   alias Prizmo.TcgEngine.CardInstance
   alias Prizmo.TcgEngine.GameEvent
   alias Prizmo.TcgEngine.GameSnapshot
+  alias Prizmo.TcgEngine.GameView
   alias Prizmo.TcgEngine.Mechanics
   alias Prizmo.TcgEngine.PendingEffect
   alias Prizmo.TcgEngine.Prompt
@@ -53,6 +54,31 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
       assert snapshot_indexes(game.id) == [0, 1, 2, 3]
     end
 
+    test "seeded games resolve coin toss from persisted RNG without publishing the seed" do
+      {:ok, game_a} = create_seeded_game("coin-toss-seed")
+      {:ok, game_b} = create_seeded_game("coin-toss-seed")
+
+      assert {:ok, game_a} = Mechanics.call_coin_toss(game_a, "player_1", :heads)
+      assert {:ok, game_b} = Mechanics.call_coin_toss(game_b, "player_1", :heads)
+
+      assert game_a.coin_toss_result == game_b.coin_toss_result
+      assert game_a.coin_toss_winner_player_id == game_b.coin_toss_winner_player_id
+
+      event = event_by_type(game_a.id, "coin_toss_resolved")
+      assert event.payload["call"] == "heads"
+      assert event.payload["result"] == Atom.to_string(game_a.coin_toss_result)
+      assert event.payload["rng_algorithm"] == "exsss"
+      assert event.payload["rng_context"] == "coin_toss:player_1:heads"
+      assert event.payload["rng_seed_source"] == "explicit"
+      refute Map.has_key?(event.payload, "rng_seed")
+
+      assert {:ok, view} = GameView.for_player(game_a.id, "player_1")
+      refute Map.has_key?(view, :rng_seed)
+
+      coin_toss_event_view = Enum.find(view.events, &(&1.type == "coin_toss_resolved"))
+      refute Map.has_key?(coin_toss_event_view, :payload)
+    end
+
     test "only the coin toss winner can choose who starts" do
       {:ok, game} = create_game()
       {:ok, game} = Mechanics.call_coin_toss(game, "player_1", :heads)
@@ -97,6 +123,18 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
                "turn_card_drawn",
                "action_window_opened"
              ]
+
+      assert_setup_move_payload(event_by_type(game.id, "opening_hands_drawn").payload, "hand", 7)
+      assert_setup_move_payload(event_by_type(game.id, "prizes_placed").payload, "prize", 6)
+
+      assert %{"card" => drawn_card, "turn_id" => turn_id} =
+               event_by_type(game.id, "turn_card_drawn").payload
+
+      assert turn_id == current_turn(game.id).id
+      assert drawn_card["owner_player_id"] == "player_1"
+      assert drawn_card["from_zone"] == "deck"
+      assert drawn_card["to_zone"] == "hand"
+      assert drawn_card["to_position"] == 7
     end
 
     test "pass ends the current turn and automatically opens the opponent action window" do
@@ -300,6 +338,17 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
     ])
   end
 
+  defp create_seeded_game(seed) do
+    Mechanics.create_game(
+      [
+        {"player_1", Alakazam27147},
+        {"player_2", Dragapult27431}
+      ],
+      rng_seed: seed,
+      rng_seed_source: "explicit"
+    )
+  end
+
   defp create_flow_action_window_game(opts \\ []) do
     with {:ok, game} <- create_game(),
          {:ok, game} <- Mechanics.call_coin_toss(game, "player_1", :heads),
@@ -467,6 +516,32 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
     |> Ash.Query.sort(index: :asc)
     |> Ash.read!()
     |> Enum.map(& &1.type)
+  end
+
+  defp event_by_type(game_id, type) do
+    GameEvent
+    |> Ash.Query.filter(game_id == ^game_id and type == ^type)
+    |> Ash.Query.sort(index: :asc)
+    |> Ash.read!()
+    |> List.first()
+  end
+
+  defp assert_setup_move_payload(payload, to_zone, card_count) do
+    assert is_binary(payload["setup_id"])
+
+    players = Enum.sort_by(payload["players"], & &1["player_id"])
+    assert Enum.map(players, & &1["player_id"]) == ["player_1", "player_2"]
+
+    for player <- players do
+      assert player["card_count"] == card_count
+      assert length(player["cards"]) == card_count
+
+      assert Enum.map(player["cards"], & &1["to_position"]) == Enum.to_list(1..card_count)
+
+      assert Enum.all?(player["cards"], &(&1["owner_player_id"] == player["player_id"]))
+      assert Enum.all?(player["cards"], &(&1["from_zone"] == "deck"))
+      assert Enum.all?(player["cards"], &(&1["to_zone"] == to_zone))
+    end
   end
 
   defp snapshot_indexes(game_id) do

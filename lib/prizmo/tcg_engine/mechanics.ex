@@ -79,6 +79,7 @@ defmodule Prizmo.TcgEngine.Mechanics do
   alias Prizmo.TcgEngine.CardPlay
   alias Prizmo.TcgEngine.Cards.Registry, as: EngineCardRegistry
   alias Prizmo.TcgEngine.ChoiceValidator
+  alias Prizmo.TcgEngine.EventPayloads
   alias Prizmo.TcgEngine.Flow.Interpreter, as: FlowInterpreter
   alias Prizmo.TcgEngine.Game
   alias Prizmo.TcgEngine.GameSetup
@@ -192,8 +193,14 @@ defmodule Prizmo.TcgEngine.Mechanics do
            {:ok, setup} <- get_setup(game.id),
            {:ok, setup} <- update(setup, :draw_opening_hand, %{}),
            :ok <- GameSetup.require_no_setup_cards_moved(game.id),
-           {:ok, _cards} <- GameSetup.draw_opening_cards(game.id),
-           {:ok, event} <- write_event(game, :draw_opening_hand, nil, %{setup_id: setup.id}),
+           {:ok, player_hand_facts} <- GameSetup.draw_opening_cards(game.id),
+           {:ok, event} <-
+             write_event(
+               game,
+               :draw_opening_hand,
+               nil,
+               setup_move_payload(setup, player_hand_facts)
+             ),
            {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do
         get_game(game.id)
       end
@@ -297,8 +304,9 @@ defmodule Prizmo.TcgEngine.Mechanics do
            :ok <- require_all_players_have_active(game.id),
            :ok <- require_no_prizes_placed(game.id),
            {:ok, setup} <- update(setup, :place_prizes, %{}),
-           {:ok, _cards} <- GameSetup.place_prize_cards(game.id),
-           {:ok, event} <- write_event(game, :place_prizes, nil, %{setup_id: setup.id}),
+           {:ok, player_prize_facts} <- GameSetup.place_prize_cards(game.id),
+           {:ok, event} <-
+             write_event(game, :place_prizes, nil, setup_move_payload(setup, player_prize_facts)),
            {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do
         get_game(game.id)
       end
@@ -1943,6 +1951,13 @@ defmodule Prizmo.TcgEngine.Mechanics do
   defp maybe_put(map, _key, nil), do: map
   defp maybe_put(map, key, value), do: Map.put(map, key, value)
 
+  defp setup_move_payload(%Setup{} = setup, player_facts) do
+    %{
+      setup_id: setup.id,
+      players: player_facts
+    }
+  end
+
   @spec draw_for_turn(Game.t() | String.t(), String.t()) :: {:ok, Game.t()} | {:error, term()}
   def draw_for_turn(game_or_id, player_id) when is_binary(player_id) do
     transaction(fn ->
@@ -1953,8 +1968,12 @@ defmodule Prizmo.TcgEngine.Mechanics do
            :ok <- require_turn_player(turn, player_id),
            {:ok, turn} <- update(turn, :draw_for_turn, %{}) do
         case draw_one_for_turn(game.id, player_id) do
-          {:ok, _card} ->
-            with {:ok, event} <- write_event(game, :draw_for_turn, player_id, %{turn_id: turn.id}),
+          {:ok, drawn_card} ->
+            with {:ok, event} <-
+                   write_event(game, :draw_for_turn, player_id, %{
+                     turn_id: turn.id,
+                     card: [drawn_card] |> EventPayloads.moved_cards(:deck, :hand) |> List.first()
+                   }),
                  {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do
               get_game(game.id)
             end

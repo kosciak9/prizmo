@@ -5,6 +5,7 @@ defmodule Prizmo.TcgEngine.GameSetup do
 
   alias Prizmo.TcgEngine.CardInstance
   alias Prizmo.TcgEngine.CardStore
+  alias Prizmo.TcgEngine.EventPayloads
   alias Prizmo.TcgEngine.Game
   alias Prizmo.TcgEngine.GamePlayer
   alias Prizmo.TcgEngine.PlayerStore
@@ -149,6 +150,7 @@ defmodule Prizmo.TcgEngine.GameSetup do
         update(card, :draw_to_hand, %{position: hand_position})
       end)
       |> collect_results()
+      |> move_fact(player.player_id, :deck, :hand)
     end
   end
 
@@ -160,8 +162,20 @@ defmodule Prizmo.TcgEngine.GameSetup do
         update(card, :place_prize, %{position: prize_position})
       end)
       |> collect_results()
+      |> move_fact(player.player_id, :deck, :prize)
     end
   end
+
+  defp move_fact({:ok, cards}, player_id, from_zone, to_zone) do
+    {:ok,
+     %{
+       player_id: player_id,
+       card_count: length(cards),
+       cards: EventPayloads.moved_cards(cards, from_zone, to_zone)
+     }}
+  end
+
+  defp move_fact({:error, reason}, _player_id, _from_zone, _to_zone), do: {:error, reason}
 
   defp collect_results(results) do
     results

@@ -12,8 +12,10 @@ defmodule Prizmo.TcgEngine.EventPayloads do
       %{
         instance_id: card.id,
         card_id: card.card_id,
+        owner_player_id: card.owner_player_id,
         from_zone: from_zone,
-        to_zone: to_zone
+        to_zone: to_zone,
+        to_position: card.position
       }
     end)
   end
