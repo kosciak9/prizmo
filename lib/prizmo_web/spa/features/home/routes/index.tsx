@@ -8845,7 +8845,7 @@ function promptGuidanceMessages(
 ) {
   if (choiceKey === 'search_basic_energy_split_hand_attach_to_pokemon') {
     return [
-      'Choose two Basic Energy cards of different types from deck plus one of your Pokémon. Selection order matters: first Energy goes to hand, second Energy attaches to the chosen Pokémon.',
+      'Choose one Basic Energy to put into hand, or choose two Basic Energy cards of different types plus one of your Pokémon. Selection order matters: first Energy goes to hand, second Energy attaches to the chosen Pokémon.',
       `This prompt accepts ${promptChoiceInstruction(min, max)} from ${legalChoiceCount} legal Energy or Pokémon choices.`
     ]
   }

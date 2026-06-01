@@ -350,23 +350,19 @@ defmodule Prizmo.TcgEngine.CardPlay do
            validate_crispin_effect(game.id, player.player_id, effect, target_ids),
          {:ok, moved_hand_energy_card} <-
            CardStore.move_deck_card_to_hand(game.id, player.player_id, hand_energy_card),
-         {:ok, position} <- CardStore.next_attachment_position(game.id, target_card.id),
          {:ok, moved_attached_energy_card} <-
-           update(attach_energy_card, :attach_from_deck, %{
-             attached_to_card_instance_id: target_card.id,
-             position: position
-           }),
+           maybe_attach_crispin_energy(game, attach_energy_card, target_card),
          {:ok, _event} <-
            write_event_and_snapshot(game.id, :cards_moved, player.player_id, %{
              reason: :effect_resolution,
              source: EventPayloads.card_source(card),
              effect_key: effect.key,
-             cards: [
-               moved_card_payload(moved_hand_energy_card, :deck, :hand),
-               moved_card_payload(moved_attached_energy_card, :deck, :attached,
-                 to_attached_to_card_instance_id: target_card.id
+             cards:
+               crispin_moved_card_payloads(
+                 moved_hand_energy_card,
+                 moved_attached_energy_card,
+                 target_card
                )
-             ]
            }),
          {:ok, _event} <- maybe_shuffle_and_write_deck_shuffled(game, turn, player, card, effect) do
       complete_play_card_resolution(game, turn, player, card, effect)
@@ -693,11 +689,8 @@ defmodule Prizmo.TcgEngine.CardPlay do
 
   defp validate_crispin_effect(game_id, player_id, effect, target_ids) do
     with {:ok, target_ids} <- EffectRunner.validate_choice_selection(effect, target_ids),
-         {:ok, target_cards} <- CardStore.get_cards(game_id, target_ids),
-         {:ok, {hand_energy_card, attach_energy_card, target_card}} <-
-           selected_crispin_cards(target_cards, player_id),
-         :ok <- require_different_basic_energy_types(hand_energy_card, attach_energy_card) do
-      {:ok, {hand_energy_card, attach_energy_card, target_card}}
+         {:ok, target_cards} <- CardStore.get_cards(game_id, target_ids) do
+      selected_crispin_cards(target_cards, player_id)
     end
   end
 
@@ -924,6 +917,11 @@ defmodule Prizmo.TcgEngine.CardPlay do
       |> ChoiceValidator.max_count_for(choice_key)
       |> min(length(legal_choice_ids))
       |> maybe_cap_bench_choice_max(game_id, player_id, effect_step(definition, choice_key))
+      |> maybe_cap_crispin_choice_max(
+        game_id,
+        effect_step(definition, choice_key),
+        legal_choice_ids
+      )
 
     {min, max}
   end
@@ -936,6 +934,27 @@ defmodule Prizmo.TcgEngine.CardPlay do
   end
 
   defp maybe_cap_bench_choice_max(max, _game_id, _player_id, _choice_step), do: max
+
+  defp maybe_cap_crispin_choice_max(
+         max,
+         game_id,
+         %{type: :search_basic_energy_split_hand_attach},
+         legal_choice_ids
+       ) do
+    case CardStore.get_cards(game_id, legal_choice_ids) do
+      {:ok, cards} ->
+        if Enum.any?(cards, &(&1.zone in [:active, :bench])) do
+          max
+        else
+          min(max, 1)
+        end
+
+      {:error, _reason} ->
+        max
+    end
+  end
+
+  defp maybe_cap_crispin_choice_max(max, _game_id, _choice_step, _legal_choice_ids), do: max
 
   defp search_deck_choice_cards(cards, player_id, choice_step) do
     choices =
@@ -981,15 +1000,16 @@ defmodule Prizmo.TcgEngine.CardPlay do
     energy_cards = crispin_basic_energy_choice_cards(cards, player_id)
     target_cards = crispin_target_choice_cards(cards, player_id)
 
-    if crispin_has_different_energy_types?(energy_cards) and target_cards != [] do
-      legal_energy_cards =
-        Enum.filter(energy_cards, fn energy_card ->
-          Enum.any?(energy_cards, &different_basic_energy_type?(energy_card, &1))
-        end)
+    legal_target_cards =
+      if crispin_has_different_energy_types?(energy_cards) and target_cards != [] do
+        target_cards
+      else
+        []
+      end
 
-      legal_energy_cards ++ target_cards
-    else
-      []
+    case energy_cards do
+      [] -> []
+      legal_energy_cards -> legal_energy_cards ++ legal_target_cards
     end
   end
 
@@ -1307,15 +1327,6 @@ defmodule Prizmo.TcgEngine.CardPlay do
     |> Kernel.>=(2)
   end
 
-  defp different_basic_energy_type?(%CardInstance{id: id}, %CardInstance{id: id}), do: false
-
-  defp different_basic_energy_type?(%CardInstance{} = left, %CardInstance{} = right) do
-    case {basic_energy_type(left), basic_energy_type(right)} do
-      {{:ok, left_type}, {:ok, right_type}} -> left_type != right_type
-      _other -> false
-    end
-  end
-
   defp basic_energy_type(%CardInstance{card_id: card_id}) do
     case CardCatalog.fetch(card_id) do
       {:ok, %{supertype: :energy, energy_type: :basic, provides: [type | _types]}}
@@ -1341,16 +1352,24 @@ defmodule Prizmo.TcgEngine.CardPlay do
     target_cards = Enum.filter(cards, &crispin_target_card?(&1, player_id))
 
     case {energy_cards, target_cards} do
-      {[hand_energy_card, attach_energy_card], [target_card]} ->
-        {:ok, {hand_energy_card, attach_energy_card, target_card}}
+      {[hand_energy_card], []} ->
+        {:ok, {hand_energy_card, nil, nil}}
 
-      {[], [_target_card]} ->
+      {[hand_energy_card, attach_energy_card], [target_card]} ->
+        with :ok <- require_different_basic_energy_types(hand_energy_card, attach_energy_card) do
+          {:ok, {hand_energy_card, attach_energy_card, target_card}}
+        end
+
+      {[], _target_cards} ->
         {:error, :missing_crispin_energy_choices}
 
       {[_energy_card], [_target_card]} ->
-        {:error, :missing_crispin_second_energy_choice}
+        {:error, :crispin_single_energy_choice_cannot_attach}
 
-      {energy_cards, [_target_card]} when length(energy_cards) > 2 ->
+      {[_energy_card], target_cards} when length(target_cards) > 1 ->
+        {:error, {:too_many_crispin_target_pokemon, length(target_cards)}}
+
+      {energy_cards, _target_cards} when length(energy_cards) > 2 ->
         {:error, {:too_many_crispin_energy_choices, length(energy_cards)}}
 
       {[_energy_card, _attach_energy_card], []} ->
@@ -1500,6 +1519,38 @@ defmodule Prizmo.TcgEngine.CardPlay do
     with {:ok, position} <- CardStore.next_discard_position(game.id, card.owner_player_id) do
       update(card, :discard, %{position: position, attached_to_card_instance_id: nil})
     end
+  end
+
+  defp maybe_attach_crispin_energy(_game, nil, nil), do: {:ok, nil}
+
+  defp maybe_attach_crispin_energy(
+         %Game{} = game,
+         %CardInstance{} = energy_card,
+         %CardInstance{} = target_card
+       ) do
+    with {:ok, position} <- CardStore.next_attachment_position(game.id, target_card.id) do
+      update(energy_card, :attach_from_deck, %{
+        attached_to_card_instance_id: target_card.id,
+        position: position
+      })
+    end
+  end
+
+  defp crispin_moved_card_payloads(moved_hand_energy_card, nil, nil) do
+    [moved_card_payload(moved_hand_energy_card, :deck, :hand)]
+  end
+
+  defp crispin_moved_card_payloads(
+         moved_hand_energy_card,
+         moved_attached_energy_card,
+         %CardInstance{} = target_card
+       ) do
+    [
+      moved_card_payload(moved_hand_energy_card, :deck, :hand),
+      moved_card_payload(moved_attached_energy_card, :deck, :attached,
+        to_attached_to_card_instance_id: target_card.id
+      )
+    ]
   end
 
   defp rare_candy_evolution_payloads(
@@ -1692,7 +1743,7 @@ defmodule Prizmo.TcgEngine.CardPlay do
       id: card.id,
       label: card_name(card, card.card_id),
       detail:
-        "Basic Energy in deck. Select two different types; the first selected Energy goes to hand and the second attaches."
+        "Basic Energy in deck. Select one to add to hand, or choose two different types plus a target Pokémon to attach the second."
     }
   end
 
@@ -1700,7 +1751,7 @@ defmodule Prizmo.TcgEngine.CardPlay do
     %{
       id: card.id,
       label: card_name(card, card.card_id),
-      detail: "Target Pokémon in #{Atom.to_string(card.zone)} for the second selected Energy."
+      detail: "Target Pokémon in #{Atom.to_string(card.zone)} for a second selected Energy."
     }
   end
 

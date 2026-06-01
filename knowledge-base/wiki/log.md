@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-06-01] iteration 213 | Partial Crispin search
+- Task attempted: advanced arbitrary-deck Supporter playability by completing Crispin's partial one-Basic-Energy use while preserving the existing two-different-Basic-Energy search/attach path.
+- Files changed: updated `lib/prizmo/tcg_engine/cards/registry.ex`, `lib/prizmo/tcg_engine/card_play.ex`, `lib/prizmo_web/spa/features/home/routes/index.tsx`, the canonical north-star article, this log, and the TCG engine playtest handoff.
+- Validation: `mix format`, `mix compile --warnings-as-errors`, `mix test test/prizmo/tcg_engine/mechanics_test.exs`, `node_modules/.bin/tsc --noEmit --ignoreDeprecations 6.0`, `git diff --check`, rollback Tidewave validation, and final `mix check` passed. Rollback validation confirmed one-Energy Crispin exposes a min/max `1/1` prompt, resolves by moving exactly one Basic Energy from deck to hand with no attachment, completes the pending effect, and rolls back; it also confirmed the full two-Energy-plus-target path still moves one Energy to hand and attaches the second from deck.
+- Remaining/blocking notes: this closes the documented partial Crispin gap. Festival Grounds-style Stadium condition/prevention semantics, other printed Tool/Stadium effects, and the benchmarked card-table density/polish batch remain open.
+
 ## [2026-06-01] iteration 212 | Air Balloon retreat reduction
 - Task attempted: advanced arbitrary-deck Tool playability by turning Air Balloon's existing authored retreat-cost-reduction overlay into executable Ash-engine behavior for retreat commands, viewer affordances, event payloads, and card rules summaries.
 - Files changed: added `lib/prizmo/tcg_engine/tool_effects.ex` and `lib/prizmo/tcg_engine/retreat_costs.ex`; updated `lib/prizmo/tcg_engine/mechanics.ex`, `lib/prizmo/tcg_engine/game_view/action_affordances.ex`, `lib/prizmo/tcg_engine/game_view.ex`, the canonical north-star article, this log, and the TCG engine playtest handoff.

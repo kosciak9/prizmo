@@ -14,7 +14,7 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
       %Effect{
         key: :search_basic_energy_split_hand_attach_to_pokemon,
         type: :search_basic_energy_split_hand_attach,
-        params: %{count: 3, shuffle_after: true}
+        params: %{min_count: 1, max_count: 3, shuffle_after: true}
       }
     ]
   }
