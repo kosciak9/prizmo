@@ -17,6 +17,11 @@ defmodule Prizmo.TcgEngine.Flow.Machine do
       action: :choose_setup_active,
       target: :setup_choosing_opening_active
     },
+    mulligan_opening_hand: %{
+      from: :setup_choosing_opening_active,
+      action: :mulligan_opening_hand,
+      target: :setup_choosing_opening_active
+    },
     choose_setup_bench: %{
       from: :setup_choosing_opening_bench,
       action: :choose_setup_bench,

@@ -200,6 +200,32 @@ defmodule Prizmo.TcgEngine.Flow.Actions do
     end
   end
 
+  def mulligan_opening_hand(%Context{game: %Game{} = game} = context, attrs) do
+    player_id = Map.fetch!(attrs, :player_id)
+
+    with :ok <- require_player(context, player_id),
+         :ok <- require_setup_player_not_ready(context, player_id),
+         :ok <- require_no_active(game.id, player_id),
+         {:ok, setup} <- SetupStore.require_setup_status(game.id, :hands_drawn),
+         {:ok, false} <- GameSetup.opening_hand_has_basic?(game.id, player_id),
+         %GamePlayer{} = player <- player(context, player_id),
+         {:ok, mulligan_fact} <- GameSetup.mulligan_opening_hand(game, player),
+         {:ok, event} <-
+           write_event(
+             game,
+             :opening_hand_mulligan,
+             player_id,
+             setup_mulligan_payload(setup, mulligan_fact)
+           ),
+         {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do
+      {:ok, game}
+    else
+      {:ok, true} -> {:error, :opening_hand_has_basic}
+      nil -> {:error, :player_not_found}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
   def open_setup_bench_choices(%Context{game: %Game{} = game}, _attrs) do
     with {:ok, game} <-
            update(game, :set_flow_state, %{flow_state: :setup_choosing_opening_bench}),
@@ -435,6 +461,10 @@ defmodule Prizmo.TcgEngine.Flow.Actions do
       setup_id: setup.id,
       players: player_facts
     }
+  end
+
+  defp setup_mulligan_payload(%Setup{} = setup, mulligan_fact) do
+    Map.put(mulligan_fact, :setup_id, setup.id)
   end
 
   defp coin_toss_rng_context(player_id, call), do: {:coin_toss, player_id, call}

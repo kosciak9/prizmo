@@ -23,6 +23,7 @@ import {
   runGetTcgEngineGameState,
   runListTcgEngineGames,
   runListSupportedTcgDecks,
+  runMulliganTcgEngineOpeningHand,
   runOpenTcgEngineActionWindow,
   runPassTcgEngineTurn,
   runPlaceTcgEnginePrizes,
@@ -526,6 +527,11 @@ type PlayBasicToBenchCommand = {
   cardInstanceId: string
 }
 
+type MulliganOpeningHandInput = {
+  gameId: string
+  playerId: PlayerId
+}
+
 type EvolveFromHandInput = {
   gameId: string
   playerId: PlayerId
@@ -851,6 +857,13 @@ export function HomeRoute() {
     }
   })
 
+  const mulliganOpeningHandMutation = useMutation({
+    mutationFn: (input: MulliganOpeningHandInput) => mulliganOpeningHand(input),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['tcg-engine', 'game-state'] })
+    }
+  })
+
   const chooseSetupBenchMutation = useMutation({
     mutationFn: (input: { gameId: string; playerId: PlayerId; cardInstanceId: string }) =>
       chooseSetupBenchFromHand(input),
@@ -1080,6 +1093,11 @@ export function HomeRoute() {
       chooseActiveMutation.error,
       'Setup Active choice failed',
       'No Active Pokémon was chosen. Confirm the selected card is still a visible Basic in this viewer hand, then retry.'
+    ) ??
+    commandErrorNotice(
+      mulliganOpeningHandMutation.error,
+      'Opening mulligan failed',
+      'The opening hand was not redrawn. Retry only when this viewer has no visible Basic before choosing an Active Pokémon.'
     ) ??
     commandErrorNotice(
       chooseSetupBenchMutation.error,
@@ -1485,6 +1503,14 @@ export function HomeRoute() {
                     })
                   }
                 }}
+                onMulliganOpeningHand={({ playerId }) => {
+                  if (isPlayerId(playerId)) {
+                    mulliganOpeningHandMutation.mutate({
+                      gameId: normalisedGameId,
+                      playerId
+                    })
+                  }
+                }}
                 onChooseSetupBench={({ playerId, cardInstanceId }) => {
                   if (isPlayerId(playerId)) {
                     chooseSetupBenchMutation.mutate({
@@ -1644,6 +1670,11 @@ export function HomeRoute() {
                 }
                 chooseSetupActivePendingCardId={
                   chooseActiveMutation.isPending ? chooseActiveMutation.variables?.cardInstanceId ?? null : null
+                }
+                mulliganOpeningHandPendingPlayerId={
+                  mulliganOpeningHandMutation.isPending
+                    ? mulliganOpeningHandMutation.variables?.playerId ?? null
+                    : null
                 }
                 chooseSetupBenchPendingCardId={
                   chooseSetupBenchMutation.isPending ? chooseSetupBenchMutation.variables?.cardInstanceId ?? null : null
@@ -2019,6 +2050,20 @@ async function chooseActiveFromHand(input: {
   return result.data as CreatedGame
 }
 
+async function mulliganOpeningHand(input: MulliganOpeningHandInput): Promise<CreatedGame> {
+  const result = await runMulliganTcgEngineOpeningHand({
+    input,
+    fields: GAME_RESOURCE_FIELDS,
+    headers: buildAshRpcHeaders()
+  })
+
+  if (!result.success) {
+    throw new Error(rpcErrorMessage(result.errors))
+  }
+
+  return result.data as CreatedGame
+}
+
 async function chooseSetupBenchFromHand(input: {
   gameId: string
   playerId: PlayerId
@@ -2317,6 +2362,7 @@ function GameStateWorkbench({
   onChooseSetupActive,
   onChooseSetupBench,
   onChooseStartingPlayer,
+  onMulliganOpeningHand,
   onChoosePrompt,
   onChooseReplacementActive,
   onAttachEnergy,
@@ -2341,6 +2387,7 @@ function GameStateWorkbench({
   evolveFromHandPendingKey,
   finishAttackPendingPlayerId,
   finishSetupChoicesPending,
+  mulliganOpeningHandPendingPlayerId,
   undoPending,
   playBasicToBenchPendingCardId,
   promptPendingId,
@@ -2361,6 +2408,7 @@ function GameStateWorkbench({
   onChooseSetupActive: (input: SetupCardCommand) => void
   onChooseSetupBench: (input: SetupCardCommand) => void
   onChooseStartingPlayer: (input: ChooseStartingPlayerCommand) => void
+  onMulliganOpeningHand: (input: TurnPlayerCommand) => void
   onChoosePrompt: (input: ChoosePromptCommand) => void
   onChooseReplacementActive: (input: ChooseReplacementActiveCommand) => void
   onAttachEnergy: (input: AttachEnergyCommand) => void
@@ -2385,6 +2433,7 @@ function GameStateWorkbench({
   evolveFromHandPendingKey: string | null
   finishAttackPendingPlayerId: string | null
   finishSetupChoicesPending: boolean
+  mulliganOpeningHandPendingPlayerId: string | null
   undoPending: boolean
   playBasicToBenchPendingCardId: string | null
   promptPendingId: string | null
@@ -2460,6 +2509,8 @@ function GameStateWorkbench({
             onChooseSetupBench={onChooseSetupBench}
             onChooseStartingPlayer={onChooseStartingPlayer}
             onFinishSetupChoices={onFinishSetupChoices}
+            onMulliganOpeningHand={onMulliganOpeningHand}
+            mulliganOpeningHandPendingPlayerId={mulliganOpeningHandPendingPlayerId}
             viewerPlayerId={viewerPlayerId}
           />
 
@@ -2857,6 +2908,8 @@ function GameFlowPanel({
   onChooseSetupBench,
   onChooseStartingPlayer,
   onFinishSetupChoices,
+  onMulliganOpeningHand,
+  mulliganOpeningHandPendingPlayerId,
   viewerPlayerId
 }: {
   callCoinTossPending: boolean
@@ -2871,6 +2924,8 @@ function GameFlowPanel({
   onChooseSetupBench: (input: SetupCardCommand) => void
   onChooseStartingPlayer: (input: ChooseStartingPlayerCommand) => void
   onFinishSetupChoices: (input: TurnPlayerCommand) => void
+  onMulliganOpeningHand: (input: TurnPlayerCommand) => void
+  mulliganOpeningHandPendingPlayerId: string | null
   viewerPlayerId: PlayerId
 }) {
   const viewerPlayer = gameState.players.find(player => player.playerId === viewerPlayerId)
@@ -2907,6 +2962,16 @@ function GameFlowPanel({
       setupActiveCandidates.length > 0 &&
       !chooseSetupActivePendingCardId
   )
+  const viewerNeedsOpeningMulligan = Boolean(
+    choosingSetupActive &&
+      viewerPlayer &&
+      !viewerPlayer.setupReady &&
+      !viewerPlayer.active &&
+      viewerPlayer.hand.length > 0 &&
+      setupActiveCandidates.length === 0
+  )
+  const mulliganOpeningHandPending = mulliganOpeningHandPendingPlayerId === viewerPlayerId
+  const canMulliganOpeningHand = viewerNeedsOpeningMulligan && !mulliganOpeningHandPendingPlayerId
   const canChooseSetupBench = Boolean(
     choosingSetupBench &&
       viewerPlayer &&
@@ -2982,8 +3047,23 @@ function GameFlowPanel({
             {choosingSetupActive ? (
               <RailActionBlock title="Opening Active" trailing={<StatusBadge tone="warning">active</StatusBadge>}>
                 <p className="text-sm text-muted-foreground">
-                  {canChooseSetupActive ? 'Pick from hand.' : 'No Basic visible.'}
+                  {canChooseSetupActive
+                    ? 'Pick from hand.'
+                    : viewerNeedsOpeningMulligan
+                      ? 'No Basic in hand. Mulligan to redraw 7.'
+                      : 'No Basic visible.'}
                 </p>
+
+                {viewerNeedsOpeningMulligan ? (
+                  <ActionCommandButton
+                    className="mt-2"
+                    disabled={!canMulliganOpeningHand}
+                    onClick={() => onMulliganOpeningHand({ playerId: viewerPlayerId })}
+                    tone="primary"
+                  >
+                    {mulliganOpeningHandPending ? 'Redrawing...' : 'Mulligan opening hand'}
+                  </ActionCommandButton>
+                ) : null}
               </RailActionBlock>
             ) : null}
 
@@ -3256,6 +3336,14 @@ function SetupPathGuide({
   const startingPlayerChosen = Boolean(gameState.startingPlayerChosenByPlayerId || gameState.setup || setupCompleted)
   const openingHandsDrawn = Boolean(gameState.setup && !awaitingCoinToss && !awaitingStartingPlayerChoice && flowState !== 'setup_dealing_opening_hands')
   const viewerPlayer = gameState.players.find(player => player.playerId === viewerPlayerId)
+  const viewerNeedsOpeningMulligan = Boolean(
+    openingHandsDrawn &&
+      choosingActive &&
+      viewerPlayer &&
+      !viewerPlayer.active &&
+      viewerPlayer.hand.length > 0 &&
+      viewerPlayer.hand.every(card => !isSetupActiveCandidate(card))
+  )
   const playersMissingActive = gameState.players.filter(player => !player.active)
   const allPlayersHaveSetupActive = playersMissingActive.length === 0
   const playersSetupReady = gameState.players.filter(player => player.setupReady)
@@ -3288,6 +3376,8 @@ function SetupPathGuide({
     : openingHandsDrawn
       ? viewerPlayer?.active
         ? `${viewerPlayer.active.name} is ready here. ${missingActiveSummary} still needs an Active.`
+        : viewerNeedsOpeningMulligan
+          ? `${formatPlayerId(viewerPlayerId)} has no Basic in hand. Use the mulligan command to redraw 7.`
         : `${formatPlayerId(viewerPlayerId)} chooses a visible Basic Pokémon from this hand.`
       : 'Opening hands are dealt automatically after the starting player is chosen.'
 

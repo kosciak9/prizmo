@@ -113,6 +113,24 @@ defmodule Prizmo.TcgEngine.Game.ActionCommands do
       end
     end
 
+    action :mulligan_opening_hand_command, :struct do
+      description "Shuffle a no-Basic opening hand into the deck and draw a replacement hand."
+
+      constraints instance_of: Game
+
+      argument :game_id, :uuid do
+        allow_nil? false
+      end
+
+      argument :player_id, :string do
+        allow_nil? false
+      end
+
+      run fn input, _context ->
+        Mechanics.mulligan_opening_hand(input.arguments.game_id, input.arguments.player_id)
+      end
+    end
+
     action :choose_setup_bench_from_hand_command, :struct do
       description "Choose a player's setup Benched Pokémon from hand through the mechanics layer."
 

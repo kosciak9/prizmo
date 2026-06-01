@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-06-01] iteration 192 | Opening-hand mulligan command
+- Task attempted: closed the first arbitrary-deck setup edge by adding a server-authoritative no-Basic opening-hand mulligan command plus a compact React command rail affordance for affected viewers.
+- Files changed: updated `lib/prizmo/tcg_engine/card_instance.ex`, `lib/prizmo/tcg_engine/game_setup.ex`, `lib/prizmo/tcg_engine/flow/machine.ex`, `lib/prizmo/tcg_engine/flow/actions.ex`, `lib/prizmo/tcg_engine/mechanics.ex`, `lib/prizmo/tcg_engine/game.ex`, `lib/prizmo/tcg_engine/game/action_commands.ex`, `lib/prizmo/tcg_engine.ex`, `lib/prizmo_web/spa/lib/ash/client.ts`, `lib/prizmo_web/spa/features/home/routes/index.tsx`, the canonical north-star article, this log, and the TCG engine playtest handoff.
+- Validation: `mix format`, `mix ash_typescript.codegen`, `mix compile --warnings-as-errors`, `node_modules/.bin/tsc --noEmit --ignoreDeprecations 6.0`, a Tidewave rollback eval, `mix test test/prizmo/tcg_engine/mechanics_test.exs`, and `mix ash_typescript.codegen --check` passed before the wiki update. The rollback eval confirmed a seeded no-Basic Player 1 hand can mulligan to a fresh 7-card hand with a Basic, records stable RNG context without leaking `rng_seed`, and preserves the viewer event-payload boundary.
+- Remaining/blocking notes: the no-Basic redraw dead-end is closed, but full official mulligan semantics are not complete yet. Follow-ups include reveal/compensation-draw handling, deterministic/browser validation of the UI mulligan path, broader generic mechanics, and benchmarked card-table UI density/polish.
+
 ## [2026-06-01] iteration 191 | Seeded setup randomness facts
 - Task attempted: closed part of the richer random/setup fact gap by making seeded coin tosses deterministic from persisted game RNG metadata and by recording hidden card-move payloads for opening hands, prize placement, and turn draws.
 - Files changed: updated `lib/prizmo/tcg_engine/rng.ex`, `lib/prizmo/tcg_engine/event_payloads.ex`, `lib/prizmo/tcg_engine/game_setup.ex`, `lib/prizmo/tcg_engine/flow/actions.ex`, `lib/prizmo/tcg_engine/mechanics.ex`, `test/prizmo/tcg_engine/mechanics_test.exs`, the canonical north-star article, this log, and the TCG engine playtest handoff.

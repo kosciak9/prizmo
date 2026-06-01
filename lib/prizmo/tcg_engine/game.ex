@@ -84,6 +84,7 @@ defmodule Prizmo.TcgEngine.Game do
 
     define :draw_opening_hand_command, args: [:game_id]
     define :choose_active_from_hand_command, args: [:game_id, :player_id, :card_instance_id]
+    define :mulligan_opening_hand_command, args: [:game_id, :player_id]
     define :choose_setup_bench_from_hand_command, args: [:game_id, :player_id, :card_instance_id]
     define :finish_setup_choices_command, args: [:game_id, :player_id]
     define :place_prizes_command, args: [:game_id]

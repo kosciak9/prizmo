@@ -3,13 +3,17 @@ defmodule Prizmo.TcgEngine.GameSetup do
 
   import Prizmo.TcgEngine.Operation, only: [create: 3, update: 3]
 
+  alias Prizmo.TcgEngine.CardCatalog
   alias Prizmo.TcgEngine.CardInstance
   alias Prizmo.TcgEngine.CardStore
   alias Prizmo.TcgEngine.EventPayloads
   alias Prizmo.TcgEngine.Game
+  alias Prizmo.TcgEngine.GameEvent
   alias Prizmo.TcgEngine.GamePlayer
   alias Prizmo.TcgEngine.PlayerStore
   alias Prizmo.TcgEngine.Rng
+
+  require Ash.Query
 
   def first_player_id([{player_id, _deck} | _rest]), do: player_id
   def first_player_id([]), do: nil
@@ -97,6 +101,36 @@ defmodule Prizmo.TcgEngine.GameSetup do
     end)
   end
 
+  def opening_hand_has_basic?(game_id, player_id) do
+    with {:ok, hand_cards} <- CardStore.cards_in_zone(game_id, player_id, :hand) do
+      {:ok, hand_has_basic?(hand_cards)}
+    end
+  end
+
+  def mulligan_opening_hand(%Game{} = game, %GamePlayer{} = player) do
+    with {:ok, hand_cards} <- CardStore.cards_in_zone(game.id, player.player_id, :hand),
+         :ok <- require_opening_hand_without_basic(hand_cards),
+         {:ok, mulligan_number} <- next_mulligan_number(game.id, player.player_id),
+         returned_card_ids = MapSet.new(hand_cards, & &1.id),
+         {:ok, _returned_cards} <- return_hand_to_deck(game.id, player.player_id, hand_cards),
+         {:ok, shuffled_cards} <- reshuffle_player_deck(game, player, mulligan_number),
+         returned_cards = Enum.filter(shuffled_cards, &MapSet.member?(returned_card_ids, &1.id)),
+         {:ok, hand_fact} <- draw_opening_cards_for_player(player) do
+      {:ok,
+       game
+       |> mulligan_rng_payload(player.player_id, mulligan_number)
+       |> Map.merge(%{
+         player_id: player.player_id,
+         deck_key: player.deck_key,
+         mulligan_number: mulligan_number,
+         returned_card_count: length(returned_cards),
+         drawn_card_count: hand_fact.card_count,
+         returned_cards: EventPayloads.moved_cards(returned_cards, :hand, :deck),
+         drawn_cards: hand_fact.cards
+       })}
+    end
+  end
+
   def require_no_setup_cards_moved(game_id) do
     case CardStore.non_deck_cards(game_id) do
       {:ok, []} -> :ok
@@ -164,6 +198,74 @@ defmodule Prizmo.TcgEngine.GameSetup do
       |> collect_results()
       |> move_fact(player.player_id, :deck, :prize)
     end
+  end
+
+  defp require_opening_hand_without_basic([]), do: {:error, :opening_hand_not_drawn}
+
+  defp require_opening_hand_without_basic(hand_cards) do
+    if hand_has_basic?(hand_cards) do
+      {:error, :opening_hand_has_basic}
+    else
+      :ok
+    end
+  end
+
+  defp hand_has_basic?(hand_cards) do
+    Enum.any?(hand_cards, &CardCatalog.basic_pokemon?(&1.card_id))
+  end
+
+  defp next_mulligan_number(game_id, player_id) do
+    case GameEvent
+         |> Ash.Query.filter(
+           game_id == ^game_id and player_id == ^player_id and type == "opening_hand_mulligan"
+         )
+         |> Ash.read() do
+      {:ok, events} -> {:ok, length(events) + 1}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp return_hand_to_deck(game_id, player_id, hand_cards) do
+    with {:ok, deck_count} <- CardStore.deck_count(game_id, player_id) do
+      hand_cards
+      |> Enum.with_index(deck_count + 1)
+      |> Enum.map(fn {card, position} ->
+        update(card, :shuffle_into_deck, %{attached_to_card_instance_id: nil, position: position})
+      end)
+      |> collect_results()
+    end
+  end
+
+  defp reshuffle_player_deck(%Game{} = game, %GamePlayer{} = player, mulligan_number) do
+    context = {:opening_hand_mulligan, player.player_id, mulligan_number}
+
+    with {:ok, cards} <- CardStore.cards_in_zone(game.id, player.player_id, :deck) do
+      cards
+      |> shuffle_cards(game.rng_seed, context)
+      |> Enum.with_index(1)
+      |> Enum.map(fn {card, position} -> update(card, :reorder_deck, %{position: position}) end)
+      |> collect_results()
+    end
+  end
+
+  defp shuffle_cards(cards, seed, context) when is_binary(seed),
+    do: Rng.shuffle(cards, seed, context)
+
+  defp shuffle_cards(cards, _seed, _context), do: Enum.shuffle(cards)
+
+  defp mulligan_rng_payload(%Game{rng_seed: seed} = game, player_id, mulligan_number)
+       when is_binary(seed) do
+    %{
+      rng_algorithm: game.rng_algorithm || Rng.algorithm(),
+      rng_context: mulligan_rng_context_label(player_id, mulligan_number),
+      rng_seed_source: game.rng_seed_source
+    }
+  end
+
+  defp mulligan_rng_payload(%Game{}, _player_id, _mulligan_number), do: %{}
+
+  defp mulligan_rng_context_label(player_id, mulligan_number) do
+    "opening_hand_mulligan:#{player_id}:#{mulligan_number}"
   end
 
   defp move_fact({:ok, cards}, player_id, from_zone, to_zone) do
