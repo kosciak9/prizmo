@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-06-01] iteration 195 | Two-browser mulligan path validation
+- Task attempted: validated the full supported no-Basic opening-hand mulligan plus opponent compensation-draw setup path in two independent browser contexts using deterministic open-deck input that forces the setup edge.
+- Files changed: updated the canonical north-star article, this log, and the TCG engine playtest handoff; no product source changed.
+- Validation: Playwright contexts drove game `762faa63-a747-430a-ab00-b4ce3b59158a` with seed `mulligan-ui-validation-2` from open-deck creation through coin toss, starting-player choice, Player 1 no-Basic mulligan, public seven-card reveal in both event histories, Player 1 and Player 2 Active choices, Player 2 one-card mulligan bonus draw, both setup-ready commands, setup completion, Turn 1 action window, and reload recovery with zero console errors, page errors, or non-font failed requests. SQL confirmed the 17-event persisted sequence and explicit RNG metadata; Tidewave read-model eval confirmed public reveal/bonus notes without raw payloads or `rng_seed` and preserved hidden opponent hands; `mix test test/prizmo/tcg_engine/mechanics_test.exs`, `mix check`, and `git diff --check` passed. Wrong-seed exploratory game `c33dbcf4-b83c-473e-817d-af8a8f2837dd` was deleted with SQL verification.
+- Remaining/blocking notes: the documented browser-validation gap for the no-Basic mulligan plus bonus-draw path is closed. Next work should move to generic mechanics/card behavior for arbitrary decks or, after the required benchmark, card-table UI density/polish; avoid repeating this validation unless source changes require it.
+
 ## [2026-06-01] iteration 194 | Public mulligan reveal events
 - Task attempted: completed the next setup-edge presentation slice by projecting official no-Basic mulligan reveals into the viewer-safe read model and React event history without exposing hidden payload internals.
 - Files changed: updated `lib/prizmo/tcg_engine/game_view.ex`, `lib/prizmo/tcg_engine/game_view/fields.ex`, `lib/prizmo_web/spa/features/home/routes/index.tsx`, the canonical north-star article, this log, and the TCG engine playtest handoff.
