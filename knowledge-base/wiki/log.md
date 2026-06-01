@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-06-01] iteration 197 | Enriching Energy attach draw
+- Task attempted: advanced arbitrary-deck card-behavior support by turning Enriching Energy's Special Energy text from a pending notice into an executable attach-from-hand draw effect in the Ash-backed engine.
+- Files changed: added `lib/prizmo/tcg_engine/energy_effects.ex`; updated `lib/prizmo/tcg_engine/mechanics.ex`, `lib/prizmo/tcg/cards/behaviors/ssp.ex`, `lib/prizmo/tcg_engine/game_view.ex`, `lib/prizmo/tcg_engine/game_view/action_affordances.ex`, the canonical north-star article, this log, and the TCG engine playtest handoff.
+- Validation: `mix format`, `mix compile --warnings-as-errors`, two Tidewave rollback evals, `mix test test/prizmo/tcg_engine/mechanics_test.exs`, and final `mix check` passed. Rollback validation confirmed `SSP-191` attaches through the generic command, records `attach_energy` plus `energy_attach_effect_drawn`, draws four hidden deck cards to hand, exposes only the public count note, and removes Enriching Energy from unsupported-action/pending-energy read-model surfaces.
+- Remaining/blocking notes: this implements only Enriching Energy's attached `{C}` provider plus draw-4 attach effect. Mist Energy prevention, Team Rocket's Energy attachment restrictions/provider semantics, broader Special Energy effects, and the benchmarked card-table UI density/polish remain future north-star work.
+
 ## [2026-06-01] iteration 196 | Special Energy pending text
 - Task attempted: advanced arbitrary-deck safety after setup by making Special Energy provider support and unsupported text explicit instead of silently treating all Special Energy as generic attachments with no visible pending behavior.
 - Files changed: updated `lib/prizmo/tcg_engine/card_catalog.ex`, `lib/prizmo/tcg_engine/game_view.ex`, `lib/prizmo/tcg_engine/game_view/action_affordances.ex`, `lib/prizmo_web/spa/features/home/routes/index.tsx`, the canonical north-star article, this log, and the TCG engine playtest handoff.

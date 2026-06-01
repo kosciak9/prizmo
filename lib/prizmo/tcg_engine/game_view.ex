@@ -369,6 +369,17 @@ defmodule Prizmo.TcgEngine.GameView do
     }
   end
 
+  defp public_event_details(%GameEvent{type: "energy_attach_effect_drawn", payload: payload}) do
+    card_count = payload_integer(payload, "card_count") || 0
+    card_name = payload_card_name(payload, "energy_card_id", "Special Energy")
+
+    %{
+      public_note: "#{card_name} drew #{card_count} #{pluralize("card", card_count)}.",
+      public_card_count: card_count,
+      public_revealed_cards: []
+    }
+  end
+
   defp public_event_details(%GameEvent{}) do
     %{
       public_note: nil,
@@ -410,6 +421,18 @@ defmodule Prizmo.TcgEngine.GameView do
     }
   end
 
+  defp payload_card_name(payload, key, fallback) do
+    case payload_value(payload, key) do
+      card_id when is_binary(card_id) ->
+        card_id
+        |> catalog_card()
+        |> Map.get(:name, fallback)
+
+      _other ->
+        fallback
+    end
+  end
+
   defp payload_list(payload, key) do
     case payload_value(payload, key) do
       list when is_list(list) -> list
@@ -434,6 +457,7 @@ defmodule Prizmo.TcgEngine.GameView do
 
   defp payload_atom_key("card_count"), do: :card_count
   defp payload_atom_key("card_id"), do: :card_id
+  defp payload_atom_key("energy_card_id"), do: :energy_card_id
   defp payload_atom_key("mulligan_number"), do: :mulligan_number
   defp payload_atom_key("returned_card_count"), do: :returned_card_count
   defp payload_atom_key("returned_cards"), do: :returned_cards
@@ -542,6 +566,22 @@ defmodule Prizmo.TcgEngine.GameView do
       "Generic Energy",
       "Basic Energy can attach through the generic engine action."
     )
+  end
+
+  defp rules_summary(_card_id, %{supertype: :energy, energy_type: :special} = card) do
+    if supported_special_energy?(card) do
+      rules_summary(
+        :engine_defined,
+        "Engine-defined Energy",
+        "This Special Energy provides its catalog Energy type and executes its attach-from-hand effect."
+      )
+    else
+      rules_summary(
+        :partial,
+        "Special text pending",
+        "This Energy can attach through the generic engine action; special card text is not executable yet."
+      )
+    end
   end
 
   defp rules_summary(_card_id, %{supertype: :energy}) do
@@ -747,7 +787,7 @@ defmodule Prizmo.TcgEngine.GameView do
   defp attack_damage(_attack), do: nil
 
   defp unsupported_energy_summaries(card) do
-    if present_text?(Map.get(card, :raw_effect)) do
+    if present_text?(Map.get(card, :raw_effect)) and not supported_special_energy?(card) do
       [
         %{
           kind: "energy",
@@ -776,6 +816,16 @@ defmodule Prizmo.TcgEngine.GameView do
   defp unsupported_energy_reason(_card) do
     "This Special Energy can attach through the generic engine action, but its printed Energy rule or effects are not executable yet."
   end
+
+  defp supported_special_energy?(%{
+         effect: %{type: :draw_cards_on_attach_from_hand, count: count},
+         provides: provides
+       })
+       when is_integer(count) and count > 0 and is_list(provides) do
+    :colorless in provides
+  end
+
+  defp supported_special_energy?(_card), do: false
 
   defp format_action_id(value) when is_atom(value),
     do: value |> Atom.to_string() |> format_action_id()

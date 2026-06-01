@@ -79,6 +79,7 @@ defmodule Prizmo.TcgEngine.Mechanics do
   alias Prizmo.TcgEngine.CardPlay
   alias Prizmo.TcgEngine.Cards.Registry, as: EngineCardRegistry
   alias Prizmo.TcgEngine.ChoiceValidator
+  alias Prizmo.TcgEngine.EnergyEffects
   alias Prizmo.TcgEngine.EventPayloads
   alias Prizmo.TcgEngine.Flow.Interpreter, as: FlowInterpreter
   alias Prizmo.TcgEngine.Game
@@ -426,17 +427,29 @@ defmodule Prizmo.TcgEngine.Mechanics do
                position: position
              }),
            {:ok, _player} <- update(player, :mark_energy_attached, %{}),
-           {:ok, event} <-
-             write_event(game, :attach_energy, player_id, %{
+           {:ok, _attach_event} <-
+             write_event_and_snapshot(game.id, :attach_energy, player_id, %{
                turn_id: turn.id,
                energy_card_instance_id: energy_card.id,
                target_card_instance_id: target_card.id,
                position: position
              }),
-           {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do
+           {:ok, effect_event} <-
+             EnergyEffects.after_attach_from_hand(game, player, energy_card, target_card),
+           {:ok, _effect_event} <-
+             write_energy_attach_effect_event(game.id, player_id, turn.id, effect_event) do
         get_game(game.id)
       end
     end)
+  end
+
+  defp write_energy_attach_effect_event(_game_id, _player_id, _turn_id, nil), do: {:ok, nil}
+
+  defp write_energy_attach_effect_event(game_id, player_id, turn_id, %{
+         type: type,
+         payload: payload
+       }) do
+    write_event_and_snapshot(game_id, type, player_id, Map.put(payload, :turn_id, turn_id))
   end
 
   @spec play_trainer_to_discard(Game.t() | String.t(), String.t(), String.t()) ::

@@ -441,7 +441,7 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
     |> Enum.flat_map(fn card ->
       with {:ok, %{supertype: :energy, energy_type: :special} = catalog_card} <-
              CardCatalog.fetch(card.card_id),
-           true <- present_text?(Map.get(catalog_card, :raw_effect)) do
+           true <- pending_special_energy_text?(catalog_card) do
         [
           affordance(
             :unsupported_energy,
@@ -572,6 +572,20 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
   defp special_energy_pending_note(_card) do
     "This Special Energy can attach generically, but its printed Energy rule or effects are still pending."
   end
+
+  defp pending_special_energy_text?(card) do
+    present_text?(Map.get(card, :raw_effect)) and not supported_special_energy?(card)
+  end
+
+  defp supported_special_energy?(%{
+         effect: %{type: :draw_cards_on_attach_from_hand, count: count},
+         provides: provides
+       })
+       when is_integer(count) and count > 0 and is_list(provides) do
+    :colorless in provides
+  end
+
+  defp supported_special_energy?(_card), do: false
 
   defp unsupported_attack_note({:unsupported_attack_effect, _card_id, _attack_id, effect_type}) do
     "This paid attack is visible on the Active Pokémon, but effect #{format_action_id(effect_type)} is not executable yet."

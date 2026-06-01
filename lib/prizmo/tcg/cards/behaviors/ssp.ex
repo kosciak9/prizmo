@@ -47,4 +47,8 @@ defmodule Prizmo.Tcg.Cards.Behaviors.SSP do
   card "SSP-170" do
     card_effect(effect: %{type: :search_pokemon_ex_to_hand, max_targets: 3})
   end
+
+  card "SSP-191" do
+    card_effect(effect: %{type: :draw_cards_on_attach_from_hand, count: 4})
+  end
 end
