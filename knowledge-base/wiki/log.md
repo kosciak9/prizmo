@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-06-01] iteration 189 | Copied-row open-deck imports
+- Task attempted: improved open-deck game creation ergonomics by letting the React SPA parser accept common copied PTCGL/Limitless-style rows and section headings instead of requiring every pasted row to already be a catalog ID.
+- Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, the canonical north-star article, this log, and the TCG engine playtest handoff.
+- Validation: `node_modules/.bin/tsc --noEmit --ignoreDeprecations 6.0` passed; Playwright browser smoke pasted two 60-card copied-row decklists derived from committed Dragapult `27431` and Alakazam/Dudunsparce `27147` fixtures, confirmed `60/60` readiness and 51 normalized external rows, clicked `Create RNG open-deck board`, and created game `fa2d7462-b130-4685-8390-28aea9a02841` with zero application console errors; Tidewave SQL confirmed explicit RNG metadata, two open-deck game-player rows, 120 deck-zone cards, and two `deck_shuffled` events; the smoke game and dependent rows were deleted and SQL confirmed cleanup; `mix assets.build` passed.
+- Remaining/blocking notes: decklist paste ergonomics are materially better, but unresolved-card errors still come from the create RPC and copy-limit/mulligan edge cases remain follow-ups. Next highest-value work is a true two-independent-browser milestone pass for the open-deck setup/action loop or deeper setup/randomness semantics.
+
 ## [2026-06-01] iteration 188 | Named pending card-text affordances
 - Task attempted: made arbitrary loaded decks safer by turning visible unsupported attacks, abilities, and Trainer text into named pending read-model entries and non-clickable blocked SPA affordances instead of only card-level unsupported counts.
 - Files changed: updated `lib/prizmo/tcg_engine/game_view.ex`, `lib/prizmo/tcg_engine/game_view/action_affordances.ex`, `lib/prizmo/tcg_engine/game_view/fields.ex`, `lib/prizmo_web/spa/features/home/routes/index.tsx`, the canonical north-star article, this log, and the TCG engine playtest handoff.

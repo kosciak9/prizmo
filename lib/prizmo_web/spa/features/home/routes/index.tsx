@@ -54,7 +54,10 @@ const COPY_OPPONENT_ACTIVE_TERA_POKEMON_ATTACK_EFFECT = 'copy_opponent_active_te
 const ULTRA_BALL_CARD_ID = 'MEG-131'
 const BENCH_SLOT_COUNT = 5
 const EXPECTED_OPEN_DECK_CARD_COUNT = 60
-const OPEN_DECK_CARD_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_.:-]*$/
+const OPEN_DECK_CATALOG_CARD_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_.:]*-[A-Za-z0-9][A-Za-z0-9_.:-]*$/
+const OPEN_DECK_EXTERNAL_CARD_PATTERN = /(?:^|\s)([A-Za-z]{2,5})[-\s]+([A-Za-z0-9]{1,4})$/
+const OPEN_DECK_SECTION_HEADING_PATTERN = /^(?:pok[eé]mon|trainers?|energy|energies|total cards)\s*(?::|-)?\s*\d+\s*$/i
+const OPEN_DECK_DECK_HEADING_PATTERN = /^(?:deck(?:\s+list)?|cards)\s*$/i
 const PLAYER_ONE_OPEN_DECK_KEY = 'player-1-open-deck'
 const PLAYER_TWO_OPEN_DECK_KEY = 'player-2-open-deck'
 
@@ -286,9 +289,14 @@ type OpenDeckParseError = {
   message: string
 }
 
+type OpenDeckParsedLine = OpenDeckCardCount & {
+  source: 'catalog-id' | 'external-row'
+}
+
 type ParsedOpenDeck = {
   cards: OpenDeckCardCount[]
   errors: OpenDeckParseError[]
+  importedLineCount: number
   totalCount: number
   uniqueCardCount: number
 }
@@ -1716,6 +1724,7 @@ function parseOpenDeckText(text: string): ParsedOpenDeck {
   const countsByCardId = new Map<string, number>()
   const cardIdOrder: string[] = []
   const errors: OpenDeckParseError[] = []
+  let importedLineCount = 0
 
   for (const [index, rawLine] of text.split(/\r?\n/).entries()) {
     const trimmedLine = rawLine.trim()
@@ -1725,11 +1734,20 @@ function parseOpenDeckText(text: string): ParsedOpenDeck {
     }
 
     const line = trimmedLine.replace(/\s+(?:#|\/\/).*$/, '').trim()
+
+    if (!line || shouldIgnoreOpenDeckLine(line)) {
+      continue
+    }
+
     const parsedLine = parseOpenDeckLine(line)
 
     if ('message' in parsedLine) {
       errors.push({ lineNumber: index + 1, line: trimmedLine, message: parsedLine.message })
       continue
+    }
+
+    if (parsedLine.source === 'external-row') {
+      importedLineCount += 1
     }
 
     if (!countsByCardId.has(parsedLine.cardId)) {
@@ -1753,31 +1771,88 @@ function parseOpenDeckText(text: string): ParsedOpenDeck {
   return {
     cards,
     errors,
+    importedLineCount,
     totalCount,
     uniqueCardCount: cards.length
   }
 }
 
-function parseOpenDeckLine(line: string): OpenDeckCardCount | { message: string } {
-  const compactCountFirstMatch = line.match(/^(\d+)x(.+)$/i)
-  const countFirstMatch = line.match(/^(\d+)\s*x?\s+(.+)$/i)
-  const countLastMatch = line.match(/^(.+?)\s+x?\s*(\d+)$/i)
-  const count = Number(compactCountFirstMatch?.[1] ?? countFirstMatch?.[1] ?? countLastMatch?.[2] ?? 1)
-  const cardId = (compactCountFirstMatch?.[2] ?? countFirstMatch?.[2] ?? countLastMatch?.[1] ?? line).trim()
+function shouldIgnoreOpenDeckLine(line: string) {
+  return OPEN_DECK_SECTION_HEADING_PATTERN.test(line) || OPEN_DECK_DECK_HEADING_PATTERN.test(line)
+}
+
+function parseOpenDeckLine(line: string): OpenDeckParsedLine | { message: string } {
+  const { cardText, count } = parseOpenDeckQuantity(line)
 
   if (!Number.isSafeInteger(count) || count < 1) {
     return { message: 'Count must be a positive whole number.' }
   }
 
-  if (!cardId) {
+  if (!cardText) {
     return { message: 'Missing catalog card ID.' }
   }
 
-  if (!OPEN_DECK_CARD_ID_PATTERN.test(cardId)) {
-    return { message: 'Use catalog card IDs like MEG-131, not card names or section headings.' }
+  const catalogCardId = normalizeOpenDeckCatalogCardId(cardText)
+
+  if (catalogCardId) {
+    return { cardId: catalogCardId, count, source: 'catalog-id' }
   }
 
-  return { cardId, count }
+  const externalCardId = normalizeExternalOpenDeckCardId(cardText)
+
+  if (externalCardId) {
+    return { cardId: externalCardId, count, source: 'external-row' }
+  }
+
+  return { message: 'Use catalog IDs like MEG-131 or rows like 4 Dragapult ex TWM 130.' }
+}
+
+function parseOpenDeckQuantity(line: string) {
+  const compactCountFirstMatch = line.match(/^(\d+)x(.+)$/i)
+
+  if (compactCountFirstMatch) {
+    return { count: Number(compactCountFirstMatch[1]), cardText: compactCountFirstMatch[2].trim() }
+  }
+
+  const countFirstMatch = line.match(/^(\d+)\s*x?\s+(.+)$/i)
+
+  if (countFirstMatch) {
+    return { count: Number(countFirstMatch[1]), cardText: countFirstMatch[2].trim() }
+  }
+
+  const explicitCountLastMatch = line.match(/^(.+?)\s+x\s*(\d+)$/i)
+
+  if (explicitCountLastMatch) {
+    return { count: Number(explicitCountLastMatch[2]), cardText: explicitCountLastMatch[1].trim() }
+  }
+
+  const catalogIdCountLastMatch = line.match(/^([A-Za-z0-9][A-Za-z0-9_.:]*-[A-Za-z0-9][A-Za-z0-9_.:-]*)\s+(\d+)$/i)
+
+  if (catalogIdCountLastMatch) {
+    return { count: Number(catalogIdCountLastMatch[2]), cardText: catalogIdCountLastMatch[1].trim() }
+  }
+
+  return { count: 1, cardText: line.trim() }
+}
+
+function normalizeOpenDeckCatalogCardId(cardText: string) {
+  const catalogCardId = cardText.trim()
+
+  return OPEN_DECK_CATALOG_CARD_ID_PATTERN.test(catalogCardId) ? catalogCardId.toUpperCase() : null
+}
+
+function normalizeExternalOpenDeckCardId(cardText: string) {
+  const match = cardText.trim().match(OPEN_DECK_EXTERNAL_CARD_PATTERN)
+
+  if (!match) {
+    return null
+  }
+
+  const setCode = match[1].toUpperCase()
+  const cardNumber = match[2].toUpperCase()
+  const normalizedNumber = /^\d+$/.test(cardNumber) ? cardNumber.padStart(3, '0') : cardNumber
+
+  return `${setCode}-${normalizedNumber}`
 }
 
 function isOpenDeckReady(parsedDeck: ParsedOpenDeck) {
@@ -1791,8 +1866,10 @@ function openDeckLoadoutDetail(
 ) {
   if (isOpenDeckReady(playerOneDeck) && isOpenDeckReady(playerTwoDeck)) {
     const seedDetail = rngSeed ? ` explicit seed ${rngSeed}` : ' fresh RNG seed'
+    const importedLineCount = playerOneDeck.importedLineCount + playerTwoDeck.importedLineCount
+    const importDetail = importedLineCount > 0 ? `; ${importedLineCount} external rows normalized` : ''
 
-    return `P1 ${playerOneDeck.uniqueCardCount} unique / P2 ${playerTwoDeck.uniqueCardCount} unique with${seedDetail}.`
+    return `P1 ${playerOneDeck.uniqueCardCount} unique / P2 ${playerTwoDeck.uniqueCardCount} unique with${seedDetail}${importDetail}.`
   }
 
   if (playerOneDeck.errors.length > 0 || playerTwoDeck.errors.length > 0) {
@@ -6868,23 +6945,33 @@ function OpenDeckTextArea({
         <textarea
           className="min-h-44 w-full resize-y rounded-xl border border-input bg-input/40 px-3 py-2 font-mono text-xs leading-5 text-foreground outline-none transition placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring/30"
           onChange={event => onChange(event.currentTarget.value)}
-          placeholder={'4 MEG-131\n3 MEG-132\nMEG-133 x2\n# one catalog card ID per row; counts default to 1'}
+          placeholder={'Pokémon: 17\n4 Dragapult ex TWM 130\n3 MEG-132\nMEG-133 x2\n# catalog IDs and PTCGL/Limitless rows both work'}
           spellCheck={false}
           value={value}
         />
       </label>
+
+      <p className="mt-2 text-xs leading-5 text-muted-foreground">
+        Paste catalog IDs like <span className="font-mono text-foreground">4 MEG-131</span> or copied rows like{' '}
+        <span className="font-mono text-foreground">4 Dragapult ex TWM 130</span>. Section headings are ignored.
+      </p>
 
       <div className="mt-3 flex flex-wrap gap-1.5 text-xs font-medium text-muted-foreground">
         <span className="rounded-full bg-muted px-2 py-1">
           {parsedDeck.totalCount}/{EXPECTED_OPEN_DECK_CARD_COUNT} cards
         </span>
         <span className="rounded-full bg-muted px-2 py-1">{parsedDeck.uniqueCardCount} unique</span>
-        <span className="rounded-full bg-muted px-2 py-1">catalog IDs only</span>
+        <span className="rounded-full bg-muted px-2 py-1">catalog or PTCGL rows</span>
+        {parsedDeck.importedLineCount > 0 ? (
+          <span className="rounded-full bg-primary/12 px-2 py-1 text-primary">
+            {parsedDeck.importedLineCount} normalized
+          </span>
+        ) : null}
       </div>
 
       {parsedDeck.errors.length > 0 ? (
         <div className="mt-3 rounded-xl bg-attention/10 px-3 py-2 text-xs leading-5 text-attention">
-          <p className="font-semibold">Fix decklist format before creating the board.</p>
+          <p className="font-semibold">Fix decklist import before creating the board.</p>
           <ul className="mt-1 list-disc space-y-1 pl-4">
             {parsedDeck.errors.slice(0, 3).map(error => (
               <li key={`${error.lineNumber}-${error.message}`}>
