@@ -121,6 +121,20 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     ]
   }
 
+  @energy_switch %CardDefinition{
+    id: "MEG-115",
+    kind: :trainer,
+    trainer_type: :item,
+    play_window: :action_window,
+    effects: [
+      %Effect{
+        key: :move_basic_energy_between_own_pokemon,
+        type: :move_basic_energy_between_own_pokemon,
+        params: %{count: 2}
+      }
+    ]
+  }
+
   @ultra_ball %CardDefinition{
     id: "MEG-131",
     kind: :trainer,
@@ -194,6 +208,7 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     @buddy_buddy_poffin.id => @buddy_buddy_poffin,
     @dawn.id => @dawn,
     @enhanced_hammer.id => @enhanced_hammer,
+    @energy_switch.id => @energy_switch,
     @hilda.id => @hilda,
     @judge.id => @judge,
     @lillies_determination.id => @lillies_determination,

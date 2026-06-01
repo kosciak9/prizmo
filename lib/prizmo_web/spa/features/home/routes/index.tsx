@@ -8501,6 +8501,8 @@ function promptSubmitLabel(choiceKey: string, selectedCount: number, max: number
       return `Add Evolution + Energy ${selectedCount}/${max}`
     case 'switch_opponent_bench_to_active':
       return `Switch chosen Pokémon ${selectedCount}/${max}`
+    case 'move_basic_energy_between_own_pokemon':
+      return `Move selected Energy ${selectedCount}/${max}`
     case 'knockout_prize_cards':
       return `Take selected Prizes ${selectedCount}/${max}`
     default:
@@ -8698,6 +8700,10 @@ function promptChoiceCardDetail(
 ) {
   if (!card) {
     return choiceLabel?.detail ?? formatCardInstanceId(cardInstanceId)
+  }
+
+  if (choiceLabel?.detail) {
+    return choiceLabel.detail
   }
 
   return [card.cardId, card.category ? formatEventType(card.category) : null, formatEventType(card.zone)]

@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-06-01] iteration 206 | Energy Switch generic attachment move
+- Task attempted: advanced arbitrary-deck Item safety by moving Energy Switch (`MEG-115`) onto the generic `play_card` path as an engine-defined prompt effect that moves one attached Basic Energy between the active player's own Pokémon.
+- Files changed: updated `lib/prizmo/tcg_engine/cards/registry.ex`, `lib/prizmo/tcg_engine/effect_runner.ex`, `lib/prizmo/tcg_engine/card_play.ex`, `lib/prizmo_web/spa/features/home/routes/index.tsx`, the canonical north-star article, this log, and the TCG engine playtest handoff.
+- Validation: `mix format`, `mix compile --warnings-as-errors`, `mix test test/prizmo/tcg_engine/mechanics_test.exs`, `node_modules/.bin/tsc --noEmit --ignoreDeprecations 6.0`, rollback Tidewave validation, cleanup SQL proving no scratch validation game remained, and final `mix check` passed. Rollback validation confirmed Energy Switch appears as an engine-defined Play source, opens a two-card source Energy/target Pokémon prompt, exposes viewer prompt choice cards and source/target labels, resolves through `choose_prompt`, reparents the Basic Energy from Active to Bench, discards Energy Switch, completes its pending effect, and writes the expected prompt/effect/card-play suffix.
+- Remaining/blocking notes: this covers Energy Switch's printed Basic Energy movement through the generic Item path. It does not cover Crispin's split Energy search/attach, Rare Candy, top-N search Items like Pokégear/Bug Catching Set, broader Tools, or the benchmarked card-table density/polish batch.
+
 ## [2026-06-01] iteration 205 | Dawn and Hilda grouped searches
 - Task attempted: advanced arbitrary-deck Supporter safety by moving Dawn (`PFL-087`) and Hilda (`WHT-084`) onto the generic `play_card` path as engine-defined multi-category deck-search effects.
 - Files changed: updated `lib/prizmo/tcg_engine/cards/registry.ex`, `lib/prizmo/tcg_engine/card_play.ex`, `lib/prizmo_web/spa/features/home/routes/index.tsx`, the canonical north-star article, this log, and the TCG engine playtest handoff.

@@ -6,7 +6,8 @@ defmodule Prizmo.TcgEngine.EffectRunner do
   @choice_effect_types [
     :search_deck,
     :switch_opponent_bench_to_active,
-    :discard_opponent_special_energy
+    :discard_opponent_special_energy,
+    :move_basic_energy_between_own_pokemon
   ]
 
   def first_effect(definition) do

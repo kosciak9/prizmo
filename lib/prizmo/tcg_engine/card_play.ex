@@ -3,6 +3,7 @@ defmodule Prizmo.TcgEngine.CardPlay do
 
   import Prizmo.TcgEngine.CardMetadataRequirements,
     only: [
+      require_basic_energy: 1,
       require_non_rule_box_pokemon_card: 1,
       require_poffin_targets: 1,
       require_pokemon_card: 1,
@@ -296,6 +297,40 @@ defmodule Prizmo.TcgEngine.CardPlay do
          turn,
          player,
          card,
+         %{type: :move_basic_energy_between_own_pokemon} = effect,
+         target_ids
+       ) do
+    with {:ok, {energy_card, target_card}} <-
+           validate_energy_switch_effect(game.id, player.player_id, effect, target_ids),
+         source_target_card_instance_id = energy_card.attached_to_card_instance_id,
+         {:ok, position} <- CardStore.next_attachment_position(game.id, target_card.id),
+         {:ok, moved_energy_card} <-
+           update(energy_card, :reparent_attachment, %{
+             attached_to_card_instance_id: target_card.id,
+             position: position
+           }),
+         {:ok, _event} <-
+           write_event_and_snapshot(game.id, :cards_moved, player.player_id, %{
+             reason: :effect_resolution,
+             source: EventPayloads.card_source(card),
+             effect_key: effect.key,
+             cards: [
+               energy_switch_move_payload(
+                 moved_energy_card,
+                 source_target_card_instance_id,
+                 target_card.id
+               )
+             ]
+           }) do
+      complete_play_card_resolution(game, turn, player, card, effect)
+    end
+  end
+
+  defp complete_play_card_effect(
+         game,
+         turn,
+         player,
+         card,
          %{type: :switch_opponent_bench_to_active} = effect,
          target_ids
        ) do
@@ -455,12 +490,7 @@ defmodule Prizmo.TcgEngine.CardPlay do
              pending_effect_id: pending_effect.id,
              prompt_type: "select_cards",
              player_id: player.player_id,
-             payload: %{
-               choice_key: Atom.to_string(choice_key),
-               legal_choices: legal_choice_ids,
-               min: min,
-               max: max
-             }
+             payload: prompt_payload(game.id, choice_key, legal_choice_ids, min, max)
            }),
          {:ok, _event} <-
            write_event_and_snapshot(game.id, :prompt_created, player.player_id, %{
@@ -511,6 +541,16 @@ defmodule Prizmo.TcgEngine.CardPlay do
     end
   end
 
+  defp validate_energy_switch_effect(game_id, player_id, effect, target_ids) do
+    with {:ok, target_ids} <- EffectRunner.validate_choice_selection(effect, target_ids),
+         {:ok, target_cards} <- CardStore.get_cards(game_id, target_ids),
+         {:ok, energy_card} <- selected_energy_switch_source(target_cards, player_id),
+         {:ok, target_card} <- selected_energy_switch_target(target_cards, player_id),
+         :ok <- require_energy_switch_target_changed(energy_card, target_card) do
+      {:ok, {energy_card, target_card}}
+    end
+  end
+
   defp move_search_targets(game, _turn, player, %{params: %{destination: :hand}}, target_cards) do
     target_cards
     |> Enum.map(&CardStore.move_deck_card_to_hand(game.id, player.player_id, &1))
@@ -549,6 +589,13 @@ defmodule Prizmo.TcgEngine.CardPlay do
     |> then(&{:ok, &1})
   end
 
+  defp effect_choice_ids(cards, player_id, %{type: :move_basic_energy_between_own_pokemon}) do
+    cards
+    |> energy_switch_choice_cards(player_id)
+    |> Enum.map(& &1.id)
+    |> then(&{:ok, &1})
+  end
+
   defp effect_choice_ids(_cards, _player_id, choice_step) do
     {:error, {:unsupported_choice_step, choice_step.key, choice_step.type}}
   end
@@ -583,7 +630,8 @@ defmodule Prizmo.TcgEngine.CardPlay do
       when type in [
              :search_deck,
              :switch_opponent_bench_to_active,
-             :discard_opponent_special_energy
+             :discard_opponent_special_energy,
+             :move_basic_energy_between_own_pokemon
            ] ->
         effect_choice_ids(cards, player_id, choice_step)
 
@@ -659,6 +707,39 @@ defmodule Prizmo.TcgEngine.CardPlay do
     |> Enum.sort_by(
       &{&1.owner_player_id, &1.attached_to_card_instance_id, &1.position, &1.instance_id}
     )
+  end
+
+  defp energy_switch_choice_cards(cards, player_id) do
+    source_cards = energy_switch_source_cards(cards, player_id)
+    target_cards = energy_switch_target_cards(cards, player_id)
+
+    legal_source_cards =
+      Enum.filter(source_cards, fn source_card ->
+        Enum.any?(target_cards, &(&1.id != source_card.attached_to_card_instance_id))
+      end)
+
+    legal_target_cards =
+      Enum.filter(target_cards, fn target_card ->
+        Enum.any?(source_cards, &(&1.attached_to_card_instance_id != target_card.id))
+      end)
+
+    if Enum.empty?(legal_source_cards) or Enum.empty?(legal_target_cards) do
+      []
+    else
+      legal_source_cards ++ legal_target_cards
+    end
+  end
+
+  defp energy_switch_source_cards(cards, player_id) do
+    cards
+    |> Enum.filter(&energy_switch_source_card?(&1, player_id))
+    |> Enum.sort_by(&{&1.attached_to_card_instance_id, &1.position, &1.instance_id})
+  end
+
+  defp energy_switch_target_cards(cards, player_id) do
+    cards
+    |> Enum.filter(&energy_switch_target_card?(&1, player_id))
+    |> Enum.sort_by(&{in_play_zone_sort(&1.zone), &1.position, &1.instance_id})
   end
 
   defp maybe_hide_when_bench_full(choices, cards, player_id, %{params: %{destination: :bench}}) do
@@ -778,6 +859,41 @@ defmodule Prizmo.TcgEngine.CardPlay do
     match?({:ok, %{supertype: :energy, energy_type: :special}}, CardCatalog.fetch(card_id))
   end
 
+  defp energy_switch_source_card?(%CardInstance{} = card, player_id) do
+    card.owner_player_id == player_id and card.zone == :attached and
+      is_binary(card.attached_to_card_instance_id) and require_basic_energy(card.card_id) == :ok
+  end
+
+  defp energy_switch_target_card?(%CardInstance{} = card, player_id) do
+    card.owner_player_id == player_id and card.zone in [:active, :bench] and
+      require_pokemon_card(card.card_id) == :ok
+  end
+
+  defp selected_energy_switch_source(cards, player_id) do
+    case Enum.filter(cards, &energy_switch_source_card?(&1, player_id)) do
+      [energy_card] -> {:ok, energy_card}
+      [] -> {:error, :missing_energy_switch_source}
+      _multiple -> {:error, :ambiguous_energy_switch_source}
+    end
+  end
+
+  defp selected_energy_switch_target(cards, player_id) do
+    case Enum.filter(cards, &energy_switch_target_card?(&1, player_id)) do
+      [target_card] -> {:ok, target_card}
+      [] -> {:error, :missing_energy_switch_target}
+      _multiple -> {:error, :ambiguous_energy_switch_target}
+    end
+  end
+
+  defp require_energy_switch_target_changed(
+         %CardInstance{attached_to_card_instance_id: target_card_instance_id},
+         %CardInstance{id: target_card_instance_id}
+       ) do
+    {:error, :energy_switch_target_must_be_different_pokemon}
+  end
+
+  defp require_energy_switch_target_changed(%CardInstance{}, %CardInstance{}), do: :ok
+
   defp require_all_special_energy(cards) do
     cards
     |> Enum.map(&require_special_energy(&1.card_id))
@@ -789,6 +905,94 @@ defmodule Prizmo.TcgEngine.CardPlay do
       update(card, :discard, %{position: position, attached_to_card_instance_id: nil})
     end
   end
+
+  defp energy_switch_move_payload(card, source_target_card_instance_id, target_card_instance_id) do
+    %{
+      instance_id: card.id,
+      card_id: card.card_id,
+      owner_player_id: card.owner_player_id,
+      from_zone: :attached,
+      to_zone: :attached,
+      from_attached_to_card_instance_id: source_target_card_instance_id,
+      to_attached_to_card_instance_id: target_card_instance_id,
+      to_position: card.position
+    }
+  end
+
+  defp prompt_payload(game_id, choice_key, legal_choice_ids, min, max) do
+    maybe_put_prompt_choice_labels(
+      %{
+        choice_key: Atom.to_string(choice_key),
+        legal_choices: legal_choice_ids,
+        min: min,
+        max: max
+      },
+      game_id,
+      choice_key,
+      legal_choice_ids
+    )
+  end
+
+  defp maybe_put_prompt_choice_labels(
+         payload,
+         game_id,
+         :move_basic_energy_between_own_pokemon,
+         legal_choice_ids
+       ) do
+    case CardStore.list_cards(game_id) do
+      {:ok, cards} ->
+        cards_by_id = Map.new(cards, &{&1.id, &1})
+
+        labels =
+          legal_choice_ids
+          |> Enum.map(&Map.get(cards_by_id, &1))
+          |> Enum.reject(&is_nil/1)
+          |> Enum.map(&energy_switch_choice_label(&1, cards_by_id))
+
+        Map.put(payload, :legal_choice_labels, labels)
+
+      {:error, _reason} ->
+        payload
+    end
+  end
+
+  defp maybe_put_prompt_choice_labels(payload, _game_id, _choice_key, _legal_choice_ids),
+    do: payload
+
+  defp energy_switch_choice_label(%CardInstance{zone: :attached} = card, cards_by_id) do
+    target_name =
+      cards_by_id
+      |> Map.get(card.attached_to_card_instance_id)
+      |> card_name("attached Pokémon")
+
+    %{
+      id: card.id,
+      label: card_name(card, card.card_id),
+      detail: "Source Basic Energy attached to #{target_name}"
+    }
+  end
+
+  defp energy_switch_choice_label(%CardInstance{} = card, _cards_by_id) do
+    %{
+      id: card.id,
+      label: card_name(card, card.card_id),
+      detail: "Target Pokémon in #{Atom.to_string(card.zone)}"
+    }
+  end
+
+  defp card_name(nil, fallback), do: fallback
+
+  defp card_name(%CardInstance{card_id: card_id}, fallback) do
+    case CardCatalog.fetch(card_id) do
+      {:ok, %{name: name}} when is_binary(name) -> name
+      {:ok, _card} -> fallback
+      {:error, _reason} -> fallback
+    end
+  end
+
+  defp in_play_zone_sort(:active), do: 0
+  defp in_play_zone_sort(:bench), do: 1
+  defp in_play_zone_sort(_zone), do: 2
 
   defp effect_step(definition, choice_key) do
     Enum.find(definition.effects, &(&1.key == choice_key))
