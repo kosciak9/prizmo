@@ -128,6 +128,10 @@ defmodule Prizmo.Tcg.Cards.Behaviors.TWM do
     card_effect(effect: %{type: :special_condition_immunity_for_pokemon_with_energy})
   end
 
+  card "TWM-150" do
+    card_effect(effect: %{type: :move_energy_from_attacker_to_defender_bench_on_damage})
+  end
+
   card "TWM-154" do
     card_effect(
       effect: %{

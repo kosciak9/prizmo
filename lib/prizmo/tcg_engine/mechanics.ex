@@ -93,6 +93,7 @@ defmodule Prizmo.TcgEngine.Mechanics do
   alias Prizmo.TcgEngine.Setup
   alias Prizmo.TcgEngine.SnapshotRestorer
   alias Prizmo.TcgEngine.StadiumEffects
+  alias Prizmo.TcgEngine.ToolEffects
   alias Prizmo.TcgEngine.Turn
   alias Prizmo.TcgEngine.ZoneActions
 
@@ -1461,6 +1462,15 @@ defmodule Prizmo.TcgEngine.Mechanics do
                effective_attack,
                opts
              ),
+           {:ok, handheld_fan_payload} <-
+             ToolEffects.apply_handheld_fan_if_needed(
+               game.id,
+               player_id,
+               attacker_card,
+               defender_card,
+               damage_result,
+               opts
+             ),
            {:ok, event} <-
              write_event(
                game,
@@ -1475,6 +1485,7 @@ defmodule Prizmo.TcgEngine.Mechanics do
                |> Map.merge(
                  AttackEffects.merge_copied_attack_payload(copied_attack_payload, effect_payload)
                )
+               |> maybe_put(:handheld_fan_energy_moved, handheld_fan_payload)
              ),
            {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do
         with {:ok, prize_selections} <-

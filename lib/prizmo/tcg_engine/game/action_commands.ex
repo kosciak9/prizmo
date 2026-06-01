@@ -651,6 +651,14 @@ defmodule Prizmo.TcgEngine.Game.ActionCommands do
         allow_nil? true
       end
 
+      argument :handheld_fan_attachment_id, :uuid do
+        allow_nil? true
+      end
+
+      argument :handheld_fan_target_id, :uuid do
+        allow_nil? true
+      end
+
       run fn input, _context ->
         Mechanics.resolve_declared_attack(input.arguments.game_id, input.arguments.player_id, %{
           switch_bench_card_instance_id: Map.get(input.arguments, :switch_bench_card_instance_id),
@@ -663,7 +671,9 @@ defmodule Prizmo.TcgEngine.Game.ActionCommands do
           bench_damage_counter_allocations: input.arguments.bench_damage_counter_allocations,
           coin_result: Map.get(input.arguments, :coin_result),
           heads_count: Map.get(input.arguments, :heads_count),
-          copied_attack_id: Map.get(input.arguments, :copied_attack_id)
+          copied_attack_id: Map.get(input.arguments, :copied_attack_id),
+          handheld_fan_attachment_id: Map.get(input.arguments, :handheld_fan_attachment_id),
+          handheld_fan_target_id: Map.get(input.arguments, :handheld_fan_target_id)
         })
       end
     end
