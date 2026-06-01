@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 
 import {
   runAttachTcgEngineEnergy,
+  runAttachTcgEngineTool,
   buildAshRpcHeaders,
   runCallTcgEngineCoinToss,
   runChooseTcgEngineActiveFromHand,
@@ -30,6 +31,7 @@ import {
   runPlaceTcgEnginePrizes,
   runPlayTcgEngineBasicToBench,
   runPlayTcgEngineCard,
+  runPlayTcgEngineStadium,
   runRetreatTcgEngineActive,
   runResolveTcgEngineDeclaredAttack,
   runSkipTcgEngineDrawForTurn,
@@ -542,6 +544,17 @@ type PlayCardCommand = {
   cardInstanceId: string
 }
 
+type PlayStadiumInput = {
+  gameId: string
+  playerId: PlayerId
+  cardInstanceId: string
+}
+
+type PlayStadiumCommand = {
+  playerId: string
+  cardInstanceId: string
+}
+
 type PlayBasicToBenchInput = {
   gameId: string
   playerId: PlayerId
@@ -587,6 +600,19 @@ type AttachEnergyInput = {
 type AttachEnergyCommand = {
   playerId: string
   energyCardInstanceId: string
+  targetCardInstanceId: string
+}
+
+type AttachToolInput = {
+  gameId: string
+  playerId: PlayerId
+  toolCardInstanceId: string
+  targetCardInstanceId: string
+}
+
+type AttachToolCommand = {
+  playerId: string
+  toolCardInstanceId: string
   targetCardInstanceId: string
 }
 
@@ -976,6 +1002,14 @@ export function HomeRoute() {
     }
   })
 
+  const playStadiumMutation = useMutation({
+    mutationFn: (input: PlayStadiumInput) => playStadium(input),
+    onSuccess: async (_game, input) => {
+      clearUltraBallPostSearchHandoff(input.gameId, input.playerId)
+      await queryClient.invalidateQueries({ queryKey: ['tcg-engine', 'game-state'] })
+    }
+  })
+
   const playBasicToBenchMutation = useMutation({
     mutationFn: (input: PlayBasicToBenchInput) => playBasicToBench(input),
     onSuccess: async (_game, input) => {
@@ -994,6 +1028,14 @@ export function HomeRoute() {
 
   const attachEnergyMutation = useMutation({
     mutationFn: (input: AttachEnergyInput) => attachEnergy(input),
+    onSuccess: async (_game, input) => {
+      clearUltraBallPostSearchHandoff(input.gameId, input.playerId)
+      await queryClient.invalidateQueries({ queryKey: ['tcg-engine', 'game-state'] })
+    }
+  })
+
+  const attachToolMutation = useMutation({
+    mutationFn: (input: AttachToolInput) => attachTool(input),
     onSuccess: async (_game, input) => {
       clearUltraBallPostSearchHandoff(input.gameId, input.playerId)
       await queryClient.invalidateQueries({ queryKey: ['tcg-engine', 'game-state'] })
@@ -1198,6 +1240,11 @@ export function HomeRoute() {
       'The card stayed in place. Refresh state and confirm the card is still playable from this viewer hand.'
     ) ??
     commandErrorNotice(
+      playStadiumMutation.error,
+      'Play Stadium failed',
+      'The Stadium stayed in hand. Refresh state and confirm this viewer still has priority from the action window.'
+    ) ??
+    commandErrorNotice(
       playBasicToBenchMutation.error,
       'Bench Basic failed',
       'No Pokémon was Benched. Confirm the card is a visible Basic and this viewer has an open Bench slot.'
@@ -1211,6 +1258,11 @@ export function HomeRoute() {
       attachEnergyMutation.error,
       'Attach Energy failed',
       'Energy was not attached. Confirm this player has not already attached Energy this turn, then retry.'
+    ) ??
+    commandErrorNotice(
+      attachToolMutation.error,
+      'Attach Tool failed',
+      'The Tool was not attached. Confirm the target Pokémon has no Tool attached and this viewer has priority.'
     ) ??
     commandErrorNotice(
       retreatMutation.error,
@@ -1616,6 +1668,16 @@ export function HomeRoute() {
                     })
                   }
                 }}
+                onAttachTool={({ playerId, toolCardInstanceId, targetCardInstanceId }) => {
+                  if (isPlayerId(playerId)) {
+                    attachToolMutation.mutate({
+                      gameId: normalisedGameId,
+                      playerId,
+                      toolCardInstanceId,
+                      targetCardInstanceId
+                    })
+                  }
+                }}
                 onEndTurn={({ playerId }) => {
                   if (isPlayerId(playerId)) {
                     endTurnMutation.mutate({
@@ -1691,6 +1753,15 @@ export function HomeRoute() {
                     })
                   }
                 }}
+                onPlayStadium={({ playerId, cardInstanceId }) => {
+                  if (isPlayerId(playerId)) {
+                    playStadiumMutation.mutate({
+                      gameId: normalisedGameId,
+                      playerId,
+                      cardInstanceId
+                    })
+                  }
+                }}
                 onPlayBasicToBench={({ playerId, cardInstanceId }) => {
                   if (isPlayerId(playerId)) {
                     playBasicToBenchMutation.mutate({
@@ -1729,6 +1800,14 @@ export function HomeRoute() {
                       )
                     : null
                 }
+                attachToolPendingKey={
+                  attachToolMutation.isPending && attachToolMutation.variables
+                    ? attachToolPairKey(
+                        attachToolMutation.variables.toolCardInstanceId,
+                        attachToolMutation.variables.targetCardInstanceId
+                      )
+                    : null
+                }
                 chooseSetupActivePendingCardId={
                   chooseActiveMutation.isPending ? chooseActiveMutation.variables?.cardInstanceId ?? null : null
                 }
@@ -1755,6 +1834,9 @@ export function HomeRoute() {
                 promptPendingId={choosePromptMutation.isPending ? choosePromptMutation.variables?.promptId ?? null : null}
                 endTurnPendingPlayerId={endTurnMutation.isPending ? endTurnMutation.variables?.playerId ?? null : null}
                 playCardPendingCardId={playCardMutation.isPending ? playCardMutation.variables?.cardInstanceId ?? null : null}
+                playStadiumPendingCardId={
+                  playStadiumMutation.isPending ? playStadiumMutation.variables?.cardInstanceId ?? null : null
+                }
                 retreatPendingKey={
                   retreatMutation.isPending && retreatMutation.variables
                     ? retreatKey(
@@ -2274,6 +2356,20 @@ async function playCard(input: PlayCardInput): Promise<CreatedGame> {
   return result.data as CreatedGame
 }
 
+async function playStadium(input: PlayStadiumInput): Promise<CreatedGame> {
+  const result = await runPlayTcgEngineStadium({
+    input,
+    fields: GAME_RESOURCE_FIELDS,
+    headers: buildAshRpcHeaders()
+  })
+
+  if (!result.success) {
+    throw new Error(rpcErrorMessage(result.errors))
+  }
+
+  return result.data as CreatedGame
+}
+
 async function playBasicToBench(input: PlayBasicToBenchInput): Promise<CreatedGame> {
   const result = await runPlayTcgEngineBasicToBench({
     input,
@@ -2304,6 +2400,20 @@ async function evolveFromHand(input: EvolveFromHandInput): Promise<CreatedGame> 
 
 async function attachEnergy(input: AttachEnergyInput): Promise<CreatedGame> {
   const result = await runAttachTcgEngineEnergy({
+    input,
+    fields: GAME_RESOURCE_FIELDS,
+    headers: buildAshRpcHeaders()
+  })
+
+  if (!result.success) {
+    throw new Error(rpcErrorMessage(result.errors))
+  }
+
+  return result.data as CreatedGame
+}
+
+async function attachTool(input: AttachToolInput): Promise<CreatedGame> {
+  const result = await runAttachTcgEngineTool({
     input,
     fields: GAME_RESOURCE_FIELDS,
     headers: buildAshRpcHeaders()
@@ -2447,6 +2557,7 @@ function GameStateWorkbench({
   onChoosePrompt,
   onChooseReplacementActive,
   onAttachEnergy,
+  onAttachTool,
   onDeclareAttack,
   onEndTurn,
   onEvolveFromHand,
@@ -2454,10 +2565,12 @@ function GameStateWorkbench({
   onFinishAttack,
   onPlayBasicToBench,
   onPlayCard,
+  onPlayStadium,
   onRetreat,
   onResolveDeclaredAttack,
   onUndo,
   attachEnergyPendingKey,
+  attachToolPendingKey,
   callCoinTossPending,
   chooseSetupActivePendingCardId,
   chooseSetupBenchPendingCardId,
@@ -2474,6 +2587,7 @@ function GameStateWorkbench({
   playBasicToBenchPendingCardId,
   promptPendingId,
   playCardPendingCardId,
+  playStadiumPendingCardId,
   resolveDeclaredAttackPendingPlayerId,
   retreatPendingKey
 }: {
@@ -2495,6 +2609,7 @@ function GameStateWorkbench({
   onChoosePrompt: (input: ChoosePromptCommand) => void
   onChooseReplacementActive: (input: ChooseReplacementActiveCommand) => void
   onAttachEnergy: (input: AttachEnergyCommand) => void
+  onAttachTool: (input: AttachToolCommand) => void
   onDeclareAttack: (input: DeclareAttackCommand) => void
   onEndTurn: (input: EndTurnCommand) => void
   onEvolveFromHand: (input: EvolveFromHandCommand) => void
@@ -2502,10 +2617,12 @@ function GameStateWorkbench({
   onFinishAttack: (input: FinishAttackCommand) => void
   onPlayBasicToBench: (input: PlayBasicToBenchCommand) => void
   onPlayCard: (input: PlayCardCommand) => void
+  onPlayStadium: (input: PlayStadiumCommand) => void
   onRetreat: (input: RetreatCommand) => void
   onResolveDeclaredAttack: (input: ResolveDeclaredAttackCommand) => void
   onUndo: () => void
   attachEnergyPendingKey: string | null
+  attachToolPendingKey: string | null
   callCoinTossPending: boolean
   chooseSetupActivePendingCardId: string | null
   chooseSetupBenchPendingCardId: string | null
@@ -2522,14 +2639,17 @@ function GameStateWorkbench({
   playBasicToBenchPendingCardId: string | null
   promptPendingId: string | null
   playCardPendingCardId: string | null
+  playStadiumPendingCardId: string | null
   resolveDeclaredAttackPendingPlayerId: string | null
   retreatPendingKey: string | null
 }) {
   const cardsById = useMemo(() => visibleCardsById(gameState), [gameState])
   const actionCommandPending = Boolean(
     playCardPendingCardId ||
+      playStadiumPendingCardId ||
       playBasicToBenchPendingCardId ||
       attachEnergyPendingKey ||
+      attachToolPendingKey ||
       chooseReplacementActivePendingCardId ||
       declareAttackPendingKey ||
       endTurnPendingPlayerId ||
@@ -2539,6 +2659,7 @@ function GameStateWorkbench({
   const cardInteractions = buildCardInteractionModel({
     actionCommandPending,
     attachEnergyPendingKey,
+    attachToolPendingKey,
     cardsById,
     chooseReplacementActivePendingCardId,
     chooseSetupActivePendingCardId,
@@ -2547,6 +2668,7 @@ function GameStateWorkbench({
     evolveFromHandPendingKey,
     gameState,
     onAttachEnergy,
+    onAttachTool,
     onChooseReplacementActive,
     onChooseSetupActive,
     onChooseSetupBench,
@@ -2554,9 +2676,11 @@ function GameStateWorkbench({
     onEvolveFromHand,
     onPlayBasicToBench,
     onPlayCard,
+    onPlayStadium,
     onRetreat,
     playBasicToBenchPendingCardId,
     playCardPendingCardId,
+    playStadiumPendingCardId,
     retreatPendingKey,
     viewerPlayerId
   })
@@ -2633,19 +2757,23 @@ function GameStateWorkbench({
             chooseReplacementActivePendingCardId={chooseReplacementActivePendingCardId}
             gameState={gameState}
             onAttachEnergy={onAttachEnergy}
+            onAttachTool={onAttachTool}
             onChooseReplacementActive={onChooseReplacementActive}
             onDeclareAttack={onDeclareAttack}
             onEndTurn={onEndTurn}
             onEvolveFromHand={onEvolveFromHand}
             onPlayBasicToBench={onPlayBasicToBench}
             onPlayCard={onPlayCard}
+            onPlayStadium={onPlayStadium}
             onRetreat={onRetreat}
             attachEnergyPendingKey={attachEnergyPendingKey}
+            attachToolPendingKey={attachToolPendingKey}
             declareAttackPendingKey={declareAttackPendingKey}
             endTurnPendingPlayerId={endTurnPendingPlayerId}
             evolveFromHandPendingKey={evolveFromHandPendingKey}
             playBasicToBenchPendingCardId={playBasicToBenchPendingCardId}
             playCardPendingCardId={playCardPendingCardId}
+            playStadiumPendingCardId={playStadiumPendingCardId}
             retreatPendingKey={retreatPendingKey}
             ultraBallPostSearchHandoff={ultraBallPostSearchHandoff}
             viewerPlayerId={viewerPlayerId}
@@ -2663,6 +2791,7 @@ function GameStateWorkbench({
 function buildCardInteractionModel({
   actionCommandPending,
   attachEnergyPendingKey,
+  attachToolPendingKey,
   cardsById,
   chooseReplacementActivePendingCardId,
   chooseSetupActivePendingCardId,
@@ -2671,6 +2800,7 @@ function buildCardInteractionModel({
   evolveFromHandPendingKey,
   gameState,
   onAttachEnergy,
+  onAttachTool,
   onChooseReplacementActive,
   onChooseSetupActive,
   onChooseSetupBench,
@@ -2678,14 +2808,17 @@ function buildCardInteractionModel({
   onEvolveFromHand,
   onPlayBasicToBench,
   onPlayCard,
+  onPlayStadium,
   onRetreat,
   playBasicToBenchPendingCardId,
   playCardPendingCardId,
+  playStadiumPendingCardId,
   retreatPendingKey,
   viewerPlayerId
 }: {
   actionCommandPending: boolean
   attachEnergyPendingKey: string | null
+  attachToolPendingKey: string | null
   cardsById: Map<string, CardSummary>
   chooseReplacementActivePendingCardId: string | null
   chooseSetupActivePendingCardId: string | null
@@ -2694,6 +2827,7 @@ function buildCardInteractionModel({
   evolveFromHandPendingKey: string | null
   gameState: GameState
   onAttachEnergy: (input: AttachEnergyCommand) => void
+  onAttachTool: (input: AttachToolCommand) => void
   onChooseReplacementActive: (input: ChooseReplacementActiveCommand) => void
   onChooseSetupActive: (input: SetupCardCommand) => void
   onChooseSetupBench: (input: SetupCardCommand) => void
@@ -2701,9 +2835,11 @@ function buildCardInteractionModel({
   onEvolveFromHand: (input: EvolveFromHandCommand) => void
   onPlayBasicToBench: (input: PlayBasicToBenchCommand) => void
   onPlayCard: (input: PlayCardCommand) => void
+  onPlayStadium: (input: PlayStadiumCommand) => void
   onRetreat: (input: RetreatCommand) => void
   playBasicToBenchPendingCardId: string | null
   playCardPendingCardId: string | null
+  playStadiumPendingCardId: string | null
   retreatPendingKey: string | null
   viewerPlayerId: PlayerId
 }): CardInteractionModel {
@@ -2780,6 +2916,24 @@ function buildCardInteractionModel({
       cardDirectedActionKeys.add(actionKeyValue)
     }
 
+    if (action.key === 'play_stadium') {
+      for (const cardInstanceId of action.sourceCardInstanceIds) {
+        const card = cardsById.get(cardInstanceId)
+        const pending = playStadiumPendingCardId === cardInstanceId
+
+        setCardIntent(cardInstanceId, {
+          badge: 'Stadium',
+          disabled: !canRunAction,
+          label: `Play Stadium ${card?.name ?? formatCardInstanceId(cardInstanceId)}`,
+          pending,
+          tone: 'primary',
+          onClick: () => onPlayStadium({ playerId: action.playerId, cardInstanceId })
+        })
+      }
+
+      cardDirectedActionKeys.add(actionKeyValue)
+    }
+
     if (action.key === 'play_basic_to_bench') {
       for (const cardInstanceId of action.sourceCardInstanceIds) {
         const card = cardsById.get(cardInstanceId)
@@ -2834,6 +2988,27 @@ function buildCardInteractionModel({
           pending: attachEnergyPendingKey === pairKey,
           tone: 'primary',
           onClick: () => onAttachEnergy({ playerId: action.playerId, energyCardInstanceId, targetCardInstanceId })
+        })
+      }
+
+      cardDirectedActionKeys.add(actionKeyValue)
+    }
+
+    if (action.key === 'attach_tool' && action.targetCardInstanceIds.length === 1) {
+      const targetCardInstanceId = action.targetCardInstanceIds[0]!
+
+      for (const toolCardInstanceId of action.sourceCardInstanceIds) {
+        const toolCard = cardsById.get(toolCardInstanceId)
+        const targetCard = cardsById.get(targetCardInstanceId)
+        const pairKey = attachToolPairKey(toolCardInstanceId, targetCardInstanceId)
+
+        setCardIntent(toolCardInstanceId, {
+          badge: 'Tool',
+          disabled: !canRunAction,
+          label: `Attach ${toolCard?.name ?? 'Tool'} to ${targetCard?.name ?? formatCardInstanceId(targetCardInstanceId)}`,
+          pending: attachToolPendingKey === pairKey,
+          tone: 'primary',
+          onClick: () => onAttachTool({ playerId: action.playerId, toolCardInstanceId, targetCardInstanceId })
         })
       }
 
@@ -5033,19 +5208,23 @@ function ActionAffordancesPanel({
   chooseReplacementActivePendingCardId,
   gameState,
   onAttachEnergy,
+  onAttachTool,
   onChooseReplacementActive,
   onDeclareAttack,
   onEndTurn,
   onEvolveFromHand,
   onPlayBasicToBench,
   onPlayCard,
+  onPlayStadium,
   onRetreat,
   attachEnergyPendingKey,
+  attachToolPendingKey,
   declareAttackPendingKey,
   endTurnPendingPlayerId,
   evolveFromHandPendingKey,
   playBasicToBenchPendingCardId,
   playCardPendingCardId,
+  playStadiumPendingCardId,
   retreatPendingKey,
   ultraBallPostSearchHandoff,
   viewerPlayerId
@@ -5056,27 +5235,33 @@ function ActionAffordancesPanel({
   chooseReplacementActivePendingCardId: string | null
   gameState: GameState
   onAttachEnergy: (input: AttachEnergyCommand) => void
+  onAttachTool: (input: AttachToolCommand) => void
   onChooseReplacementActive: (input: ChooseReplacementActiveCommand) => void
   onDeclareAttack: (input: DeclareAttackCommand) => void
   onEndTurn: (input: EndTurnCommand) => void
   onEvolveFromHand: (input: EvolveFromHandCommand) => void
   onPlayBasicToBench: (input: PlayBasicToBenchCommand) => void
   onPlayCard: (input: PlayCardCommand) => void
+  onPlayStadium: (input: PlayStadiumCommand) => void
   onRetreat: (input: RetreatCommand) => void
   attachEnergyPendingKey: string | null
+  attachToolPendingKey: string | null
   declareAttackPendingKey: string | null
   endTurnPendingPlayerId: string | null
   evolveFromHandPendingKey: string | null
   playBasicToBenchPendingCardId: string | null
   playCardPendingCardId: string | null
+  playStadiumPendingCardId: string | null
   retreatPendingKey: string | null
   ultraBallPostSearchHandoff: UltraBallPostSearchHandoff | null
   viewerPlayerId: PlayerId
 }) {
   const actionCommandPending = Boolean(
     playCardPendingCardId ||
+      playStadiumPendingCardId ||
       playBasicToBenchPendingCardId ||
       attachEnergyPendingKey ||
+      attachToolPendingKey ||
       chooseReplacementActivePendingCardId ||
       declareAttackPendingKey ||
       endTurnPendingPlayerId ||
@@ -5141,6 +5326,7 @@ function ActionAffordancesPanel({
                     action={entry.action}
                     actionCommandPending={actionCommandPending}
                     attachEnergyPendingKey={attachEnergyPendingKey}
+                    attachToolPendingKey={attachToolPendingKey}
                     benchOptions={entry.benchOptions}
                     cardsById={cardsById}
                     chooseReplacementActivePendingCardId={chooseReplacementActivePendingCardId}
@@ -5150,15 +5336,18 @@ function ActionAffordancesPanel({
                     evolveFromHandPendingKey={evolveFromHandPendingKey}
                     key={entry.key}
                     onAttachEnergy={onAttachEnergy}
+                    onAttachTool={onAttachTool}
                     onChooseReplacementActive={onChooseReplacementActive}
                     onDeclareAttack={onDeclareAttack}
                     onEndTurn={onEndTurn}
                     onEvolveFromHand={onEvolveFromHand}
                     onPlayBasicToBench={onPlayBasicToBench}
                     onPlayCard={onPlayCard}
+                    onPlayStadium={onPlayStadium}
                     onRetreat={onRetreat}
                     playBasicToBenchPendingCardId={playBasicToBenchPendingCardId}
                     playCardPendingCardId={playCardPendingCardId}
+                    playStadiumPendingCardId={playStadiumPendingCardId}
                     postSearchBattleAttackIds={postSearchHandoff?.battleAttackIds ?? []}
                     postSearchBenchCardInstanceIds={postSearchHandoff?.benchableCardInstanceIds ?? []}
                     postSearchEndTurnPlayerIds={postSearchHandoff?.endTurnPlayerIds ?? []}
@@ -5431,9 +5620,11 @@ function actionGroupDescription(group: ActionGroup, actionGroups: ActionGroup[])
 
   const commandPhrases = [
     group.actions.some(action => action.key === 'play_card') ? 'play engine-defined cards' : null,
+    group.actions.some(action => action.key === 'play_stadium') ? 'play Stadiums' : null,
     group.actions.some(action => action.key === 'play_basic_to_bench') ? 'Bench Basic Pokémon' : null,
     group.actions.some(action => action.key === 'evolve_from_hand') ? 'evolve eligible Pokémon' : null,
-    group.actions.some(action => action.key === 'attach_energy') ? 'attach Energy' : null
+    group.actions.some(action => action.key === 'attach_energy') ? 'attach Energy' : null,
+    group.actions.some(action => action.key === 'attach_tool') ? 'attach Tools' : null
   ].filter((phrase): phrase is string => Boolean(phrase))
 
   if (commandPhrases.length === 0) {
@@ -5463,6 +5654,8 @@ function handActionGuideDetail(
   const hasBasicBenchChoices = basicBenchOptions.length > 0
   const hasEvolutionChoices = evolutionOptions.length > 0
   const hasAttachEnergyChoice = handGroup.actions.some(action => action.key === 'attach_energy')
+  const hasAttachToolChoice = handGroup.actions.some(action => action.key === 'attach_tool')
+  const hasStadiumChoice = handGroup.actions.some(action => action.key === 'play_stadium')
   const hasTrainerChoice = playCardOptions.length > 0
   const followUpPhrase = handActionFollowUpPhrase(followUp)
   const evolutionTargetScope = evolutionTargetScopeLabel(evolutionOptions)
@@ -5493,16 +5686,20 @@ function handActionGuideDetail(
       : `${choiceLabel} visible. Bench the Basic Pokémon that improves the board ${followUpPhrase}.`
   }
 
-  if (hasAttachEnergyChoice && hasTrainerChoice) {
+  if ((hasAttachEnergyChoice || hasAttachToolChoice || hasStadiumChoice) && hasTrainerChoice) {
     return hasRepeatedPlayCardChoices
-      ? `${choiceLabel} visible. Duplicate Trainers use hand-slot labels; play one or attach Energy ${followUpPhrase}.`
-      : `${choiceLabel} visible. Play Trainers or attach Energy ${followUpPhrase}.`
+      ? `${choiceLabel} visible. Duplicate Trainers use hand-slot labels; play one, attach Energy, or attach Tools ${followUpPhrase}.`
+      : `${choiceLabel} visible. Play Trainers, Stadiums, or attach cards ${followUpPhrase}.`
   }
 
   if (hasTrainerChoice) {
     return hasRepeatedPlayCardChoices
       ? `${choiceLabel} visible. Duplicate Trainers use hand-slot labels, so choose the exact copy to play ${followUpPhrase}.`
       : `${choiceLabel} visible. Play Trainers ${followUpPhrase}.`
+  }
+
+  if (hasStadiumChoice || hasAttachToolChoice) {
+    return `${choiceLabel} visible. Play Stadiums or attach Tools ${followUpPhrase}.`
   }
 
   if (hasAttachEnergyChoice) {
@@ -5609,6 +5806,10 @@ function handActionChoiceCount(handGroup: ActionGroup, cardsById: Map<string, Ca
         return count + evolutionCommandOptions(action, cardsById).length
       case 'attach_energy':
         return count + action.sourceCardInstanceIds.length * action.targetCardInstanceIds.length
+      case 'attach_tool':
+        return count + action.sourceCardInstanceIds.length * action.targetCardInstanceIds.length
+      case 'play_stadium':
+        return count + action.sourceCardInstanceIds.length
       case 'play_card':
         return count + action.sourceCardInstanceIds.length
       default:
@@ -5707,6 +5908,7 @@ function ActionAffordanceCard({
   action,
   actionCommandPending,
   attachEnergyPendingKey,
+  attachToolPendingKey,
   benchOptions: providedBenchOptions,
   cardsById,
   chooseReplacementActivePendingCardId,
@@ -5715,15 +5917,18 @@ function ActionAffordanceCard({
   evolutionOptions: providedEvolutionOptions,
   evolveFromHandPendingKey,
   onAttachEnergy,
+  onAttachTool,
   onChooseReplacementActive,
   onDeclareAttack,
   onEndTurn,
   onEvolveFromHand,
   onPlayBasicToBench,
   onPlayCard,
+  onPlayStadium,
   onRetreat,
   playBasicToBenchPendingCardId,
   playCardPendingCardId,
+  playStadiumPendingCardId,
   postSearchBattleAttackIds,
   postSearchBenchCardInstanceIds,
   postSearchEndTurnPlayerIds,
@@ -5732,6 +5937,7 @@ function ActionAffordanceCard({
   action: ActionAffordance
   actionCommandPending: boolean
   attachEnergyPendingKey: string | null
+  attachToolPendingKey: string | null
   benchOptions?: BasicBenchCommandOption[]
   cardsById: Map<string, CardSummary>
   chooseReplacementActivePendingCardId: string | null
@@ -5740,15 +5946,18 @@ function ActionAffordanceCard({
   evolutionOptions?: EvolutionCommandOption[]
   evolveFromHandPendingKey: string | null
   onAttachEnergy: (input: AttachEnergyCommand) => void
+  onAttachTool: (input: AttachToolCommand) => void
   onChooseReplacementActive: (input: ChooseReplacementActiveCommand) => void
   onDeclareAttack: (input: DeclareAttackCommand) => void
   onEndTurn: (input: EndTurnCommand) => void
   onEvolveFromHand: (input: EvolveFromHandCommand) => void
   onPlayBasicToBench: (input: PlayBasicToBenchCommand) => void
   onPlayCard: (input: PlayCardCommand) => void
+  onPlayStadium: (input: PlayStadiumCommand) => void
   onRetreat: (input: RetreatCommand) => void
   playBasicToBenchPendingCardId: string | null
   playCardPendingCardId: string | null
+  playStadiumPendingCardId: string | null
   postSearchBattleAttackIds: string[]
   postSearchBenchCardInstanceIds: string[]
   postSearchEndTurnPlayerIds: PlayerId[]
@@ -5821,6 +6030,27 @@ function ActionAffordanceCard({
                 onClick={() => onPlayCard({ playerId: action.playerId, cardInstanceId: option.cardInstanceId })}
               >
                 {isPending ? playCardPendingLabel(option) : playCardButtonLabel(option, needsSourceCopyLabel)}
+              </ActionCommandButton>
+            )
+          })}
+        </div>
+      ) : null}
+
+      {action.key === 'play_stadium' && action.sourceCardInstanceIds.length > 0 ? (
+        <div className="mt-2 space-y-1.5">
+          {action.sourceCardInstanceIds.map(cardInstanceId => {
+            const stadiumCard = cardsById.get(cardInstanceId)
+            const isPending = playStadiumPendingCardId === cardInstanceId
+
+            return (
+              <ActionCommandButton
+                disabled={!canRunAction}
+                key={cardInstanceId}
+                onClick={() => onPlayStadium({ playerId: action.playerId, cardInstanceId })}
+              >
+                {isPending
+                  ? `Playing ${stadiumCard?.name ?? 'Stadium'}...`
+                  : `Play Stadium ${stadiumCard?.name ?? formatCardInstanceId(cardInstanceId)}`}
               </ActionCommandButton>
             )
           })}
@@ -5903,6 +6133,39 @@ function ActionAffordanceCard({
                   {isPending
                     ? `Attaching ${energyCard?.name ?? 'Energy'}...`
                     : `Attach ${energyCard?.name ?? formatCardInstanceId(energyCardInstanceId)} to ${
+                        targetCard?.name ?? formatCardInstanceId(targetCardInstanceId)
+                      }`}
+                </ActionCommandButton>
+              )
+            })
+          )}
+        </div>
+      ) : null}
+
+      {action.key === 'attach_tool' && action.sourceCardInstanceIds.length > 0 && action.targetCardInstanceIds.length > 0 ? (
+        <div className="mt-2 space-y-1.5">
+          {action.sourceCardInstanceIds.flatMap(toolCardInstanceId =>
+            action.targetCardInstanceIds.map(targetCardInstanceId => {
+              const toolCard = cardsById.get(toolCardInstanceId)
+              const targetCard = cardsById.get(targetCardInstanceId)
+              const pairKey = attachToolPairKey(toolCardInstanceId, targetCardInstanceId)
+              const isPending = attachToolPendingKey === pairKey
+
+              return (
+                <ActionCommandButton
+                  disabled={!canRunAction}
+                  key={pairKey}
+                  onClick={() =>
+                    onAttachTool({
+                      playerId: action.playerId,
+                      toolCardInstanceId,
+                      targetCardInstanceId
+                    })
+                  }
+                >
+                  {isPending
+                    ? `Attaching ${toolCard?.name ?? 'Tool'}...`
+                    : `Attach ${toolCard?.name ?? formatCardInstanceId(toolCardInstanceId)} to ${
                         targetCard?.name ?? formatCardInstanceId(targetCardInstanceId)
                       }`}
                 </ActionCommandButton>
@@ -6001,7 +6264,7 @@ function ActionAffordanceCard({
 function BlockedActionNotice({ action }: { action: ActionAffordance }) {
   return (
     <div className="mt-2 rounded-lg border border-attention/25 bg-attention/10 px-3 py-2 text-xs leading-5 text-attention">
-      <p className="font-semibold">Known card text, no command yet</p>
+      <p className="font-semibold">Known card text pending</p>
       <p className="mt-1 text-attention/90">{actionSummary(action)}</p>
     </div>
   )
@@ -6132,6 +6395,8 @@ function actionSummary(action: ActionAffordance) {
       return `${actionCountLabel(action.targetCardInstanceIds.length, 'Bench candidate')} can become Active.`
     case 'play_card':
       return `${actionCountLabel(action.sourceCardInstanceIds.length, 'card')} from hand can be played.`
+    case 'play_stadium':
+      return `${actionCountLabel(action.sourceCardInstanceIds.length, 'Stadium')} from hand can enter the Stadium zone.`
     case 'play_basic_to_bench':
       return `${actionCountLabel(action.sourceCardInstanceIds.length, 'Basic Pokémon', 'Basic Pokémon')} can move to Bench.`
     case 'evolve_from_hand':
@@ -6143,6 +6408,11 @@ function actionSummary(action: ActionAffordance) {
       return `${actionCountLabel(action.sourceCardInstanceIds.length, 'Energy card')} can attach to ${actionCountLabel(
         action.targetCardInstanceIds.length,
         'target'
+      )}.`
+    case 'attach_tool':
+      return `${actionCountLabel(action.sourceCardInstanceIds.length, 'Tool')} can attach to ${actionCountLabel(
+        action.targetCardInstanceIds.length,
+        'Pokémon'
       )}.`
     case 'retreat':
       return `${actionCountLabel(action.targetCardInstanceIds.length, 'Bench target')} with ${retreatCostSummary(
@@ -6157,7 +6427,7 @@ function actionSummary(action: ActionAffordance) {
     case 'unsupported_ability':
       return `${pendingActionName(action)} is visible on a Pokémon in play, but ability execution is pending implementation.`
     case 'unsupported_trainer':
-      return `${pendingActionName(action)} is in hand and known to the catalog, but no executable Play command is available yet.`
+      return action.note ?? `${pendingActionName(action)} is in hand and known to the catalog, but no executable Play command is available yet.`
     case 'pass':
       return `End the action window for ${formatPlayerId(action.playerId)}.`
     default:
@@ -6548,9 +6818,11 @@ function actionGroupId(action: ActionAffordance): ActionGroupId {
     case 'choose_replacement_active':
       return 'required'
     case 'play_card':
+    case 'play_stadium':
     case 'play_basic_to_bench':
     case 'evolve_from_hand':
     case 'attach_energy':
+    case 'attach_tool':
       return 'hand'
     case 'retreat':
     case 'declare_attack':
@@ -8785,6 +9057,10 @@ function actionKey(action: ActionAffordance) {
 
 function attachEnergyPairKey(energyCardInstanceId: string, targetCardInstanceId: string) {
   return `${energyCardInstanceId}:${targetCardInstanceId}`
+}
+
+function attachToolPairKey(toolCardInstanceId: string, targetCardInstanceId: string) {
+  return `${toolCardInstanceId}:${targetCardInstanceId}`
 }
 
 function evolveKey(evolutionCardInstanceId: string, targetCardInstanceId: string) {

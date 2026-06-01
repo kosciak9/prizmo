@@ -12,6 +12,7 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
   alias Prizmo.TcgEngine.Game
   alias Prizmo.TcgEngine.GamePlayer
   alias Prizmo.TcgEngine.Prompt
+  alias Prizmo.TcgEngine.Requirements
   alias Prizmo.TcgEngine.RetreatLocks
   alias Prizmo.TcgEngine.Turn
 
@@ -103,8 +104,10 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
   defp available_action_window_affordances(%GamePlayer{} = player, current_turn, cards, all_cards) do
     [
       play_card_affordance(player, current_turn, cards, all_cards),
+      play_stadium_affordance(player, cards),
       play_basic_to_bench_affordance(player, cards),
       attach_energy_affordance(player, cards),
+      attach_tool_affordance(player, cards),
       retreat_affordance(player, current_turn, cards)
     ] ++
       evolve_from_hand_affordances(player, current_turn, cards) ++
@@ -128,6 +131,24 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
       affordance(:play_card, "Play engine-defined card", :command, player.player_id,
         source_card_instance_ids: source_ids,
         note: "Cards with engine-owned behavior can start costs, effects, or prompts."
+      )
+    end
+  end
+
+  defp play_stadium_affordance(%GamePlayer{} = player, cards) do
+    source_ids =
+      cards
+      |> hand_cards()
+      |> Enum.filter(&generic_stadium_playable?(player, &1))
+      |> card_ids()
+
+    if Enum.empty?(source_ids) do
+      nil
+    else
+      affordance(:play_stadium, "Play Stadium", :command, player.player_id,
+        source_card_instance_ids: source_ids,
+        note:
+          "Choose one Stadium from hand. The engine moves it to the Stadium zone and discards any existing Stadium; printed Stadium text may still be pending."
       )
     end
   end
@@ -167,6 +188,30 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
         source_card_instance_ids: source_ids,
         target_card_instance_ids: target_ids,
         note: "Choose one Energy from hand and one of your Pokémon in play."
+      )
+    end
+  end
+
+  defp attach_tool_affordance(%GamePlayer{} = player, cards) do
+    source_ids =
+      cards
+      |> hand_cards()
+      |> Enum.filter(&generic_tool_attachable?(player, &1))
+      |> card_ids()
+
+    target_ids =
+      cards
+      |> in_play_pokemon_cards_without_tool()
+      |> card_ids()
+
+    if Enum.empty?(source_ids) or Enum.empty?(target_ids) do
+      nil
+    else
+      affordance(:attach_tool, "Attach Pokémon Tool", :command, player.player_id,
+        source_card_instance_ids: source_ids,
+        target_card_instance_ids: target_ids,
+        note:
+          "Choose one Tool from hand and one of your Pokémon without a Tool attached. The attachment is generic; printed Tool text may still be pending."
       )
     end
   end
@@ -318,12 +363,46 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
     |> Enum.sort_by(&{&1.position, &1.instance_id})
   end
 
+  defp in_play_pokemon_cards_without_tool(cards) do
+    Enum.reject(in_play_pokemon_cards(cards), &tool_attached?(cards, &1.id))
+  end
+
+  defp tool_attached?(cards, card_instance_id) do
+    cards
+    |> attached_cards_for(card_instance_id)
+    |> Enum.any?(&tool_card?/1)
+  end
+
   defp bench_full?(cards), do: Enum.count(cards, &(&1.zone == :bench)) >= 5
 
   defp basic_pokemon?(%CardInstance{card_id: card_id}), do: CardCatalog.basic_pokemon?(card_id)
 
   defp energy_card?(%CardInstance{card_id: card_id}) do
     match?({:ok, %{supertype: :energy}}, CardCatalog.fetch(card_id))
+  end
+
+  defp tool_card?(%CardInstance{card_id: card_id}) do
+    match?({:ok, %{supertype: :trainer, trainer_type: :tool}}, CardCatalog.fetch(card_id))
+  end
+
+  defp generic_stadium_playable?(%GamePlayer{} = player, %CardInstance{card_id: card_id}) do
+    with {:ok, %{supertype: :trainer, trainer_type: :stadium} = metadata} <-
+           CardCatalog.fetch(card_id),
+         :ok <- Requirements.require_ace_spec_available(player, metadata) do
+      true
+    else
+      _other -> false
+    end
+  end
+
+  defp generic_tool_attachable?(%GamePlayer{} = player, %CardInstance{card_id: card_id}) do
+    with {:ok, %{supertype: :trainer, trainer_type: :tool} = metadata} <-
+           CardCatalog.fetch(card_id),
+         :ok <- Requirements.require_ace_spec_available(player, metadata) do
+      true
+    else
+      _other -> false
+    end
   end
 
   defp evolution_pokemon?(%CardInstance{card_id: card_id}) do
@@ -544,7 +623,7 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
     )
   end
 
-  defp trainer_pending_reason(card_id, %{raw_effect: raw_effect}) do
+  defp trainer_pending_reason(card_id, %{raw_effect: raw_effect} = catalog_card) do
     with true <- present_text?(raw_effect),
          {:ok, definition} <- EngineCardRegistry.fetch(card_id),
          false <- Map.get(definition, :play_window) == :action_window do
@@ -552,12 +631,23 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
        "This Trainer has authored behavior, but that timing window is not exposed in the current action surface."}
     else
       {:error, _reason} ->
-        {:pending,
-         "Trainer text has no executable engine behavior yet, so no Play command appears."}
+        {:pending, trainer_pending_note(catalog_card)}
 
       _other ->
         false
     end
+  end
+
+  defp trainer_pending_note(%{trainer_type: :stadium}) do
+    "This Stadium can be played generically, but its printed Stadium text is not executable yet."
+  end
+
+  defp trainer_pending_note(%{trainer_type: :tool}) do
+    "This Tool can attach generically, but its printed Tool text is not executable yet."
+  end
+
+  defp trainer_pending_note(_catalog_card) do
+    "Trainer text has no executable engine behavior yet, so no Play command appears."
   end
 
   defp special_energy_pending_note(%{name: "Team Rocket's Energy"}) do

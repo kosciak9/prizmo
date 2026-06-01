@@ -615,11 +615,7 @@ defmodule Prizmo.TcgEngine.GameView do
         )
 
       {:error, _reason} ->
-        rules_summary(
-          :unsupported,
-          unsupported_trainer_label(card),
-          "Known catalog card; Trainer text has no executable engine behavior yet, so no Play button appears."
-        )
+        generic_trainer_rules_summary(card)
     end
   end
 
@@ -739,6 +735,30 @@ defmodule Prizmo.TcgEngine.GameView do
 
   defp unsupported_trainer_label(_card), do: "Unsupported Trainer"
 
+  defp generic_trainer_rules_summary(%{trainer_type: :stadium}) do
+    rules_summary(
+      :partial,
+      "Generic Stadium",
+      "This Stadium can be played through the generic engine action; printed Stadium text may still be pending."
+    )
+  end
+
+  defp generic_trainer_rules_summary(%{trainer_type: :tool}) do
+    rules_summary(
+      :partial,
+      "Generic Tool",
+      "This Tool can attach through the generic engine action; printed Tool text may still be pending."
+    )
+  end
+
+  defp generic_trainer_rules_summary(card) do
+    rules_summary(
+      :unsupported,
+      unsupported_trainer_label(card),
+      "Known catalog card; Trainer text has no executable engine behavior yet, so no Play button appears."
+    )
+  end
+
   defp unsupported_action_summaries(card_id, %{supertype: :pokemon} = card) do
     unsupported_attack_summaries(card_id, card) ++ unsupported_ability_summaries(card)
   end
@@ -757,7 +777,7 @@ defmodule Prizmo.TcgEngine.GameView do
       {:error, _reason} ->
         unsupported_trainer_summaries(
           card,
-          "Trainer text has no executable engine behavior yet, so no Play command appears."
+          unsupported_trainer_summary_reason(card)
         )
     end
   end
@@ -843,6 +863,18 @@ defmodule Prizmo.TcgEngine.GameView do
     else
       []
     end
+  end
+
+  defp unsupported_trainer_summary_reason(%{trainer_type: :stadium}) do
+    "This Stadium can be played generically, but its printed Stadium text is not executable yet."
+  end
+
+  defp unsupported_trainer_summary_reason(%{trainer_type: :tool}) do
+    "This Tool can attach generically, but its printed Tool text is not executable yet."
+  end
+
+  defp unsupported_trainer_summary_reason(_card) do
+    "Trainer text has no executable engine behavior yet, so no Play command appears."
   end
 
   defp attack_damage(%{damage: damage}) when is_integer(damage), do: Integer.to_string(damage)

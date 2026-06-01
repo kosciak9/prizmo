@@ -34,9 +34,11 @@ defmodule Prizmo.TcgEngine do
       rpc_action :skip_tcg_engine_draw_for_turn, :skip_draw_for_turn_command
       rpc_action :open_tcg_engine_action_window, :open_action_window_command
       rpc_action :play_tcg_engine_card, :play_card_command
+      rpc_action :play_tcg_engine_stadium, :play_stadium_command
       rpc_action :play_tcg_engine_basic_to_bench, :play_basic_to_bench_command
       rpc_action :evolve_tcg_engine_from_hand, :evolve_from_hand_command
       rpc_action :attach_tcg_engine_energy, :attach_energy_command
+      rpc_action :attach_tcg_engine_tool, :attach_tool_command
       rpc_action :pass_tcg_engine_turn, :pass_turn_command
       rpc_action :undo_tcg_engine_game, :undo_command
       rpc_action :end_tcg_engine_turn, :end_turn_command
@@ -111,6 +113,10 @@ defmodule Prizmo.TcgEngine do
         action: :play_card_command,
         args: [:game_id, :player_id, :card_instance_id]
 
+      define :play_stadium_for_game,
+        action: :play_stadium_command,
+        args: [:game_id, :player_id, :card_instance_id]
+
       define :play_basic_to_bench_for_game,
         action: :play_basic_to_bench_command,
         args: [:game_id, :player_id, :card_instance_id]
@@ -122,6 +128,10 @@ defmodule Prizmo.TcgEngine do
       define :attach_energy_for_game,
         action: :attach_energy_command,
         args: [:game_id, :player_id, :energy_card_instance_id, :target_card_instance_id]
+
+      define :attach_tool_for_game,
+        action: :attach_tool_command,
+        args: [:game_id, :player_id, :tool_card_instance_id, :target_card_instance_id]
 
       define :pass_turn_for_game,
         action: :pass_turn_command,

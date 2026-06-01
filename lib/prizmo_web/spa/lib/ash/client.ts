@@ -1,5 +1,6 @@
 export {
   attachTcgEngineEnergy as runAttachTcgEngineEnergy,
+  attachTcgEngineTool as runAttachTcgEngineTool,
   buildCSRFHeaders as buildAshRpcHeaders,
   callTcgEngineCoinToss as runCallTcgEngineCoinToss,
   chooseTcgEngineReplacementActive as runChooseTcgEngineReplacementActive,
@@ -28,6 +29,7 @@ export {
   placeTcgEnginePrizes as runPlaceTcgEnginePrizes,
   playTcgEngineBasicToBench as runPlayTcgEngineBasicToBench,
   playTcgEngineCard as runPlayTcgEngineCard,
+  playTcgEngineStadium as runPlayTcgEngineStadium,
   retreatTcgEngineActive as runRetreatTcgEngineActive,
   resolveTcgEngineDeclaredAttack as runResolveTcgEngineDeclaredAttack,
   skipTcgEngineDrawForTurn as runSkipTcgEngineDrawForTurn,
@@ -39,6 +41,8 @@ export {
 export type {
   AttachTcgEngineEnergyInput,
   AttachTcgEngineEnergyResult,
+  AttachTcgEngineToolInput,
+  AttachTcgEngineToolResult,
   CallTcgEngineCoinTossInput,
   CallTcgEngineCoinTossResult,
   ChooseTcgEngineActiveFromHandInput,
@@ -94,6 +98,8 @@ export type {
   PlayTcgEngineBasicToBenchResult,
   PlayTcgEngineCardInput,
   PlayTcgEngineCardResult,
+  PlayTcgEngineStadiumInput,
+  PlayTcgEngineStadiumResult,
   RetreatTcgEngineActiveInput,
   RetreatTcgEngineActiveResult,
   ResolveTcgEngineDeclaredAttackInput,
