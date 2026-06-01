@@ -15,9 +15,11 @@ defmodule Prizmo.TcgEngine.EventLog do
     with {:ok, current_game} <- get_game(game.id),
          :ok <- truncate_future_branch(current_game),
          index = current_game.cursor_index + 1,
+         turn_id = Map.get(payload, :turn_id) || Map.get(payload, "turn_id"),
          {:ok, event} <-
            create(GameEvent, :create, %{
              game_id: current_game.id,
+             turn_id: turn_id,
              index: index,
              type: Atom.to_string(type),
              player_id: player_id,

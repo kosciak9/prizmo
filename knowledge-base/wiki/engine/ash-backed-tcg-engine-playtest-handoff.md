@@ -1,6 +1,6 @@
 # Ash-backed TCG Engine Playtest Handoff
 
-- Updated: 2026-06-01 (batch 223)
+- Updated: 2026-06-01 (batch 224)
 - Sources: Project codebase; local validation; wiki log
 - Raw: N/A — operational handoff
 
@@ -11,6 +11,13 @@
 - Highest-value feasible batches to prefer when available: open-deck game creation and catalog-backed deck validation; engine-owned persisted RNG for shuffle, opening hands, prizes, and draws; safe setup for arbitrary loaded decks with explicit unsupported-card behavior; TCG layout benchmark notes followed by card-front/card-back board improvements; compact experienced-player action and prompt surfaces; then broader generic mechanics and card behavior. If another fixture-backed mechanic slice is the highest-value feasible step, do it and record how it protects correctness or advances the north star.
 - UI batches must benchmark Pokémon TCG and at least one other TCG layout before substantial layout changes, then record what Prizmo adopts or rejects in the wiki/log for the batch. Batch 219 completed this benchmark; Prizmo adopted overlapping card backs for opponent hand, card back zone visuals for deck/prizes, top-card discard preview, and stadium card art. Prizmo deferred Hearthstone-style board interactivity/fanning and PTCGL-style exact zone replication.
 - Keep raw payloads, IDs, debug counters, and tutorial copy out of the normal play path. The product target is a serious, dense card table for players who already know Pokémon TCG.
+
+## Iteration 224 handoff
+
+- Current state: no durable game command was executed against long-lived playtest game `f6df7025-7d0f-4d9b-9bc2-31c864de1d4e`, open-deck validation game `302a39ed-d15b-4fcb-8a13-80eb2eed71be`, or mulligan validation game `762faa63-a747-430a-ab00-b4ce3b59158a`. Ariana validation used rollback-only staged player-1-turn-2 Rocket's Mewtwo vs Alakazam boards. Archer validation used the same rollback-only staged turn-2 setup plus a synthetic previous-turn `take_knockout_prizes` event carrying a Team Rocket KO payload so the new persisted legality gate could be exercised without mutating a durable game. Last commit at iteration start: `e6d38e9 feat(tcg): support wallys compassion`.
+- Completed grouped Rocket Supporter Ash parity: Team Rocket's Ariana (`DRI-171`) and Team Rocket's Archer (`DRI-170`) are now engine-defined on the canonical `play_card` path. Ariana is visible only when its post-play hand would stay below the target size, draws until 5 cards in hand or 8 when all of the active player's in-play Pokémon are Team Rocket Pokémon, and rejects with `:draw_until_hand_size_has_no_effect` when it would be a no-op. Archer is visible only when the opponent's immediately previous turn persisted a `take_knockout_prizes` fact whose knockout payload includes one of the current player's Team Rocket Pokémon. It then discards/marks through normal Supporter handling, shuffles each player's hand into deck with the existing engine-owned Trainer shuffle, and draws 5 for the acting player plus 3 for the opponent. Supporting plumbing: `EventLog.write_event/4` now fills `GameEvent.turn_id` from payload, and knockout-prize events now pass `turn_id`, so last-turn legality checks can derive from persisted event history instead of mutable player flags.
+- Validation: `mix format`, `mix compile --warnings-as-errors`, `node_modules/.bin/tsc --noEmit`, `mix test test/prizmo/tcg_engine/mechanics_test.exs`, rollback Tidewave validation of Ariana visibility/resolution/no-effect gating and Archer hidden/visible legality plus 5/3 shuffle-draw resolution, `git diff --check`, and final `mix check` passed.
+- Recommended next atomic task: if the next batch stays on engine behavior, Team Rocket's Factory (`DRI-173`) is now the strongest remaining Rocket's Mewtwo canonical parity candidate because Ariana, Archer, Proton, and Giovanni all make its once-per-turn post-Team Rocket-Supporter draw effect more valuable on the real Ash path. If the next batch returns to the product surface instead, large-hand density/fanning or event-history polish remain stronger candidates than revisiting basic card-attached affordances.
 
 ## Iteration 223 handoff
 

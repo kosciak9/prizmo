@@ -43,6 +43,7 @@ defmodule Prizmo.TcgEngine.CardPlay do
   alias Prizmo.TcgEngine.EffectRunner
   alias Prizmo.TcgEngine.EventPayloads
   alias Prizmo.TcgEngine.Game
+  alias Prizmo.TcgEngine.GameEvent
   alias Prizmo.TcgEngine.GamePlayer
   alias Prizmo.TcgEngine.GameStore
   alias Prizmo.TcgEngine.PendingEffects
@@ -53,6 +54,8 @@ defmodule Prizmo.TcgEngine.CardPlay do
   alias Prizmo.TcgEngine.TrainerPlay
   alias Prizmo.TcgEngine.Turn
   alias Prizmo.TcgEngine.TurnStore
+
+  require Ash.Query
 
   @coin_faces [:heads, :tails]
 
@@ -72,7 +75,8 @@ defmodule Prizmo.TcgEngine.CardPlay do
              allow_first_turn_when_going_first?:
                definition.first_turn_supporter_allowed_when_going_first?
            ),
-         :ok <- require_ace_spec_available(player, metadata) do
+         :ok <- require_ace_spec_available(player, metadata),
+         :ok <- require_effect_available(game, turn, player, definition) do
       {:ok, metadata}
     end
   end
@@ -383,6 +387,28 @@ defmodule Prizmo.TcgEngine.CardPlay do
              effect_key: effect.key,
              affected_player_id: discarded_energy_card.owner_player_id,
              cards: EventPayloads.moved_cards([discarded_energy_card], :attached, :discard)
+           }) do
+      complete_play_card_resolution(game, turn, player, card, effect)
+    end
+  end
+
+  defp complete_play_card_effect(
+         game,
+         turn,
+         player,
+         card,
+         %{type: :draw_until_hand_size} = effect,
+         _target_ids
+       ) do
+    with {:ok, target_hand_size} <- draw_until_hand_size_target(game.id, player.player_id, effect),
+         {:ok, drawn_cards} <- draw_until_hand_size_for_effect(game, player, target_hand_size),
+         {:ok, _event} <-
+           write_event_and_snapshot(game.id, :cards_moved, player.player_id, %{
+             reason: :effect_resolution,
+             source: EventPayloads.card_source(card),
+             effect_key: effect.key,
+             affected_player_id: player.player_id,
+             cards: EventPayloads.moved_cards(drawn_cards, :deck, :hand)
            }) do
       complete_play_card_resolution(game, turn, player, card, effect)
     end
@@ -789,7 +815,8 @@ defmodule Prizmo.TcgEngine.CardPlay do
          _target_ids
        ) do
     with {:ok, affected_players} <- PlayerStore.list_players(game.id),
-         :ok <- require_each_player_can_draw_after_hand_shuffle(game, affected_players, effect),
+         :ok <-
+           require_each_player_can_draw_after_hand_shuffle(game, player, affected_players, effect),
          {:ok, _summaries} <-
            shuffle_each_player_hand_into_deck_then_draw(
              game,
@@ -898,6 +925,118 @@ defmodule Prizmo.TcgEngine.CardPlay do
          :ok <- require_all_owned_in_zone(discard_cards, player_id, :hand) do
       {:ok, discard_cards}
     end
+  end
+
+  defp require_effect_available(
+         %Game{} = game,
+         %Turn{} = turn,
+         %GamePlayer{} = player,
+         definition
+       ) do
+    case EffectRunner.first_effect(definition) do
+      {:ok, %{type: :draw_until_hand_size} = effect} ->
+        require_draw_until_hand_size_effect(game.id, player.player_id, effect)
+
+      {:ok, %{type: :shuffle_each_player_hand_into_deck_then_draw} = effect} ->
+        require_previous_turn_team_rocket_knockout(game.id, turn, player.player_id, effect)
+
+      {:ok, _effect} ->
+        :ok
+
+      {:error, :missing_effect_definition} ->
+        :ok
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  defp require_draw_until_hand_size_effect(game_id, player_id, effect) do
+    with {:ok, target_hand_size} <- draw_until_hand_size_target(game_id, player_id, effect),
+         {:ok, hand_cards} <- CardStore.cards_in_zone(game_id, player_id, :hand),
+         {:ok, deck_count} <- CardStore.deck_count(game_id, player_id) do
+      remaining_hand_size_after_play = max(length(hand_cards) - 1, 0)
+      required_draw_count = max(target_hand_size - remaining_hand_size_after_play, 0)
+
+      if required_draw_count > 0 and deck_count > 0 do
+        :ok
+      else
+        {:error, :draw_until_hand_size_has_no_effect}
+      end
+    end
+  end
+
+  defp require_previous_turn_team_rocket_knockout(game_id, %Turn{} = turn, player_id, %{
+         params: %{requires_team_rocket_knockout_last_turn: true}
+       }) do
+    with {:ok, previous_turn} <- previous_turn(game_id, turn.turn_number),
+         :ok <- require_previous_turn_was_opponents_turn(previous_turn, player_id),
+         {:ok, previous_turn_knockout_events} <-
+           knockout_prize_events_for_turn(game_id, previous_turn.id) do
+      if Enum.any?(
+           previous_turn_knockout_events,
+           &team_rocket_knockout_for_player?(&1, player_id)
+         ) do
+        :ok
+      else
+        {:error, :team_rockets_archer_requires_team_rocket_ko_during_opponents_last_turn}
+      end
+    end
+  end
+
+  defp require_previous_turn_team_rocket_knockout(_game_id, _turn, _player_id, _effect), do: :ok
+
+  defp previous_turn(_game_id, turn_number) when turn_number <= 1,
+    do: {:error, :team_rockets_archer_requires_team_rocket_ko_during_opponents_last_turn}
+
+  defp previous_turn(game_id, turn_number) do
+    case TurnStore.list_all_turns(game_id) do
+      {:ok, turns} ->
+        turns
+        |> Enum.find(&(&1.turn_number == turn_number - 1))
+        |> case do
+          %Turn{} = turn ->
+            {:ok, turn}
+
+          nil ->
+            {:error, :team_rockets_archer_requires_team_rocket_ko_during_opponents_last_turn}
+        end
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  defp require_previous_turn_was_opponents_turn(
+         %Turn{active_player_id: active_player_id},
+         player_id
+       ) do
+    if active_player_id == player_id do
+      {:error, :team_rockets_archer_requires_team_rocket_ko_during_opponents_last_turn}
+    else
+      :ok
+    end
+  end
+
+  defp knockout_prize_events_for_turn(game_id, turn_id) do
+    GameEvent
+    |> Ash.Query.filter(
+      game_id == ^game_id and turn_id == ^turn_id and type == "take_knockout_prizes"
+    )
+    |> Ash.Query.sort(index: :asc)
+    |> Ash.read()
+  end
+
+  defp team_rocket_knockout_for_player?(%GameEvent{payload: payload}, player_id) do
+    payload
+    |> Map.get("knockouts", [])
+    |> Enum.any?(fn
+      %{"knocked_out_player_id" => ^player_id, "knocked_out_card_id" => card_id} ->
+        require_team_rocket_pokemon_card(card_id) == :ok
+
+      _other ->
+        false
+    end)
   end
 
   defp validate_search_deck_effect(game_id, player_id, effect, target_ids) do
@@ -1176,6 +1315,24 @@ defmodule Prizmo.TcgEngine.CardPlay do
 
   defp effect_choice_ids(_cards, _player_id, choice_step, _current_turn) do
     {:error, {:unsupported_choice_step, choice_step.key, choice_step.type}}
+  end
+
+  defp draw_until_hand_size_target(game_id, player_id, %{params: %{hand_size: hand_size} = params}) do
+    with {:ok, cards} <- CardStore.list_cards(game_id) do
+      if all_own_pokemon_in_play_are_team_rocket?(cards, player_id) do
+        {:ok, Map.get(params, :team_rocket_hand_size, hand_size)}
+      else
+        {:ok, hand_size}
+      end
+    end
+  end
+
+  defp all_own_pokemon_in_play_are_team_rocket?(cards, player_id) do
+    in_play_cards =
+      Enum.filter(cards, &(&1.owner_player_id == player_id and &1.zone in [:active, :bench]))
+
+    in_play_cards != [] and
+      Enum.all?(in_play_cards, &(require_team_rocket_pokemon_card(&1.card_id) == :ok))
   end
 
   defp legal_choice_ids(game_id, player_id, action_card_id, definition, choice_key, current_turn) do
@@ -2565,7 +2722,9 @@ defmodule Prizmo.TcgEngine.CardPlay do
          card,
          effect
        ) do
-    with {:ok, hand_cards} <- CardStore.cards_in_zone(game.id, affected_player.player_id, :hand),
+    with {:ok, draw_count} <-
+           shuffle_each_player_draw_count(game.id, action_player, affected_player, effect),
+         {:ok, hand_cards} <- CardStore.cards_in_zone(game.id, affected_player.player_id, :hand),
          returned_card_ids = MapSet.new(hand_cards, & &1.id),
          {:ok, _returned_to_deck} <-
            return_hand_to_deck(game.id, affected_player.player_id, hand_cards),
@@ -2589,7 +2748,6 @@ defmodule Prizmo.TcgEngine.CardPlay do
              effect,
              shuffled_deck
            ),
-         {:ok, draw_count} <- draw_count_for_effect(game.id, affected_player.player_id, effect),
          {:ok, drawn_cards} <- draw_cards_for_effect(game, affected_player, draw_count),
          {:ok, _event} <-
            write_event_and_snapshot(game.id, :cards_moved, affected_player.player_id, %{
@@ -2607,6 +2765,28 @@ defmodule Prizmo.TcgEngine.CardPlay do
          drawn_card_count: length(drawn_cards)
        }}
     end
+  end
+
+  defp shuffle_each_player_draw_count(
+         _game_id,
+         %GamePlayer{player_id: action_player_id},
+         %GamePlayer{player_id: affected_player_id},
+         %{
+           params: %{
+             player_draw_count: player_draw_count,
+             opponent_draw_count: opponent_draw_count
+           }
+         }
+       ) do
+    if affected_player_id == action_player_id do
+      {:ok, player_draw_count}
+    else
+      {:ok, opponent_draw_count}
+    end
+  end
+
+  defp shuffle_each_player_draw_count(game_id, _action_player, affected_player, effect) do
+    draw_count_for_effect(game_id, affected_player.player_id, effect)
   end
 
   defp write_effect_deck_shuffled(
@@ -2663,14 +2843,29 @@ defmodule Prizmo.TcgEngine.CardPlay do
     "trainer_effect_shuffle:#{player_id}:turn_#{turn.turn_number}:#{card.card_id}:#{effect.key}"
   end
 
-  defp require_each_player_can_draw_after_hand_shuffle(game, affected_players, effect) do
+  defp require_each_player_can_draw_after_hand_shuffle(
+         game,
+         action_player,
+         affected_players,
+         effect
+       ) do
     affected_players
-    |> Enum.map(&require_can_draw_after_hand_shuffle(game, &1, effect))
+    |> Enum.map(&require_can_draw_after_hand_shuffle(game, action_player, &1, effect))
     |> collect_ok_results()
   end
 
   defp require_can_draw_after_hand_shuffle(%Game{} = game, %GamePlayer{} = player, effect) do
-    with {:ok, draw_count} <- draw_count_for_effect(game.id, player.player_id, effect),
+    require_can_draw_after_hand_shuffle(game, player, player, effect)
+  end
+
+  defp require_can_draw_after_hand_shuffle(
+         %Game{} = game,
+         %GamePlayer{} = action_player,
+         %GamePlayer{} = player,
+         effect
+       ) do
+    with {:ok, draw_count} <-
+           shuffle_each_player_draw_count(game.id, action_player, player, effect),
          {:ok, hand_cards} <- CardStore.cards_in_zone(game.id, player.player_id, :hand),
          {:ok, deck_count} <- CardStore.deck_count(game.id, player.player_id) do
       available_after_shuffle = deck_count + length(hand_cards)
@@ -2680,6 +2875,16 @@ defmodule Prizmo.TcgEngine.CardPlay do
       else
         {:error, {:cannot_draw_card_effect_from_deck, draw_count, available_after_shuffle}}
       end
+    end
+  end
+
+  defp draw_until_hand_size_for_effect(%Game{} = game, %GamePlayer{} = player, target_hand_size) do
+    with {:ok, hand_cards} <- CardStore.cards_in_zone(game.id, player.player_id, :hand),
+         desired_draw_count = max(target_hand_size - length(hand_cards), 0),
+         {:ok, cards} <- CardStore.deck_cards_for_player(player.id, desired_draw_count),
+         {:ok, starting_position} <-
+           CardStore.next_hand_position_result(game.id, player.player_id) do
+      draw_cards_to_hand(cards, starting_position)
     end
   end
 

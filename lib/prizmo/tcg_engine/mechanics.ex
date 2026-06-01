@@ -636,6 +636,7 @@ defmodule Prizmo.TcgEngine.Mechanics do
          {:ok, game} <- maybe_finish_for_last_prize(game, player_id),
          {:ok, event} <-
            write_event(game, :take_knockout_prizes, player_id, %{
+             turn_id: current_turn_id(game.id),
              prompt_id: prompt.id,
              pending_effect_id: pending_effect.id,
              prize_count: prize_count,
@@ -1797,6 +1798,7 @@ defmodule Prizmo.TcgEngine.Mechanics do
            }),
          {:ok, event} <-
            write_event(game, :knockout_prize_selection_required, attacking_player_id, %{
+             turn_id: current_turn_id(game.id),
              prompt_id: prompt.id,
              pending_effect_id: pending_effect.id,
              prize_count: prize_count,

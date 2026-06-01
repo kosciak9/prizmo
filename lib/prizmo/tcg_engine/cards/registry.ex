@@ -107,6 +107,38 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     ]
   }
 
+  @team_rockets_archer %CardDefinition{
+    id: "DRI-170",
+    kind: :trainer,
+    trainer_type: :supporter,
+    play_window: :action_window,
+    effects: [
+      %Effect{
+        key: :shuffle_each_player_hand_into_deck_then_draw_if_team_rocket_knocked_out,
+        type: :shuffle_each_player_hand_into_deck_then_draw,
+        params: %{
+          player_draw_count: 5,
+          opponent_draw_count: 3,
+          requires_team_rocket_knockout_last_turn: true
+        }
+      }
+    ]
+  }
+
+  @team_rockets_ariana %CardDefinition{
+    id: "DRI-171",
+    kind: :trainer,
+    trainer_type: :supporter,
+    play_window: :action_window,
+    effects: [
+      %Effect{
+        key: :draw_until_hand_size_if_all_own_pokemon_are_team_rocket,
+        type: :draw_until_hand_size,
+        params: %{hand_size: 5, team_rocket_hand_size: 8}
+      }
+    ]
+  }
+
   @lillies_determination %CardDefinition{
     id: "MEG-119",
     kind: :trainer,
@@ -485,6 +517,8 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     @rare_candy.id => @rare_candy,
     @sacred_ash.id => @sacred_ash,
     @secret_box.id => @secret_box,
+    @team_rockets_archer.id => @team_rockets_archer,
+    @team_rockets_ariana.id => @team_rockets_ariana,
     @team_rockets_giovanni.id => @team_rockets_giovanni,
     @team_rockets_proton.id => @team_rockets_proton,
     @team_rockets_transceiver.id => @team_rockets_transceiver,
