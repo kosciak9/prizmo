@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-06-01] iteration 190 | Two-browser open-deck setup/action validation
+- Task attempted: validated the open-deck north-star path in two independent browser contexts instead of a single context or second tab, carrying a newly created explicit-seed game through setup, first action window, one UI `Pass`, reload recovery, and Player 2 Turn 2 priority.
+- Files changed: updated the canonical north-star article, this log, and the TCG engine playtest handoff; no product source changed.
+- Validation: Playwright browser contexts created/rejoined game `302a39ed-d15b-4fcb-8a13-80eb2eed71be` with seed `two-seat-open-deck-2026-06-01`, drove coin toss, starting-player choice, opening Active choices from separate Player 1/Player 2 contexts, both setup-ready clicks, auto prize/setup/turn-start/draw/action-window progression, Player 1 `Pass`, and reload recovery with distinct `viewerPlayerId` URLs; browser automation saw zero console/page errors and zero failed non-font requests, with only existing local Geist font decode warnings. SQL confirmed explicit RNG metadata, Turn 2 Player 2 action window at cursor/latest `20`, both players setup-ready, expected zone counts, and the ordered 20-event setup/pass sequence. Tidewave read-model eval confirmed hidden opponent hands and Player 2 legal/pending actions; Tidewave error-log check returned no matching errors.
+- Remaining/blocking notes: this closes the previously documented true two-independent-browser validation gap for the currently supported open-deck setup/pass slice. Remaining north-star work is broader: mulligan/setup edge cases, richer random-choice facts, more generic mechanics/card behavior, and benchmarked card-table UI density/polish.
+
 ## [2026-06-01] iteration 189 | Copied-row open-deck imports
 - Task attempted: improved open-deck game creation ergonomics by letting the React SPA parser accept common copied PTCGL/Limitless-style rows and section headings instead of requiring every pasted row to already be a catalog ID.
 - Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, the canonical north-star article, this log, and the TCG engine playtest handoff.
