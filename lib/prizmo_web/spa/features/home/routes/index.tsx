@@ -38,6 +38,7 @@ import {
   runStartNextTcgEngineTurn,
   runStartTcgEngineSetup,
   runUndoTcgEngineGame,
+  runUseTcgEngineTeamRocketsFactory,
   type CreateOpenDeckTcgEngineGameFields,
   type CreateTcgEngineGameFields,
   type GetTcgEngineGameStateFields,
@@ -558,6 +559,15 @@ type PlayStadiumCommand = {
   cardInstanceId: string
 }
 
+type TeamRocketsFactoryInput = {
+  gameId: string
+  playerId: PlayerId
+}
+
+type TeamRocketsFactoryCommand = {
+  playerId: string
+}
+
 type PlayBasicToBenchInput = {
   gameId: string
   playerId: PlayerId
@@ -1007,6 +1017,14 @@ export function HomeRoute() {
 
   const playStadiumMutation = useMutation({
     mutationFn: (input: PlayStadiumInput) => playStadium(input),
+    onSuccess: async (_game, input) => {
+      clearUltraBallPostSearchHandoff(input.gameId, input.playerId)
+      await queryClient.invalidateQueries({ queryKey: ['tcg-engine', 'game-state'] })
+    }
+  })
+
+  const teamRocketsFactoryMutation = useMutation({
+    mutationFn: (input: TeamRocketsFactoryInput) => useTeamRocketsFactory(input),
     onSuccess: async (_game, input) => {
       clearUltraBallPostSearchHandoff(input.gameId, input.playerId)
       await queryClient.invalidateQueries({ queryKey: ['tcg-engine', 'game-state'] })
@@ -1765,6 +1783,14 @@ export function HomeRoute() {
                     })
                   }
                 }}
+                onUseTeamRocketsFactory={({ playerId }) => {
+                  if (isPlayerId(playerId)) {
+                    teamRocketsFactoryMutation.mutate({
+                      gameId: normalisedGameId,
+                      playerId
+                    })
+                  }
+                }}
                 onPlayBasicToBench={({ playerId, cardInstanceId }) => {
                   if (isPlayerId(playerId)) {
                     playBasicToBenchMutation.mutate({
@@ -1839,6 +1865,11 @@ export function HomeRoute() {
                 playCardPendingCardId={playCardMutation.isPending ? playCardMutation.variables?.cardInstanceId ?? null : null}
                 playStadiumPendingCardId={
                   playStadiumMutation.isPending ? playStadiumMutation.variables?.cardInstanceId ?? null : null
+                }
+                teamRocketsFactoryPendingPlayerId={
+                  teamRocketsFactoryMutation.isPending
+                    ? teamRocketsFactoryMutation.variables?.playerId ?? null
+                    : null
                 }
                 retreatPendingKey={
                   retreatMutation.isPending && retreatMutation.variables
@@ -2373,6 +2404,20 @@ async function playStadium(input: PlayStadiumInput): Promise<CreatedGame> {
   return result.data as CreatedGame
 }
 
+async function useTeamRocketsFactory(input: TeamRocketsFactoryInput): Promise<CreatedGame> {
+  const result = await runUseTcgEngineTeamRocketsFactory({
+    input,
+    fields: GAME_RESOURCE_FIELDS,
+    headers: buildAshRpcHeaders()
+  })
+
+  if (!result.success) {
+    throw new Error(rpcErrorMessage(result.errors))
+  }
+
+  return result.data as CreatedGame
+}
+
 async function playBasicToBench(input: PlayBasicToBenchInput): Promise<CreatedGame> {
   const result = await runPlayTcgEngineBasicToBench({
     input,
@@ -2569,6 +2614,7 @@ function GameStateWorkbench({
   onPlayBasicToBench,
   onPlayCard,
   onPlayStadium,
+  onUseTeamRocketsFactory,
   onRetreat,
   onResolveDeclaredAttack,
   onUndo,
@@ -2591,6 +2637,7 @@ function GameStateWorkbench({
   promptPendingId,
   playCardPendingCardId,
   playStadiumPendingCardId,
+  teamRocketsFactoryPendingPlayerId,
   resolveDeclaredAttackPendingPlayerId,
   retreatPendingKey
 }: {
@@ -2621,6 +2668,7 @@ function GameStateWorkbench({
   onPlayBasicToBench: (input: PlayBasicToBenchCommand) => void
   onPlayCard: (input: PlayCardCommand) => void
   onPlayStadium: (input: PlayStadiumCommand) => void
+  onUseTeamRocketsFactory: (input: TeamRocketsFactoryCommand) => void
   onRetreat: (input: RetreatCommand) => void
   onResolveDeclaredAttack: (input: ResolveDeclaredAttackCommand) => void
   onUndo: () => void
@@ -2643,6 +2691,7 @@ function GameStateWorkbench({
   promptPendingId: string | null
   playCardPendingCardId: string | null
   playStadiumPendingCardId: string | null
+  teamRocketsFactoryPendingPlayerId: string | null
   resolveDeclaredAttackPendingPlayerId: string | null
   retreatPendingKey: string | null
 }) {
@@ -2650,6 +2699,7 @@ function GameStateWorkbench({
   const actionCommandPending = Boolean(
     playCardPendingCardId ||
       playStadiumPendingCardId ||
+      teamRocketsFactoryPendingPlayerId ||
       playBasicToBenchPendingCardId ||
       attachEnergyPendingKey ||
       attachToolPendingKey ||
@@ -2680,10 +2730,12 @@ function GameStateWorkbench({
     onPlayBasicToBench,
     onPlayCard,
     onPlayStadium,
+    onUseTeamRocketsFactory,
     onRetreat,
     playBasicToBenchPendingCardId,
     playCardPendingCardId,
     playStadiumPendingCardId,
+    teamRocketsFactoryPendingPlayerId,
     retreatPendingKey,
     viewerPlayerId
   })
@@ -2768,6 +2820,7 @@ function GameStateWorkbench({
             onPlayBasicToBench={onPlayBasicToBench}
             onPlayCard={onPlayCard}
             onPlayStadium={onPlayStadium}
+            onUseTeamRocketsFactory={onUseTeamRocketsFactory}
             onRetreat={onRetreat}
             attachEnergyPendingKey={attachEnergyPendingKey}
             attachToolPendingKey={attachToolPendingKey}
@@ -2777,6 +2830,7 @@ function GameStateWorkbench({
             playBasicToBenchPendingCardId={playBasicToBenchPendingCardId}
             playCardPendingCardId={playCardPendingCardId}
             playStadiumPendingCardId={playStadiumPendingCardId}
+            teamRocketsFactoryPendingPlayerId={teamRocketsFactoryPendingPlayerId}
             retreatPendingKey={retreatPendingKey}
             ultraBallPostSearchHandoff={ultraBallPostSearchHandoff}
             viewerPlayerId={viewerPlayerId}
@@ -2812,10 +2866,12 @@ function buildCardInteractionModel({
   onPlayBasicToBench,
   onPlayCard,
   onPlayStadium,
+  onUseTeamRocketsFactory,
   onRetreat,
   playBasicToBenchPendingCardId,
   playCardPendingCardId,
   playStadiumPendingCardId,
+  teamRocketsFactoryPendingPlayerId,
   retreatPendingKey,
   viewerPlayerId
 }: {
@@ -2839,10 +2895,12 @@ function buildCardInteractionModel({
   onPlayBasicToBench: (input: PlayBasicToBenchCommand) => void
   onPlayCard: (input: PlayCardCommand) => void
   onPlayStadium: (input: PlayStadiumCommand) => void
+  onUseTeamRocketsFactory: (input: TeamRocketsFactoryCommand) => void
   onRetreat: (input: RetreatCommand) => void
   playBasicToBenchPendingCardId: string | null
   playCardPendingCardId: string | null
   playStadiumPendingCardId: string | null
+  teamRocketsFactoryPendingPlayerId: string | null
   retreatPendingKey: string | null
   viewerPlayerId: PlayerId
 }): CardInteractionModel {
@@ -2931,6 +2989,24 @@ function buildCardInteractionModel({
           pending,
           tone: 'primary',
           onClick: () => onPlayStadium({ playerId: action.playerId, cardInstanceId })
+        })
+      }
+
+      cardDirectedActionKeys.add(actionKeyValue)
+    }
+
+    if (action.key === 'team_rockets_factory') {
+      for (const cardInstanceId of action.sourceCardInstanceIds) {
+        const card = cardsById.get(cardInstanceId)
+        const pending = teamRocketsFactoryPendingPlayerId === action.playerId
+
+        setCardIntent(cardInstanceId, {
+          badge: 'Stadium',
+          disabled: !canRunAction,
+          label: `Use ${card?.name ?? "Team Rocket's Factory"}`,
+          pending,
+          tone: 'primary',
+          onClick: () => onUseTeamRocketsFactory({ playerId: action.playerId })
         })
       }
 
@@ -5219,6 +5295,7 @@ function ActionAffordancesPanel({
   onPlayBasicToBench,
   onPlayCard,
   onPlayStadium,
+  onUseTeamRocketsFactory,
   onRetreat,
   attachEnergyPendingKey,
   attachToolPendingKey,
@@ -5228,6 +5305,7 @@ function ActionAffordancesPanel({
   playBasicToBenchPendingCardId,
   playCardPendingCardId,
   playStadiumPendingCardId,
+  teamRocketsFactoryPendingPlayerId,
   retreatPendingKey,
   ultraBallPostSearchHandoff,
   viewerPlayerId
@@ -5246,6 +5324,7 @@ function ActionAffordancesPanel({
   onPlayBasicToBench: (input: PlayBasicToBenchCommand) => void
   onPlayCard: (input: PlayCardCommand) => void
   onPlayStadium: (input: PlayStadiumCommand) => void
+  onUseTeamRocketsFactory: (input: TeamRocketsFactoryCommand) => void
   onRetreat: (input: RetreatCommand) => void
   attachEnergyPendingKey: string | null
   attachToolPendingKey: string | null
@@ -5255,6 +5334,7 @@ function ActionAffordancesPanel({
   playBasicToBenchPendingCardId: string | null
   playCardPendingCardId: string | null
   playStadiumPendingCardId: string | null
+  teamRocketsFactoryPendingPlayerId: string | null
   retreatPendingKey: string | null
   ultraBallPostSearchHandoff: UltraBallPostSearchHandoff | null
   viewerPlayerId: PlayerId
@@ -5262,6 +5342,7 @@ function ActionAffordancesPanel({
   const actionCommandPending = Boolean(
     playCardPendingCardId ||
       playStadiumPendingCardId ||
+      teamRocketsFactoryPendingPlayerId ||
       playBasicToBenchPendingCardId ||
       attachEnergyPendingKey ||
       attachToolPendingKey ||
@@ -5347,10 +5428,12 @@ function ActionAffordancesPanel({
                     onPlayBasicToBench={onPlayBasicToBench}
                     onPlayCard={onPlayCard}
                     onPlayStadium={onPlayStadium}
+                    onUseTeamRocketsFactory={onUseTeamRocketsFactory}
                     onRetreat={onRetreat}
                     playBasicToBenchPendingCardId={playBasicToBenchPendingCardId}
                     playCardPendingCardId={playCardPendingCardId}
                     playStadiumPendingCardId={playStadiumPendingCardId}
+                    teamRocketsFactoryPendingPlayerId={teamRocketsFactoryPendingPlayerId}
                     postSearchBattleAttackIds={postSearchHandoff?.battleAttackIds ?? []}
                     postSearchBenchCardInstanceIds={postSearchHandoff?.benchableCardInstanceIds ?? []}
                     postSearchEndTurnPlayerIds={postSearchHandoff?.endTurnPlayerIds ?? []}
@@ -5928,10 +6011,12 @@ function ActionAffordanceCard({
   onPlayBasicToBench,
   onPlayCard,
   onPlayStadium,
+  onUseTeamRocketsFactory,
   onRetreat,
   playBasicToBenchPendingCardId,
   playCardPendingCardId,
   playStadiumPendingCardId,
+  teamRocketsFactoryPendingPlayerId,
   postSearchBattleAttackIds,
   postSearchBenchCardInstanceIds,
   postSearchEndTurnPlayerIds,
@@ -5957,10 +6042,12 @@ function ActionAffordanceCard({
   onPlayBasicToBench: (input: PlayBasicToBenchCommand) => void
   onPlayCard: (input: PlayCardCommand) => void
   onPlayStadium: (input: PlayStadiumCommand) => void
+  onUseTeamRocketsFactory: (input: TeamRocketsFactoryCommand) => void
   onRetreat: (input: RetreatCommand) => void
   playBasicToBenchPendingCardId: string | null
   playCardPendingCardId: string | null
   playStadiumPendingCardId: string | null
+  teamRocketsFactoryPendingPlayerId: string | null
   postSearchBattleAttackIds: string[]
   postSearchBenchCardInstanceIds: string[]
   postSearchEndTurnPlayerIds: PlayerId[]
@@ -6054,6 +6141,27 @@ function ActionAffordanceCard({
                 {isPending
                   ? `Playing ${stadiumCard?.name ?? 'Stadium'}...`
                   : `Play Stadium ${stadiumCard?.name ?? formatCardInstanceId(cardInstanceId)}`}
+              </ActionCommandButton>
+            )
+          })}
+        </div>
+      ) : null}
+
+      {action.key === 'team_rockets_factory' && action.sourceCardInstanceIds.length > 0 ? (
+        <div className="mt-2 space-y-1.5">
+          {action.sourceCardInstanceIds.map(cardInstanceId => {
+            const stadiumCard = cardsById.get(cardInstanceId)
+            const isPending = teamRocketsFactoryPendingPlayerId === action.playerId
+
+            return (
+              <ActionCommandButton
+                disabled={!canRunAction}
+                key={cardInstanceId}
+                onClick={() => onUseTeamRocketsFactory({ playerId: action.playerId })}
+              >
+                {isPending
+                  ? `Using ${stadiumCard?.name ?? "Team Rocket's Factory"}...`
+                  : `Use ${stadiumCard?.name ?? formatCardInstanceId(cardInstanceId)}`}
               </ActionCommandButton>
             )
           })}

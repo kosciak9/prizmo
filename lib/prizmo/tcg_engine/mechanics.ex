@@ -964,6 +964,36 @@ defmodule Prizmo.TcgEngine.Mechanics do
     end)
   end
 
+  @spec use_team_rockets_factory(Game.t() | String.t(), String.t()) ::
+          {:ok, Game.t()} | {:error, term()}
+  def use_team_rockets_factory(game_or_id, player_id) when is_binary(player_id) do
+    transaction(fn ->
+      with {:ok, game} <- get_game(game_or_id),
+           :ok <- require_game_status(game, :in_progress),
+           :ok <- require_active_player(game, player_id),
+           {:ok, turn} <- require_current_turn_status(game.id, :action_window),
+           {:ok, player} <- get_player(game.id, player_id),
+           {:ok, %CardInstance{} = stadium_card} <-
+             StadiumEffects.active_team_rockets_factory(game.id),
+           :ok <-
+             StadiumEffects.require_team_rockets_factory_available(game.id, turn.id, player_id),
+           {:ok, %{effect: %{count: draw_count}}} <- CardCatalog.fetch(stadium_card.card_id),
+           {:ok, drawn_cards} <- draw_team_rockets_factory_cards(game.id, player, draw_count),
+           {:ok, _event} <-
+             write_event_and_snapshot(game.id, :stadium_effect_used, player_id, %{
+               turn_id: turn.id,
+               source: EventPayloads.card_source(stadium_card),
+               effect_key: :draw_after_playing_team_rocket_supporter,
+               affected_player_id: player_id,
+               card_count: length(drawn_cards),
+               cards: EventPayloads.moved_cards(drawn_cards, :deck, :hand),
+               public_note: team_rockets_factory_public_note(player_id, length(drawn_cards))
+             }) do
+        get_game(game.id)
+      end
+    end)
+  end
+
   @spec attach_tool(Game.t() | String.t(), String.t(), String.t(), String.t()) ::
           {:ok, Game.t()} | {:error, term()}
   def attach_tool(game_or_id, player_id, tool_card_instance_id, target_card_instance_id)
@@ -2033,6 +2063,22 @@ defmodule Prizmo.TcgEngine.Mechanics do
          {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do
       get_game(game.id)
     end
+  end
+
+  defp draw_team_rockets_factory_cards(game_id, player, draw_count) do
+    with {:ok, cards} <- Prizmo.TcgEngine.CardStore.deck_cards_for_player(player.id, draw_count) do
+      cards
+      |> Enum.map(&move_deck_card_to_hand(game_id, player.player_id, &1))
+      |> collect_results()
+    end
+  end
+
+  defp team_rockets_factory_public_note(player_id, 1) do
+    "Team Rocket's Factory let #{String.replace(player_id, "_", " ")} draw 1 card."
+  end
+
+  defp team_rockets_factory_public_note(player_id, card_count) do
+    "Team Rocket's Factory let #{String.replace(player_id, "_", " ")} draw #{card_count} cards."
   end
 
   defp collect_results(results) do

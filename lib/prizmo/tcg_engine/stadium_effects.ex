@@ -6,15 +6,27 @@ defmodule Prizmo.TcgEngine.StadiumEffects do
   alias Prizmo.TcgEngine.CardCatalog
   alias Prizmo.TcgEngine.CardInstance
   alias Prizmo.TcgEngine.CardStore
+  alias Prizmo.TcgEngine.GameEvent
+
+  require Ash.Query
 
   @special_condition_immunity_effect :special_condition_immunity_for_pokemon_with_energy
   @special_conditions [:asleep, :burned, :confused, :paralyzed, :poisoned]
   @festival_grounds_effect_id "festival_grounds"
+  @team_rockets_factory_effect :draw_after_playing_team_rocket_supporter
+  @team_rockets_factory_card_id "DRI-173"
 
   def supported_stadium?(%{
         supertype: :trainer,
         trainer_type: :stadium,
         effect: %{type: @special_condition_immunity_effect}
+      }),
+      do: true
+
+  def supported_stadium?(%{
+        supertype: :trainer,
+        trainer_type: :stadium,
+        effect: %{type: @team_rockets_factory_effect}
       }),
       do: true
 
@@ -24,6 +36,46 @@ defmodule Prizmo.TcgEngine.StadiumEffects do
     case CardCatalog.fetch(card_id) do
       {:ok, card} -> supported_stadium?(card)
       {:error, _reason} -> false
+    end
+  end
+
+  def team_rockets_factory_card?(%CardInstance{card_id: card_id}),
+    do: team_rockets_factory_card?(card_id)
+
+  def team_rockets_factory_card?(card_id) when is_binary(card_id) do
+    case CardCatalog.fetch(card_id) do
+      {:ok, %{effect: %{type: @team_rockets_factory_effect}}} -> true
+      {:ok, _card} -> false
+      {:error, _reason} -> false
+    end
+  end
+
+  def active_team_rockets_factory(game_id) when is_binary(game_id) do
+    with {:ok, stadiums} <- CardStore.cards_in_zone(game_id, :stadium) do
+      case stadiums do
+        [%CardInstance{} = stadium] ->
+          if team_rockets_factory_card?(stadium) do
+            {:ok, stadium}
+          else
+            {:error, {:wrong_stadium_in_play, @team_rockets_factory_card_id, stadium.card_id}}
+          end
+
+        [] ->
+          {:error, {:stadium_not_in_play, @team_rockets_factory_card_id}}
+
+        _multiple ->
+          {:error, {:stadium_not_in_play, @team_rockets_factory_card_id}}
+      end
+    end
+  end
+
+  def require_team_rockets_factory_available(game_id, turn_id, player_id)
+      when is_binary(game_id) and is_binary(turn_id) and is_binary(player_id) do
+    with :ok <- require_team_rocket_supporter_played_this_turn(game_id, turn_id, player_id),
+         :ok <- require_team_rockets_factory_unused_this_turn(game_id, turn_id, player_id),
+         {:ok, deck_count} <- CardStore.deck_count(game_id, player_id),
+         true <- deck_count > 0 || {:error, :team_rockets_factory_has_no_effect} do
+      :ok
     end
   end
 
@@ -63,6 +115,78 @@ defmodule Prizmo.TcgEngine.StadiumEffects do
       {:ok, stadium}
     end
   end
+
+  defp require_team_rocket_supporter_played_this_turn(game_id, turn_id, player_id) do
+    with {:ok, events} <- card_play_completed_events_for_turn(game_id, turn_id, player_id) do
+      if Enum.any?(events, &team_rocket_supporter_card_play?/1) do
+        :ok
+      else
+        {:error, :team_rockets_factory_requires_team_rocket_supporter_played_this_turn}
+      end
+    end
+  end
+
+  defp require_team_rockets_factory_unused_this_turn(game_id, turn_id, player_id) do
+    with {:ok, events} <- stadium_effect_used_events_for_turn(game_id, turn_id, player_id) do
+      if Enum.any?(events, &team_rockets_factory_effect_used?/1) do
+        {:error, :team_rockets_factory_already_used_this_turn}
+      else
+        :ok
+      end
+    end
+  end
+
+  defp card_play_completed_events_for_turn(game_id, turn_id, player_id) do
+    GameEvent
+    |> Ash.Query.filter(
+      game_id == ^game_id and turn_id == ^turn_id and player_id == ^player_id and
+        type == "card_play_completed"
+    )
+    |> Ash.Query.sort(index: :asc)
+    |> Ash.read()
+  end
+
+  defp stadium_effect_used_events_for_turn(game_id, turn_id, player_id) do
+    GameEvent
+    |> Ash.Query.filter(
+      game_id == ^game_id and turn_id == ^turn_id and player_id == ^player_id and
+        type == "stadium_effect_used"
+    )
+    |> Ash.Query.sort(index: :asc)
+    |> Ash.read()
+  end
+
+  defp team_rocket_supporter_card_play?(%GameEvent{payload: payload}) do
+    case payload_value(payload, "card_id") do
+      card_id when is_binary(card_id) -> team_rocket_supporter_card_id?(card_id)
+      _other -> false
+    end
+  end
+
+  defp team_rockets_factory_effect_used?(%GameEvent{payload: payload}) do
+    payload_value(payload, "effect_key") == Atom.to_string(@team_rockets_factory_effect) or
+      payload_value(payload, "source_card_id") == @team_rockets_factory_card_id
+  end
+
+  defp team_rocket_supporter_card_id?(card_id) when is_binary(card_id) do
+    case CardCatalog.fetch(card_id) do
+      {:ok, %{trainer_type: :supporter, name: "Team Rocket" <> _rest}} -> true
+      {:ok, _card} -> false
+      {:error, _reason} -> false
+    end
+  end
+
+  defp payload_value(payload, key) when is_map(payload) and is_binary(key) do
+    case payload_atom_key(key) do
+      nil -> Map.get(payload, key)
+      atom_key -> Map.get(payload, key) || Map.get(payload, atom_key)
+    end
+  end
+
+  defp payload_atom_key("card_id"), do: :card_id
+  defp payload_atom_key("effect_key"), do: :effect_key
+  defp payload_atom_key("source_card_id"), do: :source_card_id
+  defp payload_atom_key(_key), do: nil
 
   defp special_condition_immunity_stadium?(%CardInstance{card_id: card_id}) do
     card_id

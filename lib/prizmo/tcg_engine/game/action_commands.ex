@@ -383,6 +383,27 @@ defmodule Prizmo.TcgEngine.Game.ActionCommands do
       end
     end
 
+    action :use_team_rockets_factory_command, :struct do
+      description "Use Team Rocket's Factory from the active Stadium zone through the mechanics layer."
+
+      constraints instance_of: Game
+
+      argument :game_id, :uuid do
+        allow_nil? false
+      end
+
+      argument :player_id, :string do
+        allow_nil? false
+      end
+
+      run fn input, _context ->
+        Mechanics.use_team_rockets_factory(
+          input.arguments.game_id,
+          input.arguments.player_id
+        )
+      end
+    end
+
     action :play_basic_to_bench_command, :struct do
       description "Play a Basic Pokémon from hand to the Bench through the mechanics layer."
 

@@ -35,6 +35,7 @@ defmodule Prizmo.TcgEngine do
       rpc_action :open_tcg_engine_action_window, :open_action_window_command
       rpc_action :play_tcg_engine_card, :play_card_command
       rpc_action :play_tcg_engine_stadium, :play_stadium_command
+      rpc_action :use_tcg_engine_team_rockets_factory, :use_team_rockets_factory_command
       rpc_action :play_tcg_engine_basic_to_bench, :play_basic_to_bench_command
       rpc_action :evolve_tcg_engine_from_hand, :evolve_from_hand_command
       rpc_action :attach_tcg_engine_energy, :attach_energy_command
@@ -116,6 +117,10 @@ defmodule Prizmo.TcgEngine do
       define :play_stadium_for_game,
         action: :play_stadium_command,
         args: [:game_id, :player_id, :card_instance_id]
+
+      define :use_team_rockets_factory_for_game,
+        action: :use_team_rockets_factory_command,
+        args: [:game_id, :player_id]
 
       define :play_basic_to_bench_for_game,
         action: :play_basic_to_bench_command,

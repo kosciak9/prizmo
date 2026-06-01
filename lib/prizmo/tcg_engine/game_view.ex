@@ -401,6 +401,19 @@ defmodule Prizmo.TcgEngine.GameView do
     }
   end
 
+  defp public_event_details(%GameEvent{type: "stadium_effect_used", payload: payload}) do
+    card_name = payload_card_name(payload, "source_card_id", "Stadium")
+    card_count = payload_integer(payload, "card_count") || 0
+
+    %{
+      public_note:
+        payload_value(payload, "public_note") ||
+          "#{card_name} resolved for #{card_count} #{pluralize("card", card_count)}.",
+      public_card_count: card_count,
+      public_revealed_cards: []
+    }
+  end
+
   defp public_event_details(%GameEvent{type: "cards_moved", payload: payload}) do
     if payload_value(payload, "public_reveal") == true do
       revealed_cards = public_revealed_cards(payload, "revealed_cards")

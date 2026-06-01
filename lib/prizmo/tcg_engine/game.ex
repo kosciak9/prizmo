@@ -96,6 +96,7 @@ defmodule Prizmo.TcgEngine.Game do
     define :open_action_window_command, args: [:game_id]
     define :play_card_command, args: [:game_id, :player_id, :card_instance_id]
     define :play_stadium_command, args: [:game_id, :player_id, :card_instance_id]
+    define :use_team_rockets_factory_command, args: [:game_id, :player_id]
     define :play_basic_to_bench_command, args: [:game_id, :player_id, :card_instance_id]
 
     define :attach_tool_command,

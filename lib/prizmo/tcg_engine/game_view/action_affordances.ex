@@ -114,6 +114,7 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
     [
       play_card_affordance(game, player, current_turn, cards, all_cards),
       play_stadium_affordance(player, cards),
+      team_rockets_factory_affordance(game, player, current_turn, all_cards),
       play_basic_to_bench_affordance(player, cards),
       attach_energy_affordance(player, cards),
       attach_tool_affordance(player, cards),
@@ -167,6 +168,31 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
       )
     end
   end
+
+  defp team_rockets_factory_affordance(
+         %Game{} = game,
+         %GamePlayer{} = player,
+         %Turn{id: turn_id},
+         all_cards
+       ) do
+    with %CardInstance{} = stadium_card <- active_team_rockets_factory_card(all_cards),
+         :ok <-
+           StadiumEffects.require_team_rockets_factory_available(
+             game.id,
+             turn_id,
+             player.player_id
+           ) do
+      affordance(:team_rockets_factory, "Use Team Rocket's Factory", :command, player.player_id,
+        source_card_instance_ids: [stadium_card.id],
+        note:
+          "If you played a Team Rocket Supporter from hand this turn, draw 2 cards once from the active Stadium."
+      )
+    else
+      _other -> nil
+    end
+  end
+
+  defp team_rockets_factory_affordance(_game, _player, _current_turn, _all_cards), do: nil
 
   defp play_basic_to_bench_affordance(%GamePlayer{} = player, cards) do
     source_ids =
@@ -412,6 +438,10 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
     else
       _other -> false
     end
+  end
+
+  defp active_team_rockets_factory_card(cards) do
+    Enum.find(cards, &(&1.zone == :stadium and StadiumEffects.team_rockets_factory_card?(&1)))
   end
 
   defp generic_tool_attachable?(%GamePlayer{} = player, %CardInstance{card_id: card_id}) do

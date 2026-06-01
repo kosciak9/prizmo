@@ -36,6 +36,7 @@ export {
   startNextTcgEngineTurn as runStartNextTcgEngineTurn,
   startTcgEngineSetup as runStartTcgEngineSetup,
   undoTcgEngineGame as runUndoTcgEngineGame,
+  useTcgEngineTeamRocketsFactory as runUseTcgEngineTeamRocketsFactory,
 } from './generated/ash_rpc'
 
 export type {
@@ -112,5 +113,7 @@ export type {
   StartTcgEngineSetupResult,
   UndoTcgEngineGameInput,
   UndoTcgEngineGameResult,
+  UseTcgEngineTeamRocketsFactoryInput,
+  UseTcgEngineTeamRocketsFactoryResult,
 } from './generated/ash_rpc'
 export type { TcgEngineGameResourceSchema, UserResourceSchema } from './generated/ash_types'
