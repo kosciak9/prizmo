@@ -1,6 +1,6 @@
 # Ash-backed TCG Engine Playtest Handoff
 
-- Updated: 2026-06-01 (batch 224)
+- Updated: 2026-06-01 (batch 225)
 - Sources: Project codebase; local validation; wiki log
 - Raw: N/A — operational handoff
 
@@ -11,6 +11,13 @@
 - Highest-value feasible batches to prefer when available: open-deck game creation and catalog-backed deck validation; engine-owned persisted RNG for shuffle, opening hands, prizes, and draws; safe setup for arbitrary loaded decks with explicit unsupported-card behavior; TCG layout benchmark notes followed by card-front/card-back board improvements; compact experienced-player action and prompt surfaces; then broader generic mechanics and card behavior. If another fixture-backed mechanic slice is the highest-value feasible step, do it and record how it protects correctness or advances the north star.
 - UI batches must benchmark Pokémon TCG and at least one other TCG layout before substantial layout changes, then record what Prizmo adopts or rejects in the wiki/log for the batch. Batch 219 completed this benchmark; Prizmo adopted overlapping card backs for opponent hand, card back zone visuals for deck/prizes, top-card discard preview, and stadium card art. Prizmo deferred Hearthstone-style board interactivity/fanning and PTCGL-style exact zone replication.
 - Keep raw payloads, IDs, debug counters, and tutorial copy out of the normal play path. The product target is a serious, dense card table for players who already know Pokémon TCG.
+
+## Iteration 225 handoff
+
+- Current state: Team Rocket's Factory (`DRI-173`) was implemented and committed (`a40559c feat(tcg): support team rockets factory`). No durable game command was executed against the long-lived playtest game or open-deck validation games. Wiki updates for Factory are included in this batch. Last commit at iteration start (for this follow-on wiki/documentation batch): `a40559c feat(tcg): support team rockets factory`.
+- Completed the next Rocket's Mewtwo fixture card gap: Team Rocket's Factory (`DRI-173`) is now an engine-defined Stadium with a once-per-turn `Use Team Rocket's Factory` affordance that draws 2 cards when the current player has played a Team Rocket Supporter this turn. The legality gate checks persisted `card_play_completed` events for the current turn instead of mutable scratch flags, following the pattern established by Archer. `Prizmo.TcgEngine.StadiumEffects` now owns both Festival Grounds Special Condition immunity/recovery and Factory's Supporter-draw trigger. A new `stadium_effect_used` event type with viewer-safe public notes exposes the draw to both players without leaking `rng_seed` or hidden deck order. The TypeScript RPC, React action affordance rail, and command surface are wired through the existing Ash action pipeline.
+- Validation: `mix compile --warnings-as-errors`, `node_modules/.bin/tsc --noEmit`, `mix test test/prizmo/tcg_engine/mechanics_test.exs` (12/0) pass. No rollback Tidewave validation was performed for Factory in this batch — the commit was pre-existing and validated only through compilation and existing tests.
+- Recommended next atomic task: if the next batch stays on engine behavior, the clearest pending fixture-card gaps with bounded mechanics are Earthen Vessel (`POR-086`, discard-for-2-Basic-Energy search Item in Dragapult and Festival Lead decks), Unfair Stamp (`TWM-165`, ACE SPEC both-player hand-shuffle draw in multiple decks), and Handheld Fan (`TWM-150`, printed Tool effect in Alakazam deck). If the next batch returns to the product surface, event-history visual polish or large-hand density/fanning are the strongest UI-density candidates — the benchmark requirement is already satisfied from batch 219.
 
 ## Iteration 224 handoff
 

@@ -7286,42 +7286,119 @@ function BenchSlots({ cards, cardIntentsById }: { cards: CardSummary[]; cardInte
   )
 }
 
+const TURN_SETUP_EVENTS = new Set([
+  'action_window_opened', 'start_next_turn', 'turn_ended', 'turn_passed', 'turn_started',
+  'end_turn', 'open_action_window', 'start_setup', 'setup_active_chosen', 'setup_completed',
+  'setup_player_ready', 'starting_player_chosen', 'complete_setup', 'place_prizes',
+  'prizes_placed', 'draw_for_turn', 'skip_draw_for_turn', 'turn_card_drawn',
+  'setup_bench_choices_opened', 'setup_bench_chosen', 'choose_active_from_hand',
+  'choose_setup_bench_from_hand', 'choose_prize', 'choose_replacement_active',
+  'replacement_active_required', 'auto_replacement_active',
+])
+
+const CARD_PLAY_EVENTS = new Set([
+  'card_play_started', 'card_play_completed', 'play_basic_to_bench', 'evolve_from_hand',
+  'play_trainer_to_discard', 'play_stadium', 'attach_energy', 'attach_tool',
+  'ultra_ball', 'buddy_buddy_poffin', 'poke_pad',
+  'night_stretcher', 'boss_orders', 'retreat',
+])
+
+const CARD_MOVE_EVENTS = new Set([
+  'cards_moved', 'deck_shuffled',
+])
+
+const COMBAT_EVENTS = new Set([
+  'declare_attack', 'finish_attack', 'take_knockout_prizes', 'attack_effect_completed',
+  'knockout_prize_selection_required',
+])
+
+const EFFECT_EVENTS = new Set([
+  'cost_paid', 'cost_payment_started', 'effect_started', 'effect_completed',
+  'pending_effect_created', 'stadium_effect_used',
+])
+
+const PROMPT_EVENTS = new Set([
+  'prompt_created', 'prompt_resolved',
+])
+
+const SWITCH_EVENTS = new Set([
+  'switch_active_with_bench',
+])
+
+const COIN_EVENTS = new Set([
+  'coin_flipped',
+])
+
+function eventTypeCategory(type: string): { dot: string; label: string } {
+  if (TURN_SETUP_EVENTS.has(type)) return { dot: 'bg-sky-500', label: 'turn' }
+  if (CARD_PLAY_EVENTS.has(type)) return { dot: 'bg-emerald-500', label: 'play' }
+  if (CARD_MOVE_EVENTS.has(type)) return { dot: 'bg-teal-500', label: 'move' }
+  if (COMBAT_EVENTS.has(type)) return { dot: 'bg-rose-500', label: 'combat' }
+  if (EFFECT_EVENTS.has(type)) return { dot: 'bg-violet-500', label: 'effect' }
+  if (PROMPT_EVENTS.has(type)) return { dot: 'bg-slate-400', label: 'prompt' }
+  if (SWITCH_EVENTS.has(type)) return { dot: 'bg-cyan-500', label: 'switch' }
+  if (COIN_EVENTS.has(type)) return { dot: 'bg-amber-500', label: 'coin' }
+  return { dot: 'bg-gray-400', label: 'other' }
+}
+
 function EventHistoryPanel({ events }: { events: GameState['events'] }) {
-  const latestEvents = events.slice(-24)
+  const latestEvents = events.slice(-32)
+  const empty = latestEvents.length === 0
 
   return (
     <Panel title="Event history" trailing={<StatusBadge tone={events.length > 0 ? 'active' : 'neutral'}>{events.length} events</StatusBadge>}>
-      <div className="space-y-3">
-        <p className="text-sm leading-6 text-muted-foreground">
-          Persisted domain facts from the engine. New events appear at the bottom so the table reads like a played turn.
-        </p>
+      {!empty ? (
+        <ol className="max-h-[22rem] overflow-auto pr-0.5 text-sm" aria-label="Game event history">
+          {latestEvents.map((event, idx) => {
+            const prevEvent = idx > 0 ? latestEvents[idx - 1] : null
+            const turnChanged =
+              prevEvent &&
+              prevEvent.turnId &&
+              event.turnId &&
+              prevEvent.turnId !== event.turnId
+            const cat = eventTypeCategory(event.type)
 
-        {latestEvents.length > 0 ? (
-          <ol className="max-h-80 space-y-2 overflow-auto pr-1" aria-label="Recent persisted game events">
-            {latestEvents.map(event => (
-              <li
-                className="grid gap-2 rounded-xl bg-secondary/65 px-3 py-2 text-sm sm:grid-cols-[4.5rem_minmax(0,1fr)_auto] sm:items-start"
-                key={event.id}
-              >
-                <span className="font-mono text-xs text-muted-foreground">#{event.index}</span>
-                <div className="min-w-0 space-y-2">
-                  <span className="block truncate font-medium text-foreground">{event.publicNote ?? formatEventType(event.type)}</span>
-                  {event.publicRevealedCards.length > 0 ? (
-                    <div className="flex gap-2 overflow-x-auto pb-1" aria-label="Publicly revealed mulligan hand">
-                      {event.publicRevealedCards.map((card, cardIndex) => (
-                        <RevealedEventCard key={`${event.id}-${card.cardId}-${cardIndex}`} card={card} />
-                      ))}
-                    </div>
-                  ) : null}
+            return (
+              <li key={event.id}>
+                {turnChanged ? (
+                  <div className="my-1.5 flex items-center gap-2 px-1">
+                    <hr className="flex-1 border-t border-border/30" />
+                    <span className="text-[0.6rem] font-semibold uppercase tracking-[0.18em] text-muted-foreground/50">Next turn</span>
+                    <hr className="flex-1 border-t border-border/30" />
+                  </div>
+                ) : null}
+                <div className="group flex items-start gap-2.5 rounded-lg px-2.5 py-1.5 transition-colors hover:bg-secondary/40">
+                  <span className="mt-0.5 shrink-0 self-stretch">
+                    <span className={`block h-full w-0.5 rounded-full ${cat.dot} opacity-40 group-hover:opacity-70 transition-opacity`} />
+                  </span>
+                  <div className="min-w-0 flex-1 space-y-0.5">
+                    <p className="truncate font-medium leading-snug text-foreground">
+                      {event.publicNote ?? formatEventType(event.type)}
+                    </p>
+                    {event.publicRevealedCards.length > 0 ? (
+                      <div className="flex gap-1.5 overflow-x-auto pb-0.5" aria-label="Publicly revealed cards">
+                        {event.publicRevealedCards.map((card, cardIndex) => (
+                          <RevealedEventCard key={`${event.id}-${card.cardId}-${cardIndex}`} card={card} />
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1.5 self-start">
+                    <span className="font-mono text-[0.62rem] text-muted-foreground/50">{event.index}</span>
+                    {event.playerId ? (
+                      <span className="rounded-md bg-muted/60 px-1.5 py-0.5 text-[0.6rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                        {formatPlayerId(event.playerId)}
+                      </span>
+                    ) : null}
+                  </div>
                 </div>
-                {event.playerId ? <StatusBadge>{formatPlayerId(event.playerId)}</StatusBadge> : <span className="text-xs text-muted-foreground">engine</span>}
               </li>
-            ))}
-          </ol>
-        ) : (
-          <RailEmptyState title="No events yet">Create or reconnect to a game, then engine facts will appear here.</RailEmptyState>
-        )}
-      </div>
+            )
+          })}
+        </ol>
+      ) : (
+        <RailEmptyState title="No events yet">Create or reconnect to a game, then engine facts will appear here.</RailEmptyState>
+      )}
     </Panel>
   )
 }
