@@ -7478,6 +7478,23 @@ function PrivateHandZone({
   isViewer: boolean
   player: PlayerView
 }) {
+  const handSize = player.hand.length
+  const densityTier =
+    handSize <= 6 ? 'normal' : handSize <= 10 ? 'compact' : handSize <= 15 ? 'dense' : 'overflow'
+
+  const gridClassName = (() => {
+    switch (densityTier) {
+      case 'normal':
+        return 'grid max-h-72 grid-cols-2 gap-1.5 overflow-auto pr-1'
+      case 'compact':
+        return 'grid max-h-96 grid-cols-3 gap-1 pr-0.5'
+      case 'dense':
+        return 'grid grid-cols-4 gap-0.5 pr-0.5'
+      case 'overflow':
+        return 'flex flex-wrap gap-0 [&>*]:w-[4.5rem] [&>*]:shrink-0 [&>*]:-mr-2.5 [&>*]:last:mr-0'
+    }
+  })()
+
   return (
     <div className="rounded-2xl bg-background/45 p-2.5">
       <div className="mb-2 flex items-center justify-between gap-2">
@@ -7492,10 +7509,15 @@ function PrivateHandZone({
       {isViewer ? (
         <>
           <HandRulesSupportNotice cards={player.hand} />
-          {player.hand.length > 0 ? (
-            <div className="grid max-h-72 grid-cols-2 gap-1.5 overflow-auto pr-1">
-              {player.hand.map(card => (
-                <HandCardTile card={card} intent={cardIntentsById.get(card.id)} key={card.id} />
+          {handSize > 0 ? (
+            <div className={gridClassName}>
+              {player.hand.map((card, _i) => (
+                <HandCardTile
+                  card={card}
+                  compact={densityTier === 'dense' || densityTier === 'overflow'}
+                  intent={cardIntentsById.get(card.id)}
+                  key={card.id}
+                />
               ))}
             </div>
           ) : (
@@ -7542,15 +7564,16 @@ function HandRulesSupportNotice({ cards }: { cards: CardSummary[] }) {
   )
 }
 
-function HandCardTile({ card, intent }: { card: CardSummary; intent?: CardIntent }) {
+function HandCardTile({ card, compact, intent }: { card: CardSummary; compact?: boolean; intent?: CardIntent }) {
   const content = (
     <>
-      <CardArt card={card} variant="hand" />
-      <RulesSupportBadge card={card} compact />
+      <CardArt card={card} variant={compact ? 'compact' : 'hand'} />
+      <RulesSupportBadge card={card} compact={compact !== false} />
       {intent ? <CardIntentBadge intent={intent} compact /> : null}
     </>
   )
-  const className = `relative rounded-xl bg-secondary/70 p-1 text-left ring-1 ring-border/40 ${intent ? cardIntentClassName(intent) : ''}`
+  const paddingClass = compact ? 'p-0.5' : 'p-1'
+  const className = `relative rounded-xl bg-secondary/70 ${paddingClass} text-left ring-1 ring-border/40 ${intent ? cardIntentClassName(intent) : ''}`
   const title = intent ? `${intent.label} · ${card.name} · ${card.cardId}` : `${card.name} · ${card.cardId}`
 
   return intent ? (
