@@ -6910,11 +6910,20 @@ function BattlefieldPanel({
           />
         ) : null}
 
-        <div className="my-2 grid items-center gap-3 sm:grid-cols-[1fr_auto_1fr]">
+        <div className="my-2 grid items-center gap-3 sm:grid-cols-[1fr_auto_auto_1fr]">
           <div className="hidden h-px bg-border/60 sm:block" />
-          <div className="rounded-full bg-background/55 px-3 py-1.5 text-center text-xs font-medium text-muted-foreground">
-            {stadium ? `Stadium: ${stadium.name}` : 'No stadium'}
-          </div>
+          {stadium ? (
+            <div className="flex items-center gap-2 rounded-full bg-background/55 pl-2 pr-3 py-1.5 text-center text-xs font-medium text-muted-foreground">
+              <div className="aspect-[63/88] w-7 overflow-hidden rounded bg-muted/55 ring-1 ring-border/40">
+                <CardArt card={stadium} variant="compact" />
+              </div>
+              <span>{stadium.name}</span>
+            </div>
+          ) : (
+            <div className="rounded-full bg-background/55 px-3 py-1.5 text-center text-xs font-medium text-muted-foreground">
+              No stadium
+            </div>
+          )}
           <div className="hidden h-px bg-border/60 sm:block" />
         </div>
 
@@ -7063,10 +7072,10 @@ function PlayerBattleSide({
       </div>
 
       <div className="mt-3 grid gap-2.5 xl:grid-cols-[5.5rem_minmax(0,1fr)_minmax(10rem,14rem)]">
-        <div className="grid grid-cols-4 gap-2 xl:grid-cols-1">
-          <ZoneStack label="Deck" value={player.deckCount} />
-          <ZoneStack label="Prizes" value={player.prizeCount} />
-          <ZoneStack label="Discard" value={player.discardCount} />
+        <div className="grid grid-cols-4 gap-1.5 xl:grid-cols-1">
+          <MiniCardBack label="Deck" count={player.deckCount} />
+          <MiniCardBack label="Prizes" count={player.prizeCount} />
+          <DiscardPreview cards={player.discard} count={player.discardCount} />
           <ZoneStack label="Hand" value={player.handCount} tone={isViewer ? 'active' : 'hidden'} />
         </div>
 
@@ -7297,7 +7306,7 @@ function PrivateHandZone({
         <>
           <HandRulesSupportNotice cards={player.hand} />
           {player.hand.length > 0 ? (
-            <div className="grid max-h-80 grid-cols-2 gap-2 overflow-auto pr-1">
+            <div className="grid max-h-72 grid-cols-2 gap-1.5 overflow-auto pr-1">
               {player.hand.map(card => (
                 <HandCardTile card={card} intent={cardIntentsById.get(card.id)} key={card.id} />
               ))}
@@ -7309,9 +7318,7 @@ function PrivateHandZone({
           )}
         </>
       ) : (
-        <div className="rounded-xl bg-muted/55 px-3 py-4 text-center text-sm text-muted-foreground">
-          {player.handCount} hidden
-        </div>
+        <OpponentHandBacks count={player.handCount} />
       )}
     </div>
   )
@@ -7356,7 +7363,7 @@ function HandCardTile({ card, intent }: { card: CardSummary; intent?: CardIntent
       {intent ? <CardIntentBadge intent={intent} compact /> : null}
     </>
   )
-  const className = `relative rounded-xl bg-secondary/70 p-1.5 text-left ring-1 ring-border/40 ${intent ? cardIntentClassName(intent) : ''}`
+  const className = `relative rounded-xl bg-secondary/70 p-1 text-left ring-1 ring-border/40 ${intent ? cardIntentClassName(intent) : ''}`
   const title = intent ? `${intent.label} · ${card.name} · ${card.cardId}` : `${card.name} · ${card.cardId}`
 
   return intent ? (
@@ -9303,6 +9310,87 @@ function visibleCardsById(gameState: GameState) {
   }
 
   return cards
+}
+
+function MiniCardBack({ label, count }: { label: string; count: number }) {
+  return (
+    <div className="relative mx-auto aspect-[63/88] w-full max-w-[4rem] overflow-hidden rounded-lg bg-gradient-to-br from-blue-950 via-blue-900 to-purple-950 ring-1 ring-white/10 shadow-sm transition-transform hover:scale-105">
+      <div className="absolute inset-1.5 rounded-[3px] border border-white/15" />
+      <div className="absolute inset-[30%] rounded-full border border-white/15">
+        <div className="absolute inset-[28%] rounded-full border border-white/15" />
+      </div>
+      <div className="absolute left-1.5 top-1.5 h-2 w-2 rounded-full border border-white/10" />
+      <div className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full border border-white/10" />
+      <div className="absolute bottom-1.5 left-1.5 h-2 w-2 rounded-full border border-white/10" />
+      <div className="absolute bottom-1.5 right-1.5 h-2 w-2 rounded-full border border-white/10" />
+      <div className="absolute inset-0 flex flex-col items-center justify-center px-1">
+        <span className="text-lg font-bold tabular-nums leading-none text-white drop-shadow-lg">{count}</span>
+        <span className="mt-0.5 text-[0.55rem] font-semibold uppercase tracking-[0.1em] text-white/80 drop-shadow-lg">
+          {label}
+        </span>
+      </div>
+    </div>
+  )
+}
+
+function DiscardPreview({ cards, count }: { cards: CardSummary[]; count: number }) {
+  const topCard = cards.length > 0 ? cards[cards.length - 1] : null
+
+  if (topCard) {
+    return (
+      <div className="relative mx-auto aspect-[63/88] w-full max-w-[4rem] overflow-hidden rounded-lg bg-gradient-to-br from-blue-950 via-blue-900 to-purple-950 ring-1 ring-white/10 shadow-sm">
+        <div className="absolute inset-0">
+          <CardArt card={topCard} variant="compact" />
+        </div>
+        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent px-1 pb-1 pt-4">
+          <span className="block text-center text-lg font-bold tabular-nums leading-none text-white drop-shadow-lg">
+            {count}
+          </span>
+          <span className="block text-center text-[0.55rem] font-semibold uppercase tracking-[0.1em] text-white/80 drop-shadow-lg">
+            Discard
+          </span>
+        </div>
+      </div>
+    )
+  }
+
+  return <MiniCardBack label="Discard" count={count} />
+}
+
+function OpponentHandBacks({ count }: { count: number }) {
+  if (count === 0) {
+    return (
+      <div className="rounded-xl bg-muted/55 px-3 py-4 text-center text-sm text-muted-foreground">
+        Empty.
+      </div>
+    )
+  }
+
+  const visibleBacks = Math.min(count, 4)
+
+  return (
+    <div className="flex items-center justify-center gap-1 rounded-xl bg-muted/55 px-3 py-4" title={`${count} hidden cards`}>
+      <div className="relative flex items-center">
+        {Array.from({ length: visibleBacks }).map((_, i) => (
+          <div
+            className="relative -ml-2.5 aspect-[63/88] w-9 overflow-hidden rounded bg-gradient-to-br from-blue-950 via-blue-900 to-purple-950 ring-1 ring-white/10 shadow-sm first:ml-0"
+            key={i}
+            style={{ zIndex: visibleBacks - i }}
+          >
+            <div className="absolute inset-1 rounded-[2px] border border-white/15" />
+            <div className="absolute inset-[28%] rounded-full border border-white/15">
+              <div className="absolute inset-[26%] rounded-full border border-white/15" />
+            </div>
+            <div className="absolute left-1 top-1 h-1.5 w-1.5 rounded-full border border-white/10" />
+            <div className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full border border-white/10" />
+            <div className="absolute bottom-1 left-1 h-1.5 w-1.5 rounded-full border border-white/10" />
+            <div className="absolute bottom-1 right-1 h-1.5 w-1.5 rounded-full border border-white/10" />
+          </div>
+        ))}
+      </div>
+      <span className="ml-1 text-sm font-semibold tabular-nums text-muted-foreground">{count}</span>
+    </div>
+  )
 }
 
 function addVisibleCard(cards: Map<string, CardSummary>, card: CardSummary) {

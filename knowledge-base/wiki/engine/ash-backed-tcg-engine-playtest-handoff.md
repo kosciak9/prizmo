@@ -1,6 +1,6 @@
 # Ash-backed TCG Engine Playtest Handoff
 
-- Updated: 2026-06-01
+- Updated: 2026-06-01 (batch 219)
 - Sources: Project codebase; local validation; wiki log
 - Raw: N/A — operational handoff
 
@@ -9,8 +9,15 @@
 - Current direction: follow the canonical [Open-Deck RNG TCG Engine and Card-First Playtest UI North Star](ash-backed-tcg-engine-playtest-north-star.md). The north star is the product target, not a ban on fixture-backed engine validation.
 - Selection rule for loopers: game `f6df7025-7d0f-4d9b-9bc2-31c864de1d4e`, preseeded fixtures, deterministic seeds, and narrow scripted scenarios remain valid when they prove engine correctness, prevent regressions, or validate a UI path. They should not be mistaken for the finished product experience.
 - Highest-value feasible batches to prefer when available: open-deck game creation and catalog-backed deck validation; engine-owned persisted RNG for shuffle, opening hands, prizes, and draws; safe setup for arbitrary loaded decks with explicit unsupported-card behavior; TCG layout benchmark notes followed by card-front/card-back board improvements; compact experienced-player action and prompt surfaces; then broader generic mechanics and card behavior. If another fixture-backed mechanic slice is the highest-value feasible step, do it and record how it protects correctness or advances the north star.
-- UI batches must benchmark Pokémon TCG and at least one other TCG layout before substantial layout changes, then record what Prizmo adopts or rejects in the wiki/log for the batch.
+- UI batches must benchmark Pokémon TCG and at least one other TCG layout before substantial layout changes, then record what Prizmo adopts or rejects in the wiki/log for the batch. Batch 219 completed this benchmark; Prizmo adopted overlapping card backs for opponent hand, card back zone visuals for deck/prizes, top-card discard preview, and stadium card art. Prizmo deferred Hearthstone-style board interactivity/fanning and PTCGL-style exact zone replication.
 - Keep raw payloads, IDs, debug counters, and tutorial copy out of the normal play path. The product target is a serious, dense card table for players who already know Pokémon TCG.
+
+## Iteration 219 handoff
+
+- Current state: no durable game command was executed against long-lived playtest game `f6df7025-7d0f-4d9b-9bc2-31c864de1d4e`, open-deck validation game `302a39ed-d15b-4fcb-8a13-80eb2eed71be`, or mulligan validation game `762faa63-a747-430a-ab00-b4ce3b59158a`. No engine source files were changed. All changes were in the React SPA playtest board (`lib/prizmo_web/spa/features/home/routes/index.tsx`). Last commit at iteration start: `b5fb877 feat(tcg): support secret box search`.
+- Completed TCG layout benchmark and card-table UI polish batch. The benchmark inspected PTCGL, Hearthstone, and physical Pokémon TCG tournament table layouts; lessons recorded in wiki/log. Implementation added three new inline components: `MiniCardBack` (CSS-only Pokémon-style card back gradient with count/label at `aspect-[63/88]` using [from-blue-950 via-blue-900 to-purple-950] scheme with decorative border rings and corner accents), `DiscardPreview` (face-up top-0 CardArt with count gradient overlay, falling back to MiniCardBack when discard is empty), and `OpponentHandBacks` (up to 4 overlapping -ml-2.5 card backs with total count badge). Zone column in PlayerBattleSide now renders MiniCardBack for Deck/Prizes and DiscardPreview instead of bare text-only ZoneStack. PrivateHandZone opponent branch renders OpponentHandBacks instead of plain "X hidden" text. BattlefieldPanel stadium divider shows CardArt thumbnail alongside name. HandCardTile padding and grid gap reduced for denser viewer hand. Stadium card art integration uses `CardArt variant="compact"` within a small `aspect-[63/88] w-7` container inside the center divider.
+- Validation: `node_modules/.bin/tsc --noEmit --ignoreDeprecations 6.0`, `mix format --check-formatted`, `mix compile --warnings-as-errors`, `mix ash_typescript.codegen --check`, `mix test test/prizmo/tcg_engine/mechanics_test.exs` (10/0), and final `mix check` (all 11 gates) passed.
+- Recommended next atomic task: continue card-table UI improvement toward the north-star experienced-player density target. Good next candidates are hand fanning/overlap for very large hands (>10 cards) to avoid scrolling, card-attached action affordances on the board instead of sidebar-only, event history visual polish, or returning to pending high-frequency card behavior such as Arven, Iono, or Counter Catcher from fixture decks. The required TCG layout benchmark is now complete and should not be repeated unless the board layout changes substantially.
 
 ## Iteration 218 handoff
 
