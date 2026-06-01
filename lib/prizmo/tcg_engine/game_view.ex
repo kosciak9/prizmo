@@ -388,7 +388,9 @@ defmodule Prizmo.TcgEngine.GameView do
       card_name = payload_card_name(payload, "source_card_id", "Card effect")
 
       %{
-        public_note: revealed_cards_note(card_name, length(revealed_cards)),
+        public_note:
+          payload_value(payload, "public_note") ||
+            revealed_cards_note(card_name, length(revealed_cards)),
         public_card_count: length(revealed_cards),
         public_revealed_cards: revealed_cards
       }
@@ -487,6 +489,7 @@ defmodule Prizmo.TcgEngine.GameView do
   defp payload_atom_key("card_id"), do: :card_id
   defp payload_atom_key("energy_card_id"), do: :energy_card_id
   defp payload_atom_key("mulligan_number"), do: :mulligan_number
+  defp payload_atom_key("public_note"), do: :public_note
   defp payload_atom_key("public_reveal"), do: :public_reveal
   defp payload_atom_key("revealed_cards"), do: :revealed_cards
   defp payload_atom_key("returned_card_count"), do: :returned_card_count

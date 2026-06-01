@@ -181,6 +181,20 @@ defmodule Prizmo.TcgEngine.CardStore do
     end
   end
 
+  def shuffle_discard_cards_into_deck(game_id, player_id, cards) do
+    with {:ok, deck_count} <- deck_count(game_id, player_id) do
+      cards
+      |> Enum.with_index(deck_count + 1)
+      |> Enum.map(fn {card, position} ->
+        update(card, :shuffle_into_deck, %{
+          position: position,
+          attached_to_card_instance_id: nil
+        })
+      end)
+      |> collect_results()
+    end
+  end
+
   def move_card_to_hand(%CardInstance{} = card, :deck, position) do
     update(card, :draw_to_hand, %{position: position})
   end

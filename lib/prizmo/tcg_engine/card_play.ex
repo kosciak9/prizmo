@@ -321,6 +321,35 @@ defmodule Prizmo.TcgEngine.CardPlay do
          turn,
          player,
          card,
+         %{type: :recover_discard_to_deck} = effect,
+         target_ids
+       ) do
+    with {:ok, target_cards} <-
+           validate_recover_discard_to_deck_effect(game.id, player.player_id, effect, target_ids),
+         {:ok, moved_targets} <-
+           CardStore.shuffle_discard_cards_into_deck(game.id, player.player_id, target_cards),
+         moved_cards = EventPayloads.moved_cards(moved_targets, :discard, :deck),
+         {:ok, _event} <-
+           write_event_and_snapshot(game.id, :cards_moved, player.player_id, %{
+             reason: :effect_resolution,
+             source: EventPayloads.card_source(card),
+             effect_key: effect.key,
+             cards: moved_cards,
+             public_reveal: true,
+             public_note: sacred_ash_public_note(length(moved_targets)),
+             source_card_id: card.card_id,
+             revealed_cards: moved_cards
+           }),
+         {:ok, _event} <- maybe_shuffle_and_write_deck_shuffled(game, turn, player, card, effect) do
+      complete_play_card_resolution(game, turn, player, card, effect)
+    end
+  end
+
+  defp complete_play_card_effect(
+         game,
+         turn,
+         player,
+         card,
          %{type: :search_top_deck} = effect,
          target_ids
        ) do
@@ -753,6 +782,15 @@ defmodule Prizmo.TcgEngine.CardPlay do
     end
   end
 
+  defp validate_recover_discard_to_deck_effect(game_id, player_id, effect, target_ids) do
+    with {:ok, target_ids} <- EffectRunner.validate_choice_selection(effect, target_ids),
+         {:ok, target_cards} <- CardStore.get_cards(game_id, target_ids),
+         :ok <- require_all_owned_in_zone(target_cards, player_id, :discard),
+         :ok <- require_all_recover_discard_to_hand_filters(target_cards, effect.params.filter) do
+      {:ok, target_cards}
+    end
+  end
+
   defp validate_rare_candy_effect(game_id, player_id, turn, effect, target_ids) do
     with :ok <- require_evolution_allowed_this_turn(turn),
          {:ok, target_ids} <- EffectRunner.validate_choice_selection(effect, target_ids),
@@ -863,6 +901,18 @@ defmodule Prizmo.TcgEngine.CardPlay do
     |> then(&{:ok, &1})
   end
 
+  defp effect_choice_ids(
+         cards,
+         player_id,
+         %{type: :recover_discard_to_deck} = choice_step,
+         _current_turn
+       ) do
+    cards
+    |> recover_discard_to_hand_choice_cards(player_id, choice_step)
+    |> Enum.map(& &1.id)
+    |> then(&{:ok, &1})
+  end
+
   defp effect_choice_ids(cards, player_id, %{type: :rare_candy_evolve}, current_turn) do
     cards
     |> rare_candy_choice_cards(player_id, current_turn)
@@ -909,6 +959,7 @@ defmodule Prizmo.TcgEngine.CardPlay do
              :discard_opponent_special_energy,
              :move_basic_energy_between_own_pokemon,
              :recover_discard_to_hand,
+             :recover_discard_to_deck,
              :rare_candy_evolve
            ] ->
         effect_choice_ids(cards, player_id, choice_step, current_turn)
@@ -1680,6 +1731,11 @@ defmodule Prizmo.TcgEngine.CardPlay do
   end
 
   defp maybe_put_reveal_payload(payload, _card, _effect, _moved_cards), do: payload
+
+  defp sacred_ash_public_note(1), do: "Sacred Ash shuffled 1 Pokémon from discard into the deck."
+
+  defp sacred_ash_public_note(card_count),
+    do: "Sacred Ash shuffled #{card_count} Pokémon from discard into the deck."
 
   defp maybe_put(map, _key, nil), do: map
   defp maybe_put(map, key, value), do: Map.put(map, key, value)

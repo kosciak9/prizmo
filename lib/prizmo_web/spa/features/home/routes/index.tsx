@@ -8811,6 +8811,8 @@ function promptSubmitLabel(choiceKey: string, selectedCount: number, max: number
       return `Recover selected card ${selectedCount}/${max}`
     case 'recover_non_rule_box_pokemon_or_basic_energy_from_discard':
       return `Recover selected cards ${selectedCount}/${max}`
+    case 'shuffle_up_to_5_pokemon_from_discard_into_deck':
+      return `Shuffle selected Pokémon ${selectedCount}/${max}`
     case 'knockout_prize_cards':
       return `Take selected Prizes ${selectedCount}/${max}`
     default:
@@ -8879,6 +8881,13 @@ function promptGuidanceMessages(
     return [
       "Lana's Aid can recover up to 3 cards from discard in any mix of non-rule-box Pokémon and Basic Energy.",
       `This prompt accepts ${promptChoiceInstruction(min, max)} from ${legalChoiceCount} legal discard choices.`
+    ]
+  }
+
+  if (choiceKey === 'shuffle_up_to_5_pokemon_from_discard_into_deck') {
+    return [
+      'Sacred Ash shuffles selected Pokémon from your discard pile into your deck, then the engine shuffles the deck with persisted RNG metadata.',
+      `This prompt accepts ${promptChoiceInstruction(min, max)} from ${legalChoiceCount} legal discard Pokémon choices.`
     ]
   }
 

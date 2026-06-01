@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-06-01] iteration 217 | Sacred Ash discard recovery
+- Task attempted: advanced arbitrary-deck Item playability by moving Sacred Ash (`DRI-168`) onto the generic Ash engine `play_card` path as a discard-Pokémon-to-deck recovery effect with seeded deck shuffle.
+- Files changed: updated `lib/prizmo/tcg_engine/cards/registry.ex`, `lib/prizmo/tcg_engine/effect_runner.ex`, `lib/prizmo/tcg_engine/card_instance.ex`, `lib/prizmo/tcg_engine/card_store.ex`, `lib/prizmo/tcg_engine/card_play.ex`, `lib/prizmo/tcg_engine/game_view.ex`, `lib/prizmo_web/spa/features/home/routes/index.tsx`, the canonical north-star article, this log, and the TCG engine playtest handoff.
+- Validation: `mix format`, `mix compile --warnings-as-errors`, `node_modules/.bin/tsc --noEmit --ignoreDeprecations 6.0`, `mix test test/prizmo/tcg_engine/mechanics_test.exs`, rollback Tidewave validation, SQL rollback cleanup verification, `git diff --check`, and final `mix check` passed. Rollback validation confirmed Sacred Ash is engine-defined, appears as a normal Play source, prompts for discard Pokémon, moves five selected Pokémon from discard into deck, discards Sacred Ash, writes viewer-safe public note/thumbnails, shuffles the deck with seeded metadata and no `rng_seed`, resolves without prompts/pending effects, and persisted no scratch game.
+- Remaining/blocking notes: this covers Sacred Ash's bounded one-to-five Pokémon discard recovery into deck. Secret Box, additional printed Tool/Stadium effects, and the benchmarked card-table density/polish batch remain open.
+
 ## [2026-06-01] iteration 216 | Team Rocket's Transceiver search
 - Task attempted: advanced arbitrary-deck Team Rocket Item playability by moving Team Rocket's Transceiver (`DRI-178`) onto the generic Ash engine `play_card` path as a Team Rocket Supporter deck-search effect.
 - Files changed: updated `lib/prizmo/tcg_engine/cards/registry.ex`, `lib/prizmo/tcg_engine/card_play.ex`, `lib/prizmo_web/spa/features/home/routes/index.tsx`, the canonical north-star article, this log, and the TCG engine playtest handoff.

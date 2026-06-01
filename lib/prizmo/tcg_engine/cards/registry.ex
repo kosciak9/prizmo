@@ -181,6 +181,25 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     ]
   }
 
+  @sacred_ash %CardDefinition{
+    id: "DRI-168",
+    kind: :trainer,
+    trainer_type: :item,
+    play_window: :action_window,
+    effects: [
+      %Effect{
+        key: :shuffle_up_to_5_pokemon_from_discard_into_deck,
+        type: :recover_discard_to_deck,
+        params: %{
+          filter: %{kind: :pokemon},
+          min_count: 1,
+          max_count: 5,
+          shuffle_after: true
+        }
+      }
+    ]
+  }
+
   @lanas_aid %CardDefinition{
     id: "TWM-155",
     kind: :trainer,
@@ -358,6 +377,7 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     @poke_pad.id => @poke_pad,
     @pokegear_3_0.id => @pokegear_3_0,
     @rare_candy.id => @rare_candy,
+    @sacred_ash.id => @sacred_ash,
     @team_rockets_transceiver.id => @team_rockets_transceiver,
     @ultra_ball.id => @ultra_ball
   }
