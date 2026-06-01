@@ -1,6 +1,6 @@
 # Ash-backed TCG Engine Playtest Handoff
 
-- Updated: 2026-06-01 (batch 222)
+- Updated: 2026-06-01 (batch 223)
 - Sources: Project codebase; local validation; wiki log
 - Raw: N/A — operational handoff
 
@@ -11,6 +11,13 @@
 - Highest-value feasible batches to prefer when available: open-deck game creation and catalog-backed deck validation; engine-owned persisted RNG for shuffle, opening hands, prizes, and draws; safe setup for arbitrary loaded decks with explicit unsupported-card behavior; TCG layout benchmark notes followed by card-front/card-back board improvements; compact experienced-player action and prompt surfaces; then broader generic mechanics and card behavior. If another fixture-backed mechanic slice is the highest-value feasible step, do it and record how it protects correctness or advances the north star.
 - UI batches must benchmark Pokémon TCG and at least one other TCG layout before substantial layout changes, then record what Prizmo adopts or rejects in the wiki/log for the batch. Batch 219 completed this benchmark; Prizmo adopted overlapping card backs for opponent hand, card back zone visuals for deck/prizes, top-card discard preview, and stadium card art. Prizmo deferred Hearthstone-style board interactivity/fanning and PTCGL-style exact zone replication.
 - Keep raw payloads, IDs, debug counters, and tutorial copy out of the normal play path. The product target is a serious, dense card table for players who already know Pokémon TCG.
+
+## Iteration 223 handoff
+
+- Current state: no durable game command was executed against long-lived playtest game `f6df7025-7d0f-4d9b-9bc2-31c864de1d4e`, open-deck validation game `302a39ed-d15b-4fcb-8a13-80eb2eed71be`, or mulligan validation game `762faa63-a747-430a-ab00-b4ce3b59158a`. Wally validation used a rollback-only staged turn-2 Lopunny vs Alakazam board, so no scratch game persisted. Last commit at iteration start: `0253137 feat(tcg): support team rockets giovanni`.
+- Completed the next hidden Ash parity slice: Wally's Compassion (`MEG-132`) is now engine-defined on the generic `play_card` path. It appears only when the active player has a damaged Mega Evolution Pokémon ex in play, opens prompt key `heal_mega_evolution_pokemon_ex_then_return_attached_energy_to_hand`, heals all damage from the chosen own Mega target, returns only attached Energy cards to hand, leaves attached Tools in place, and emits a viewer-safe public note plus revealed returned Energy cards. This also captured a durable repo-state caveat: `mix prizmo.cards.coverage` measures metadata/overlay implementation and can overstate canonical Ash action-surface parity.
+- Validation: `mix format`, `mix compile --warnings-as-errors`, `node_modules/.bin/tsc --noEmit`, rollback Tidewave validation of no-damage affordance gating plus full Wally resolution on a staged turn-2 Lopunny board, `mix test test/prizmo/tcg_engine/mechanics_test.exs`, `git diff --check`, and final `mix check` passed.
+- Recommended next atomic task: if the next batch stays on engine behavior, Team Rocket's Ariana (`DRI-171`) or Team Rocket's Archer (`DRI-170`) are now stronger next Ash-support candidates than repeating coverage work, because they remain overlay-backed Rocket's Mewtwo Supporters without canonical `play_card` parity. If the next batch returns to the product surface instead, large-hand density/fanning or event-history polish are stronger candidates than the older “card-attached action affordances” note, because the board already has card-bound intent badges/click targets.
 
 ## Iteration 222 handoff
 

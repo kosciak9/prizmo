@@ -121,6 +121,20 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     ]
   }
 
+  @wallys_compassion %CardDefinition{
+    id: "MEG-132",
+    kind: :trainer,
+    trainer_type: :supporter,
+    play_window: :action_window,
+    effects: [
+      %Effect{
+        key: :heal_mega_evolution_pokemon_ex_then_return_attached_energy_to_hand,
+        type: :heal_mega_evolution_pokemon_ex_then_return_attached_energy_to_hand,
+        params: %{count: 1}
+      }
+    ]
+  }
+
   @boss_orders %CardDefinition{
     id: "MEG-114",
     kind: :trainer,
@@ -474,6 +488,7 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     @team_rockets_giovanni.id => @team_rockets_giovanni,
     @team_rockets_proton.id => @team_rockets_proton,
     @team_rockets_transceiver.id => @team_rockets_transceiver,
+    @wallys_compassion.id => @wallys_compassion,
     @ultra_ball.id => @ultra_ball
   }
 

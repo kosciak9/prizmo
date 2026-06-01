@@ -8870,6 +8870,7 @@ function trainerPromptFlowGuide(
   return (
     ultraBallPromptFlowGuide(choiceKey, min, max, legalChoiceCount) ??
     crushingHammerPromptFlowGuide(choiceKey, min, max, legalChoiceCount) ??
+    wallysCompassionPromptFlowGuide(choiceKey, min, max, legalChoiceCount) ??
     teamRocketsGiovanniPromptFlowGuide(choiceKey, min, max, legalChoiceCount) ??
     secretBoxPromptFlowGuide(choiceKey, min, max, legalChoiceCount)
   )
@@ -9016,6 +9017,44 @@ function teamRocketsGiovanniPromptFlowGuide(
   }
 }
 
+function wallysCompassionPromptFlowGuide(
+  choiceKey: string,
+  min: number,
+  max: number,
+  legalChoiceCount: number
+): PromptFlowGuide | null {
+  if (choiceKey !== 'heal_mega_evolution_pokemon_ex_then_return_attached_energy_to_hand') {
+    return null
+  }
+
+  return {
+    eyebrow: "Wally's Compassion prompt",
+    title: 'Choose the damaged Mega Evolution Pokémon ex to heal',
+    detail:
+      "Finish Wally's Compassion by choosing one of your damaged Mega Evolution Pokémon ex. If any damage is healed, the engine returns that Pokémon’s attached Energy to hand.",
+    steps: [
+      {
+        label: 'play',
+        title: 'Supporter started',
+        detail: "Wally's Compassion is resolving from the prior action.",
+        tone: 'complete'
+      },
+      {
+        label: 'heal',
+        title: 'Pick the damaged Mega target',
+        detail: `${promptChoiceInstruction(min, max)} from ${legalChoiceCount} legal damaged Mega Evolution Pokémon ex choices.`,
+        tone: 'focus'
+      },
+      {
+        label: 'return',
+        title: 'Return attached Energy if healed',
+        detail: 'After the target is healed, any attached Energy cards on that Pokémon return to hand automatically.',
+        tone: 'next'
+      }
+    ]
+  }
+}
+
 function secretBoxPromptFlowGuide(
   choiceKey: string,
   min: number,
@@ -9111,6 +9150,8 @@ function promptSubmitLabel(choiceKey: string, selectedCount: number, max: number
       return `Add Supporter or reveal none ${selectedCount}/${max}`
     case 'search_top_7_for_grass_pokemon_or_basic_grass_energy':
       return `Add revealed Grass cards ${selectedCount}/${max}`
+    case 'heal_mega_evolution_pokemon_ex_then_return_attached_energy_to_hand':
+      return `Resolve Wally's Compassion ${selectedCount}/${max}`
     case 'rare_candy_evolve_basic_to_stage_2':
       return `Resolve Rare Candy evolution ${selectedCount}/${max}`
     case 'search_basic_energy_split_hand_attach_to_pokemon':
@@ -9197,6 +9238,13 @@ function promptGuidanceMessages(
     return [
       "Lana's Aid can recover up to 3 cards from discard in any mix of non-rule-box Pokémon and Basic Energy.",
       `This prompt accepts ${promptChoiceInstruction(min, max)} from ${legalChoiceCount} legal discard choices.`
+    ]
+  }
+
+  if (choiceKey === 'heal_mega_evolution_pokemon_ex_then_return_attached_energy_to_hand') {
+    return [
+      "Wally's Compassion only targets one of your damaged Mega Evolution Pokémon ex in play. The engine heals all damage from that Pokémon, then returns its attached Energy cards to hand.",
+      `This prompt accepts ${promptChoiceInstruction(min, max)} from ${legalChoiceCount} legal damaged Mega Evolution Pokémon ex choices.`
     ]
   }
 

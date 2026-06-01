@@ -116,6 +116,26 @@ defmodule Prizmo.TcgEngine.CardMetadataRequirements do
     end
   end
 
+  def require_mega_evolution_pokemon_ex_card(card_id) do
+    case CardCatalog.fetch(card_id) do
+      {:ok, %{supertype: :pokemon, name: name} = metadata} when is_binary(name) ->
+        if String.starts_with?(name, "Mega ") and String.ends_with?(name, " ex") do
+          :ok
+        else
+          {:error, {:not_mega_evolution_pokemon_ex, metadata.id}}
+        end
+
+      {:ok, %{supertype: :pokemon} = metadata} ->
+        {:error, {:not_mega_evolution_pokemon_ex, metadata.id}}
+
+      {:ok, metadata} ->
+        {:error, {:not_pokemon, metadata.id}}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
   def require_night_stretcher_target(card_id) do
     case CardCatalog.fetch(card_id) do
       {:ok, %{supertype: :pokemon}} -> :ok

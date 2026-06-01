@@ -7,6 +7,7 @@ defmodule Prizmo.TcgEngine.CardPlay do
       require_basic_pokemon: 1,
       require_energy: 1,
       require_basic_energy: 1,
+      require_mega_evolution_pokemon_ex_card: 1,
       require_night_stretcher_target: 1,
       require_non_rule_box_pokemon_card: 1,
       require_poffin_targets: 1,
@@ -578,6 +579,49 @@ defmodule Prizmo.TcgEngine.CardPlay do
          turn,
          player,
          card,
+         %{type: :heal_mega_evolution_pokemon_ex_then_return_attached_energy_to_hand} = effect,
+         target_ids
+       ) do
+    with {:ok, target_card} <-
+           validate_wallys_compassion_effect(game.id, player.player_id, effect, target_ids),
+         healed_damage = target_card.damage,
+         {:ok, healed_card} <- update(target_card, :set_damage, %{damage: 0}),
+         {:ok, attached_cards} <- CardStore.attached_cards(game.id, target_card.id),
+         energy_cards = Enum.filter(attached_cards, &energy_card?/1),
+         {:ok, returned_energy_cards} <-
+           energy_cards
+           |> Enum.map(&CardStore.move_attached_card_to_hand(game.id, player.player_id, &1))
+           |> collect_results(),
+         returned_energy_payloads =
+           wallys_compassion_returned_energy_payloads(returned_energy_cards, target_card.id),
+         {:ok, _event} <-
+           write_event_and_snapshot(game.id, :cards_moved, player.player_id, %{
+             reason: :effect_resolution,
+             source: EventPayloads.card_source(card),
+             effect_key: effect.key,
+             affected_player_id: player.player_id,
+             healed_card_instance_id: healed_card.id,
+             healed_damage: healed_damage,
+             source_card_id: card.card_id,
+             public_note:
+               wallys_compassion_public_note(
+                 healed_card,
+                 healed_damage,
+                 length(returned_energy_cards)
+               ),
+             public_reveal: true,
+             revealed_cards: returned_energy_payloads,
+             cards: returned_energy_payloads
+           }) do
+      complete_play_card_resolution(game, turn, player, card, effect)
+    end
+  end
+
+  defp complete_play_card_effect(
+         game,
+         turn,
+         player,
+         card,
          %{type: :move_basic_energy_between_own_pokemon} = effect,
          target_ids
        ) do
@@ -892,6 +936,13 @@ defmodule Prizmo.TcgEngine.CardPlay do
     end
   end
 
+  defp validate_wallys_compassion_effect(game_id, player_id, effect, target_ids) do
+    with {:ok, target_ids} <- EffectRunner.validate_choice_selection(effect, target_ids),
+         {:ok, target_cards} <- CardStore.get_cards(game_id, target_ids) do
+      selected_wallys_compassion_target(target_cards, player_id)
+    end
+  end
+
   defp validate_opponent_bench_switch_effect(game_id, player_id, effect, target_ids) do
     with {:ok, target_ids} <- EffectRunner.validate_choice_selection(effect, target_ids),
          {:ok, target_cards} <- CardStore.get_cards(game_id, target_ids),
@@ -1035,6 +1086,18 @@ defmodule Prizmo.TcgEngine.CardPlay do
   defp effect_choice_ids(
          cards,
          player_id,
+         %{type: :heal_mega_evolution_pokemon_ex_then_return_attached_energy_to_hand},
+         _current_turn
+       ) do
+    cards
+    |> wallys_compassion_choice_cards(player_id)
+    |> Enum.map(& &1.id)
+    |> then(&{:ok, &1})
+  end
+
+  defp effect_choice_ids(
+         cards,
+         player_id,
          %{type: :switch_team_rocket_bench_and_opponent_bench_to_active},
          _current_turn
        ) do
@@ -1147,6 +1210,7 @@ defmodule Prizmo.TcgEngine.CardPlay do
              :search_top_deck,
              :search_basic_energy_split_hand_attach,
              :flip_coin_then_discard_opponent_attached_energy,
+             :heal_mega_evolution_pokemon_ex_then_return_attached_energy_to_hand,
              :switch_team_rocket_bench_and_opponent_bench_to_active,
              :switch_opponent_bench_to_active,
              :discard_opponent_special_energy,
@@ -1289,6 +1353,12 @@ defmodule Prizmo.TcgEngine.CardPlay do
     else
       _other -> []
     end
+  end
+
+  defp wallys_compassion_choice_cards(cards, player_id) do
+    cards
+    |> Enum.filter(&wallys_compassion_target_card?(&1, player_id))
+    |> Enum.sort_by(&{in_play_zone_sort(&1.zone), &1.position, &1.instance_id})
   end
 
   defp crispin_choice_cards(cards, player_id) do
@@ -1811,11 +1881,24 @@ defmodule Prizmo.TcgEngine.CardPlay do
       require_pokemon_card(card.card_id) == :ok
   end
 
+  defp wallys_compassion_target_card?(%CardInstance{} = card, player_id) do
+    card.owner_player_id == player_id and card.zone in [:active, :bench] and card.damage > 0 and
+      require_mega_evolution_pokemon_ex_card(card.card_id) == :ok
+  end
+
   defp rare_candy_target_card?(%CardInstance{} = card, player_id, turn_number) do
     card.owner_player_id == player_id and card.zone in [:active, :bench] and
       require_basic_pokemon(card.card_id) == :ok and
       require_in_play_pokemon_zone(card) == :ok and
       require_can_evolve_target(card, turn_number) == :ok
+  end
+
+  defp selected_wallys_compassion_target(cards, player_id) do
+    case Enum.filter(cards, &wallys_compassion_target_card?(&1, player_id)) do
+      [target_card] -> {:ok, target_card}
+      [] -> {:error, :missing_wallys_compassion_target}
+      targets -> {:error, {:too_many_wallys_compassion_targets, length(targets)}}
+    end
   end
 
   defp rare_candy_evolves_from?(%CardInstance{} = stage_2_card, %CardInstance{} = target_card) do
@@ -2071,6 +2154,14 @@ defmodule Prizmo.TcgEngine.CardPlay do
     }
   end
 
+  defp wallys_compassion_returned_energy_payloads(returned_energy_cards, target_card_instance_id) do
+    Enum.map(returned_energy_cards, fn returned_energy_card ->
+      moved_card_payload(returned_energy_card, :attached, :hand,
+        from_attached_to_card_instance_id: target_card_instance_id
+      )
+    end)
+  end
+
   defp search_cards_moved_payload(card, effect, moved_targets) do
     moved_cards =
       EventPayloads.moved_cards(moved_targets, :deck, search_effect_destination_zone(effect))
@@ -2132,6 +2223,30 @@ defmodule Prizmo.TcgEngine.CardPlay do
       choice_key,
       legal_choice_ids
     )
+  end
+
+  defp maybe_put_prompt_choice_labels(
+         payload,
+         game_id,
+         _player_id,
+         :heal_mega_evolution_pokemon_ex_then_return_attached_energy_to_hand,
+         legal_choice_ids
+       ) do
+    case CardStore.list_cards(game_id) do
+      {:ok, cards} ->
+        cards_by_id = Map.new(cards, &{&1.id, &1})
+
+        labels =
+          legal_choice_ids
+          |> Enum.map(&Map.get(cards_by_id, &1))
+          |> Enum.reject(&is_nil/1)
+          |> Enum.map(&wallys_compassion_choice_label/1)
+
+        Map.put(payload, :legal_choice_labels, labels)
+
+      {:error, _reason} ->
+        payload
+    end
   end
 
   defp maybe_put_prompt_choice_labels(
@@ -2279,6 +2394,15 @@ defmodule Prizmo.TcgEngine.CardPlay do
       label: card_name(card, card.card_id),
       detail:
         "Opponent Benched Pokémon to switch into the Active Spot after your Team Rocket switch."
+    }
+  end
+
+  defp wallys_compassion_choice_label(%CardInstance{} = card) do
+    %{
+      id: card.id,
+      label: card_name(card, card.card_id),
+      detail:
+        "Damaged Mega Evolution Pokémon ex in #{Atom.to_string(card.zone)}. Wally's Compassion heals it, then returns its attached Energy to hand."
     }
   end
 
@@ -2637,6 +2761,25 @@ defmodule Prizmo.TcgEngine.CardPlay do
       switched_card_payload(opponent_active_card, :active, :bench),
       switched_card_payload(opponent_bench_card, :bench, :active)
     ]
+  end
+
+  defp wallys_compassion_public_note(%CardInstance{} = target_card, healed_damage, 0)
+       when healed_damage > 0 do
+    "Wally's Compassion healed all damage from #{card_name(target_card, target_card.card_id)}."
+  end
+
+  defp wallys_compassion_public_note(%CardInstance{} = target_card, healed_damage, 1)
+       when healed_damage > 0 do
+    "Wally's Compassion healed all damage from #{card_name(target_card, target_card.card_id)} and returned 1 attached Energy card to hand."
+  end
+
+  defp wallys_compassion_public_note(
+         %CardInstance{} = target_card,
+         healed_damage,
+         returned_energy_count
+       )
+       when healed_damage > 0 do
+    "Wally's Compassion healed all damage from #{card_name(target_card, target_card.card_id)} and returned #{returned_energy_count} attached Energy cards to hand."
   end
 
   defp switched_card_payload(card, from_zone, to_zone) do
