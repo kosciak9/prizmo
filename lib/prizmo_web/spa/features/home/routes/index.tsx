@@ -515,7 +515,7 @@ const ACTION_GROUPS: Array<Omit<ActionGroup, 'actions'>> = [
   {
     id: 'pending',
     title: 'Pending card text',
-    description: 'Named attacks, abilities, or Trainer text that are visible but not executable yet.'
+    description: 'Named attacks, abilities, Trainer text, or Special Energy text that are visible but not executable yet.'
   },
   {
     id: 'other',
@@ -6538,6 +6538,7 @@ function actionGroupId(action: ActionAffordance): ActionGroupId {
     case 'unsupported_attack':
     case 'unsupported_ability':
     case 'unsupported_trainer':
+    case 'unsupported_energy':
       return 'pending'
     default:
       return 'other'

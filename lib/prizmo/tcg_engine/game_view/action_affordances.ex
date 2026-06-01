@@ -408,6 +408,7 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
          all_cards
        ) do
     unsupported_trainer_affordances(player, cards) ++
+      unsupported_energy_affordances(player, cards) ++
       unsupported_ability_affordances(player, cards) ++
       unsupported_attack_affordances(player, current_turn, cards, all_cards)
   end
@@ -426,6 +427,29 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
             player.player_id,
             source_card_instance_ids: [card.id],
             note: reason
+          )
+        ]
+      else
+        _other -> []
+      end
+    end)
+  end
+
+  defp unsupported_energy_affordances(%GamePlayer{} = player, cards) do
+    cards
+    |> Enum.filter(&(&1.zone in [:hand, :attached]))
+    |> Enum.flat_map(fn card ->
+      with {:ok, %{supertype: :energy, energy_type: :special} = catalog_card} <-
+             CardCatalog.fetch(card.card_id),
+           true <- present_text?(Map.get(catalog_card, :raw_effect)) do
+        [
+          affordance(
+            :unsupported_energy,
+            "Pending Special Energy: #{catalog_card.name}",
+            :blocked,
+            player.player_id,
+            source_card_instance_ids: [card.id],
+            note: special_energy_pending_note(catalog_card)
           )
         ]
       else
@@ -534,6 +558,19 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
       _other ->
         false
     end
+  end
+
+  defp special_energy_pending_note(%{name: "Team Rocket's Energy"}) do
+    "Team Rocket's Energy has narrow attack-cost provider support, but attachment restrictions and remaining printed text are still pending."
+  end
+
+  defp special_energy_pending_note(%{provides: provides})
+       when is_list(provides) and provides != [] do
+    "This Special Energy can provide Energy for generic attack costs, but remaining printed effects are still pending."
+  end
+
+  defp special_energy_pending_note(_card) do
+    "This Special Energy can attach generically, but its printed Energy rule or effects are still pending."
   end
 
   defp unsupported_attack_note({:unsupported_attack_effect, _card_id, _attack_id, effect_type}) do

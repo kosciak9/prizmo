@@ -228,6 +228,13 @@ defmodule Prizmo.TcgEngine.CardCatalog do
     end)
   end
 
+  defp inferred_provides(%{supertype: :energy, energy_type: :special, raw_effect: raw_effect})
+       when is_binary(raw_effect) do
+    if raw_effect |> String.downcase() |> String.contains?("provides {c} energy") do
+      [:colorless]
+    end
+  end
+
   defp inferred_provides(_card), do: nil
 
   defp primary_type(%Metadata{types: [type | _types]}), do: type

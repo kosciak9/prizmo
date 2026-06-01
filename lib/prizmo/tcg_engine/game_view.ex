@@ -659,6 +659,12 @@ defmodule Prizmo.TcgEngine.GameView do
     end
   end
 
+  defp unsupported_action_summaries(_card_id, %{supertype: :energy, energy_type: :basic}), do: []
+
+  defp unsupported_action_summaries(_card_id, %{supertype: :energy} = card) do
+    unsupported_energy_summaries(card)
+  end
+
   defp unsupported_action_summaries(_card_id, _card), do: []
 
   defp unsupported_attack_summaries(card_id, %{attacks: attacks}) when is_map(attacks) do
@@ -739,6 +745,37 @@ defmodule Prizmo.TcgEngine.GameView do
   defp attack_damage(%{damage: damage}) when is_integer(damage), do: Integer.to_string(damage)
   defp attack_damage(%{damage: damage}) when is_binary(damage), do: damage
   defp attack_damage(_attack), do: nil
+
+  defp unsupported_energy_summaries(card) do
+    if present_text?(Map.get(card, :raw_effect)) do
+      [
+        %{
+          kind: "energy",
+          id: nil,
+          name: Map.get(card, :name) || "Special Energy",
+          reason: unsupported_energy_reason(card),
+          text: blank_to_nil(Map.get(card, :raw_effect)),
+          cost: [],
+          damage: nil
+        }
+      ]
+    else
+      []
+    end
+  end
+
+  defp unsupported_energy_reason(%{name: "Team Rocket's Energy"}) do
+    "This Special Energy has narrow attack-cost provider support, but attachment restrictions and remaining printed text are not executable yet."
+  end
+
+  defp unsupported_energy_reason(%{provides: provides})
+       when is_list(provides) and provides != [] do
+    "This Special Energy can provide Energy for generic attack costs, but remaining printed effects are not executable yet."
+  end
+
+  defp unsupported_energy_reason(_card) do
+    "This Special Energy can attach through the generic engine action, but its printed Energy rule or effects are not executable yet."
+  end
 
   defp format_action_id(value) when is_atom(value),
     do: value |> Atom.to_string() |> format_action_id()

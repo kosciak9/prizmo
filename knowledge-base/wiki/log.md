@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-06-01] iteration 196 | Special Energy pending text
+- Task attempted: advanced arbitrary-deck safety after setup by making Special Energy provider support and unsupported text explicit instead of silently treating all Special Energy as generic attachments with no visible pending behavior.
+- Files changed: updated `lib/prizmo/tcg_engine/card_catalog.ex`, `lib/prizmo/tcg_engine/game_view.ex`, `lib/prizmo/tcg_engine/game_view/action_affordances.ex`, `lib/prizmo_web/spa/features/home/routes/index.tsx`, the canonical north-star article, this log, and the TCG engine playtest handoff.
+- Validation: `mix format`, `mix compile --warnings-as-errors`, `node_modules/.bin/tsc --noEmit --ignoreDeprecations 6.0`, Tidewave rollback eval, `mix test test/prizmo/tcg_engine/mechanics_test.exs`, final `mix check`, and `git diff --check` passed. The rollback eval confirmed `SSP-191` Enriching Energy now infers `provides: [:colorless]`, pays a Colorless attack cost through `AttackCosts.paid?/2`, remains `partial` in `GameView`, exposes an `energy` unsupported-action summary, keeps legal `attach_energy`, and adds a blocked `unsupported_energy` pending-text affordance.
+- Remaining/blocking notes: this does not implement full Special Energy effects. Follow-ups include Enriching Energy's on-attach draw, Mist Energy prevention, Team Rocket's Energy attachment restrictions, broader generic mechanics/card behavior, or the required benchmark before a substantial card-table UI polish batch.
+
 ## [2026-06-01] iteration 195 | Two-browser mulligan path validation
 - Task attempted: validated the full supported no-Basic opening-hand mulligan plus opponent compensation-draw setup path in two independent browser contexts using deterministic open-deck input that forces the setup edge.
 - Files changed: updated the canonical north-star article, this log, and the TCG engine playtest handoff; no product source changed.
