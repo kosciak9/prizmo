@@ -15,6 +15,23 @@ defmodule Prizmo.TcgEngine.GameView.Fields do
     executable_attack_count: [type: :integer, allow_nil?: false],
     unsupported_attack_count: [type: :integer, allow_nil?: false],
     unsupported_ability_count: [type: :integer, allow_nil?: false],
+    unsupported_actions: [
+      type: {:array, :map},
+      allow_nil?: false,
+      constraints: [
+        items: [
+          fields: [
+            kind: [type: :string, allow_nil?: false],
+            id: [type: :string],
+            name: [type: :string, allow_nil?: false],
+            reason: [type: :string, allow_nil?: false],
+            text: [type: :string],
+            cost: [type: {:array, :string}, allow_nil?: false],
+            damage: [type: :string]
+          ]
+        ]
+      ]
+    ],
     owner_player_id: [type: :string, allow_nil?: false],
     zone: [type: :string, allow_nil?: false],
     position: [type: :integer, allow_nil?: false],

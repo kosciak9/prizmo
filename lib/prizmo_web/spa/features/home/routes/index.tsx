@@ -109,6 +109,7 @@ const BASE_CARD_SUMMARY_FIELDS = [
   'executableAttackCount',
   'unsupportedAttackCount',
   'unsupportedAbilityCount',
+  { unsupportedActions: ['kind', 'id', 'name', 'reason', 'text', 'cost', 'damage'] },
   'ownerPlayerId',
   'zone',
   'position',
@@ -333,6 +334,7 @@ type CardSummary = {
   executableAttackCount: number
   unsupportedAttackCount: number
   unsupportedAbilityCount: number
+  unsupportedActions: UnsupportedCardAction[]
   ownerPlayerId: string
   zone: string
   position: number
@@ -342,6 +344,16 @@ type CardSummary = {
   evolvesFromCardInstanceId: string | null
   turnEnteredPlay: number | null
   attachedCards?: CardSummary[]
+}
+
+type UnsupportedCardAction = {
+  kind: string
+  id: string | null
+  name: string
+  reason: string
+  text: string | null
+  cost: string[]
+  damage: string | null
 }
 
 type CardPillVariant = 'active' | 'compact' | 'default' | 'hand'
@@ -388,7 +400,7 @@ type CommandErrorNotice = {
   recovery: string
 }
 
-type ActionGroupId = 'required' | 'hand' | 'battle' | 'turn' | 'other'
+type ActionGroupId = 'required' | 'hand' | 'battle' | 'turn' | 'pending' | 'other'
 
 type ActionGroup = {
   id: ActionGroupId
@@ -464,6 +476,11 @@ const ACTION_GROUPS: Array<Omit<ActionGroup, 'actions'>> = [
     id: 'turn',
     title: 'Turn flow',
     description: 'Pass priority back to the engine when this turn is done.'
+  },
+  {
+    id: 'pending',
+    title: 'Pending card text',
+    description: 'Named attacks, abilities, or Trainer text that are visible but not executable yet.'
   },
   {
     id: 'other',
@@ -2333,13 +2350,14 @@ function GameStateWorkbench({
     retreatPendingKey,
     viewerPlayerId
   })
+  const legalActionCount = gameState.actionAffordances.filter(actionIsExecutable).length
 
   return (
     <div className="space-y-5">
       <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(16rem,20rem)]">
         <BattlefieldPanel
           activePlayerId={gameState.activePlayerId}
-          actionCount={gameState.actionAffordances.length}
+          actionCount={legalActionCount}
           awaitingPromptPlayerIds={gameState.awaitingPromptPlayerIds}
           cardIntentsById={cardInteractions.cardIntentsById}
           currentTurn={gameState.currentTurn}
@@ -4757,6 +4775,8 @@ function ActionAffordancesPanel({
   const actionGroups = useMemo(() => groupActionAffordances(actions), [actions])
   const primaryActionGroup = actionGroups[0]
   const primaryActionGroupId = primaryActionGroup?.id
+  const executableActionCount = actions.filter(actionIsExecutable).length
+  const pendingActionCount = actions.length - executableActionCount
   const postSearchHandoff = ultraBallPostSearchHandoffPlan(
     gameState,
     viewerPlayerId,
@@ -4772,7 +4792,11 @@ function ActionAffordancesPanel({
   return (
     <Panel
       title="Actions"
-      trailing={<StatusBadge tone={actions.length > 0 ? 'active' : 'neutral'}>{actions.length}</StatusBadge>}
+      trailing={
+        <StatusBadge tone={executableActionCount > 0 ? 'active' : pendingActionCount > 0 ? 'warning' : 'neutral'}>
+          {pendingActionCount > 0 ? `${executableActionCount} legal · ${pendingActionCount} pending` : String(executableActionCount)}
+        </StatusBadge>
+      }
     >
       <div className="space-y-3">
         {commandError ? <CommandErrorCard notice={commandError} /> : null}
@@ -4789,7 +4813,7 @@ function ActionAffordancesPanel({
                   {group.title}
                 </h3>
                 <div className="flex shrink-0 items-center gap-2">
-                  {group.id === primaryActionGroupId ? (
+                  {group.id === primaryActionGroupId && group.id !== 'pending' ? (
                     <span className="rounded-full bg-accent-mint/15 px-2 py-0.5 text-xs font-medium text-accent-mint">
                       next
                     </span>
@@ -5361,6 +5385,8 @@ function priorityInstruction(
       return 'Hand and board actions are the safest first pass. Improve the board before the next engine decision.'
     case 'turn':
       return 'No higher-priority move is available. Pass after confirming the board state.'
+    case 'pending':
+      return 'No command is available for these named card-text entries yet; use another legal action or pass when ready.'
     default:
       return 'Use the engine action exposed first, then refresh the board if the next step is unclear.'
   }
@@ -5417,7 +5443,8 @@ function ActionAffordanceCard({
   postSearchEndTurnPlayerIds: PlayerId[]
   retreatPendingKey: string | null
 }) {
-  const canRunAction = !actionCommandPending && isPlayerId(action.playerId)
+  const isBlockedAction = !actionIsExecutable(action)
+  const canRunAction = !actionCommandPending && isPlayerId(action.playerId) && !isBlockedAction
   const isPostSearchEndTurnAction = isPlayerId(action.playerId) && postSearchEndTurnPlayerIds.includes(action.playerId)
   const playCardPromptGuide = ultraBallPlayCardPromptGuide(action, cardsById)
   const playCardOptions = uniquePlayCardOptions(playCardCommandOptions(action, cardsById))
@@ -5438,10 +5465,12 @@ function ActionAffordanceCard({
             </span>
           </div>
         </div>
-        <StatusBadge tone={action.key === 'choose_replacement_active' ? 'warning' : 'neutral'}>
+        <StatusBadge tone={action.key === 'choose_replacement_active' || isBlockedAction ? 'warning' : 'neutral'}>
           {formatPlayerId(action.playerId)}
         </StatusBadge>
       </div>
+
+      {isBlockedAction ? <BlockedActionNotice action={action} /> : null}
 
       {playCardPromptGuide ? (
         <details className="mt-2 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-xs text-stone-600">
@@ -5658,6 +5687,15 @@ function ActionAffordanceCard({
   )
 }
 
+function BlockedActionNotice({ action }: { action: ActionAffordance }) {
+  return (
+    <div className="mt-2 rounded-lg border border-attention/25 bg-attention/10 px-3 py-2 text-xs leading-5 text-attention">
+      <p className="font-semibold">Known card text, no command yet</p>
+      <p className="mt-1 text-attention/90">{actionSummary(action)}</p>
+    </div>
+  )
+}
+
 function BasicBenchChoiceGuide({ options }: { options: BasicBenchCommandOption[] }) {
   const duplicatedBaseLabelCount = repeatedBasicBenchBaseLabels(options).size
   const detail = duplicatedBaseLabelCount > 0
@@ -5766,6 +5804,10 @@ function actionSurfaceClassName(action: ActionAffordance) {
       return 'border-attention/35 bg-attention/10'
     case 'declare_attack':
       return 'border-accent-mint/30 bg-accent-mint/10'
+    case 'unsupported_attack':
+    case 'unsupported_ability':
+    case 'unsupported_trainer':
+      return 'border-attention/35 bg-attention/10'
     default:
       return 'border-border bg-card'
   }
@@ -5799,11 +5841,21 @@ function actionSummary(action: ActionAffordance) {
       return `${action.attackName ?? (action.attackId ? formatAttackId(action.attackId) : 'Attack')}: ${attackCostSummary(
         action.attackCost
       )}, ${attackDamageSummary(action.attackDamage)}.`
+    case 'unsupported_attack':
+      return `${action.attackName ?? (action.attackId ? formatAttackId(action.attackId) : 'Attack')} is visible and paid, but its effect is pending implementation.`
+    case 'unsupported_ability':
+      return `${pendingActionName(action)} is visible on a Pokémon in play, but ability execution is pending implementation.`
+    case 'unsupported_trainer':
+      return `${pendingActionName(action)} is in hand and known to the catalog, but no executable Play command is available yet.`
     case 'pass':
       return `End the action window for ${formatPlayerId(action.playerId)}.`
     default:
       return `${formatEventType(action.kind)} command exposed by the current engine state.`
   }
+}
+
+function pendingActionName(action: ActionAffordance) {
+  return action.label.replace(/^Pending (Attack|Ability|Trainer): /, '')
 }
 
 function evolutionCommandOptions(
@@ -6171,6 +6223,10 @@ function groupActionAffordances(actions: ActionAffordance[]): ActionGroup[] {
   })).filter(group => group.actions.length > 0)
 }
 
+function actionIsExecutable(action: ActionAffordance) {
+  return action.kind === 'command' || action.kind === 'prompt'
+}
+
 function actionGroupId(action: ActionAffordance): ActionGroupId {
   switch (action.key) {
     case 'choose_prompt':
@@ -6186,6 +6242,10 @@ function actionGroupId(action: ActionAffordance): ActionGroupId {
       return 'battle'
     case 'pass':
       return 'turn'
+    case 'unsupported_attack':
+    case 'unsupported_ability':
+    case 'unsupported_trainer':
+      return 'pending'
     default:
       return 'other'
   }
@@ -6193,6 +6253,10 @@ function actionGroupId(action: ActionAffordance): ActionGroupId {
 
 function actionGroupBadgeTone(groupId: ActionGroupId, isPrimaryGroup: boolean): 'active' | 'neutral' | 'warning' {
   if (groupId === 'required') {
+    return 'warning'
+  }
+
+  if (groupId === 'pending') {
     return 'warning'
   }
 
@@ -6615,6 +6679,7 @@ function PrivateHandZone({
 
 function HandRulesSupportNotice({ cards }: { cards: CardSummary[] }) {
   const counts = rulesSupportCounts(cards)
+  const unsupportedActionCount = cards.reduce((count, card) => count + card.unsupportedActions.length, 0)
 
   if (counts.total === 0) {
     return null
@@ -6626,6 +6691,9 @@ function HandRulesSupportNotice({ cards }: { cards: CardSummary[] }) {
       : counts.unsupported > 0
         ? `${actionCountLabel(counts.unsupported, 'card')} ${counts.unsupported === 1 ? 'has' : 'have'} card text that is not executable yet.`
         : `${actionCountLabel(counts.partial, 'card')} ${counts.partial === 1 ? 'has' : 'have'} only partial card-text support.`
+  const pendingActionDetail = unsupportedActionCount > 0
+    ? ` ${actionCountLabel(unsupportedActionCount, 'named card-text item')} ${unsupportedActionCount === 1 ? 'is' : 'are'} listed in card details as pending.`
+    : ''
 
   return (
     <div className="mb-2 rounded-xl border border-attention/25 bg-attention/10 px-3 py-2 text-xs leading-5 text-attention">
@@ -6633,7 +6701,9 @@ function HandRulesSupportNotice({ cards }: { cards: CardSummary[] }) {
         <p className="font-semibold">Rules coverage</p>
         <StatusBadge tone="warning">{counts.total} flagged</StatusBadge>
       </div>
-      <p className="mt-1 text-attention/90">{detail} Legal generic actions still appear as card badges or action buttons.</p>
+      <p className="mt-1 text-attention/90">
+        {detail} Legal generic actions still appear as card badges or action buttons.{pendingActionDetail}
+      </p>
     </div>
   )
 }
@@ -7189,8 +7259,35 @@ function RulesSupportCallout({ card }: { card: CardSummary }) {
       {details.length > 0 ? (
         <p className="mt-1 font-medium text-attention/90">{details.join(' · ')}</p>
       ) : null}
+      {card.unsupportedActions.length > 0 ? <UnsupportedCardActionList actions={card.unsupportedActions} /> : null}
     </div>
   )
+}
+
+function UnsupportedCardActionList({ actions }: { actions: UnsupportedCardAction[] }) {
+  return (
+    <ul className="mt-2 space-y-1.5">
+      {actions.map((action, index) => (
+        <li className="rounded-md bg-background/45 px-2 py-1.5" key={`${action.kind}-${action.id ?? index}-${action.name}`}>
+          <p className="font-semibold text-attention">{unsupportedCardActionTitle(action)}</p>
+          <p className="mt-0.5 text-attention/85">{unsupportedCardActionDetail(action)}</p>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+function unsupportedCardActionTitle(action: UnsupportedCardAction) {
+  return `${formatEventType(action.kind)} · ${action.name}`
+}
+
+function unsupportedCardActionDetail(action: UnsupportedCardAction) {
+  const attackMeta = action.kind === 'attack'
+    ? ` ${attackCostSummary(action.cost)}, ${attackDamageSummary(action.damage)}.`
+    : ''
+  const cardText = action.text ? ` Text: ${action.text}` : ''
+
+  return `${action.reason}${attackMeta}${cardText}`
 }
 
 function RulesSupportBadge({ card, compact = false }: { card: CardSummary; compact?: boolean }) {

@@ -109,6 +109,7 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
     ] ++
       evolve_from_hand_affordances(player, current_turn, cards) ++
       declare_attack_affordances(player, current_turn, cards, all_cards) ++
+      unsupported_card_text_affordances(player, current_turn, cards, all_cards) ++
       [
         pass_affordance(player)
       ]
@@ -400,6 +401,149 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
     end
   end
 
+  defp unsupported_card_text_affordances(
+         %GamePlayer{} = player,
+         %Turn{} = current_turn,
+         cards,
+         all_cards
+       ) do
+    unsupported_trainer_affordances(player, cards) ++
+      unsupported_ability_affordances(player, cards) ++
+      unsupported_attack_affordances(player, current_turn, cards, all_cards)
+  end
+
+  defp unsupported_trainer_affordances(%GamePlayer{} = player, cards) do
+    cards
+    |> hand_cards()
+    |> Enum.flat_map(fn card ->
+      with {:ok, %{supertype: :trainer} = catalog_card} <- CardCatalog.fetch(card.card_id),
+           {:pending, reason} <- trainer_pending_reason(card.card_id, catalog_card) do
+        [
+          affordance(
+            :unsupported_trainer,
+            "Pending Trainer: #{catalog_card.name}",
+            :blocked,
+            player.player_id,
+            source_card_instance_ids: [card.id],
+            note: reason
+          )
+        ]
+      else
+        _other -> []
+      end
+    end)
+  end
+
+  defp unsupported_ability_affordances(%GamePlayer{} = player, cards) do
+    cards
+    |> in_play_pokemon_cards()
+    |> Enum.flat_map(fn card ->
+      case CardCatalog.fetch(card.card_id) do
+        {:ok, %{abilities: abilities, name: card_name, supertype: :pokemon}}
+        when is_map(abilities) ->
+          abilities
+          |> Enum.sort_by(fn {ability_id, _ability} -> Atom.to_string(ability_id) end)
+          |> Enum.flat_map(fn {ability_id, ability} ->
+            if present_text?(Map.get(ability, :raw_effect)) and is_nil(Map.get(ability, :effect)) do
+              ability_name = Map.get(ability, :name) || format_action_id(ability_id)
+
+              [
+                affordance(
+                  :unsupported_ability,
+                  "Pending Ability: #{ability_name}",
+                  :blocked,
+                  player.player_id,
+                  source_card_instance_ids: [card.id],
+                  note:
+                    "#{card_name}'s #{ability_name} ability has catalog text but no executable engine behavior yet."
+                )
+              ]
+            else
+              []
+            end
+          end)
+
+        _other ->
+          []
+      end
+    end)
+  end
+
+  defp unsupported_attack_affordances(
+         %GamePlayer{} = player,
+         %Turn{} = current_turn,
+         cards,
+         all_cards
+       ) do
+    with %CardInstance{} = active_card <- active_pokemon_card(cards),
+         false <- blocked_attack_status?(active_card),
+         false <- AttackLocks.blocked_this_turn?(active_card, current_turn),
+         true <-
+           AttackRequirements.attack_restrictions_met?(active_card, in_play_pokemon_cards(cards)),
+         %CardInstance{} <- opponent_active_pokemon_card(all_cards, player.player_id),
+         {:ok, %{attacks: attacks}} <- CardCatalog.fetch(active_card.card_id) do
+      attached_cards = attached_cards_for(cards, active_card.id)
+
+      attacks
+      |> Enum.sort_by(fn {attack_id, _attack} -> Atom.to_string(attack_id) end)
+      |> Enum.flat_map(fn {attack_id, attack} ->
+        attack_cost = AttackCosts.attack_cost(attack)
+
+        if AttackCosts.paid?(attack_cost, attached_cards) do
+          case CardCatalog.fetch_attack(active_card.card_id, attack_id) do
+            {:ok, _attack} ->
+              []
+
+            {:error, reason} ->
+              [unsupported_attack_affordance(player, active_card, attack_id, attack, reason)]
+          end
+        else
+          []
+        end
+      end)
+    else
+      _other -> []
+    end
+  end
+
+  defp unsupported_attack_affordance(player, active_card, attack_id, attack, reason) do
+    cost = AttackCosts.stringify_cost(AttackCosts.attack_cost(attack))
+    attack_name = Map.get(attack, :name) || format_action_id(attack_id)
+
+    affordance(:unsupported_attack, "Pending Attack: #{attack_name}", :blocked, player.player_id,
+      source_card_instance_ids: [active_card.id],
+      attack_id: Atom.to_string(attack_id),
+      attack_name: attack_name,
+      attack_cost: cost,
+      attack_damage: attack_damage(attack),
+      note: unsupported_attack_note(reason)
+    )
+  end
+
+  defp trainer_pending_reason(card_id, %{raw_effect: raw_effect}) do
+    with true <- present_text?(raw_effect),
+         {:ok, definition} <- EngineCardRegistry.fetch(card_id),
+         false <- Map.get(definition, :play_window) == :action_window do
+      {:pending,
+       "This Trainer has authored behavior, but that timing window is not exposed in the current action surface."}
+    else
+      {:error, _reason} ->
+        {:pending,
+         "Trainer text has no executable engine behavior yet, so no Play command appears."}
+
+      _other ->
+        false
+    end
+  end
+
+  defp unsupported_attack_note({:unsupported_attack_effect, _card_id, _attack_id, effect_type}) do
+    "This paid attack is visible on the Active Pokémon, but effect #{format_action_id(effect_type)} is not executable yet."
+  end
+
+  defp unsupported_attack_note(_reason) do
+    "This paid attack is visible on the Active Pokémon, but its card text has no executable engine behavior yet."
+  end
+
   defp attack_damage(%{damage: damage}) when is_integer(damage), do: Integer.to_string(damage)
   defp attack_damage(%{damage: damage}) when is_binary(damage), do: damage
   defp attack_damage(_attack), do: nil
@@ -411,6 +555,22 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
   defp attack_note(cost) do
     "Declaration validates attached Energy cost #{Enum.join(cost, ", ")}. Damage and effects resolve in follow-up attack commands."
   end
+
+  defp present_text?(text) when is_binary(text), do: String.trim(text) != ""
+  defp present_text?(_text), do: false
+
+  defp format_action_id(value) when is_atom(value),
+    do: value |> Atom.to_string() |> format_action_id()
+
+  defp format_action_id(value) when is_binary(value) do
+    value
+    |> String.replace("_", " ")
+    |> String.replace("-", " ")
+    |> String.split()
+    |> Enum.map_join(" ", &String.capitalize/1)
+  end
+
+  defp format_action_id(value), do: value |> to_string() |> format_action_id()
 
   defp retreat_note(0),
     do: "Switch the Active Pokémon with a Benched Pokémon without discarding Energy."

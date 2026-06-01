@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-06-01] iteration 188 | Named pending card-text affordances
+- Task attempted: made arbitrary loaded decks safer by turning visible unsupported attacks, abilities, and Trainer text into named pending read-model entries and non-clickable blocked SPA affordances instead of only card-level unsupported counts.
+- Files changed: updated `lib/prizmo/tcg_engine/game_view.ex`, `lib/prizmo/tcg_engine/game_view/action_affordances.ex`, `lib/prizmo/tcg_engine/game_view/fields.ex`, `lib/prizmo_web/spa/features/home/routes/index.tsx`, the canonical north-star article, this log, and the TCG engine playtest handoff.
+- Validation: `mix format`, `mix compile --warnings-as-errors`, `mix test test/prizmo/tcg_engine/mechanics_test.exs`, `mix ash_typescript.codegen`, `node_modules/.bin/tsc --noEmit --ignoreDeprecations 6.0`, `mix ash_typescript.codegen --check`, and final `mix check` passed. Tidewave read-model eval on open-deck game `a0b7a99e-2fb7-4d40-bec4-cdd35b16f1c1` confirmed named unsupported card-text summaries and `kind = blocked` affordances while preserving hidden opponent hand data. Browser smoke on the same game confirmed the `Pending card text` rail group and blocked notices render with zero application console errors; only existing local Geist font decode warnings appeared.
+- Remaining/blocking notes: named pending card text is now visible without becoming executable. Next high-value work remains decklist import ergonomics or a true two-independent-browser milestone pass; if unsupported-card safety continues, refine timing/cost semantics and special Energy text rather than repeating card-level visibility.
+
 ## [2026-06-01] iteration 187 | Unsupported card visibility
 - Task attempted: made arbitrary loaded decks safer and clearer by surfacing per-card rules support and unsupported card text in the Ash-backed read model and React playtest board.
 - Files changed: updated `lib/prizmo/tcg_engine/game_view.ex`, `lib/prizmo/tcg_engine/game_view/fields.ex`, `lib/prizmo_web/spa/features/home/routes/index.tsx`, the canonical north-star article, this log, and the TCG engine playtest handoff.

@@ -1,6 +1,7 @@
 defmodule Prizmo.TcgEngine.GameView do
   @moduledoc false
 
+  alias Prizmo.TcgEngine.AttackCosts
   alias Prizmo.TcgEngine.AttackEffects
   alias Prizmo.TcgEngine.CardCatalog
   alias Prizmo.TcgEngine.CardInstance
@@ -309,6 +310,7 @@ defmodule Prizmo.TcgEngine.GameView do
       executable_attack_count: rules_summary.executable_attack_count,
       unsupported_attack_count: rules_summary.unsupported_attack_count,
       unsupported_ability_count: rules_summary.unsupported_ability_count,
+      unsupported_actions: unsupported_action_summaries(card.card_id, catalog),
       owner_player_id: card.owner_player_id,
       zone: stringify(card.zone),
       position: card.position,
@@ -516,6 +518,131 @@ defmodule Prizmo.TcgEngine.GameView do
   end
 
   defp unsupported_trainer_label(_card), do: "Unsupported Trainer"
+
+  defp unsupported_action_summaries(card_id, %{supertype: :pokemon} = card) do
+    unsupported_attack_summaries(card_id, card) ++ unsupported_ability_summaries(card)
+  end
+
+  defp unsupported_action_summaries(card_id, %{supertype: :trainer} = card) do
+    case EngineCardRegistry.fetch(card_id) do
+      {:ok, %{play_window: :action_window}} ->
+        []
+
+      {:ok, _definition} ->
+        unsupported_trainer_summaries(
+          card,
+          "This Trainer has authored behavior, but that timing window is not exposed in the current action surface."
+        )
+
+      {:error, _reason} ->
+        unsupported_trainer_summaries(
+          card,
+          "Trainer text has no executable engine behavior yet, so no Play command appears."
+        )
+    end
+  end
+
+  defp unsupported_action_summaries(_card_id, _card), do: []
+
+  defp unsupported_attack_summaries(card_id, %{attacks: attacks}) when is_map(attacks) do
+    attacks
+    |> Enum.sort_by(fn {attack_id, _attack} -> Atom.to_string(attack_id) end)
+    |> Enum.flat_map(fn {attack_id, attack} ->
+      case CardCatalog.fetch_attack(card_id, attack_id) do
+        {:ok, _attack} -> []
+        {:error, reason} -> [unsupported_attack_summary(attack_id, attack, reason)]
+      end
+    end)
+  end
+
+  defp unsupported_attack_summaries(_card_id, _card), do: []
+
+  defp unsupported_attack_summary(attack_id, attack, reason) do
+    %{
+      kind: "attack",
+      id: Atom.to_string(attack_id),
+      name: Map.get(attack, :name) || format_action_id(attack_id),
+      reason: unsupported_attack_reason(reason),
+      text: blank_to_nil(Map.get(attack, :raw_effect)),
+      cost: AttackCosts.stringify_cost(AttackCosts.attack_cost(attack)),
+      damage: attack_damage(attack)
+    }
+  end
+
+  defp unsupported_attack_reason({:unsupported_attack_effect, _card_id, _attack_id, effect_type}) do
+    "Attack effect #{effect_type |> stringify() |> format_action_id()} is not executable in this engine slice yet."
+  end
+
+  defp unsupported_attack_reason(_reason) do
+    "Attack text has no executable engine behavior yet, so no Declare command appears."
+  end
+
+  defp unsupported_ability_summaries(%{abilities: abilities}) when is_map(abilities) do
+    abilities
+    |> Enum.sort_by(fn {ability_id, _ability} -> Atom.to_string(ability_id) end)
+    |> Enum.flat_map(fn {ability_id, ability} ->
+      if present_text?(Map.get(ability, :raw_effect)) and is_nil(Map.get(ability, :effect)) do
+        [
+          %{
+            kind: "ability",
+            id: Atom.to_string(ability_id),
+            name: Map.get(ability, :name) || format_action_id(ability_id),
+            reason: "Ability text has no executable engine behavior yet.",
+            text: blank_to_nil(Map.get(ability, :raw_effect)),
+            cost: [],
+            damage: nil
+          }
+        ]
+      else
+        []
+      end
+    end)
+  end
+
+  defp unsupported_ability_summaries(_card), do: []
+
+  defp unsupported_trainer_summaries(card, reason) do
+    if present_text?(Map.get(card, :raw_effect)) do
+      [
+        %{
+          kind: "trainer",
+          id: nil,
+          name: Map.get(card, :name) || "Trainer",
+          reason: reason,
+          text: blank_to_nil(Map.get(card, :raw_effect)),
+          cost: [],
+          damage: nil
+        }
+      ]
+    else
+      []
+    end
+  end
+
+  defp attack_damage(%{damage: damage}) when is_integer(damage), do: Integer.to_string(damage)
+  defp attack_damage(%{damage: damage}) when is_binary(damage), do: damage
+  defp attack_damage(_attack), do: nil
+
+  defp format_action_id(value) when is_atom(value),
+    do: value |> Atom.to_string() |> format_action_id()
+
+  defp format_action_id(value) when is_binary(value) do
+    value
+    |> String.replace("_", " ")
+    |> String.replace("-", " ")
+    |> String.split()
+    |> Enum.map_join(" ", &String.capitalize/1)
+  end
+
+  defp format_action_id(value), do: value |> to_string() |> format_action_id()
+
+  defp blank_to_nil(value) when is_binary(value) do
+    value = String.trim(value)
+
+    if value == "", do: nil, else: value
+  end
+
+  defp blank_to_nil(_value), do: nil
 
   defp attack_support_counts(card_id, %{attacks: attacks}) when is_map(attacks) do
     Enum.reduce(attacks, %{executable: 0, unsupported: 0}, fn {attack_id, _attack}, counts ->
