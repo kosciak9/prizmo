@@ -19,6 +19,20 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     ]
   }
 
+  @rare_candy %CardDefinition{
+    id: "MEG-125",
+    kind: :trainer,
+    trainer_type: :item,
+    play_window: :action_window,
+    effects: [
+      %Effect{
+        key: :rare_candy_evolve_basic_to_stage_2,
+        type: :rare_candy_evolve,
+        params: %{count: 2}
+      }
+    ]
+  }
+
   @dawn %CardDefinition{
     id: "PFL-087",
     kind: :trainer,
@@ -247,6 +261,7 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     @lillies_determination.id => @lillies_determination,
     @night_stretcher.id => @night_stretcher,
     @poke_pad.id => @poke_pad,
+    @rare_candy.id => @rare_candy,
     @ultra_ball.id => @ultra_ball
   }
 

@@ -2,6 +2,7 @@ defmodule Prizmo.TcgEngine.CardCatalog do
   @moduledoc false
 
   alias Prizmo.Tcg.Cards.Metadata
+  alias Prizmo.Tcg.Data.TCGdex
   alias Prizmo.TcgEngine.AttackEffects
 
   @energy_name_types %{
@@ -67,6 +68,19 @@ defmodule Prizmo.TcgEngine.CardCatalog do
 
   def basic_pokemon?(card_id) do
     match?({:ok, %{supertype: :pokemon, stage: :basic}}, fetch(card_id))
+  end
+
+  def stage_2_evolves_from_basic?(stage_2_card_id, basic_card_id) do
+    with {:ok, %{supertype: :pokemon, stage: :stage_2, evolves_from: stage_1_name}}
+         when is_binary(stage_1_name) <- fetch(stage_2_card_id),
+         {:ok, %{supertype: :pokemon, stage: :basic, id: basic_id, name: basic_name}}
+         when is_binary(basic_name) <- fetch(basic_card_id) do
+      stage_1_name
+      |> stage_1_cards_by_name()
+      |> Enum.any?(&(&1.evolves_from in [basic_name, basic_id]))
+    else
+      _other -> false
+    end
   end
 
   def fetch_attack(card_id, attack_id) do
@@ -254,6 +268,51 @@ defmodule Prizmo.TcgEngine.CardCatalog do
   end
 
   defp inferred_provides(_card), do: nil
+
+  defp stage_1_cards_by_name(stage_1_name) do
+    Map.get(stage_1_evolution_index(), stage_1_name, [])
+  end
+
+  defp stage_1_evolution_index do
+    key = {__MODULE__, :stage_1_evolution_index}
+
+    case :persistent_term.get(key, :missing) do
+      :missing ->
+        index = load_stage_1_evolution_index()
+        :persistent_term.put(key, index)
+        index
+
+      index ->
+        index
+    end
+  end
+
+  defp load_stage_1_evolution_index do
+    TCGdex.cache_root()
+    |> Path.join("cards/*.json")
+    |> Path.wildcard()
+    |> Enum.flat_map(&stage_1_card_from_cache_path/1)
+    |> Enum.group_by(& &1.name)
+  end
+
+  defp stage_1_card_from_cache_path(path) do
+    with {:ok, %{"prizmo_id" => id, "tcgdex" => card}} <- read_cached_card_payload(path),
+         "Pokemon" <- Map.get(card, "category"),
+         "Stage1" <- Map.get(card, "stage"),
+         name when is_binary(name) <- Map.get(card, "name"),
+         evolves_from when is_binary(evolves_from) <- Map.get(card, "evolveFrom") do
+      [%{id: id, name: name, evolves_from: evolves_from}]
+    else
+      _other -> []
+    end
+  end
+
+  # sobelow_skip ["Traversal.FileModule"] paths come from the repository-controlled TCGdex cache root.
+  defp read_cached_card_payload(path) do
+    path
+    |> File.read!()
+    |> Jason.decode()
+  end
 
   defp primary_type(%Metadata{types: [type | _types]}), do: type
   defp primary_type(%Metadata{}), do: nil

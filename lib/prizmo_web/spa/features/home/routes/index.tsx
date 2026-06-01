@@ -8499,6 +8499,8 @@ function promptSubmitLabel(choiceKey: string, selectedCount: number, max: number
       return `Add staged Pokémon ${selectedCount}/${max}`
     case 'search_deck_for_evolution_pokemon_and_energy':
       return `Add Evolution + Energy ${selectedCount}/${max}`
+    case 'rare_candy_evolve_basic_to_stage_2':
+      return `Resolve Rare Candy evolution ${selectedCount}/${max}`
     case 'search_basic_energy_split_hand_attach_to_pokemon':
       return `Resolve Crispin Energy choices ${selectedCount}/${max}`
     case 'switch_opponent_bench_to_active':
@@ -8547,6 +8549,13 @@ function promptGuidanceMessages(
     return [
       'Choose two Basic Energy cards of different types from deck plus one of your Pokémon. Selection order matters: first Energy goes to hand, second Energy attaches to the chosen Pokémon.',
       `This prompt accepts ${promptChoiceInstruction(min, max)} from ${legalChoiceCount} legal Energy or Pokémon choices.`
+    ]
+  }
+
+  if (choiceKey === 'rare_candy_evolve_basic_to_stage_2') {
+    return [
+      'Choose one Stage 2 Pokémon from hand and one compatible Basic Pokémon in play. The engine enforces first-turn and this-turn evolution restrictions.',
+      `This prompt accepts ${promptChoiceInstruction(min, max)} from ${legalChoiceCount} legal Stage 2 or Basic choices.`
     ]
   }
 

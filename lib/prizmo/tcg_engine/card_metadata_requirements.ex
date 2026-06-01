@@ -45,6 +45,22 @@ defmodule Prizmo.TcgEngine.CardMetadataRequirements do
     end
   end
 
+  def require_stage_2_pokemon(card_id) do
+    case CardCatalog.fetch(card_id) do
+      {:ok, %{supertype: :pokemon, stage: :stage_2}} ->
+        :ok
+
+      {:ok, %{supertype: :pokemon, stage: stage} = metadata} ->
+        {:error, {:not_stage_2_pokemon, metadata.id, stage}}
+
+      {:ok, metadata} ->
+        {:error, {:not_pokemon, metadata.id}}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
   def require_tera_pokemon_card(card_id) do
     case CardCatalog.fetch(card_id) do
       {:ok, %{supertype: :pokemon} = metadata} ->
@@ -131,6 +147,21 @@ defmodule Prizmo.TcgEngine.CardMetadataRequirements do
 
         true ->
           {:error, {:invalid_evolution_target, evolution_card.evolves_from, target_card.name}}
+      end
+    end
+  end
+
+  def require_rare_candy_evolves_from(stage_2_card_id, basic_card_id) do
+    with {:ok, stage_2_card} <- CardCatalog.fetch(stage_2_card_id),
+         {:ok, basic_card} <- CardCatalog.fetch(basic_card_id),
+         :ok <- require_stage_2_pokemon(stage_2_card_id),
+         :ok <- require_basic_pokemon(basic_card_id) do
+      if CardCatalog.stage_2_evolves_from_basic?(stage_2_card_id, basic_card_id) do
+        :ok
+      else
+        {:error,
+         {:cannot_rare_candy, stage_2_card.id, :expected_basic_for_stage_1,
+          stage_2_card.evolves_from, :got, basic_card.name}}
       end
     end
   end

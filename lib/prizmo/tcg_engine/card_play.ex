@@ -3,12 +3,15 @@ defmodule Prizmo.TcgEngine.CardPlay do
 
   import Prizmo.TcgEngine.CardMetadataRequirements,
     only: [
+      require_basic_pokemon: 1,
       require_basic_energy: 1,
       require_night_stretcher_target: 1,
       require_non_rule_box_pokemon_card: 1,
       require_poffin_targets: 1,
       require_pokemon_card: 1,
+      require_rare_candy_evolves_from: 2,
       require_special_energy: 1,
+      require_stage_2_pokemon: 1,
       require_trainer_type: 2
     ]
 
@@ -18,8 +21,12 @@ defmodule Prizmo.TcgEngine.CardPlay do
   import Prizmo.TcgEngine.Requirements,
     only: [
       require_ace_spec_available: 2,
+      require_can_evolve_target: 2,
       require_card_owned_by_player: 2,
       require_card_zone: 2,
+      evolve_action_for_zone: 1,
+      require_evolution_allowed_this_turn: 1,
+      require_in_play_pokemon_zone: 1,
       require_supporter_available: 2
     ]
 
@@ -80,10 +87,21 @@ defmodule Prizmo.TcgEngine.CardPlay do
     end
   end
 
-  def required_choices_available?(cards, %CardInstance{} = action_card, definition)
+  def required_choices_available?(
+        cards,
+        %CardInstance{} = action_card,
+        definition,
+        current_turn \\ nil
+      )
       when is_list(cards) do
     Enum.all?(choice_steps(definition), fn choice_step ->
-      case legal_choice_ids(cards, action_card.owner_player_id, action_card.id, choice_step) do
+      case legal_choice_ids(
+             cards,
+             action_card.owner_player_id,
+             action_card.id,
+             choice_step,
+             current_turn
+           ) do
         {:ok, legal_choice_ids} ->
           required_choice_count_available?(legal_choice_ids, definition, choice_step.key)
 
@@ -95,15 +113,24 @@ defmodule Prizmo.TcgEngine.CardPlay do
 
   def require_required_choices_available(game_id, player_id, action_card_id, definition)
       when is_binary(game_id) and is_binary(player_id) and is_binary(action_card_id) do
-    Enum.reduce_while(choice_steps(definition), :ok, fn choice_step, :ok ->
-      with {:ok, legal_choice_ids} <-
-             legal_choice_ids(game_id, player_id, action_card_id, definition, choice_step.key),
-           :ok <- require_required_choice_count(legal_choice_ids, definition, choice_step.key) do
-        {:cont, :ok}
-      else
-        {:error, reason} -> {:halt, {:error, reason}}
-      end
-    end)
+    with {:ok, current_turn} <- TurnStore.current_turn(game_id) do
+      Enum.reduce_while(choice_steps(definition), :ok, fn choice_step, :ok ->
+        with {:ok, legal_choice_ids} <-
+               legal_choice_ids(
+                 game_id,
+                 player_id,
+                 action_card_id,
+                 definition,
+                 choice_step.key,
+                 current_turn
+               ),
+             :ok <- require_required_choice_count(legal_choice_ids, definition, choice_step.key) do
+          {:cont, :ok}
+        else
+          {:error, reason} -> {:halt, {:error, reason}}
+        end
+      end)
+    end
   end
 
   def resolve_play_card_costs(game, turn, player, card, metadata, definition, choices) do
@@ -356,6 +383,54 @@ defmodule Prizmo.TcgEngine.CardPlay do
          turn,
          player,
          card,
+         %{type: :rare_candy_evolve} = effect,
+         target_ids
+       ) do
+    with {:ok, {stage_2_card, target_basic_card}} <-
+           validate_rare_candy_effect(game.id, player.player_id, turn, effect, target_ids),
+         target_position = target_basic_card.position,
+         target_zone = target_basic_card.zone,
+         evolve_action = evolve_action_for_zone(target_zone),
+         {:ok, evolved_card} <-
+           update(stage_2_card, evolve_action, %{
+             evolves_from_card_instance_id: target_basic_card.id,
+             position: target_position,
+             damage: target_basic_card.damage,
+             status: nil,
+             turn_entered_play: turn.turn_number
+           }),
+         {:ok, reparented_attachments} <-
+           CardStore.reparent_attached_cards(game.id, target_basic_card.id, evolved_card.id),
+         {:ok, evolved_under_card} <-
+           update(target_basic_card, :evolve_under, %{
+             attached_to_card_instance_id: evolved_card.id,
+             damage: 0,
+             status: nil,
+             position: 1
+           }),
+         {:ok, _event} <-
+           write_event_and_snapshot(game.id, :cards_moved, player.player_id, %{
+             reason: :effect_resolution,
+             source: EventPayloads.card_source(card),
+             effect_key: effect.key,
+             cards:
+               rare_candy_evolution_payloads(
+                 evolved_card,
+                 evolved_under_card,
+                 reparented_attachments,
+                 target_zone,
+                 target_basic_card.id
+               )
+           }) do
+      complete_play_card_resolution(game, turn, player, card, effect)
+    end
+  end
+
+  defp complete_play_card_effect(
+         game,
+         turn,
+         player,
+         card,
          %{type: :move_basic_energy_between_own_pokemon} = effect,
          target_ids
        ) do
@@ -516,7 +591,7 @@ defmodule Prizmo.TcgEngine.CardPlay do
          choice_key
        ) do
     with {:ok, legal_choice_ids} <-
-           legal_choice_ids(game.id, player.player_id, card.id, definition, choice_key),
+           legal_choice_ids(game.id, player.player_id, card.id, definition, choice_key, turn),
          :ok <- require_required_choice_count(legal_choice_ids, definition, choice_key),
          {min, max} <-
            prompt_choice_bounds(
@@ -629,6 +704,17 @@ defmodule Prizmo.TcgEngine.CardPlay do
     end
   end
 
+  defp validate_rare_candy_effect(game_id, player_id, turn, effect, target_ids) do
+    with :ok <- require_evolution_allowed_this_turn(turn),
+         {:ok, target_ids} <- EffectRunner.validate_choice_selection(effect, target_ids),
+         {:ok, target_cards} <- CardStore.get_cards(game_id, target_ids),
+         {:ok, {stage_2_card, target_basic_card}} <-
+           selected_rare_candy_cards(target_cards, player_id, turn.turn_number),
+         :ok <- require_rare_candy_evolves_from(stage_2_card.card_id, target_basic_card.card_id) do
+      {:ok, {stage_2_card, target_basic_card}}
+    end
+  end
+
   defp move_search_targets(game, _turn, player, %{params: %{destination: :hand}}, target_cards) do
     target_cards
     |> Enum.map(&CardStore.move_deck_card_to_hand(game.id, player.player_id, &1))
@@ -646,53 +732,87 @@ defmodule Prizmo.TcgEngine.CardPlay do
   defp search_effect_destination_zone(%{params: %{destination: :bench}}), do: :bench
   defp search_effect_destination_zone(%{params: %{destination: :hand}}), do: :hand
 
-  defp effect_choice_ids(cards, player_id, %{type: :search_deck} = choice_step) do
+  defp effect_choice_ids(cards, player_id, choice_step, current_turn)
+
+  defp effect_choice_ids(cards, player_id, %{type: :search_deck} = choice_step, _current_turn) do
     cards
     |> search_deck_choice_cards(player_id, choice_step)
     |> Enum.map(& &1.id)
     |> then(&{:ok, &1})
   end
 
-  defp effect_choice_ids(cards, player_id, %{type: :search_basic_energy_split_hand_attach}) do
+  defp effect_choice_ids(
+         cards,
+         player_id,
+         %{type: :search_basic_energy_split_hand_attach},
+         _current_turn
+       ) do
     cards
     |> crispin_choice_cards(player_id)
     |> Enum.map(& &1.id)
     |> then(&{:ok, &1})
   end
 
-  defp effect_choice_ids(cards, player_id, %{type: :switch_opponent_bench_to_active}) do
+  defp effect_choice_ids(
+         cards,
+         player_id,
+         %{type: :switch_opponent_bench_to_active},
+         _current_turn
+       ) do
     cards
     |> opponent_bench_choice_cards(player_id)
     |> Enum.map(& &1.id)
     |> then(&{:ok, &1})
   end
 
-  defp effect_choice_ids(cards, player_id, %{type: :discard_opponent_special_energy}) do
+  defp effect_choice_ids(
+         cards,
+         player_id,
+         %{type: :discard_opponent_special_energy},
+         _current_turn
+       ) do
     cards
     |> opponent_special_energy_choice_cards(player_id)
     |> Enum.map(& &1.id)
     |> then(&{:ok, &1})
   end
 
-  defp effect_choice_ids(cards, player_id, %{type: :move_basic_energy_between_own_pokemon}) do
+  defp effect_choice_ids(
+         cards,
+         player_id,
+         %{type: :move_basic_energy_between_own_pokemon},
+         _current_turn
+       ) do
     cards
     |> energy_switch_choice_cards(player_id)
     |> Enum.map(& &1.id)
     |> then(&{:ok, &1})
   end
 
-  defp effect_choice_ids(cards, player_id, %{type: :recover_discard_to_hand} = choice_step) do
+  defp effect_choice_ids(
+         cards,
+         player_id,
+         %{type: :recover_discard_to_hand} = choice_step,
+         _current_turn
+       ) do
     cards
     |> recover_discard_to_hand_choice_cards(player_id, choice_step)
     |> Enum.map(& &1.id)
     |> then(&{:ok, &1})
   end
 
-  defp effect_choice_ids(_cards, _player_id, choice_step) do
+  defp effect_choice_ids(cards, player_id, %{type: :rare_candy_evolve}, current_turn) do
+    cards
+    |> rare_candy_choice_cards(player_id, current_turn)
+    |> Enum.map(& &1.id)
+    |> then(&{:ok, &1})
+  end
+
+  defp effect_choice_ids(_cards, _player_id, choice_step, _current_turn) do
     {:error, {:unsupported_choice_step, choice_step.key, choice_step.type}}
   end
 
-  defp legal_choice_ids(game_id, player_id, action_card_id, definition, choice_key) do
+  defp legal_choice_ids(game_id, player_id, action_card_id, definition, choice_key, current_turn) do
     cond do
       Enum.any?(definition.costs, &(&1.key == choice_key)) ->
         with {:ok, hand} <- CardStore.cards_in_zone(game_id, player_id, :hand) do
@@ -701,7 +821,7 @@ defmodule Prizmo.TcgEngine.CardPlay do
 
       Enum.any?(definition.effects, &(&1.key == choice_key)) ->
         with {:ok, cards} <- CardStore.list_cards(game_id) do
-          effect_choice_ids(cards, player_id, effect_step(definition, choice_key))
+          effect_choice_ids(cards, player_id, effect_step(definition, choice_key), current_turn)
         end
 
       true ->
@@ -709,7 +829,7 @@ defmodule Prizmo.TcgEngine.CardPlay do
     end
   end
 
-  defp legal_choice_ids(cards, player_id, action_card_id, choice_step) do
+  defp legal_choice_ids(cards, player_id, action_card_id, choice_step, current_turn) do
     case choice_step.type do
       :discard_from_hand ->
         cards
@@ -725,9 +845,10 @@ defmodule Prizmo.TcgEngine.CardPlay do
              :switch_opponent_bench_to_active,
              :discard_opponent_special_energy,
              :move_basic_energy_between_own_pokemon,
-             :recover_discard_to_hand
+             :recover_discard_to_hand,
+             :rare_candy_evolve
            ] ->
-        effect_choice_ids(cards, player_id, choice_step)
+        effect_choice_ids(cards, player_id, choice_step, current_turn)
 
       _other ->
         {:error, {:unsupported_choice_step, choice_step.key, choice_step.type}}
@@ -859,6 +980,38 @@ defmodule Prizmo.TcgEngine.CardPlay do
           matches_recover_discard_to_hand_filter?(&1, choice_step.params.filter))
     )
     |> Enum.sort_by(&{&1.position, &1.instance_id})
+  end
+
+  defp rare_candy_choice_cards(cards, player_id, %{turn_number: turn_number})
+       when turn_number > 1 do
+    stage_2_cards = rare_candy_stage_2_cards(cards, player_id)
+    target_cards = rare_candy_target_cards(cards, player_id, turn_number)
+
+    legal_stage_2_cards =
+      Enum.filter(stage_2_cards, fn stage_2_card ->
+        Enum.any?(target_cards, &rare_candy_evolves_from?(stage_2_card, &1))
+      end)
+
+    legal_target_cards =
+      Enum.filter(target_cards, fn target_card ->
+        Enum.any?(stage_2_cards, &rare_candy_evolves_from?(&1, target_card))
+      end)
+
+    legal_stage_2_cards ++ legal_target_cards
+  end
+
+  defp rare_candy_choice_cards(_cards, _player_id, _current_turn), do: []
+
+  defp rare_candy_stage_2_cards(cards, player_id) do
+    cards
+    |> Enum.filter(&rare_candy_stage_2_card?(&1, player_id))
+    |> Enum.sort_by(&{&1.position, &1.instance_id})
+  end
+
+  defp rare_candy_target_cards(cards, player_id, turn_number) do
+    cards
+    |> Enum.filter(&rare_candy_target_card?(&1, player_id, turn_number))
+    |> Enum.sort_by(&{in_play_zone_sort(&1.zone), &1.position, &1.instance_id})
   end
 
   defp energy_switch_source_cards(cards, player_id) do
@@ -1070,6 +1223,47 @@ defmodule Prizmo.TcgEngine.CardPlay do
     end
   end
 
+  defp selected_rare_candy_cards(cards, player_id, turn_number) do
+    stage_2_cards = Enum.filter(cards, &rare_candy_stage_2_card?(&1, player_id))
+    target_cards = Enum.filter(cards, &rare_candy_target_card?(&1, player_id, turn_number))
+
+    case {stage_2_cards, target_cards} do
+      {[stage_2_card], [target_card]} ->
+        {:ok, {stage_2_card, target_card}}
+
+      {[], [_target_card]} ->
+        {:error, :missing_rare_candy_stage_2_choice}
+
+      {[_stage_2_card], []} ->
+        {:error, :missing_rare_candy_basic_target}
+
+      {stage_2_cards, [_target_card]} when length(stage_2_cards) > 1 ->
+        {:error, {:too_many_rare_candy_stage_2_choices, length(stage_2_cards)}}
+
+      {[_stage_2_card], target_cards} when length(target_cards) > 1 ->
+        {:error, {:too_many_rare_candy_basic_targets, length(target_cards)}}
+
+      _other ->
+        {:error, :invalid_rare_candy_choices}
+    end
+  end
+
+  defp rare_candy_stage_2_card?(%CardInstance{} = card, player_id) do
+    card.owner_player_id == player_id and card.zone == :hand and
+      require_stage_2_pokemon(card.card_id) == :ok
+  end
+
+  defp rare_candy_target_card?(%CardInstance{} = card, player_id, turn_number) do
+    card.owner_player_id == player_id and card.zone in [:active, :bench] and
+      require_basic_pokemon(card.card_id) == :ok and
+      require_in_play_pokemon_zone(card) == :ok and
+      require_can_evolve_target(card, turn_number) == :ok
+  end
+
+  defp rare_candy_evolves_from?(%CardInstance{} = stage_2_card, %CardInstance{} = target_card) do
+    require_rare_candy_evolves_from(stage_2_card.card_id, target_card.card_id) == :ok
+  end
+
   defp require_different_basic_energy_types(hand_energy_card, attach_energy_card) do
     case {basic_energy_type(hand_energy_card), basic_energy_type(attach_energy_card)} do
       {{:ok, hand_type}, {:ok, attach_type}} when hand_type == attach_type ->
@@ -1167,6 +1361,31 @@ defmodule Prizmo.TcgEngine.CardPlay do
     end
   end
 
+  defp rare_candy_evolution_payloads(
+         evolved_card,
+         evolved_under_card,
+         reparented_attachments,
+         target_zone,
+         source_target_card_instance_id
+       ) do
+    [
+      moved_card_payload(evolved_card, :hand, target_zone,
+        evolves_from_card_instance_id: evolved_under_card.id,
+        preserved_damage: evolved_card.damage,
+        cleared_status: true
+      ),
+      moved_card_payload(evolved_under_card, target_zone, :attached,
+        to_attached_to_card_instance_id: evolved_card.id
+      )
+    ] ++
+      Enum.map(reparented_attachments, fn attachment ->
+        moved_card_payload(attachment, :attached, :attached,
+          from_attached_to_card_instance_id: source_target_card_instance_id,
+          to_attached_to_card_instance_id: evolved_card.id
+        )
+      end)
+  end
+
   defp energy_switch_move_payload(card, source_target_card_instance_id, target_card_instance_id) do
     %{
       instance_id: card.id,
@@ -1206,6 +1425,29 @@ defmodule Prizmo.TcgEngine.CardPlay do
       choice_key,
       legal_choice_ids
     )
+  end
+
+  defp maybe_put_prompt_choice_labels(
+         payload,
+         game_id,
+         :rare_candy_evolve_basic_to_stage_2,
+         legal_choice_ids
+       ) do
+    case CardStore.list_cards(game_id) do
+      {:ok, cards} ->
+        cards_by_id = Map.new(cards, &{&1.id, &1})
+
+        labels =
+          legal_choice_ids
+          |> Enum.map(&Map.get(cards_by_id, &1))
+          |> Enum.reject(&is_nil/1)
+          |> Enum.map(&rare_candy_choice_label/1)
+
+        Map.put(payload, :legal_choice_labels, labels)
+
+      {:error, _reason} ->
+        payload
+    end
   end
 
   defp maybe_put_prompt_choice_labels(
@@ -1292,6 +1534,23 @@ defmodule Prizmo.TcgEngine.CardPlay do
       id: card.id,
       label: card_name(card, card.card_id),
       detail: "Target Pokémon in #{Atom.to_string(card.zone)} for the second selected Energy."
+    }
+  end
+
+  defp rare_candy_choice_label(%CardInstance{zone: :hand} = card) do
+    %{
+      id: card.id,
+      label: card_name(card, card.card_id),
+      detail: "Stage 2 Pokémon in hand. Select it with one compatible Basic Pokémon in play."
+    }
+  end
+
+  defp rare_candy_choice_label(%CardInstance{} = card) do
+    %{
+      id: card.id,
+      label: card_name(card, card.card_id),
+      detail:
+        "Basic Pokémon in #{Atom.to_string(card.zone)}. Select it with a compatible Stage 2 card from hand."
     }
   end
 
