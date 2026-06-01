@@ -1,5 +1,19 @@
 # Wiki Log
 
+## [2026-06-01] iteration 232 | Board-feel animation polish
+
+- Task attempted: delivered the next UI-density/polish batch — board-feel animation. Board-feel animation has been the strongest remaining UI-density candidate since iteration 230's handoff, recommended when returning to the product surface. The benchmark requirement was satisfied in batch 219, and large-hand density/fanning (227), event history polish (225), and card-attached action affordances (229) have all been delivered. This batch adds lightweight CSS animation to make the board feel more interactive and responsive without restructuring the layout.
+- Files changed: `lib/prizmo_web/spa/features/home/routes/index.tsx` and all three wiki files.
+- Changes:
+  - **CardActionButton** (used for on-board action intents on Active/Bench cards): added `hover:scale-105 active:scale-95` with `transition-all duration-150` so action buttons lift on hover and press on click, providing tactile feedback for available card actions.
+  - **HandCardTile** (hand card rendering with single-intent click target): added `transition-all duration-150 hover:scale-[1.02] hover:shadow-md` for playable hand cards so they lift subtly when the player can interact with them, matching the experienced-player card-table feel. Non-playable hand cards stay static.
+  - **MiniCardBack** (face-down Deck/Prizes zone cards): upgraded from bare `transition-transform hover:scale-105` to `transition-all duration-200 hover:scale-105 hover:shadow-lg`, adding shadow depth on hover and consistent easing.
+  - **DiscardPreview** (top-card face-up with gradient count overlay): added `transition-all duration-200 hover:scale-105 hover:shadow-lg` to match MiniCardBack's hover behavior, so all zone-level card back elements respond uniformly.
+  - **StatusBadge warning tone** (used for damage numbers and active-player "turn" badge): added `animate-pulse` so damage and turn-indicator badges have a gentle pulsing animation, drawing attention to active game state without being intrusive.
+- No engine or backend changes were needed. All changes are CSS-only Tailwind class additions in the same 9927-line SPA board file.
+- Validation: `node_modules/.bin/tsc --noEmit`, `mix compile --warnings-as-errors`, and full `mix check` (all 12 gates: format, sobelow, compile, unused deps, xref, filenames, service images, ash ts gen, ash ts check, credo, dialyzer, tests) pass cleanly.
+- Remaining/blocking notes: this batch closes the board-feel animation UI-density candidate. The board now feels more responsive with card hover lift effects, action button press feedback, zone card hover consistency, and pulsing status badges. If the next batch stays on the product surface, further layout refinement could include turn transition animations, card-slide-in for drawn cards, or damage counter animation. If the next batch returns to engine behavior, the strongest remaining bounded fixture-card gap from supported fixture decks is Forest of Vitality (`MEG-117`, same-turn Grass evolution Stadium in Alakazam), Black Belt's Training (`JTG-143`, Supporter damage boost in Festival Lead), or Kieran (`TWM-154`, choice Supporter in Festival Lead). The handoff's previous mention of Earthen Vessel (`POR-086`) was identified as inaccurate in iteration 226 — POR-086 is Growing Grass Energy, not a search Item. The handoff's mention of Togekiss (`JTG-120`) is also inaccurate — JTG-120 is Dunsparce by catalog metadata; future handoff entries should verify card IDs against the committed catalog.
+
 ## [2026-06-01] iteration 231 | Handheld Fan Tool triggered energy movement
 
 - Task attempted: moved Handheld Fan (`TWM-150`) from pending Tool text into executable Ash-engine behavior. Handheld Fan was the strongest remaining bounded fixture-card gap from the Alakazam fixture deck, listed in the handoff since iteration 224. It already had sim-layer hooks and test coverage but no Ash engine definition.

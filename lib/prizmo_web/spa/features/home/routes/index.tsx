@@ -7573,10 +7573,12 @@ function HandCardTile({ card, compact, intents }: { card: CardSummary; compact?:
   const className = `relative rounded-xl bg-secondary/70 ${paddingClass} text-left ring-1 ring-border/40 ${ringClass}`
   const title = firstIntent ? `${firstIntent.label} · ${card.name} · ${card.cardId}` : `${card.name} · ${card.cardId}`
 
+  const hoverClass = firstIntent ? 'transition-all duration-150 hover:scale-[1.02] hover:shadow-md' : ''
+
   return firstIntent ? (
     <button
       aria-label={firstIntent.label}
-      className={className}
+      className={`${className} ${hoverClass}`}
       disabled={firstIntent.disabled}
       onClick={firstIntent.onClick}
       title={title}
@@ -8236,7 +8238,7 @@ function CardActionButton({ intent, size }: { intent: CardIntent; size?: 'sm' | 
   return (
     <button
       aria-label={intent.label}
-      className={`inline-flex items-center rounded-full font-semibold shadow-sm shadow-black/15 transition ${sizeClass} ${toneClassName} disabled:cursor-wait disabled:opacity-70`}
+      className={`inline-flex items-center rounded-full font-semibold shadow-sm shadow-black/15 transition-all duration-150 ${sizeClass} ${toneClassName} disabled:cursor-wait disabled:opacity-70 hover:scale-105 active:scale-95`}
       disabled={intent.disabled || intent.pending}
       onClick={intent.onClick}
       type="button"
@@ -8475,7 +8477,7 @@ function StatusBadge({
     tone === 'active'
       ? 'bg-accent-mint/12 text-accent-mint'
       : tone === 'warning'
-        ? 'bg-attention/12 text-attention'
+        ? 'bg-attention/12 text-attention animate-pulse'
         : 'bg-muted/70 text-muted-foreground'
 
   return <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${className}`}>{children}</span>
@@ -9780,7 +9782,7 @@ function visibleCardsById(gameState: GameState) {
 
 function MiniCardBack({ label, count }: { label: string; count: number }) {
   return (
-    <div className="relative mx-auto aspect-[63/88] w-full max-w-[4rem] overflow-hidden rounded-lg bg-gradient-to-br from-blue-950 via-blue-900 to-purple-950 ring-1 ring-white/10 shadow-sm transition-transform hover:scale-105">
+    <div className="relative mx-auto aspect-[63/88] w-full max-w-[4rem] overflow-hidden rounded-lg bg-gradient-to-br from-blue-950 via-blue-900 to-purple-950 ring-1 ring-white/10 shadow-sm transition-all duration-200 hover:scale-105 hover:shadow-lg">
       <div className="absolute inset-1.5 rounded-[3px] border border-white/15" />
       <div className="absolute inset-[30%] rounded-full border border-white/15">
         <div className="absolute inset-[28%] rounded-full border border-white/15" />
@@ -9804,7 +9806,7 @@ function DiscardPreview({ cards, count }: { cards: CardSummary[]; count: number 
 
   if (topCard) {
     return (
-      <div className="relative mx-auto aspect-[63/88] w-full max-w-[4rem] overflow-hidden rounded-lg bg-gradient-to-br from-blue-950 via-blue-900 to-purple-950 ring-1 ring-white/10 shadow-sm">
+      <div className="relative mx-auto aspect-[63/88] w-full max-w-[4rem] overflow-hidden rounded-lg bg-gradient-to-br from-blue-950 via-blue-900 to-purple-950 ring-1 ring-white/10 shadow-sm transition-all duration-200 hover:scale-105 hover:shadow-lg">
         <div className="absolute inset-0">
           <CardArt card={topCard} variant="compact" />
         </div>
