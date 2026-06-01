@@ -490,7 +490,7 @@ type CardIntent = {
   onClick: () => void
 }
 
-type CardIntentMap = Map<string, CardIntent>
+type CardIntentMap = Map<string, CardIntent[]>
 
 type CardInteractionModel = {
   cardIntentsById: CardIntentMap
@@ -2909,9 +2909,9 @@ function buildCardInteractionModel({
   const viewerPlayer = gameState.players.find(player => player.playerId === viewerPlayerId)
 
   function setCardIntent(cardInstanceId: string, intent: CardIntent) {
-    if (!cardIntentsById.has(cardInstanceId)) {
-      cardIntentsById.set(cardInstanceId, intent)
-    }
+    const existing = cardIntentsById.get(cardInstanceId) ?? []
+    existing.push(intent)
+    cardIntentsById.set(cardInstanceId, existing)
   }
 
   const attackSourceActionCounts = declareAttackSourceActionCounts(gameState)
@@ -3113,25 +3113,20 @@ function buildCardInteractionModel({
 
     if (action.key === 'declare_attack' && action.attackId) {
       const attackSourceIds = declareAttackSourceIds(action, gameState)
-      const sourceHasOneAttack = attackSourceIds.every(
-        attackerCardInstanceId => (attackSourceActionCounts.get(attackerCardInstanceId) ?? 0) === 1
-      )
 
-      if (sourceHasOneAttack) {
-        for (const attackerCardInstanceId of attackSourceIds) {
-          setCardIntent(attackerCardInstanceId, {
-            badge: 'Attack',
-            detail: attackIntentDetail(action),
-            disabled: !canRunAction,
-            label: `Declare ${attackIntentName(action)}`,
-            pending: declareAttackPendingKey === attackKey(action.playerId, action.attackId),
-            tone: 'primary',
-            onClick: () => onDeclareAttack({ playerId: action.playerId, attackId: action.attackId! })
-          })
-        }
-
-        cardDirectedActionKeys.add(actionKeyValue)
+      for (const attackerCardInstanceId of attackSourceIds) {
+        setCardIntent(attackerCardInstanceId, {
+          badge: attackIntentName(action),
+          detail: attackIntentDetail(action),
+          disabled: !canRunAction,
+          label: `Declare ${attackIntentName(action)}`,
+          pending: declareAttackPendingKey === attackKey(action.playerId, action.attackId),
+          tone: 'primary',
+          onClick: () => onDeclareAttack({ playerId: action.playerId, attackId: action.attackId! })
+        })
       }
+
+      cardDirectedActionKeys.add(actionKeyValue)
     }
 
     if (action.key === 'retreat') {
@@ -7245,7 +7240,7 @@ function BattleZone({
           }
         >
           {cards.map(card => (
-            <CardPill card={card} intent={cardIntentsById.get(card.id)} key={card.id} variant={cardVariant} />
+            <CardPill card={card} intents={cardIntentsById.get(card.id) ?? []} key={card.id} variant={cardVariant} />
           ))}
         </div>
       ) : (
@@ -7273,7 +7268,7 @@ function BenchSlots({ cards, cardIntentsById }: { cards: CardSummary[]; cardInte
               {card ? <span className="text-accent-mint">occupied</span> : <span>open</span>}
             </div>
             {card ? (
-              <CardPill card={card} intent={cardIntentsById.get(card.id)} variant="compact" />
+              <CardPill card={card} intents={cardIntentsById.get(card.id) ?? []} variant="compact" />
             ) : (
               <div className="flex min-h-32 items-center justify-center rounded-xl border border-dashed border-border/60 bg-secondary/35 px-2 py-6 text-center text-xs font-medium text-muted-foreground">
                 Open slot
@@ -7515,7 +7510,7 @@ function PrivateHandZone({
                 <HandCardTile
                   card={card}
                   compact={densityTier === 'dense' || densityTier === 'overflow'}
-                  intent={cardIntentsById.get(card.id)}
+                  intents={cardIntentsById.get(card.id) ?? []}
                   key={card.id}
                 />
               ))}
@@ -7564,24 +7559,26 @@ function HandRulesSupportNotice({ cards }: { cards: CardSummary[] }) {
   )
 }
 
-function HandCardTile({ card, compact, intent }: { card: CardSummary; compact?: boolean; intent?: CardIntent }) {
+function HandCardTile({ card, compact, intents }: { card: CardSummary; compact?: boolean; intents?: CardIntent[] }) {
+  const firstIntent = intents?.[0]
   const content = (
     <>
       <CardArt card={card} variant={compact ? 'compact' : 'hand'} />
       <RulesSupportBadge card={card} compact={compact !== false} />
-      {intent ? <CardIntentBadge intent={intent} compact /> : null}
+      {firstIntent ? <CardIntentBadge intent={firstIntent} compact /> : null}
     </>
   )
   const paddingClass = compact ? 'p-0.5' : 'p-1'
-  const className = `relative rounded-xl bg-secondary/70 ${paddingClass} text-left ring-1 ring-border/40 ${intent ? cardIntentClassName(intent) : ''}`
-  const title = intent ? `${intent.label} · ${card.name} · ${card.cardId}` : `${card.name} · ${card.cardId}`
+  const ringClass = firstIntent ? cardIntentClassName(firstIntent) : ''
+  const className = `relative rounded-xl bg-secondary/70 ${paddingClass} text-left ring-1 ring-border/40 ${ringClass}`
+  const title = firstIntent ? `${firstIntent.label} · ${card.name} · ${card.cardId}` : `${card.name} · ${card.cardId}`
 
-  return intent ? (
+  return firstIntent ? (
     <button
-      aria-label={intent.label}
+      aria-label={firstIntent.label}
       className={className}
-      disabled={intent.disabled}
-      onClick={intent.onClick}
+      disabled={firstIntent.disabled}
+      onClick={firstIntent.onClick}
       title={title}
       type="button"
     >
@@ -7985,11 +7982,11 @@ function SupportedDeckCatalog({
 
 function CardPill({
   card,
-  intent,
+  intents,
   variant = 'default'
 }: {
   card: CardSummary
-  intent?: CardIntent
+  intents?: CardIntent[]
   variant?: CardPillVariant
 }) {
   const attachedCards = card.attachedCards ?? []
@@ -8016,9 +8013,11 @@ function CardPill({
         : 'space-y-2'
   const showMeta = variant !== 'hand' && cardMeta.length > 0
 
+  const firstIntent = intents?.[0]
+
   if (variant === 'compact') {
-    const content = (
-      <>
+    return (
+      <div className={cardClassName}>
         <CardArt card={card} variant={variant} />
         <div className="mt-2 flex items-start justify-between gap-2">
           <p className="min-w-0 truncate text-xs font-medium text-foreground">{card.name}</p>
@@ -8028,23 +8027,13 @@ function CardPill({
           <p className="mt-1 text-[0.68rem] font-medium text-muted-foreground">{attachedCards.length} attached</p>
         ) : null}
         <RulesSupportBadge card={card} compact />
-        {intent ? <CardIntentBadge intent={intent} compact /> : null}
-      </>
-    )
-
-    return intent ? (
-      <button
-        aria-label={intent.label}
-        className={`${cardClassName} relative text-left transition ${cardIntentClassName(intent)}`}
-        disabled={intent.disabled}
-        onClick={intent.onClick}
-        type="button"
-      >
-        {content}
-      </button>
-    ) : (
-      <div className={cardClassName}>
-        {content}
+        {intents && intents.length > 0 ? (
+          <div className="mt-2 flex flex-wrap gap-1">
+            {intents.map((intent, i) => (
+              <CardActionButton intent={intent} key={i} size="sm" />
+            ))}
+          </div>
+        ) : null}
       </div>
     )
   }
@@ -8085,26 +8074,21 @@ function CardPill({
           <AttachedCardGroup cards={regularAttachedCards} title="Attached" titleSuffix="attached" />
         ) : null}
 
-        {intent?.detail ? <CardIntentDetail intent={intent} /> : null}
+        {firstIntent?.detail ? <CardIntentDetail intent={firstIntent} /> : null}
       </div>
-
-      {intent ? <CardIntentBadge intent={intent} /> : null}
     </div>
   )
 
-  return intent ? (
-    <button
-      aria-label={intent.label}
-      className={`${cardClassName} relative text-left transition ${cardIntentClassName(intent)}`}
-      disabled={intent.disabled}
-      onClick={intent.onClick}
-      type="button"
-    >
+  return (
+    <div className={`${cardClassName} relative`}>
       {content}
-    </button>
-  ) : (
-    <div className={cardClassName}>
-      {content}
+      {intents && intents.length > 0 ? (
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {intents.map((intent, i) => (
+            <CardActionButton intent={intent} key={i} />
+          ))}
+        </div>
+      ) : null}
     </div>
   )
 }
@@ -8238,6 +8222,28 @@ function cardIntentClassName(intent: CardIntent) {
         : 'ring-primary/70 hover:ring-primary'
 
   return `cursor-pointer focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background disabled:cursor-wait disabled:opacity-70 ${ringClassName}`
+}
+
+function CardActionButton({ intent, size }: { intent: CardIntent; size?: 'sm' | 'md' }) {
+  const toneClassName =
+    intent.tone === 'warning'
+      ? 'bg-attention/20 text-attention hover:bg-attention/35'
+      : intent.tone === 'secondary'
+        ? 'bg-muted/60 text-foreground hover:bg-muted/85'
+        : 'bg-primary/15 text-primary hover:bg-primary/30'
+  const sizeClass = size === 'sm' ? 'px-1.5 py-0.5 text-[0.62rem]' : 'px-2.5 py-1 text-[0.68rem]'
+
+  return (
+    <button
+      aria-label={intent.label}
+      className={`inline-flex items-center rounded-full font-semibold shadow-sm shadow-black/15 transition ${sizeClass} ${toneClassName} disabled:cursor-wait disabled:opacity-70`}
+      disabled={intent.disabled || intent.pending}
+      onClick={intent.onClick}
+      type="button"
+    >
+      {intent.pending ? '...' : intent.badge}
+    </button>
+  )
 }
 
 function CardArt({ card, variant }: { card: CardSummary; variant: CardArtVariant }) {
