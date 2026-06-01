@@ -3743,7 +3743,7 @@ function PromptChoiceCard({
     isPlayerId(prompt.playerId)
   const choiceKey = promptChoiceKey(prompt.payload)
   const promptFlowGuide = ultraBallPromptFlowGuide(choiceKey, min, max, legalChoiceIds.length)
-  const promptGuidance = promptGuidanceMessages(prompt, min, max, legalChoiceIds.length)
+  const promptGuidance = promptGuidanceMessages(prompt, choiceKey, min, max, legalChoiceIds.length)
   const promptChoiceRows = promptChoiceButtonRows(legalChoiceIds, legalChoiceCardsById, cardsById, legalChoiceLabelsById)
   const promptChoiceDisambiguation = promptChoiceDisambiguationMessage(promptChoiceRows)
 
@@ -8499,6 +8499,8 @@ function promptSubmitLabel(choiceKey: string, selectedCount: number, max: number
       return `Add staged Pokémon ${selectedCount}/${max}`
     case 'search_deck_for_evolution_pokemon_and_energy':
       return `Add Evolution + Energy ${selectedCount}/${max}`
+    case 'search_basic_energy_split_hand_attach_to_pokemon':
+      return `Resolve Crispin Energy choices ${selectedCount}/${max}`
     case 'switch_opponent_bench_to_active':
       return `Switch chosen Pokémon ${selectedCount}/${max}`
     case 'move_basic_energy_between_own_pokemon':
@@ -8536,10 +8538,18 @@ function promptFlowStepBadgeClassName(tone: PromptFlowStep['tone']) {
 
 function promptGuidanceMessages(
   prompt: GameState['prompts'][number],
+  choiceKey: string,
   min: number,
   max: number,
   legalChoiceCount: number
 ) {
+  if (choiceKey === 'search_basic_energy_split_hand_attach_to_pokemon') {
+    return [
+      'Choose two Basic Energy cards of different types from deck plus one of your Pokémon. Selection order matters: first Energy goes to hand, second Energy attaches to the chosen Pokémon.',
+      `This prompt accepts ${promptChoiceInstruction(min, max)} from ${legalChoiceCount} legal Energy or Pokémon choices.`
+    ]
+  }
+
   if (prompt.promptType !== 'choose_knockout_prizes') {
     return []
   }

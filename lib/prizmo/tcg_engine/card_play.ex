@@ -288,7 +288,42 @@ defmodule Prizmo.TcgEngine.CardPlay do
                  search_effect_destination_zone(effect)
                )
            }),
-         {:ok, _event} <- maybe_write_deck_shuffled(game.id, player.player_id, card, effect) do
+         {:ok, _event} <- maybe_shuffle_and_write_deck_shuffled(game, turn, player, card, effect) do
+      complete_play_card_resolution(game, turn, player, card, effect)
+    end
+  end
+
+  defp complete_play_card_effect(
+         game,
+         turn,
+         player,
+         card,
+         %{type: :search_basic_energy_split_hand_attach} = effect,
+         target_ids
+       ) do
+    with {:ok, {hand_energy_card, attach_energy_card, target_card}} <-
+           validate_crispin_effect(game.id, player.player_id, effect, target_ids),
+         {:ok, moved_hand_energy_card} <-
+           CardStore.move_deck_card_to_hand(game.id, player.player_id, hand_energy_card),
+         {:ok, position} <- CardStore.next_attachment_position(game.id, target_card.id),
+         {:ok, moved_attached_energy_card} <-
+           update(attach_energy_card, :attach_from_deck, %{
+             attached_to_card_instance_id: target_card.id,
+             position: position
+           }),
+         {:ok, _event} <-
+           write_event_and_snapshot(game.id, :cards_moved, player.player_id, %{
+             reason: :effect_resolution,
+             source: EventPayloads.card_source(card),
+             effect_key: effect.key,
+             cards: [
+               moved_card_payload(moved_hand_energy_card, :deck, :hand),
+               moved_card_payload(moved_attached_energy_card, :deck, :attached,
+                 to_attached_to_card_instance_id: target_card.id
+               )
+             ]
+           }),
+         {:ok, _event} <- maybe_shuffle_and_write_deck_shuffled(game, turn, player, card, effect) do
       complete_play_card_resolution(game, turn, player, card, effect)
     end
   end
@@ -546,6 +581,16 @@ defmodule Prizmo.TcgEngine.CardPlay do
     end
   end
 
+  defp validate_crispin_effect(game_id, player_id, effect, target_ids) do
+    with {:ok, target_ids} <- EffectRunner.validate_choice_selection(effect, target_ids),
+         {:ok, target_cards} <- CardStore.get_cards(game_id, target_ids),
+         {:ok, {hand_energy_card, attach_energy_card, target_card}} <-
+           selected_crispin_cards(target_cards, player_id),
+         :ok <- require_different_basic_energy_types(hand_energy_card, attach_energy_card) do
+      {:ok, {hand_energy_card, attach_energy_card, target_card}}
+    end
+  end
+
   defp validate_opponent_bench_switch_effect(game_id, player_id, effect, target_ids) do
     with {:ok, target_ids} <- EffectRunner.validate_choice_selection(effect, target_ids),
          {:ok, target_cards} <- CardStore.get_cards(game_id, target_ids),
@@ -604,6 +649,13 @@ defmodule Prizmo.TcgEngine.CardPlay do
   defp effect_choice_ids(cards, player_id, %{type: :search_deck} = choice_step) do
     cards
     |> search_deck_choice_cards(player_id, choice_step)
+    |> Enum.map(& &1.id)
+    |> then(&{:ok, &1})
+  end
+
+  defp effect_choice_ids(cards, player_id, %{type: :search_basic_energy_split_hand_attach}) do
+    cards
+    |> crispin_choice_cards(player_id)
     |> Enum.map(& &1.id)
     |> then(&{:ok, &1})
   end
@@ -669,6 +721,7 @@ defmodule Prizmo.TcgEngine.CardPlay do
       type
       when type in [
              :search_deck,
+             :search_basic_energy_split_hand_attach,
              :switch_opponent_bench_to_active,
              :discard_opponent_special_energy,
              :move_basic_energy_between_own_pokemon,
@@ -738,6 +791,34 @@ defmodule Prizmo.TcgEngine.CardPlay do
     cards
     |> Enum.filter(&(&1.owner_player_id != player_id and &1.zone == :bench))
     |> Enum.sort_by(&{&1.owner_player_id, &1.position, &1.instance_id})
+  end
+
+  defp crispin_choice_cards(cards, player_id) do
+    energy_cards = crispin_basic_energy_choice_cards(cards, player_id)
+    target_cards = crispin_target_choice_cards(cards, player_id)
+
+    if crispin_has_different_energy_types?(energy_cards) and target_cards != [] do
+      legal_energy_cards =
+        Enum.filter(energy_cards, fn energy_card ->
+          Enum.any?(energy_cards, &different_basic_energy_type?(energy_card, &1))
+        end)
+
+      legal_energy_cards ++ target_cards
+    else
+      []
+    end
+  end
+
+  defp crispin_basic_energy_choice_cards(cards, player_id) do
+    cards
+    |> Enum.filter(&crispin_basic_energy_card?(&1, player_id))
+    |> Enum.sort_by(&{&1.position, &1.instance_id})
+  end
+
+  defp crispin_target_choice_cards(cards, player_id) do
+    cards
+    |> Enum.filter(&crispin_target_card?(&1, player_id))
+    |> Enum.sort_by(&{in_play_zone_sort(&1.zone), &1.position, &1.instance_id})
   end
 
   defp opponent_special_energy_choice_cards(cards, player_id) do
@@ -909,6 +990,102 @@ defmodule Prizmo.TcgEngine.CardPlay do
     match?({:ok, %{supertype: :energy, energy_type: :special}}, CardCatalog.fetch(card_id))
   end
 
+  defp crispin_basic_energy_card?(%CardInstance{} = card, player_id) do
+    card.owner_player_id == player_id and card.zone == :deck and
+      require_basic_energy(card.card_id) == :ok and
+      match?({:ok, _type}, basic_energy_type(card))
+  end
+
+  defp crispin_target_card?(%CardInstance{} = card, player_id) do
+    card.owner_player_id == player_id and card.zone in [:active, :bench] and
+      require_pokemon_card(card.card_id) == :ok
+  end
+
+  defp crispin_has_different_energy_types?(energy_cards) do
+    energy_cards
+    |> Enum.map(&basic_energy_type/1)
+    |> Enum.flat_map(fn
+      {:ok, type} -> [type]
+      {:error, _reason} -> []
+    end)
+    |> Enum.uniq()
+    |> length()
+    |> Kernel.>=(2)
+  end
+
+  defp different_basic_energy_type?(%CardInstance{id: id}, %CardInstance{id: id}), do: false
+
+  defp different_basic_energy_type?(%CardInstance{} = left, %CardInstance{} = right) do
+    case {basic_energy_type(left), basic_energy_type(right)} do
+      {{:ok, left_type}, {:ok, right_type}} -> left_type != right_type
+      _other -> false
+    end
+  end
+
+  defp basic_energy_type(%CardInstance{card_id: card_id}) do
+    case CardCatalog.fetch(card_id) do
+      {:ok, %{supertype: :energy, energy_type: :basic, provides: [type | _types]}}
+      when is_atom(type) ->
+        {:ok, type}
+
+      {:ok, %{supertype: :energy, energy_type: :basic}} ->
+        {:error, {:unknown_basic_energy_type, card_id}}
+
+      {:ok, %{supertype: :energy}} ->
+        {:error, :not_basic_energy}
+
+      {:ok, _metadata} ->
+        {:error, :not_energy}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  defp selected_crispin_cards(cards, player_id) do
+    energy_cards = Enum.filter(cards, &crispin_basic_energy_card?(&1, player_id))
+    target_cards = Enum.filter(cards, &crispin_target_card?(&1, player_id))
+
+    case {energy_cards, target_cards} do
+      {[hand_energy_card, attach_energy_card], [target_card]} ->
+        {:ok, {hand_energy_card, attach_energy_card, target_card}}
+
+      {[], [_target_card]} ->
+        {:error, :missing_crispin_energy_choices}
+
+      {[_energy_card], [_target_card]} ->
+        {:error, :missing_crispin_second_energy_choice}
+
+      {energy_cards, [_target_card]} when length(energy_cards) > 2 ->
+        {:error, {:too_many_crispin_energy_choices, length(energy_cards)}}
+
+      {[_energy_card, _attach_energy_card], []} ->
+        {:error, :missing_crispin_target_pokemon}
+
+      {[_energy_card, _attach_energy_card], target_cards} when length(target_cards) > 1 ->
+        {:error, {:too_many_crispin_target_pokemon, length(target_cards)}}
+
+      _other ->
+        {:error, :invalid_crispin_choices}
+    end
+  end
+
+  defp require_different_basic_energy_types(hand_energy_card, attach_energy_card) do
+    case {basic_energy_type(hand_energy_card), basic_energy_type(attach_energy_card)} do
+      {{:ok, hand_type}, {:ok, attach_type}} when hand_type == attach_type ->
+        {:error, {:crispin_energy_types_must_differ, hand_type}}
+
+      {{:ok, _hand_type}, {:ok, _attach_type}} ->
+        :ok
+
+      {{:error, reason}, _other} ->
+        {:error, reason}
+
+      {_other, {:error, reason}} ->
+        {:error, reason}
+    end
+  end
+
   defp energy_switch_source_card?(%CardInstance{} = card, player_id) do
     card.owner_player_id == player_id and card.zone == :attached and
       is_binary(card.attached_to_card_instance_id) and require_basic_energy(card.card_id) == :ok
@@ -1003,6 +1180,20 @@ defmodule Prizmo.TcgEngine.CardPlay do
     }
   end
 
+  defp moved_card_payload(card, from_zone, to_zone, opts \\ []) do
+    Map.merge(
+      %{
+        instance_id: card.id,
+        card_id: card.card_id,
+        owner_player_id: card.owner_player_id,
+        from_zone: from_zone,
+        to_zone: to_zone,
+        to_position: card.position
+      },
+      Map.new(opts)
+    )
+  end
+
   defp prompt_payload(game_id, choice_key, legal_choice_ids, min, max) do
     maybe_put_prompt_choice_labels(
       %{
@@ -1015,6 +1206,29 @@ defmodule Prizmo.TcgEngine.CardPlay do
       choice_key,
       legal_choice_ids
     )
+  end
+
+  defp maybe_put_prompt_choice_labels(
+         payload,
+         game_id,
+         :search_basic_energy_split_hand_attach_to_pokemon,
+         legal_choice_ids
+       ) do
+    case CardStore.list_cards(game_id) do
+      {:ok, cards} ->
+        cards_by_id = Map.new(cards, &{&1.id, &1})
+
+        labels =
+          legal_choice_ids
+          |> Enum.map(&Map.get(cards_by_id, &1))
+          |> Enum.reject(&is_nil/1)
+          |> Enum.map(&crispin_choice_label/1)
+
+        Map.put(payload, :legal_choice_labels, labels)
+
+      {:error, _reason} ->
+        payload
+    end
   end
 
   defp maybe_put_prompt_choice_labels(
@@ -1064,6 +1278,23 @@ defmodule Prizmo.TcgEngine.CardPlay do
     }
   end
 
+  defp crispin_choice_label(%CardInstance{zone: :deck} = card) do
+    %{
+      id: card.id,
+      label: card_name(card, card.card_id),
+      detail:
+        "Basic Energy in deck. Select two different types; the first selected Energy goes to hand and the second attaches."
+    }
+  end
+
+  defp crispin_choice_label(%CardInstance{} = card) do
+    %{
+      id: card.id,
+      label: card_name(card, card.card_id),
+      detail: "Target Pokémon in #{Atom.to_string(card.zone)} for the second selected Energy."
+    }
+  end
+
   defp card_name(nil, fallback), do: fallback
 
   defp card_name(%CardInstance{card_id: card_id}, fallback) do
@@ -1082,19 +1313,20 @@ defmodule Prizmo.TcgEngine.CardPlay do
     Enum.find(definition.effects, &(&1.key == choice_key))
   end
 
-  defp maybe_write_deck_shuffled(
-         game_id,
-         player_id,
+  defp maybe_shuffle_and_write_deck_shuffled(
+         %Game{} = game,
+         turn,
+         %GamePlayer{} = player,
          card,
          %{params: %{shuffle_after: true}} = effect
        ) do
-    write_event_and_snapshot(game_id, :deck_shuffled, player_id, %{
-      source: EventPayloads.card_source(card),
-      effect_key: effect.key
-    })
+    with {:ok, shuffled_deck} <- shuffle_deck_for_effect(game, turn, player, card, effect) do
+      write_effect_deck_shuffled(game, turn, player.player_id, card, effect, shuffled_deck)
+    end
   end
 
-  defp maybe_write_deck_shuffled(_game_id, _player_id, _card, _effect), do: {:ok, nil}
+  defp maybe_shuffle_and_write_deck_shuffled(_game, _turn, _player, _card, _effect),
+    do: {:ok, nil}
 
   defp return_hand_to_deck(game_id, player_id, hand_cards) do
     with {:ok, deck_count} <- CardStore.deck_count(game_id, player_id) do

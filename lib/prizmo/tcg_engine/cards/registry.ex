@@ -5,6 +5,20 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
   alias Prizmo.TcgEngine.Cards.Cost
   alias Prizmo.TcgEngine.Cards.Effect
 
+  @crispin %CardDefinition{
+    id: "SCR-133",
+    kind: :trainer,
+    trainer_type: :supporter,
+    play_window: :action_window,
+    effects: [
+      %Effect{
+        key: :search_basic_energy_split_hand_attach_to_pokemon,
+        type: :search_basic_energy_split_hand_attach,
+        params: %{count: 3, shuffle_after: true}
+      }
+    ]
+  }
+
   @dawn %CardDefinition{
     id: "PFL-087",
     kind: :trainer,
@@ -224,6 +238,7 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
   @cards %{
     @boss_orders.id => @boss_orders,
     @buddy_buddy_poffin.id => @buddy_buddy_poffin,
+    @crispin.id => @crispin,
     @dawn.id => @dawn,
     @enhanced_hammer.id => @enhanced_hammer,
     @energy_switch.id => @energy_switch,

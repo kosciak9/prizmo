@@ -5,6 +5,7 @@ defmodule Prizmo.TcgEngine.EffectRunner do
 
   @choice_effect_types [
     :search_deck,
+    :search_basic_energy_split_hand_attach,
     :switch_opponent_bench_to_active,
     :discard_opponent_special_energy,
     :move_basic_energy_between_own_pokemon,
