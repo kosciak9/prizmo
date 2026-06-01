@@ -8,6 +8,7 @@ defmodule Prizmo.TcgEngine.EffectRunner do
     :search_top_deck,
     :search_basic_energy_split_hand_attach,
     :flip_coin_then_discard_opponent_attached_energy,
+    :switch_team_rocket_bench_and_opponent_bench_to_active,
     :switch_opponent_bench_to_active,
     :discard_opponent_special_energy,
     :move_basic_energy_between_own_pokemon,

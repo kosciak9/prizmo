@@ -1,6 +1,6 @@
 # Ash-backed TCG Engine Playtest Handoff
 
-- Updated: 2026-06-01 (batch 221)
+- Updated: 2026-06-01 (batch 222)
 - Sources: Project codebase; local validation; wiki log
 - Raw: N/A — operational handoff
 
@@ -11,6 +11,13 @@
 - Highest-value feasible batches to prefer when available: open-deck game creation and catalog-backed deck validation; engine-owned persisted RNG for shuffle, opening hands, prizes, and draws; safe setup for arbitrary loaded decks with explicit unsupported-card behavior; TCG layout benchmark notes followed by card-front/card-back board improvements; compact experienced-player action and prompt surfaces; then broader generic mechanics and card behavior. If another fixture-backed mechanic slice is the highest-value feasible step, do it and record how it protects correctness or advances the north star.
 - UI batches must benchmark Pokémon TCG and at least one other TCG layout before substantial layout changes, then record what Prizmo adopts or rejects in the wiki/log for the batch. Batch 219 completed this benchmark; Prizmo adopted overlapping card backs for opponent hand, card back zone visuals for deck/prizes, top-card discard preview, and stadium card art. Prizmo deferred Hearthstone-style board interactivity/fanning and PTCGL-style exact zone replication.
 - Keep raw payloads, IDs, debug counters, and tutorial copy out of the normal play path. The product target is a serious, dense card table for players who already know Pokémon TCG.
+
+## Iteration 222 handoff
+
+- Current state: no durable game command was executed against long-lived playtest game `f6df7025-7d0f-4d9b-9bc2-31c864de1d4e`, open-deck validation game `302a39ed-d15b-4fcb-8a13-80eb2eed71be`, or mulligan validation game `762faa63-a747-430a-ab00-b4ce3b59158a`. Giovanni validation used a rollback-only Tidewave scenario on a staged turn-2 Rocket's Mewtwo vs Alakazam board, so no scratch game was persisted. Last commit at iteration start: `6a1b3e8 feat(tcg): enforce turn-one supporter rules`.
+- Completed the next Team Rocket Supporter slice on the Ash path: Team Rocket's Giovanni (`DRI-174`) is now an engine-defined Supporter on the generic `play_card` path. It appears only when the active player has a Team Rocket Active Pokémon, at least one Benched Team Rocket Pokémon, and at least one opponent Bench Pokémon. The engine discards/marks Giovanni through normal Supporter handling, opens prompt key `switch_team_rocket_bench_and_opponent_bench_to_active` with mixed own-bench/opponent-bench labels, accepts either selection order as long as exactly one own Team Rocket Bench card and one opponent Bench card are chosen, then switches the player's Active with the chosen Team Rocket Bench Pokémon before gusting the chosen opponent Bench Pokémon Active. The React prompt flow, submit copy, and guidance now recognize that mixed-role prompt.
+- Validation: `mix format`, `mix compile --warnings-as-errors`, `node_modules/.bin/tsc --noEmit`, rollback Tidewave validation of affordance visibility/prompt labels/double-switch resolution on turn 2, `mix test test/prizmo/tcg_engine/mechanics_test.exs`, `git diff --check`, and final `mix check` passed.
+- Recommended next atomic task: if the next batch stays on engine behavior, Wally's Compassion (`MEG-132`) is the clearest remaining supported-fixture Trainer gap. If the next batch returns to the product surface instead, card-attached on-board action affordances remain the strongest UI-density candidate toward the north-star experienced-player table.
 
 ## Iteration 221 handoff
 

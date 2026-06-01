@@ -58,6 +58,7 @@ const COPY_OPPONENT_ACTIVE_TERA_POKEMON_ATTACK_EFFECT = 'copy_opponent_active_te
 const ULTRA_BALL_CARD_ID = 'MEG-131'
 const CRUSHING_HAMMER_CARD_ID = 'POR-071'
 const SECRET_BOX_CARD_ID = 'TWM-163'
+const TEAM_ROCKETS_GIOVANNI_CARD_ID = 'DRI-174'
 const BENCH_SLOT_COUNT = 5
 const EXPECTED_OPEN_DECK_CARD_COUNT = 60
 const OPEN_DECK_CATALOG_CARD_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_.:]*-[A-Za-z0-9][A-Za-z0-9_.:-]*$/
@@ -8680,6 +8681,7 @@ function trainerPlayCardPromptGuide(action: ActionAffordance, cardsById: Map<str
   return (
     ultraBallPlayCardPromptGuide(action, cardsById) ??
     crushingHammerPlayCardPromptGuide(action, cardsById) ??
+    teamRocketsGiovanniPlayCardPromptGuide(action, cardsById) ??
     secretBoxPlayCardPromptGuide(action, cardsById)
   )
 }
@@ -8813,6 +8815,52 @@ function crushingHammerPlayCardPromptGuide(action: ActionAffordance, cardsById: 
   }
 }
 
+function teamRocketsGiovanniPlayCardPromptGuide(
+  action: ActionAffordance,
+  cardsById: Map<string, CardSummary>
+): PromptFlowGuide | null {
+  if (action.key !== 'play_card') {
+    return null
+  }
+
+  const hasGiovanniSource = action.sourceCardInstanceIds.some(cardInstanceId => {
+    const card = cardsById.get(cardInstanceId)
+
+    return card?.cardId === TEAM_ROCKETS_GIOVANNI_CARD_ID
+  })
+
+  if (!hasGiovanniSource) {
+    return null
+  }
+
+  return {
+    eyebrow: 'Trainer prompt path',
+    title: "Team Rocket's Giovanni switches both Active Pokémon",
+    detail:
+      'Play the Supporter here, then continue in Viewer prompts. The engine pauses for one of your Team Rocket Bench choices and one opponent Bench choice before finishing the double switch.',
+    steps: [
+      {
+        label: 'play',
+        title: "Start Team Rocket's Giovanni",
+        detail: 'The card-play command starts the Supporter and opens the Bench-selection prompt.',
+        tone: 'focus'
+      },
+      {
+        label: 'switch',
+        title: 'Choose your Team Rocket switch',
+        detail: 'Select one of your Benched Team Rocket Pokémon to become Active first.',
+        tone: 'next'
+      },
+      {
+        label: 'gust',
+        title: 'Choose the opponent switch',
+        detail: 'Select one opposing Benched Pokémon to switch into the Active Spot after your switch resolves.',
+        tone: 'next'
+      }
+    ]
+  }
+}
+
 function trainerPromptFlowGuide(
   choiceKey: string,
   min: number,
@@ -8822,6 +8870,7 @@ function trainerPromptFlowGuide(
   return (
     ultraBallPromptFlowGuide(choiceKey, min, max, legalChoiceCount) ??
     crushingHammerPromptFlowGuide(choiceKey, min, max, legalChoiceCount) ??
+    teamRocketsGiovanniPromptFlowGuide(choiceKey, min, max, legalChoiceCount) ??
     secretBoxPromptFlowGuide(choiceKey, min, max, legalChoiceCount)
   )
 }
@@ -8929,6 +8978,44 @@ function crushingHammerPromptFlowGuide(
   }
 }
 
+function teamRocketsGiovanniPromptFlowGuide(
+  choiceKey: string,
+  min: number,
+  max: number,
+  legalChoiceCount: number
+): PromptFlowGuide | null {
+  if (choiceKey !== 'switch_team_rocket_bench_and_opponent_bench_to_active') {
+    return null
+  }
+
+  return {
+    eyebrow: "Team Rocket's Giovanni prompt",
+    title: 'Choose both Bench targets for the double switch',
+    detail:
+      "Finish Team Rocket's Giovanni by choosing one of your Benched Team Rocket Pokémon and one opposing Benched Pokémon.",
+    steps: [
+      {
+        label: 'play',
+        title: 'Supporter started',
+        detail: "Team Rocket's Giovanni is resolving from the prior action.",
+        tone: 'complete'
+      },
+      {
+        label: 'switch',
+        title: 'Pick both Bench cards',
+        detail: `${promptChoiceInstruction(min, max)} from ${legalChoiceCount} legal Bench choices: one of your Team Rocket Pokémon and one opponent Bench Pokémon.`,
+        tone: 'focus'
+      },
+      {
+        label: 'resolve',
+        title: 'Switch both Active Pokémon',
+        detail: 'The engine promotes your Team Rocket Bench choice first, then gusts the chosen opponent Bench Pokémon Active.',
+        tone: 'next'
+      }
+    ]
+  }
+}
+
 function secretBoxPromptFlowGuide(
   choiceKey: string,
   min: number,
@@ -9030,6 +9117,8 @@ function promptSubmitLabel(choiceKey: string, selectedCount: number, max: number
       return `Resolve Crispin Energy choices ${selectedCount}/${max}`
     case 'discard_opponent_attached_energy_if_heads':
       return `Discard selected Energy ${selectedCount}/${max}`
+    case 'switch_team_rocket_bench_and_opponent_bench_to_active':
+      return `Resolve Team Rocket's Giovanni ${selectedCount}/${max}`
     case 'switch_opponent_bench_to_active':
       return `Switch chosen Pokémon ${selectedCount}/${max}`
     case 'move_basic_energy_between_own_pokemon':
@@ -9136,6 +9225,13 @@ function promptGuidanceMessages(
     return [
       'Crushing Hammer only opens this prompt after a heads coin flip. Choose one attached Energy on your opponent’s board to discard.',
       `This prompt accepts ${promptChoiceInstruction(min, max)} from ${legalChoiceCount} legal attached Energy choices.`
+    ]
+  }
+
+  if (choiceKey === 'switch_team_rocket_bench_and_opponent_bench_to_active') {
+    return [
+      "Team Rocket's Giovanni requires one of your Benched Team Rocket Pokémon and one opposing Benched Pokémon. Selection order does not matter; the engine resolves your switch first, then the gust.",
+      `This prompt accepts ${promptChoiceInstruction(min, max)} from ${legalChoiceCount} legal Bench choices.`
     ]
   }
 

@@ -416,6 +416,20 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     ]
   }
 
+  @team_rockets_giovanni %CardDefinition{
+    id: "DRI-174",
+    kind: :trainer,
+    trainer_type: :supporter,
+    play_window: :action_window,
+    effects: [
+      %Effect{
+        key: :switch_team_rocket_bench_and_opponent_bench_to_active,
+        type: :switch_team_rocket_bench_and_opponent_bench_to_active,
+        params: %{count: 2}
+      }
+    ]
+  }
+
   @team_rockets_proton %CardDefinition{
     id: "DRI-177",
     kind: :trainer,
@@ -457,6 +471,7 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     @rare_candy.id => @rare_candy,
     @sacred_ash.id => @sacred_ash,
     @secret_box.id => @secret_box,
+    @team_rockets_giovanni.id => @team_rockets_giovanni,
     @team_rockets_proton.id => @team_rockets_proton,
     @team_rockets_transceiver.id => @team_rockets_transceiver,
     @ultra_ball.id => @ultra_ball
