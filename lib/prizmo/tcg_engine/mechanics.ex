@@ -387,17 +387,26 @@ defmodule Prizmo.TcgEngine.Mechanics do
            :ok <- require_card_zone(card, :hand),
            :ok <- require_basic_pokemon(card.card_id),
            {:ok, position} <- next_bench_position(game.id, player_id),
-           {:ok, _card} <-
+           {:ok, updated_card} <-
              update(card, :play_to_bench, %{
                position: position,
                turn_entered_play: turn.turn_number
              }),
+           {:ok, risky_ruins_damage} <-
+             StadiumEffects.apply_risky_ruins_if_needed(
+               game.id,
+               updated_card,
+               turn.id,
+               player_id
+             ),
+           event_payload =
+             maybe_put(
+               %{turn_id: turn.id, card_instance_id: card.id, position: position},
+               :risky_ruins_damage,
+               risky_ruins_damage
+             ),
            {:ok, event} <-
-             write_event(game, :play_basic_to_bench, player_id, %{
-               turn_id: turn.id,
-               card_instance_id: card.id,
-               position: position
-             }),
+             write_event(game, :play_basic_to_bench, player_id, event_payload),
            {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do
         get_game(game.id)
       end

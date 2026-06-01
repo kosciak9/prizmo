@@ -1,6 +1,6 @@
 # Ash-backed TCG Engine Playtest Handoff
 
-- Updated: 2026-06-01 (batch 229)
+- Updated: 2026-06-01 (batch 230)
 - Sources: Project codebase; local validation; wiki log
 - Raw: N/A — operational handoff
 
@@ -11,6 +11,13 @@
 - Highest-value feasible batches to prefer when available: open-deck game creation and catalog-backed deck validation; engine-owned persisted RNG for shuffle, opening hands, prizes, and draws; safe setup for arbitrary loaded decks with explicit unsupported-card behavior; TCG layout benchmark notes followed by card-front/card-back board improvements; compact experienced-player action and prompt surfaces; then broader generic mechanics and card behavior. If another fixture-backed mechanic slice is the highest-value feasible step, do it and record how it protects correctness or advances the north star.
 - UI batches must benchmark Pokémon TCG and at least one other TCG layout before substantial layout changes, then record what Prizmo adopts or rejects in the wiki/log for the batch. Batch 219 completed this benchmark; Prizmo adopted overlapping card backs for opponent hand, card back zone visuals for deck/prizes, top-card discard preview, and stadium card art. Prizmo deferred Hearthstone-style board interactivity/fanning and PTCGL-style exact zone replication.
 - Keep raw payloads, IDs, debug counters, and tutorial copy out of the normal play path. The product target is a serious, dense card table for players who already know Pokémon TCG.
+
+## Iteration 230 handoff
+
+- Current state: moved Risky Ruins (`MEG-127`) from pending Stadium text into executable Ash-engine behavior. Risky Ruins was the long-standing "strongest remaining bounded fixture-card gap" in the Dragapult fixture deck, listed in the handoff since iteration 224. No durable game command was executed against any long-lived playtest or validation games. Last commit at iteration end: (after this batch).
+- Completed: `StadiumEffects` now recognizes the `:damage_on_bench_for_basic_non_darkness` effect type from MEG-127's authored behavior overlay. `StadiumEffects.apply_risky_ruins_if_needed/4` checks if Risky Ruins is the active Stadium and the benched card is a Basic non-Darkness Pokémon, applies 20 damage via the existing `update(card, :set_damage, ...)` path, and returns a damage payload that the caller includes in the bench event. `supported_stadium?` now returns true for the MEG-127 effect type, so `GameView` reports Risky Ruins as `Engine-defined Stadium` — no separate GameView changes were needed. No CardDefinition was needed in the registry — Stadium cards are played through the existing generic `play_stadium` command. The call is wired into `Mechanics.play_basic_to_bench/3` after the card is placed on bench and before the event/snapshot write, following the same hook pattern as Festival Grounds' `recover_special_condition` in `attach_energy`.
+- Validation: `mix compile --warnings-as-errors`, `node_modules/.bin/tsc --noEmit`, `mix test` (142/0), and full `mix check` (all 12 gates) pass cleanly. Catalog verification confirmed `supported_stadium_card?("MEG-127")` returns true and the catalog record includes `effect: %{type: :damage_on_bench_for_basic_non_darkness}`.
+- Recommended next atomic task: this closes the Risky Ruins bounded fixture-card gap from the Dragapult deck. If the next batch stays on engine behavior, Handheld Fan (`TWM-150`, complex triggered Energy-movement Tool effect in Alakazam) is the strongest remaining bounded fixture-card gap. If the next batch returns to the product surface, board-feel animation remains the strongest UI-density candidate — the benchmark requirement is already satisfied from batch 219, and large-hand density/fanning and card-attached action affordances have been delivered.
 
 ## Iteration 229 handoff
 

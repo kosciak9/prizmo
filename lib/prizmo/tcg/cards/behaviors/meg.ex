@@ -30,6 +30,10 @@ defmodule Prizmo.Tcg.Cards.Behaviors.MEG do
     card_effect(effect: %{type: :move_basic_energy_between_own_pokemon})
   end
 
+  card "MEG-127" do
+    card_effect(effect: %{type: :damage_on_bench_for_basic_non_darkness})
+  end
+
   card "MEG-132" do
     card_effect(
       effect: %{type: :heal_mega_evolution_pokemon_ex_then_return_attached_energy_to_hand}

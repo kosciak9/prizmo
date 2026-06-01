@@ -15,6 +15,9 @@ defmodule Prizmo.TcgEngine.StadiumEffects do
   @festival_grounds_effect_id "festival_grounds"
   @team_rockets_factory_effect :draw_after_playing_team_rocket_supporter
   @team_rockets_factory_card_id "DRI-173"
+  @risky_ruins_effect :damage_on_bench_for_basic_non_darkness
+  @risky_ruins_card_id "MEG-127"
+  @risky_ruins_damage 20
 
   def supported_stadium?(%{
         supertype: :trainer,
@@ -29,6 +32,12 @@ defmodule Prizmo.TcgEngine.StadiumEffects do
         effect: %{type: @team_rockets_factory_effect}
       }),
       do: true
+
+  def supported_stadium?(%{
+        supertype: :trainer,
+        trainer_type: :stadium,
+        effect: %{type: @risky_ruins_effect}
+      }), do: true
 
   def supported_stadium?(_card), do: false
 
@@ -68,6 +77,40 @@ defmodule Prizmo.TcgEngine.StadiumEffects do
       end
     end
   end
+
+  @doc """
+  Checks if Risky Ruins is the active Stadium and the benched card is a Basic non-Darkness Pokémon.
+  If so, applies 20 damage to the benched card.
+  Returns `{:ok, damage_payload}` when damage was applied,
+  `{:ok, nil}` when no effect applies.
+  The caller should include the payload in the bench event.
+  """
+  def apply_risky_ruins_if_needed(game_id, %CardInstance{} = pokemon_card, _turn_id, _player_id)
+      when is_binary(game_id) do
+    with {:ok, stadiums} <- CardStore.cards_in_zone(game_id, :stadium),
+         true <- Enum.any?(stadiums, &match?(%CardInstance{card_id: @risky_ruins_card_id}, &1)),
+         {:ok, catalog_card} <- CardCatalog.fetch(pokemon_card.card_id),
+         true <- risky_ruins_target?(catalog_card) do
+      new_damage = pokemon_card.damage + @risky_ruins_damage
+
+      with {:ok, _updated} <- update(pokemon_card, :set_damage, %{damage: new_damage}) do
+        {:ok,
+         %{
+           damage: @risky_ruins_damage,
+           target_card_instance_id: pokemon_card.id,
+           target_card_id: pokemon_card.card_id,
+           stadium_card_id: @risky_ruins_card_id
+         }}
+      end
+    else
+      _other -> {:ok, nil}
+    end
+  end
+
+  defp risky_ruins_target?(%{supertype: :pokemon, stage: :basic, type: type})
+       when type != :darkness, do: true
+
+  defp risky_ruins_target?(_catalog_card), do: false
 
   def require_team_rockets_factory_available(game_id, turn_id, player_id)
       when is_binary(game_id) and is_binary(turn_id) and is_binary(player_id) do
