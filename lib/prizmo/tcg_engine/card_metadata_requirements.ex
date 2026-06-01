@@ -19,6 +19,15 @@ defmodule Prizmo.TcgEngine.CardMetadataRequirements do
     end
   end
 
+  def require_special_energy(card_id) do
+    case CardCatalog.fetch(card_id) do
+      {:ok, %{supertype: :energy, energy_type: :special}} -> :ok
+      {:ok, %{supertype: :energy}} -> {:error, :not_special_energy}
+      {:ok, _card} -> {:error, :not_energy}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
   def require_basic_energy(card_id) do
     case CardCatalog.fetch(card_id) do
       {:ok, %{supertype: :energy, energy_type: :basic}} -> :ok

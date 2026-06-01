@@ -47,6 +47,20 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     ]
   }
 
+  @enhanced_hammer %CardDefinition{
+    id: "TWM-148",
+    kind: :trainer,
+    trainer_type: :item,
+    play_window: :action_window,
+    effects: [
+      %Effect{
+        key: :discard_opponent_special_energy,
+        type: :discard_opponent_special_energy,
+        params: %{count: 1}
+      }
+    ]
+  }
+
   @ultra_ball %CardDefinition{
     id: "MEG-131",
     kind: :trainer,
@@ -118,6 +132,7 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
   @cards %{
     @boss_orders.id => @boss_orders,
     @buddy_buddy_poffin.id => @buddy_buddy_poffin,
+    @enhanced_hammer.id => @enhanced_hammer,
     @judge.id => @judge,
     @lillies_determination.id => @lillies_determination,
     @poke_pad.id => @poke_pad,

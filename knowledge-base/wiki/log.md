@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-06-01] iteration 204 | Enhanced Hammer Special Energy discard
+- Task attempted: advanced arbitrary-deck Item safety by moving Enhanced Hammer (`TWM-148`) onto the generic `play_card` path as an engine-defined prompt effect that discards one opponent attached Special Energy.
+- Files changed: updated `lib/prizmo/tcg_engine/card_metadata_requirements.ex`, `lib/prizmo/tcg_engine/cards/registry.ex`, `lib/prizmo/tcg_engine/effect_runner.ex`, `lib/prizmo/tcg_engine/card_play.ex`, `lib/prizmo/tcg_engine/game_view.ex`, the canonical north-star article, this log, and the TCG engine playtest handoff.
+- Validation: `mix format`, `mix compile --warnings-as-errors`, rollback Tidewave validation, `mix test test/prizmo/tcg_engine/mechanics_test.exs`, `git diff --check`, and final `mix check` passed. Rollback validation confirmed Enhanced Hammer appears as an `engine_defined` hand card and generic Play source when the opponent has attached Special Energy, opens a one-card `discard_opponent_special_energy` prompt, exposes the opponent attached Telepathic Psychic Energy as a viewer-safe prompt card, resolves by discarding both Hammer and that Special Energy while clearing the Energy attachment, leaves no open prompts, writes the expected event suffix, and rejects Basic Energy submitted to the effect when a legal Special Energy is present.
+- Remaining/blocking notes: this covers Enhanced Hammer's deterministic Special Energy discard through the generic Item path, not Crushing Hammer's coin-gated Energy discard, Dawn/Hilda/Crispin multi-card search effects, Rare Candy, broader Tools, or the benchmarked card-table density/polish batch.
+
 ## [2026-06-01] iteration 203 | Judge both-player shuffle draw
 - Task attempted: advanced arbitrary-deck Supporter safety by moving Judge (`POR-076`) onto the generic `play_card` path as an engine-defined no-choice both-player shuffle-hand-into-deck then draw-4 effect.
 - Files changed: updated `lib/prizmo/tcg_engine/cards/registry.ex`, `lib/prizmo/tcg_engine/card_play.ex`, the canonical north-star article, this log, and the TCG engine playtest handoff.

@@ -3,7 +3,11 @@ defmodule Prizmo.TcgEngine.EffectRunner do
 
   alias Prizmo.TcgEngine.ChoiceValidator
 
-  @choice_effect_types [:search_deck, :switch_opponent_bench_to_active]
+  @choice_effect_types [
+    :search_deck,
+    :switch_opponent_bench_to_active,
+    :discard_opponent_special_energy
+  ]
 
   def first_effect(definition) do
     case definition.effects do

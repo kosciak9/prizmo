@@ -6,6 +6,7 @@ defmodule Prizmo.TcgEngine.CardPlay do
       require_non_rule_box_pokemon_card: 1,
       require_poffin_targets: 1,
       require_pokemon_card: 1,
+      require_special_energy: 1,
       require_trainer_type: 2
     ]
 
@@ -20,6 +21,7 @@ defmodule Prizmo.TcgEngine.CardPlay do
       require_supporter_available: 2
     ]
 
+  alias Prizmo.TcgEngine.CardCatalog
   alias Prizmo.TcgEngine.CardInstance
   alias Prizmo.TcgEngine.Cards.Registry, as: EngineCardRegistry
   alias Prizmo.TcgEngine.CardStore
@@ -324,6 +326,34 @@ defmodule Prizmo.TcgEngine.CardPlay do
          turn,
          player,
          card,
+         %{type: :discard_opponent_special_energy} = effect,
+         target_ids
+       ) do
+    with {:ok, [target_energy_card]} <-
+           validate_opponent_special_energy_discard_effect(
+             game.id,
+             player.player_id,
+             effect,
+             target_ids
+           ),
+         {:ok, discarded_energy_card} <- discard_attached_energy_card(game, target_energy_card),
+         {:ok, _event} <-
+           write_event_and_snapshot(game.id, :cards_moved, player.player_id, %{
+             reason: :effect_resolution,
+             source: EventPayloads.card_source(card),
+             effect_key: effect.key,
+             affected_player_id: discarded_energy_card.owner_player_id,
+             cards: EventPayloads.moved_cards([discarded_energy_card], :attached, :discard)
+           }) do
+      complete_play_card_resolution(game, turn, player, card, effect)
+    end
+  end
+
+  defp complete_play_card_effect(
+         game,
+         turn,
+         player,
+         card,
          %{type: :shuffle_hand_into_deck_then_draw} = effect,
          _target_ids
        ) do
@@ -469,6 +499,16 @@ defmodule Prizmo.TcgEngine.CardPlay do
     end
   end
 
+  defp validate_opponent_special_energy_discard_effect(game_id, player_id, effect, target_ids) do
+    with {:ok, target_ids} <- EffectRunner.validate_choice_selection(effect, target_ids),
+         {:ok, target_cards} <- CardStore.get_cards(game_id, target_ids),
+         :ok <- require_all_opponent_cards(target_cards, player_id),
+         :ok <- require_all_in_zone(target_cards, :attached),
+         :ok <- require_all_special_energy(target_cards) do
+      {:ok, target_cards}
+    end
+  end
+
   defp move_search_targets(game, _turn, player, %{params: %{destination: :hand}}, target_cards) do
     target_cards
     |> Enum.map(&CardStore.move_deck_card_to_hand(game.id, player.player_id, &1))
@@ -496,6 +536,13 @@ defmodule Prizmo.TcgEngine.CardPlay do
   defp effect_choice_ids(cards, player_id, %{type: :switch_opponent_bench_to_active}) do
     cards
     |> opponent_bench_choice_cards(player_id)
+    |> Enum.map(& &1.id)
+    |> then(&{:ok, &1})
+  end
+
+  defp effect_choice_ids(cards, player_id, %{type: :discard_opponent_special_energy}) do
+    cards
+    |> opponent_special_energy_choice_cards(player_id)
     |> Enum.map(& &1.id)
     |> then(&{:ok, &1})
   end
@@ -530,7 +577,12 @@ defmodule Prizmo.TcgEngine.CardPlay do
         |> Enum.map(& &1.id)
         |> then(&{:ok, &1})
 
-      type when type in [:search_deck, :switch_opponent_bench_to_active] ->
+      type
+      when type in [
+             :search_deck,
+             :switch_opponent_bench_to_active,
+             :discard_opponent_special_energy
+           ] ->
         effect_choice_ids(cards, player_id, choice_step)
 
       _other ->
@@ -590,6 +642,16 @@ defmodule Prizmo.TcgEngine.CardPlay do
     |> Enum.sort_by(&{&1.owner_player_id, &1.position, &1.instance_id})
   end
 
+  defp opponent_special_energy_choice_cards(cards, player_id) do
+    cards
+    |> Enum.filter(
+      &(&1.owner_player_id != player_id and &1.zone == :attached and special_energy_card?(&1))
+    )
+    |> Enum.sort_by(
+      &{&1.owner_player_id, &1.attached_to_card_instance_id, &1.position, &1.instance_id}
+    )
+  end
+
   defp maybe_hide_when_bench_full(choices, cards, player_id, %{params: %{destination: :bench}}) do
     if bench_space(cards, player_id) > 0, do: choices, else: []
   end
@@ -624,6 +686,22 @@ defmodule Prizmo.TcgEngine.CardPlay do
   end
 
   defp require_search_filter(_card, _filter), do: {:error, :unsupported_search_filter}
+
+  defp special_energy_card?(%CardInstance{card_id: card_id}) do
+    match?({:ok, %{supertype: :energy, energy_type: :special}}, CardCatalog.fetch(card_id))
+  end
+
+  defp require_all_special_energy(cards) do
+    cards
+    |> Enum.map(&require_special_energy(&1.card_id))
+    |> collect_ok_results()
+  end
+
+  defp discard_attached_energy_card(game, %CardInstance{} = card) do
+    with {:ok, position} <- CardStore.next_discard_position(game.id, card.owner_player_id) do
+      update(card, :discard, %{position: position, attached_to_card_instance_id: nil})
+    end
+  end
 
   defp effect_step(definition, choice_key) do
     Enum.find(definition.effects, &(&1.key == choice_key))
