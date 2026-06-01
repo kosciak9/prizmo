@@ -8491,6 +8491,10 @@ function promptSubmitLabel(choiceKey: string, selectedCount: number, max: number
       return `Discard selected cards ${selectedCount}/${max}`
     case 'search_deck_for_pokemon':
       return `Add Pokémon to hand ${selectedCount}/${max}`
+    case 'search_deck_for_basic_pokemon_to_bench':
+      return `Bench selected Pokémon ${selectedCount}/${max}`
+    case 'search_deck_for_non_rule_box_pokemon':
+      return `Add Pokémon to hand ${selectedCount}/${max}`
     case 'knockout_prize_cards':
       return `Take selected Prizes ${selectedCount}/${max}`
     default:

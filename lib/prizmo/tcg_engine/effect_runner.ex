@@ -15,25 +15,32 @@ defmodule Prizmo.TcgEngine.EffectRunner do
 
   def validate_search_deck_selection(effect, target_ids) do
     with :ok <-
-           require_exact_count(
+           require_count_range(
              target_ids,
-             Map.fetch!(effect.params, :count),
+             min_count(effect),
+             max_count(effect),
              :wrong_search_deck_target_count
            ),
          :ok <- require_unique_ids(target_ids) do
-      one_target(target_ids)
+      {:ok, target_ids}
     end
   end
 
-  defp one_target([target_id]), do: {:ok, target_id}
-  defp one_target([]), do: {:error, :missing_search_deck_target}
-  defp one_target(_targets), do: {:error, :too_many_search_deck_targets}
+  defp min_count(%{params: %{min_count: count}}), do: count
+  defp min_count(%{params: %{count: count}}), do: count
+  defp min_count(_effect), do: 1
 
-  defp require_exact_count(values, count, error_tag) do
-    if length(values) == count do
+  defp max_count(%{params: %{max_count: count}}), do: count
+  defp max_count(%{params: %{count: count}}), do: count
+  defp max_count(_effect), do: 1
+
+  defp require_count_range(values, min_count, max_count, error_tag) do
+    count = length(values)
+
+    if count >= min_count and count <= max_count do
       :ok
     else
-      {:error, {error_tag, length(values)}}
+      {:error, {error_tag, count, min_count, max_count}}
     end
   end
 

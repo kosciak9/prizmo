@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-06-01] iteration 200 | Generic search Trainers
+- Task attempted: advanced arbitrary-deck Trainer safety by moving high-frequency no-cost search Items onto the generic `play_card` path: Buddy-Buddy Poffin benches up to two Basic Pokémon with 70 HP or less, and Poké Pad searches a non-rule-box Pokémon into hand.
+- Files changed: updated `lib/prizmo/tcg_engine/cards/registry.ex`, `lib/prizmo/tcg_engine/card_play.ex`, `lib/prizmo/tcg_engine/choice_validator.ex`, `lib/prizmo/tcg_engine/effect_runner.ex`, `lib/prizmo_web/spa/features/home/routes/index.tsx`, the canonical north-star article, this log, and the TCG engine playtest handoff.
+- Validation: `mix format`, `mix compile --warnings-as-errors`, rollback Tidewave validation, `mix test test/prizmo/tcg_engine/mechanics_test.exs`, `node_modules/.bin/tsc --noEmit --ignoreDeprecations 6.0`, and final `mix check` passed. Rollback validation confirmed Poffin appears as a generic Play affordance instead of pending Trainer text, discards before the search prompt, presents `search_deck_for_basic_pokemon_to_bench` with min 1/max 2, benches two legal targets, records `deck_shuffled` and `card_play_completed`, and completes the pending effect; Poké Pad appears as a generic Play affordance, resolves an upfront non-rule-box Pokémon search to hand, and records shuffle/completion events.
+- Remaining/blocking notes: this covers these two Item search effects through the existing prompt model, not broader Supporter shuffle/draw effects, Boss-style switching, or every Trainer. Full browser click validation of the new prompt labels and broader card-table density/polish remain future north-star work.
+
 ## [2026-06-01] iteration 199 | Typed Special Energy providers
 - Task attempted: advanced arbitrary-deck Special Energy safety by inferring typed provider text for Growing Grass Energy and Telepathic Psychic Energy while keeping their unresolved HP/search text explicit as pending card behavior.
 - Files changed: updated `lib/prizmo/tcg_engine/card_catalog.ex`, `lib/prizmo/tcg_engine/energy_effects.ex`, `lib/prizmo/tcg_engine/game_view.ex`, `lib/prizmo/tcg_engine/game_view/action_affordances.ex`, the canonical north-star article, this log, and the TCG engine playtest handoff.

@@ -32,7 +32,50 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     ]
   }
 
+  @buddy_buddy_poffin %CardDefinition{
+    id: "TEF-144",
+    kind: :trainer,
+    trainer_type: :item,
+    play_window: :action_window,
+    effects: [
+      %Effect{
+        key: :search_deck_for_basic_pokemon_to_bench,
+        type: :search_deck,
+        params: %{
+          filter: %{kind: :pokemon, stage: :basic, max_hp: 70},
+          min_count: 1,
+          max_count: 2,
+          destination: :bench,
+          reveal: true,
+          shuffle_after: true
+        }
+      }
+    ]
+  }
+
+  @poke_pad %CardDefinition{
+    id: "POR-081",
+    kind: :trainer,
+    trainer_type: :item,
+    play_window: :action_window,
+    effects: [
+      %Effect{
+        key: :search_deck_for_non_rule_box_pokemon,
+        type: :search_deck,
+        params: %{
+          filter: %{kind: :pokemon, rule_box?: false},
+          count: 1,
+          destination: :hand,
+          reveal: true,
+          shuffle_after: true
+        }
+      }
+    ]
+  }
+
   @cards %{
+    @buddy_buddy_poffin.id => @buddy_buddy_poffin,
+    @poke_pad.id => @poke_pad,
     @ultra_ball.id => @ultra_ball
   }
 

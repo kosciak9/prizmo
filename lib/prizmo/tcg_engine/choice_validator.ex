@@ -60,6 +60,18 @@ defmodule Prizmo.TcgEngine.ChoiceValidator do
     |> choice_steps()
     |> Enum.find(&(&1.key == choice_key))
     |> case do
+      %{params: %{min_count: count}} -> count
+      %{params: %{count: count}} -> count
+      _other -> 1
+    end
+  end
+
+  def max_count_for(definition, choice_key) do
+    definition
+    |> choice_steps()
+    |> Enum.find(&(&1.key == choice_key))
+    |> case do
+      %{params: %{max_count: count}} -> count
       %{params: %{count: count}} -> count
       _other -> 1
     end
