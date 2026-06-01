@@ -322,6 +322,26 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     ]
   }
 
+  @team_rockets_transceiver %CardDefinition{
+    id: "DRI-178",
+    kind: :trainer,
+    trainer_type: :item,
+    play_window: :action_window,
+    effects: [
+      %Effect{
+        key: :search_deck_for_team_rocket_supporter,
+        type: :search_deck,
+        params: %{
+          filter: %{kind: :trainer, trainer_type: :supporter, name_contains: "Team Rocket"},
+          count: 1,
+          destination: :hand,
+          reveal: true,
+          shuffle_after: true
+        }
+      }
+    ]
+  }
+
   @cards %{
     @boss_orders.id => @boss_orders,
     @bug_catching_set.id => @bug_catching_set,
@@ -338,6 +358,7 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     @poke_pad.id => @poke_pad,
     @pokegear_3_0.id => @pokegear_3_0,
     @rare_candy.id => @rare_candy,
+    @team_rockets_transceiver.id => @team_rockets_transceiver,
     @ultra_ball.id => @ultra_ball
   }
 

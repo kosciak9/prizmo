@@ -8789,6 +8789,8 @@ function promptSubmitLabel(choiceKey: string, selectedCount: number, max: number
       return `Bench selected Pokémon ${selectedCount}/${max}`
     case 'search_deck_for_non_rule_box_pokemon':
       return `Add Pokémon to hand ${selectedCount}/${max}`
+    case 'search_deck_for_team_rocket_supporter':
+      return `Add Team Rocket Supporter ${selectedCount}/${max}`
     case 'search_deck_for_basic_stage_1_stage_2_pokemon':
       return `Add staged Pokémon ${selectedCount}/${max}`
     case 'search_deck_for_evolution_pokemon_and_energy':
@@ -8877,6 +8879,13 @@ function promptGuidanceMessages(
     return [
       "Lana's Aid can recover up to 3 cards from discard in any mix of non-rule-box Pokémon and Basic Energy.",
       `This prompt accepts ${promptChoiceInstruction(min, max)} from ${legalChoiceCount} legal discard choices.`
+    ]
+  }
+
+  if (choiceKey === 'search_deck_for_team_rocket_supporter') {
+    return [
+      "Team Rocket's Transceiver searches your deck for one Supporter with \"Team Rocket\" in its name.",
+      `This prompt accepts ${promptChoiceInstruction(min, max)} from ${legalChoiceCount} legal Team Rocket Supporter choices, then shuffles.`
     ]
   }
 

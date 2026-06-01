@@ -1265,6 +1265,32 @@ defmodule Prizmo.TcgEngine.CardPlay do
     end
   end
 
+  defp require_search_filter(%CardInstance{} = card, %{
+         kind: :trainer,
+         trainer_type: trainer_type,
+         name_contains: name_fragment
+       })
+       when is_binary(name_fragment) do
+    case CardCatalog.fetch(card.card_id) do
+      {:ok, %{supertype: :trainer, trainer_type: ^trainer_type, name: name}}
+      when is_binary(name) ->
+        if String.contains?(name, name_fragment) do
+          :ok
+        else
+          {:error, {:trainer_name_missing_fragment, card.card_id, name_fragment}}
+        end
+
+      {:ok, %{supertype: :trainer, trainer_type: actual_type}} ->
+        {:error, {:wrong_trainer_type, card.card_id, actual_type, trainer_type}}
+
+      {:ok, metadata} ->
+        {:error, {:not_trainer, metadata.id}}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
   defp require_search_filter(%CardInstance{} = card, %{kind: :trainer, trainer_type: trainer_type}) do
     case CardCatalog.fetch(card.card_id) do
       {:ok, %{supertype: :trainer, trainer_type: ^trainer_type}} ->
