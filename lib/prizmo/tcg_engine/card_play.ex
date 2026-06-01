@@ -715,7 +715,8 @@ defmodule Prizmo.TcgEngine.CardPlay do
          :ok <- require_all_owned_in_zone(target_cards, player_id, :deck),
          :ok <- require_all_search_filters(target_cards, effect.params.filter),
          :ok <-
-           require_required_search_groups(target_cards, Map.get(effect.params, :required_groups)) do
+           require_required_search_groups(target_cards, Map.get(effect.params, :required_groups)),
+         :ok <- require_max_search_groups(target_cards, Map.get(effect.params, :max_groups)) do
       {:ok, target_cards}
     end
   end
@@ -1394,6 +1395,23 @@ defmodule Prizmo.TcgEngine.CardPlay do
     |> collect_ok_results()
   end
 
+  defp require_max_search_groups(_target_cards, nil), do: :ok
+
+  defp require_max_search_groups(target_cards, max_groups) when is_list(max_groups) do
+    max_groups
+    |> Enum.map(fn group ->
+      max_count = Map.get(group, :count, 1)
+      actual_count = Enum.count(target_cards, &matches_search_filter?(&1, group.filter))
+
+      if actual_count <= max_count do
+        :ok
+      else
+        {:error, {:too_many_search_group_targets, group.filter, actual_count, max_count}}
+      end
+    end)
+    |> collect_ok_results()
+  end
+
   defp required_search_groups_available?(_choices, nil), do: true
 
   defp required_search_groups_available?(choices, required_groups)
@@ -1817,6 +1835,29 @@ defmodule Prizmo.TcgEngine.CardPlay do
   defp maybe_put_prompt_choice_labels(
          payload,
          game_id,
+         :search_deck_for_item_tool_supporter_stadium,
+         legal_choice_ids
+       ) do
+    case CardStore.list_cards(game_id) do
+      {:ok, cards} ->
+        cards_by_id = Map.new(cards, &{&1.id, &1})
+
+        labels =
+          legal_choice_ids
+          |> Enum.map(&Map.get(cards_by_id, &1))
+          |> Enum.reject(&is_nil/1)
+          |> Enum.map(&secret_box_choice_label/1)
+
+        Map.put(payload, :legal_choice_labels, labels)
+
+      {:error, _reason} ->
+        payload
+    end
+  end
+
+  defp maybe_put_prompt_choice_labels(
+         payload,
+         game_id,
          :move_basic_energy_between_own_pokemon,
          legal_choice_ids
        ) do
@@ -1893,6 +1934,26 @@ defmodule Prizmo.TcgEngine.CardPlay do
       detail:
         "Basic Pokémon in #{Atom.to_string(card.zone)}. Select it with a compatible Stage 2 card from hand."
     }
+  end
+
+  defp secret_box_choice_label(%CardInstance{} = card) do
+    %{
+      id: card.id,
+      label: card_name(card, card.card_id),
+      detail:
+        "#{secret_box_trainer_type_label(card.card_id)} in deck. Secret Box accepts at most one of each Trainer category."
+    }
+  end
+
+  defp secret_box_trainer_type_label(card_id) do
+    case CardCatalog.fetch(card_id) do
+      {:ok, %{trainer_type: trainer_type}}
+      when trainer_type in [:item, :tool, :supporter, :stadium] ->
+        trainer_type |> Atom.to_string() |> String.capitalize()
+
+      _other ->
+        "Trainer"
+    end
   end
 
   defp card_name(nil, fallback), do: fallback

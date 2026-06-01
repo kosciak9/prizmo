@@ -200,6 +200,47 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     ]
   }
 
+  @secret_box %CardDefinition{
+    id: "TWM-163",
+    kind: :trainer,
+    trainer_type: :item,
+    play_window: :action_window,
+    costs: [
+      %Cost{
+        key: :discard_three_from_hand,
+        type: :discard_from_hand,
+        params: %{count: 3}
+      }
+    ],
+    effects: [
+      %Effect{
+        key: :search_deck_for_item_tool_supporter_stadium,
+        type: :search_deck,
+        params: %{
+          filter: %{
+            any: [
+              %{kind: :trainer, trainer_type: :item},
+              %{kind: :trainer, trainer_type: :tool},
+              %{kind: :trainer, trainer_type: :supporter},
+              %{kind: :trainer, trainer_type: :stadium}
+            ]
+          },
+          max_groups: [
+            %{filter: %{kind: :trainer, trainer_type: :item}, count: 1},
+            %{filter: %{kind: :trainer, trainer_type: :tool}, count: 1},
+            %{filter: %{kind: :trainer, trainer_type: :supporter}, count: 1},
+            %{filter: %{kind: :trainer, trainer_type: :stadium}, count: 1}
+          ],
+          min_count: 0,
+          max_count: 4,
+          destination: :hand,
+          reveal: true,
+          shuffle_after: true
+        }
+      }
+    ]
+  }
+
   @lanas_aid %CardDefinition{
     id: "TWM-155",
     kind: :trainer,
@@ -378,6 +419,7 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     @pokegear_3_0.id => @pokegear_3_0,
     @rare_candy.id => @rare_candy,
     @sacred_ash.id => @sacred_ash,
+    @secret_box.id => @secret_box,
     @team_rockets_transceiver.id => @team_rockets_transceiver,
     @ultra_ball.id => @ultra_ball
   }

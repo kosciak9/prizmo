@@ -56,6 +56,7 @@ const SHUFFLE_ATTACHED_ENERGY_INTO_DECK_THEN_DAMAGE_OPPONENT_BENCH_EFFECT =
   'shuffle_attached_energy_into_deck_then_damage_opponent_bench'
 const COPY_OPPONENT_ACTIVE_TERA_POKEMON_ATTACK_EFFECT = 'copy_opponent_active_tera_pokemon_attack'
 const ULTRA_BALL_CARD_ID = 'MEG-131'
+const SECRET_BOX_CARD_ID = 'TWM-163'
 const BENCH_SLOT_COUNT = 5
 const EXPECTED_OPEN_DECK_CARD_COUNT = 60
 const OPEN_DECK_CATALOG_CARD_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_.:]*-[A-Za-z0-9][A-Za-z0-9_.:-]*$/
@@ -3917,7 +3918,7 @@ function PromptChoiceCard({
     !promptPendingId &&
     isPlayerId(prompt.playerId)
   const choiceKey = promptChoiceKey(prompt.payload)
-  const promptFlowGuide = ultraBallPromptFlowGuide(choiceKey, min, max, legalChoiceIds.length)
+  const promptFlowGuide = trainerPromptFlowGuide(choiceKey, min, max, legalChoiceIds.length)
   const promptGuidance = promptGuidanceMessages(prompt, choiceKey, min, max, legalChoiceIds.length)
   const promptChoiceRows = promptChoiceButtonRows(legalChoiceIds, legalChoiceCardsById, cardsById, legalChoiceLabelsById)
   const promptChoiceDisambiguation = promptChoiceDisambiguationMessage(promptChoiceRows)
@@ -5966,7 +5967,7 @@ function ActionAffordanceCard({
   const isBlockedAction = !actionIsExecutable(action)
   const canRunAction = !actionCommandPending && isPlayerId(action.playerId) && !isBlockedAction
   const isPostSearchEndTurnAction = isPlayerId(action.playerId) && postSearchEndTurnPlayerIds.includes(action.playerId)
-  const playCardPromptGuide = ultraBallPlayCardPromptGuide(action, cardsById)
+  const playCardPromptGuide = trainerPlayCardPromptGuide(action, cardsById)
   const playCardOptions = uniquePlayCardOptions(playCardCommandOptions(action, cardsById))
   const repeatedPlayCardLabels = repeatedPlayCardBaseLabels(playCardOptions)
   const benchOptions = providedBenchOptions ?? basicBenchCommandOptions(action, cardsById)
@@ -8667,6 +8668,10 @@ function promptChoiceInstruction(min: number, max: number) {
   return `choose ${min}-${max} cards`
 }
 
+function trainerPlayCardPromptGuide(action: ActionAffordance, cardsById: Map<string, CardSummary>): PromptFlowGuide | null {
+  return ultraBallPlayCardPromptGuide(action, cardsById) ?? secretBoxPlayCardPromptGuide(action, cardsById)
+}
+
 function ultraBallPlayCardPromptGuide(action: ActionAffordance, cardsById: Map<string, CardSummary>): PromptFlowGuide | null {
   if (action.key !== 'play_card') {
     return null
@@ -8708,6 +8713,58 @@ function ultraBallPlayCardPromptGuide(action: ActionAffordance, cardsById: Map<s
       }
     ]
   }
+}
+
+function secretBoxPlayCardPromptGuide(action: ActionAffordance, cardsById: Map<string, CardSummary>): PromptFlowGuide | null {
+  if (action.key !== 'play_card') {
+    return null
+  }
+
+  const hasSecretBoxSource = action.sourceCardInstanceIds.some(cardInstanceId => {
+    const card = cardsById.get(cardInstanceId)
+
+    return card?.cardId === SECRET_BOX_CARD_ID
+  })
+
+  if (!hasSecretBoxSource) {
+    return null
+  }
+
+  return {
+    eyebrow: 'Trainer prompt path',
+    title: 'Secret Box resolves cost, then Trainer search',
+    detail:
+      'Play the ACE SPEC Item here, then continue in Viewer prompts. The engine pauses for the discard cost before showing the deck-search prompt.',
+    steps: [
+      {
+        label: 'play',
+        title: 'Start Secret Box',
+        detail: 'The card-play command starts the Item and opens the cost prompt.',
+        tone: 'focus'
+      },
+      {
+        label: 'cost',
+        title: 'Discard 3 cards',
+        detail: 'Choose three other hand cards in Viewer prompts before Secret Box can search.',
+        tone: 'next'
+      },
+      {
+        label: 'search',
+        title: 'Find Trainer cards',
+        detail: 'After the discard resolves, choose up to one Item, Tool, Supporter, and Stadium from deck.',
+        tone: 'next'
+      }
+    ]
+  }
+}
+
+function trainerPromptFlowGuide(
+  choiceKey: string,
+  min: number,
+  max: number,
+  legalChoiceCount: number
+): PromptFlowGuide | null {
+  return ultraBallPromptFlowGuide(choiceKey, min, max, legalChoiceCount) ?? secretBoxPromptFlowGuide(choiceKey, min, max, legalChoiceCount)
 }
 
 function ultraBallPromptFlowGuide(
@@ -8775,6 +8832,71 @@ function ultraBallPromptFlowGuide(
   return null
 }
 
+function secretBoxPromptFlowGuide(
+  choiceKey: string,
+  min: number,
+  max: number,
+  legalChoiceCount: number
+): PromptFlowGuide | null {
+  if (choiceKey === 'discard_three_from_hand') {
+    return {
+      eyebrow: 'Secret Box prompt',
+      title: 'Pay the discard cost',
+      detail: 'This is the required follow-up from playing Secret Box. Submit the cost to open the Trainer search.',
+      steps: [
+        {
+          label: 'play',
+          title: 'Item started',
+          detail: 'Secret Box is paused by the engine until its cost is paid.',
+          tone: 'complete'
+        },
+        {
+          label: 'cost',
+          title: 'Discard from hand',
+          detail: `${promptChoiceInstruction(min, max)} from ${legalChoiceCount} legal hand choices.`,
+          tone: 'focus'
+        },
+        {
+          label: 'search',
+          title: 'Search next',
+          detail: 'The Trainer search prompt replaces this prompt after the discard resolves.',
+          tone: 'next'
+        }
+      ]
+    }
+  }
+
+  if (choiceKey === 'search_deck_for_item_tool_supporter_stadium') {
+    return {
+      eyebrow: 'Secret Box prompt',
+      title: 'Choose Trainer cards to add to hand',
+      detail: 'The discard cost is complete. Finish Secret Box by choosing at most one card from each Trainer category.',
+      steps: [
+        {
+          label: 'play',
+          title: 'Item started',
+          detail: 'Secret Box is resolving from the prior action.',
+          tone: 'complete'
+        },
+        {
+          label: 'cost',
+          title: 'Discard cost paid',
+          detail: 'The selected hand cards moved to discard.',
+          tone: 'complete'
+        },
+        {
+          label: 'search',
+          title: 'Search deck',
+          detail: `${promptChoiceInstruction(min, max)} from ${legalChoiceCount} legal Trainer choices: at most one Item, Tool, Supporter, and Stadium, then shuffle.`,
+          tone: 'focus'
+        }
+      ]
+    }
+  }
+
+  return null
+}
+
 function promptSubmitLabel(choiceKey: string, selectedCount: number, max: number, isPending: boolean) {
   if (isPending) {
     return 'Resolving prompt...'
@@ -8782,6 +8904,8 @@ function promptSubmitLabel(choiceKey: string, selectedCount: number, max: number
 
   switch (choiceKey) {
     case 'discard_two_from_hand':
+      return `Discard selected cards ${selectedCount}/${max}`
+    case 'discard_three_from_hand':
       return `Discard selected cards ${selectedCount}/${max}`
     case 'search_deck_for_pokemon':
       return `Add Pokémon to hand ${selectedCount}/${max}`
@@ -8791,6 +8915,8 @@ function promptSubmitLabel(choiceKey: string, selectedCount: number, max: number
       return `Add Pokémon to hand ${selectedCount}/${max}`
     case 'search_deck_for_team_rocket_supporter':
       return `Add Team Rocket Supporter ${selectedCount}/${max}`
+    case 'search_deck_for_item_tool_supporter_stadium':
+      return `Add Trainer cards ${selectedCount}/${max}`
     case 'search_deck_for_basic_stage_1_stage_2_pokemon':
       return `Add staged Pokémon ${selectedCount}/${max}`
     case 'search_deck_for_evolution_pokemon_and_energy':
