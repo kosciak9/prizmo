@@ -181,6 +181,55 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     ]
   }
 
+  @pokegear_3_0 %CardDefinition{
+    id: "SVI-186",
+    kind: :trainer,
+    trainer_type: :item,
+    play_window: :action_window,
+    effects: [
+      %Effect{
+        key: :search_top_7_for_supporter_to_hand,
+        type: :search_top_deck,
+        params: %{
+          look_count: 7,
+          filter: %{kind: :trainer, trainer_type: :supporter},
+          min_count: 0,
+          max_count: 1,
+          destination: :hand,
+          reveal: true,
+          shuffle_after: true
+        }
+      }
+    ]
+  }
+
+  @bug_catching_set %CardDefinition{
+    id: "TWM-143",
+    kind: :trainer,
+    trainer_type: :item,
+    play_window: :action_window,
+    effects: [
+      %Effect{
+        key: :search_top_7_for_grass_pokemon_or_basic_grass_energy,
+        type: :search_top_deck,
+        params: %{
+          look_count: 7,
+          filter: %{
+            any: [
+              %{kind: :pokemon, type: :grass},
+              %{kind: :energy, energy_type: :basic, provides: :grass}
+            ]
+          },
+          min_count: 0,
+          max_count: 2,
+          destination: :hand,
+          reveal: true,
+          shuffle_after: true
+        }
+      }
+    ]
+  }
+
   @ultra_ball %CardDefinition{
     id: "MEG-131",
     kind: :trainer,
@@ -251,6 +300,7 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
 
   @cards %{
     @boss_orders.id => @boss_orders,
+    @bug_catching_set.id => @bug_catching_set,
     @buddy_buddy_poffin.id => @buddy_buddy_poffin,
     @crispin.id => @crispin,
     @dawn.id => @dawn,
@@ -261,6 +311,7 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     @lillies_determination.id => @lillies_determination,
     @night_stretcher.id => @night_stretcher,
     @poke_pad.id => @poke_pad,
+    @pokegear_3_0.id => @pokegear_3_0,
     @rare_candy.id => @rare_candy,
     @ultra_ball.id => @ultra_ball
   }

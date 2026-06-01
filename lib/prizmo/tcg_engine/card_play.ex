@@ -304,17 +304,35 @@ defmodule Prizmo.TcgEngine.CardPlay do
            validate_search_deck_effect(game.id, player.player_id, effect, target_ids),
          {:ok, moved_targets} <- move_search_targets(game, turn, player, effect, target_cards),
          {:ok, _event} <-
-           write_event_and_snapshot(game.id, :cards_moved, player.player_id, %{
-             reason: :effect_resolution,
-             source: EventPayloads.card_source(card),
-             effect_key: effect.key,
-             cards:
-               EventPayloads.moved_cards(
-                 moved_targets,
-                 :deck,
-                 search_effect_destination_zone(effect)
-               )
-           }),
+           write_event_and_snapshot(
+             game.id,
+             :cards_moved,
+             player.player_id,
+             search_cards_moved_payload(card, effect, moved_targets)
+           ),
+         {:ok, _event} <- maybe_shuffle_and_write_deck_shuffled(game, turn, player, card, effect) do
+      complete_play_card_resolution(game, turn, player, card, effect)
+    end
+  end
+
+  defp complete_play_card_effect(
+         game,
+         turn,
+         player,
+         card,
+         %{type: :search_top_deck} = effect,
+         target_ids
+       ) do
+    with {:ok, target_cards} <-
+           validate_search_top_deck_effect(game.id, player.player_id, effect, target_ids),
+         {:ok, moved_targets} <- move_search_targets(game, turn, player, effect, target_cards),
+         {:ok, _event} <-
+           write_event_and_snapshot(
+             game.id,
+             :cards_moved,
+             player.player_id,
+             search_cards_moved_payload(card, effect, moved_targets)
+           ),
          {:ok, _event} <- maybe_shuffle_and_write_deck_shuffled(game, turn, player, card, effect) do
       complete_play_card_resolution(game, turn, player, card, effect)
     end
@@ -656,6 +674,23 @@ defmodule Prizmo.TcgEngine.CardPlay do
     end
   end
 
+  defp validate_search_top_deck_effect(game_id, player_id, effect, target_ids) do
+    look_count = Map.fetch!(effect.params, :look_count)
+
+    with {:ok, target_ids} <-
+           EffectRunner.validate_choice_selection(
+             effect,
+             target_ids,
+             :wrong_search_top_deck_target_count
+           ),
+         {:ok, target_cards} <- CardStore.get_cards(game_id, target_ids),
+         :ok <- require_all_owned_in_zone(target_cards, player_id, :deck),
+         :ok <- require_all_in_top_deck(game_id, player_id, target_cards, look_count, effect.key),
+         :ok <- require_all_search_filters(target_cards, effect.params.filter) do
+      {:ok, target_cards}
+    end
+  end
+
   defp validate_crispin_effect(game_id, player_id, effect, target_ids) do
     with {:ok, target_ids} <- EffectRunner.validate_choice_selection(effect, target_ids),
          {:ok, target_cards} <- CardStore.get_cards(game_id, target_ids),
@@ -737,6 +772,13 @@ defmodule Prizmo.TcgEngine.CardPlay do
   defp effect_choice_ids(cards, player_id, %{type: :search_deck} = choice_step, _current_turn) do
     cards
     |> search_deck_choice_cards(player_id, choice_step)
+    |> Enum.map(& &1.id)
+    |> then(&{:ok, &1})
+  end
+
+  defp effect_choice_ids(cards, player_id, %{type: :search_top_deck} = choice_step, _current_turn) do
+    cards
+    |> search_top_deck_choice_cards(player_id, choice_step)
     |> Enum.map(& &1.id)
     |> then(&{:ok, &1})
   end
@@ -841,6 +883,7 @@ defmodule Prizmo.TcgEngine.CardPlay do
       type
       when type in [
              :search_deck,
+             :search_top_deck,
              :search_basic_energy_split_hand_attach,
              :switch_opponent_bench_to_active,
              :discard_opponent_special_energy,
@@ -906,6 +949,26 @@ defmodule Prizmo.TcgEngine.CardPlay do
     else
       []
     end
+  end
+
+  defp search_top_deck_choice_cards(cards, player_id, choice_step) do
+    choices =
+      cards
+      |> top_deck_cards(player_id, Map.fetch!(choice_step.params, :look_count))
+      |> Enum.filter(&matches_search_filter?(&1, choice_step.params.filter))
+
+    if required_search_groups_available?(choices, Map.get(choice_step.params, :required_groups)) do
+      choices
+    else
+      []
+    end
+  end
+
+  defp top_deck_cards(cards, player_id, look_count) do
+    cards
+    |> Enum.filter(&(&1.owner_player_id == player_id and &1.zone == :deck))
+    |> Enum.sort_by(&{&1.position, &1.instance_id})
+    |> Enum.take(look_count)
   end
 
   defp opponent_bench_choice_cards(cards, player_id) do
@@ -1047,6 +1110,20 @@ defmodule Prizmo.TcgEngine.CardPlay do
     |> collect_ok_results()
   end
 
+  defp require_all_in_top_deck(_game_id, _player_id, [], _look_count, _effect_key), do: :ok
+
+  defp require_all_in_top_deck(game_id, player_id, target_cards, look_count, effect_key) do
+    with {:ok, deck_cards} <- CardStore.cards_in_zone(game_id, player_id, :deck) do
+      top_card_ids = deck_cards |> Enum.take(look_count) |> MapSet.new(& &1.id)
+
+      if Enum.all?(target_cards, &MapSet.member?(top_card_ids, &1.id)) do
+        :ok
+      else
+        {:error, {:target_not_in_top_deck, effect_key, look_count}}
+      end
+    end
+  end
+
   defp require_search_filter(%CardInstance{} = card, %{kind: :pokemon, stage: :basic, max_hp: 70}) do
     require_poffin_targets([card])
   end
@@ -1089,8 +1166,72 @@ defmodule Prizmo.TcgEngine.CardPlay do
     require_non_rule_box_pokemon_card(card.card_id)
   end
 
+  defp require_search_filter(%CardInstance{} = card, %{kind: :pokemon, type: type}) do
+    case CardCatalog.fetch(card.card_id) do
+      {:ok, %{supertype: :pokemon, types: types}} when is_list(types) ->
+        if type in types do
+          :ok
+        else
+          {:error, {:wrong_pokemon_type, card.card_id, types, type}}
+        end
+
+      {:ok, %{supertype: :pokemon, type: ^type}} ->
+        :ok
+
+      {:ok, %{supertype: :pokemon, type: actual_type}} ->
+        {:error, {:wrong_pokemon_type, card.card_id, actual_type, type}}
+
+      {:ok, metadata} ->
+        {:error, {:not_pokemon, metadata.id}}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
   defp require_search_filter(%CardInstance{} = card, %{kind: :pokemon}) do
     require_pokemon_card(card.card_id)
+  end
+
+  defp require_search_filter(%CardInstance{} = card, %{
+         kind: :energy,
+         energy_type: :basic,
+         provides: provides
+       }) do
+    case CardCatalog.fetch(card.card_id) do
+      {:ok, %{supertype: :energy, energy_type: :basic, provides: energy_provides}}
+      when is_list(energy_provides) ->
+        if provides in energy_provides do
+          :ok
+        else
+          {:error, {:wrong_energy_provider, card.card_id, energy_provides, provides}}
+        end
+
+      {:ok, %{supertype: :energy, energy_type: energy_type}} ->
+        {:error, {:wrong_energy_type, card.card_id, energy_type, :basic}}
+
+      {:ok, metadata} ->
+        {:error, {:not_energy, metadata.id}}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  defp require_search_filter(%CardInstance{} = card, %{kind: :trainer, trainer_type: trainer_type}) do
+    case CardCatalog.fetch(card.card_id) do
+      {:ok, %{supertype: :trainer, trainer_type: ^trainer_type}} ->
+        :ok
+
+      {:ok, %{supertype: :trainer, trainer_type: actual_type}} ->
+        {:error, {:wrong_trainer_type, card.card_id, actual_type, trainer_type}}
+
+      {:ok, metadata} ->
+        {:error, {:not_trainer, metadata.id}}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
   end
 
   defp require_search_filter(%CardInstance{} = card, %{kind: :energy}) do
@@ -1398,6 +1539,32 @@ defmodule Prizmo.TcgEngine.CardPlay do
       to_position: card.position
     }
   end
+
+  defp search_cards_moved_payload(card, effect, moved_targets) do
+    moved_cards =
+      EventPayloads.moved_cards(moved_targets, :deck, search_effect_destination_zone(effect))
+
+    maybe_put_reveal_payload(
+      %{
+        reason: :effect_resolution,
+        source: EventPayloads.card_source(card),
+        effect_key: effect.key,
+        cards: moved_cards
+      },
+      card,
+      effect,
+      moved_cards
+    )
+  end
+
+  defp maybe_put_reveal_payload(payload, card, %{params: %{reveal: true}}, moved_cards) do
+    payload
+    |> Map.put(:public_reveal, true)
+    |> Map.put(:source_card_id, card.card_id)
+    |> Map.put(:revealed_cards, moved_cards)
+  end
+
+  defp maybe_put_reveal_payload(payload, _card, _effect, _moved_cards), do: payload
 
   defp moved_card_payload(card, from_zone, to_zone, opts \\ []) do
     Map.merge(

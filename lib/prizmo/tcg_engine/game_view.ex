@@ -380,13 +380,39 @@ defmodule Prizmo.TcgEngine.GameView do
     }
   end
 
+  defp public_event_details(%GameEvent{type: "cards_moved", payload: payload}) do
+    if payload_value(payload, "public_reveal") == true do
+      revealed_cards = public_revealed_cards(payload, "revealed_cards")
+      card_name = payload_card_name(payload, "source_card_id", "Card effect")
+
+      %{
+        public_note: revealed_cards_note(card_name, length(revealed_cards)),
+        public_card_count: length(revealed_cards),
+        public_revealed_cards: revealed_cards
+      }
+    else
+      default_public_event_details()
+    end
+  end
+
   defp public_event_details(%GameEvent{}) do
+    default_public_event_details()
+  end
+
+  defp default_public_event_details do
     %{
       public_note: nil,
       public_card_count: 0,
       public_revealed_cards: []
     }
   end
+
+  defp revealed_cards_note(card_name, 0), do: "#{card_name} revealed no cards."
+
+  defp revealed_cards_note(card_name, 1), do: "#{card_name} revealed 1 card."
+
+  defp revealed_cards_note(card_name, card_count),
+    do: "#{card_name} revealed #{card_count} cards."
 
   defp opening_hand_mulligan_note(card_count, nil) do
     "Revealed a #{card_count}-card opening hand with no Basic Pokémon and took a mulligan."
@@ -459,8 +485,11 @@ defmodule Prizmo.TcgEngine.GameView do
   defp payload_atom_key("card_id"), do: :card_id
   defp payload_atom_key("energy_card_id"), do: :energy_card_id
   defp payload_atom_key("mulligan_number"), do: :mulligan_number
+  defp payload_atom_key("public_reveal"), do: :public_reveal
+  defp payload_atom_key("revealed_cards"), do: :revealed_cards
   defp payload_atom_key("returned_card_count"), do: :returned_card_count
   defp payload_atom_key("returned_cards"), do: :returned_cards
+  defp payload_atom_key("source_card_id"), do: :source_card_id
   defp payload_atom_key(_key), do: nil
 
   defp parse_integer(value) do

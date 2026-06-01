@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-06-01] iteration 210 | Top-N Item searches
+- Task attempted: advanced arbitrary-deck Item/search playability by moving Pokégear 3.0 (`SVI-186`) and Bug Catching Set (`TWM-143`) onto the generic Ash engine `play_card` path with top-seven deck choice validation, optional zero-card resolution, seeded search shuffles, and viewer-safe public reveal notes.
+- Files changed: updated `lib/prizmo/tcg_engine/cards/registry.ex`, `lib/prizmo/tcg_engine/effect_runner.ex`, `lib/prizmo/tcg_engine/card_play.ex`, `lib/prizmo/tcg_engine/game_view.ex`, `lib/prizmo_web/spa/features/home/routes/index.tsx`, the canonical north-star article, this log, and the TCG engine playtest handoff.
+- Validation: `mix format`, `mix compile --warnings-as-errors`, rollback Tidewave validation, `mix test test/prizmo/tcg_engine/mechanics_test.exs`, `node_modules/.bin/tsc --noEmit --ignoreDeprecations 6.0`, `git diff --check`, and final `mix check` passed. Rollback validation confirmed Pokégear resolving a top-seven Supporter to hand, Bug Catching Set prompting over top-seven Grass choices and moving selected Grass Pokémon/Basic Grass Energy to hand, zero-hit Pokégear accepting an empty optional prompt, deck shuffles after each path, public reveal notes/thumbnails for selected cards, and no durable scratch game persistence.
+- Remaining/blocking notes: this covers Pokégear and Bug Catching Set top-seven search behavior on the Ash path. It does not implement broader Tool/Stadium cards, partial one-Energy Crispin semantics, every top-N/search category, or the benchmarked card-table density/polish batch.
+
 ## [2026-06-01] iteration 209 | Rare Candy generic evolution
 - Task attempted: advanced arbitrary-deck Item/evolution playability by moving Rare Candy (`MEG-125`) onto the generic Ash engine `play_card` path as a bounded Basic-to-Stage-2 evolution shortcut with prompt support.
 - Files changed: updated `lib/prizmo/tcg_engine/card_catalog.ex`, `lib/prizmo/tcg_engine/card_metadata_requirements.ex`, `lib/prizmo/tcg_engine/card_play.ex`, `lib/prizmo/tcg_engine/cards/registry.ex`, `lib/prizmo/tcg_engine/effect_runner.ex`, `lib/prizmo/tcg_engine/game_view/action_affordances.ex`, `lib/prizmo_web/spa/features/home/routes/index.tsx`, the canonical north-star article, this log, and the TCG engine playtest handoff.

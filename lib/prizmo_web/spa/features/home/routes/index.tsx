@@ -3835,9 +3835,31 @@ function PromptChoiceCard({
           </button>
         </div>
       ) : (
-        <p className="mt-3 rounded-lg border border-dashed border-emerald-200 px-3 py-3 text-sm text-emerald-900">
-          This prompt did not include selectable card choices.
-        </p>
+        <div className="mt-3 space-y-2">
+          <p className="rounded-lg border border-dashed border-emerald-200 px-3 py-3 text-sm text-emerald-900">
+            {min === 0
+              ? 'No selectable cards matched this optional prompt. Submit with no selection to finish the card effect.'
+              : 'This prompt did not include selectable card choices.'}
+          </p>
+
+          {min === 0 ? (
+            <button
+              className="w-full rounded-xl bg-emerald-700 px-3 py-2 text-sm font-semibold text-stone-50 transition hover:bg-emerald-800 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:bg-stone-300 disabled:text-stone-600"
+              disabled={!canSubmit}
+              onClick={() =>
+                onChoosePrompt({
+                  playerId: prompt.playerId,
+                  promptId: prompt.id,
+                  selectedCardInstanceIds,
+                  choiceKey
+                })
+              }
+              type="button"
+            >
+              {promptSubmitLabel(choiceKey, selectedCardInstanceIds.length, max, isPending)}
+            </button>
+          ) : null}
+        </div>
       )}
 
       <details className="mt-3 rounded-lg border border-emerald-200 bg-stone-50 px-3 py-2 text-xs text-stone-600">
@@ -8499,6 +8521,10 @@ function promptSubmitLabel(choiceKey: string, selectedCount: number, max: number
       return `Add staged Pokémon ${selectedCount}/${max}`
     case 'search_deck_for_evolution_pokemon_and_energy':
       return `Add Evolution + Energy ${selectedCount}/${max}`
+    case 'search_top_7_for_supporter_to_hand':
+      return `Add Supporter or reveal none ${selectedCount}/${max}`
+    case 'search_top_7_for_grass_pokemon_or_basic_grass_energy':
+      return `Add revealed Grass cards ${selectedCount}/${max}`
     case 'rare_candy_evolve_basic_to_stage_2':
       return `Resolve Rare Candy evolution ${selectedCount}/${max}`
     case 'search_basic_energy_split_hand_attach_to_pokemon':
@@ -8556,6 +8582,20 @@ function promptGuidanceMessages(
     return [
       'Choose one Stage 2 Pokémon from hand and one compatible Basic Pokémon in play. The engine enforces first-turn and this-turn evolution restrictions.',
       `This prompt accepts ${promptChoiceInstruction(min, max)} from ${legalChoiceCount} legal Stage 2 or Basic choices.`
+    ]
+  }
+
+  if (choiceKey === 'search_top_7_for_supporter_to_hand') {
+    return [
+      'Pokégear 3.0 only exposes Supporter cards found in the top 7 cards of your deck. You may submit no selection.',
+      `This prompt accepts ${promptChoiceInstruction(min, max)} from ${legalChoiceCount} legal Supporter choices, then shuffles.`
+    ]
+  }
+
+  if (choiceKey === 'search_top_7_for_grass_pokemon_or_basic_grass_energy') {
+    return [
+      'Bug Catching Set only exposes Grass Pokémon and Basic Grass Energy found in the top 7 cards of your deck. You may submit no selection.',
+      `This prompt accepts ${promptChoiceInstruction(min, max)} from ${legalChoiceCount} legal Grass choices, then shuffles.`
     ]
   }
 
