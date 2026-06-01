@@ -4,7 +4,10 @@ defmodule Prizmo.TcgEngine.ToolEffects do
   alias Prizmo.TcgEngine.CardCatalog
   alias Prizmo.TcgEngine.CardInstance
 
-  @supported_tool_effect_types [:retreat_cost_reduction]
+  @supported_tool_effect_types [
+    :retreat_cost_reduction,
+    :bonus_attack_damage_to_pokemon_ex_if_attacker_has_no_rule_box
+  ]
 
   def supported_tool?(%{supertype: :trainer, trainer_type: :tool, effect: %{type: type}})
       when type in @supported_tool_effect_types, do: true

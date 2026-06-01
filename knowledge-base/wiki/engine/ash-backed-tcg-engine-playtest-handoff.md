@@ -1,6 +1,6 @@
 # Ash-backed TCG Engine Playtest Handoff
 
-- Updated: 2026-06-01 (batch 227)
+- Updated: 2026-06-01 (batch 228)
 - Sources: Project codebase; local validation; wiki log
 - Raw: N/A — operational handoff
 
@@ -12,12 +12,14 @@
 - UI batches must benchmark Pokémon TCG and at least one other TCG layout before substantial layout changes, then record what Prizmo adopts or rejects in the wiki/log for the batch. Batch 219 completed this benchmark; Prizmo adopted overlapping card backs for opponent hand, card back zone visuals for deck/prizes, top-card discard preview, and stadium card art. Prizmo deferred Hearthstone-style board interactivity/fanning and PTCGL-style exact zone replication.
 - Keep raw payloads, IDs, debug counters, and tutorial copy out of the normal play path. The product target is a serious, dense card table for players who already know Pokémon TCG.
 
-## Iteration 227 handoff
+## Iteration 228 handoff
 
-- Current state: delivered the first product-surface UI batch since iteration 225's event history polish. Large-hand density/fanning is now implemented in the React SPA playtest board. No durable game command was executed against long-lived playtest game `f6df7025-7d0f-4d9b-9bc2-31c864de1d4e`, open-deck validation game `302a39ed-d15b-4fcb-8a13-80eb2eed71be`, or mulligan validation game `762faa63-a747-430a-ab00-b4ce3b59158a`. Last commit at iteration end: (after this batch).
-- Completed: viewer hand rendering now adapts to the current hand count with four density tiers. Normal (≤6 cards) preserves the existing 2-column grid. Compact (7-10 cards) uses 3 columns with larger max-h. Dense (11-15 cards) uses 4 columns with minimal gap and compact card tiles (`CardArt variant="compact"`, `p-0.5`). Overflow (16+ cards) uses flex-wrap with 4.5rem card width and horizontal overlap (`-mr-2.5`). `HandCardTile` accepts a `compact` boolean prop. No engine or backend changes were needed.
-- Validation: `mix compile --warnings-as-errors`, `node_modules/.bin/tsc --noEmit`, `mix test test/prizmo/tcg_engine/mechanics_test.exs` (12/0), and full `mix check` (all 12 gates) pass.
-- Recommended next atomic task: if the next batch stays on the product surface, card-attached on-board action affordances and board-feel animation are the strongest remaining UI-density candidates. If the next batch returns to engine behavior, the strongest remaining bounded fixture-card gaps are Handheld Fan (`TWM-150`, complex triggered Energy-movement Tool effect in Alakazam), Risky Ruins (`MEG-127`, Stadium in Dragapult), or Brave Bangle (`WHT-080`, Tool +30 damage against Pokémon ex in Festival Lead). The large-hand density/fanning candidate is now closed.
+- Current state: turned Brave Bangle (`WHT-080`) from pending Tool text into executable Ash-engine damage logic. Brave Bangle is now an engine-defined Tool that adds +30 damage when a non-rule-box attacker with the Tool attacks a Pokémon ex. No durable game command was executed against long-lived playtest game `f6df7025-7d0f-4d9b-9bc2-31c864de1d4e`, open-deck validation game `302a39ed-d15b-4fcb-8a13-80eb2eed71be`, or mulligan validation game `762faa63-a747-430a-ab00-b4ce3b59158a`. A scratch validation game was created, queried, and deleted with SQL verification. Last commit at iteration end: (after this batch).
+- Completed: `AttackDamage.damage_for/4` now chains `apply_brave_bangle_bonus/3` after normal attack effect resolution. The bonus applies when three conditions are met: (1) attacker has no Rule Box (`rule_box?` from catalog metadata is false), (2) defender is a Pokémon ex (via the existing `pokemon_ex?/1` predicate checking `suffix: "ex"` or name ending with `" ex"`), and (3) attacker has a `WHT-080` Brave Bangle card attached. `ToolEffects` now recognizes `:bonus_attack_damage_to_pokemon_ex_if_attacker_has_no_rule_box` as a supported tool effect type, so `GameView` reports Brave Bangle as `Engine-defined Tool` instead of `Generic Tool` with pending text. No change was needed in `AttackEffects` because Brave Bangle is a tool effect, not an attack effect — the damage modifier applies to any qualifying attack, regardless of the attack's own effect type.
+- Validation: `mix compile --warnings-as-errors`, `node_modules/.bin/tsc --noEmit`, `mix test` (142/0), and SQL cleanup of the scratch validation game. Catalog queries confirmed `ToolEffects.supported_tool_card?("WHT-080")` returns true, Brave Bangle's effect overlay is recognized, the `rule_box?` field works correctly for non-rule-box (Dreepy, Abra) and rule-box (Dragapult ex) Pokémon, and the `pokemon_ex?` predicate identifies Dragapult ex (TWM-130) correctly.
+- Recommended next atomic task: if the next batch stays on engine behavior, the strongest remaining bounded fixture-card gaps are Handheld Fan (`TWM-150`, complex triggered Energy-movement Tool effect in Alakazam) or Risky Ruins (`MEG-127`, Stadium in Dragapult). If the next batch returns to the product surface, card-attached on-board action affordances and board-feel animation remain the strongest UI-density candidates. Brave Bangle (`WHT-080`) is now closed.
+
+## Iteration 227 handoff
 
 ## Iteration 226 handoff
 

@@ -21,8 +21,10 @@ defmodule Prizmo.TcgEngine.AttackDamage do
         opts \\ %{}
       )
       when is_map(attack) and is_map(opts) do
-    with {:ok, damage} <- base_damage(attack) do
-      apply_effect(damage, attacker_card, defender_card, Map.get(attack, :effect), opts)
+    with {:ok, damage} <- base_damage(attack),
+         {:ok, damage} <-
+           apply_effect(damage, attacker_card, defender_card, Map.get(attack, :effect), opts) do
+      apply_brave_bangle_bonus(damage, attacker_card, defender_card)
     end
   end
 
@@ -315,6 +317,33 @@ defmodule Prizmo.TcgEngine.AttackDamage do
 
   defp apply_effect(_damage, _attacker_card, _defender_card, effect) do
     {:error, {:unsupported_attack_effect, AttackEffects.type(effect)}}
+  end
+
+  defp apply_brave_bangle_bonus(
+         damage,
+         %CardInstance{} = attacker_card,
+         %CardInstance{} = defender_card
+       ) do
+    with {:ok, attacker_metadata} <- CardCatalog.fetch(attacker_card.card_id),
+         {:ok, defender_metadata} <- CardCatalog.fetch(defender_card.card_id),
+         {:ok, attached_cards} <-
+           CardStore.attached_cards(attacker_card.game_id, attacker_card.id) do
+      if brave_bangle_active?(attacker_metadata, defender_metadata, attached_cards) do
+        {:ok, damage + 30}
+      else
+        {:ok, damage}
+      end
+    end
+  end
+
+  defp brave_bangle_active?(attacker_metadata, defender_metadata, attached_cards) do
+    not Map.get(attacker_metadata, :rule_box?, false) and
+      pokemon_ex?(defender_metadata) and
+      has_brave_bangle?(attached_cards)
+  end
+
+  defp has_brave_bangle?(attached_cards) do
+    Enum.any?(attached_cards, &(&1.card_id == "WHT-080"))
   end
 
   defp pokemon_ex?(%{supertype: :pokemon, suffix: "ex"}), do: true
