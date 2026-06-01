@@ -10,7 +10,7 @@ defmodule Prizmo.TcgEngine.CardPlay do
     ]
 
   import Prizmo.TcgEngine.EventLog, only: [write_event_and_snapshot: 4]
-  import Prizmo.TcgEngine.Operation, only: [create: 3]
+  import Prizmo.TcgEngine.Operation, only: [create: 3, update: 3]
 
   import Prizmo.TcgEngine.Requirements,
     only: [
@@ -259,7 +259,14 @@ defmodule Prizmo.TcgEngine.CardPlay do
     end
   end
 
-  defp complete_play_card_effect(game, turn, player, card, effect, target_ids) do
+  defp complete_play_card_effect(
+         game,
+         turn,
+         player,
+         card,
+         %{type: :search_deck} = effect,
+         target_ids
+       ) do
     with {:ok, target_cards} <-
            validate_search_deck_effect(game.id, player.player_id, effect, target_ids),
          {:ok, moved_targets} <- move_search_targets(game, turn, player, effect, target_cards),
@@ -275,8 +282,47 @@ defmodule Prizmo.TcgEngine.CardPlay do
                  search_effect_destination_zone(effect)
                )
            }),
-         {:ok, _event} <- maybe_write_deck_shuffled(game.id, player.player_id, card, effect),
+         {:ok, _event} <- maybe_write_deck_shuffled(game.id, player.player_id, card, effect) do
+      complete_play_card_resolution(game, turn, player, card, effect)
+    end
+  end
+
+  defp complete_play_card_effect(
+         game,
+         turn,
+         player,
+         card,
+         %{type: :switch_opponent_bench_to_active} = effect,
+         target_ids
+       ) do
+    with {:ok, [target_bench_card]} <-
+           validate_opponent_bench_switch_effect(game.id, player.player_id, effect, target_ids),
+         {:ok, opponent_active_card} <- opponent_active_card(game.id, player.player_id),
+         bench_position = target_bench_card.position,
+         {:ok, moved_active_card} <-
+           update(opponent_active_card, :move_active_to_bench, %{
+             position: bench_position,
+             status: nil
+           }),
+         {:ok, moved_target_card} <-
+           update(target_bench_card, :promote_to_active, %{position: 1, status: nil}),
          {:ok, _event} <-
+           write_event_and_snapshot(game.id, :cards_moved, player.player_id, %{
+             reason: :effect_resolution,
+             source: EventPayloads.card_source(card),
+             effect_key: effect.key,
+             cards: opponent_switch_payload(moved_active_card, moved_target_card)
+           }) do
+      complete_play_card_resolution(game, turn, player, card, effect)
+    end
+  end
+
+  defp complete_play_card_effect(_game, _turn, _player, _card, effect, _target_ids) do
+    {:error, {:unsupported_card_effect, effect.type}}
+  end
+
+  defp complete_play_card_resolution(game, turn, player, card, effect) do
+    with {:ok, _event} <-
            write_event_and_snapshot(game.id, :effect_completed, player.player_id, %{
              turn_id: turn.id,
              source: EventPayloads.card_source(card),
@@ -374,6 +420,15 @@ defmodule Prizmo.TcgEngine.CardPlay do
     end
   end
 
+  defp validate_opponent_bench_switch_effect(game_id, player_id, effect, target_ids) do
+    with {:ok, target_ids} <- EffectRunner.validate_choice_selection(effect, target_ids),
+         {:ok, target_cards} <- CardStore.get_cards(game_id, target_ids),
+         :ok <- require_all_opponent_cards(target_cards, player_id),
+         :ok <- require_all_in_zone(target_cards, :bench) do
+      {:ok, target_cards}
+    end
+  end
+
   defp move_search_targets(game, _turn, player, %{params: %{destination: :hand}}, target_cards) do
     target_cards
     |> Enum.map(&CardStore.move_deck_card_to_hand(game.id, player.player_id, &1))
@@ -391,6 +446,24 @@ defmodule Prizmo.TcgEngine.CardPlay do
   defp search_effect_destination_zone(%{params: %{destination: :bench}}), do: :bench
   defp search_effect_destination_zone(%{params: %{destination: :hand}}), do: :hand
 
+  defp effect_choice_ids(cards, player_id, %{type: :search_deck} = choice_step) do
+    cards
+    |> search_deck_choice_cards(player_id, choice_step)
+    |> Enum.map(& &1.id)
+    |> then(&{:ok, &1})
+  end
+
+  defp effect_choice_ids(cards, player_id, %{type: :switch_opponent_bench_to_active}) do
+    cards
+    |> opponent_bench_choice_cards(player_id)
+    |> Enum.map(& &1.id)
+    |> then(&{:ok, &1})
+  end
+
+  defp effect_choice_ids(_cards, _player_id, choice_step) do
+    {:error, {:unsupported_choice_step, choice_step.key, choice_step.type}}
+  end
+
   defp legal_choice_ids(game_id, player_id, action_card_id, definition, choice_key) do
     cond do
       Enum.any?(definition.costs, &(&1.key == choice_key)) ->
@@ -400,10 +473,7 @@ defmodule Prizmo.TcgEngine.CardPlay do
 
       Enum.any?(definition.effects, &(&1.key == choice_key)) ->
         with {:ok, cards} <- CardStore.list_cards(game_id) do
-          cards
-          |> search_deck_choice_cards(player_id, effect_step(definition, choice_key))
-          |> Enum.map(& &1.id)
-          |> then(&{:ok, &1})
+          effect_choice_ids(cards, player_id, effect_step(definition, choice_key))
         end
 
       true ->
@@ -420,11 +490,8 @@ defmodule Prizmo.TcgEngine.CardPlay do
         |> Enum.map(& &1.id)
         |> then(&{:ok, &1})
 
-      :search_deck ->
-        cards
-        |> search_deck_choice_cards(player_id, choice_step)
-        |> Enum.map(& &1.id)
-        |> then(&{:ok, &1})
+      type when type in [:search_deck, :switch_opponent_bench_to_active] ->
+        effect_choice_ids(cards, player_id, choice_step)
 
       _other ->
         {:error, {:unsupported_choice_step, choice_step.key, choice_step.type}}
@@ -473,6 +540,12 @@ defmodule Prizmo.TcgEngine.CardPlay do
     |> Enum.filter(&(&1.owner_player_id == player_id and &1.zone == :deck))
     |> Enum.filter(&matches_search_filter?(&1, choice_step.params.filter))
     |> maybe_hide_when_bench_full(cards, player_id, choice_step)
+  end
+
+  defp opponent_bench_choice_cards(cards, player_id) do
+    cards
+    |> Enum.filter(&(&1.owner_player_id != player_id and &1.zone == :bench))
+    |> Enum.sort_by(&{&1.owner_player_id, &1.position, &1.instance_id})
   end
 
   defp maybe_hide_when_bench_full(choices, cards, player_id, %{params: %{destination: :bench}}) do
@@ -528,6 +601,34 @@ defmodule Prizmo.TcgEngine.CardPlay do
 
   defp maybe_write_deck_shuffled(_game_id, _player_id, _card, _effect), do: {:ok, nil}
 
+  defp opponent_active_card(game_id, player_id) do
+    with {:ok, cards} <- CardStore.list_cards(game_id) do
+      case Enum.filter(cards, &(&1.owner_player_id != player_id and &1.zone == :active)) do
+        [active_card] -> {:ok, active_card}
+        [] -> {:error, :missing_opponent_active_pokemon}
+        _multiple -> {:error, :ambiguous_opponent_active_pokemon}
+      end
+    end
+  end
+
+  defp opponent_switch_payload(active_card, bench_card) do
+    [
+      switched_card_payload(active_card, :active, :bench),
+      switched_card_payload(bench_card, :bench, :active)
+    ]
+  end
+
+  defp switched_card_payload(card, from_zone, to_zone) do
+    %{
+      instance_id: card.id,
+      card_id: card.card_id,
+      owner_player_id: card.owner_player_id,
+      from_zone: from_zone,
+      to_zone: to_zone,
+      to_position: card.position
+    }
+  end
+
   defp require_all_owned_in_zone(cards, player_id, zone) do
     cards
     |> Enum.map(fn card ->
@@ -537,6 +638,24 @@ defmodule Prizmo.TcgEngine.CardPlay do
     end)
     |> collect_ok_results()
   end
+
+  defp require_all_in_zone(cards, zone) do
+    cards
+    |> Enum.map(&require_card_zone(&1, zone))
+    |> collect_ok_results()
+  end
+
+  defp require_all_opponent_cards(cards, player_id) do
+    cards
+    |> Enum.map(&require_opponent_card(&1, player_id))
+    |> collect_ok_results()
+  end
+
+  defp require_opponent_card(%CardInstance{owner_player_id: player_id}, player_id) do
+    {:error, :target_not_opponent_card}
+  end
+
+  defp require_opponent_card(%CardInstance{}, _player_id), do: :ok
 
   defp collect_ok_results(results) do
     Enum.reduce_while(results, :ok, fn

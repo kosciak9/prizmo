@@ -14,12 +14,16 @@ defmodule Prizmo.TcgEngine.EffectRunner do
   def selected_choice(choices, effect), do: ChoiceValidator.fetch_choice(choices, effect.key)
 
   def validate_search_deck_selection(effect, target_ids) do
+    validate_choice_selection(effect, target_ids, :wrong_search_deck_target_count)
+  end
+
+  def validate_choice_selection(effect, target_ids, error_tag \\ :wrong_effect_target_count) do
     with :ok <-
            require_count_range(
              target_ids,
              min_count(effect),
              max_count(effect),
-             :wrong_search_deck_target_count
+             error_tag
            ),
          :ok <- require_unique_ids(target_ids) do
       {:ok, target_ids}

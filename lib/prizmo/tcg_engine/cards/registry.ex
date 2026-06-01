@@ -5,6 +5,20 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
   alias Prizmo.TcgEngine.Cards.Cost
   alias Prizmo.TcgEngine.Cards.Effect
 
+  @boss_orders %CardDefinition{
+    id: "MEG-114",
+    kind: :trainer,
+    trainer_type: :supporter,
+    play_window: :action_window,
+    effects: [
+      %Effect{
+        key: :switch_opponent_bench_to_active,
+        type: :switch_opponent_bench_to_active,
+        params: %{count: 1}
+      }
+    ]
+  }
+
   @ultra_ball %CardDefinition{
     id: "MEG-131",
     kind: :trainer,
@@ -74,6 +88,7 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
   }
 
   @cards %{
+    @boss_orders.id => @boss_orders,
     @buddy_buddy_poffin.id => @buddy_buddy_poffin,
     @poke_pad.id => @poke_pad,
     @ultra_ball.id => @ultra_ball

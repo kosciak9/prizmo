@@ -102,7 +102,7 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
 
   defp available_action_window_affordances(%GamePlayer{} = player, current_turn, cards, all_cards) do
     [
-      play_card_affordance(player, cards),
+      play_card_affordance(player, cards, all_cards),
       play_basic_to_bench_affordance(player, cards),
       attach_energy_affordance(player, cards),
       retreat_affordance(player, current_turn, cards)
@@ -115,11 +115,11 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
       ]
   end
 
-  defp play_card_affordance(%GamePlayer{} = player, cards) do
+  defp play_card_affordance(%GamePlayer{} = player, cards, all_cards) do
     source_ids =
       cards
       |> hand_cards()
-      |> Enum.filter(&engine_playable_card?(&1, cards))
+      |> Enum.filter(&engine_playable_card?(&1, all_cards))
       |> card_ids()
 
     if Enum.empty?(source_ids) do

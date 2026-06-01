@@ -500,10 +500,34 @@ defmodule Prizmo.TcgEngine.GameView do
        ), do: []
 
   defp legal_choice_cards(
+         %Prompt{
+           payload: %{"choice_key" => "switch_opponent_bench_to_active"} = payload,
+           player_id: player_id
+         },
+         cards,
+         attached_cards_by_target
+       ) do
+    payload
+    |> prompt_choice_card_instances(cards)
+    |> Enum.filter(&(&1.owner_player_id != player_id and &1.zone == :bench))
+    |> Enum.map(&card_view(&1, attached_cards_by_target))
+  end
+
+  defp legal_choice_cards(
          %Prompt{payload: payload, player_id: player_id},
          cards,
          attached_cards_by_target
        ) do
+    payload
+    |> prompt_choice_card_instances(cards)
+    |> Enum.filter(fn
+      %CardInstance{owner_player_id: ^player_id} -> true
+      _other -> false
+    end)
+    |> Enum.map(&card_view(&1, attached_cards_by_target))
+  end
+
+  defp prompt_choice_card_instances(payload, cards) do
     cards_by_id = Map.new(cards, &{&1.id, &1})
 
     payload
@@ -513,11 +537,7 @@ defmodule Prizmo.TcgEngine.GameView do
       _other -> []
     end
     |> Enum.map(&Map.get(cards_by_id, &1))
-    |> Enum.filter(fn
-      %CardInstance{owner_player_id: ^player_id} -> true
-      _other -> false
-    end)
-    |> Enum.map(&card_view(&1, attached_cards_by_target))
+    |> Enum.reject(&is_nil/1)
   end
 
   defp catalog_card(card_id) do

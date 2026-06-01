@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-06-01] iteration 201 | Boss's Orders generic switching
+- Task attempted: advanced arbitrary-deck Trainer safety by moving Boss's Orders (`MEG-114`) onto the generic `play_card` path as an engine-defined Supporter that prompts for one opponent Bench Pokémon and switches it Active.
+- Files changed: updated `lib/prizmo/tcg_engine/cards/registry.ex`, `lib/prizmo/tcg_engine/card_play.ex`, `lib/prizmo/tcg_engine/effect_runner.ex`, `lib/prizmo/tcg_engine/game_view.ex`, `lib/prizmo/tcg_engine/game_view/action_affordances.ex`, `lib/prizmo_web/spa/features/home/routes/index.tsx`, the canonical north-star article, this log, and the TCG engine playtest handoff.
+- Validation: `mix format`, `mix compile --warnings-as-errors`, rollback Tidewave validation, `mix test test/prizmo/tcg_engine/mechanics_test.exs`, `node_modules/.bin/tsc --noEmit --ignoreDeprecations 6.0`, and final `mix check` passed. Rollback validation confirmed Boss appears as a generic Play affordance instead of pending Trainer text, creates a `switch_opponent_bench_to_active` prompt, exposes the public opponent Bench target as a prompt card, discards Boss, marks Supporter used, switches opponent Active/Bench cards, completes the pending effect, and writes the expected domain-event suffix without `deck_shuffled`.
+- Remaining/blocking notes: this covers the printed Boss's Orders gust effect through the generic prompt model, not broader Supporter draw/shuffle effects, Items such as Rare Candy/Hammers, or the benchmarked card-table density/polish batch.
+
 ## [2026-06-01] iteration 200 | Generic search Trainers
 - Task attempted: advanced arbitrary-deck Trainer safety by moving high-frequency no-cost search Items onto the generic `play_card` path: Buddy-Buddy Poffin benches up to two Basic Pokémon with 70 HP or less, and Poké Pad searches a non-rule-box Pokémon into hand.
 - Files changed: updated `lib/prizmo/tcg_engine/cards/registry.ex`, `lib/prizmo/tcg_engine/card_play.ex`, `lib/prizmo/tcg_engine/choice_validator.ex`, `lib/prizmo/tcg_engine/effect_runner.ex`, `lib/prizmo_web/spa/features/home/routes/index.tsx`, the canonical north-star article, this log, and the TCG engine playtest handoff.
