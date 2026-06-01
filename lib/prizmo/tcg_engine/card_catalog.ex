@@ -18,6 +18,18 @@ defmodule Prizmo.TcgEngine.CardCatalog do
     "Water" => :water
   }
 
+  @energy_symbol_types %{
+    "C" => :colorless,
+    "D" => :darkness,
+    "F" => :fighting,
+    "G" => :grass,
+    "L" => :lightning,
+    "M" => :metal,
+    "P" => :psychic,
+    "R" => :fire,
+    "W" => :water
+  }
+
   @behavior_modules [
     Prizmo.Tcg.Cards.Behaviors.ASC,
     Prizmo.Tcg.Cards.Behaviors.DRI,
@@ -230,8 +242,14 @@ defmodule Prizmo.TcgEngine.CardCatalog do
 
   defp inferred_provides(%{supertype: :energy, energy_type: :special, raw_effect: raw_effect})
        when is_binary(raw_effect) do
-    if raw_effect |> String.downcase() |> String.contains?("provides {c} energy") do
-      [:colorless]
+    ~r/\bit provides \{([A-Z])\} Energy\b/i
+    |> Regex.scan(raw_effect, capture: :all_but_first)
+    |> Enum.map(fn [symbol] -> Map.get(@energy_symbol_types, String.upcase(symbol)) end)
+    |> Enum.reject(&is_nil/1)
+    |> Enum.uniq()
+    |> case do
+      [] -> nil
+      provides -> provides
     end
   end
 

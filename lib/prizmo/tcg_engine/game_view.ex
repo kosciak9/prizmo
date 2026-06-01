@@ -810,7 +810,7 @@ defmodule Prizmo.TcgEngine.GameView do
 
   defp unsupported_energy_reason(%{provides: provides})
        when is_list(provides) and provides != [] do
-    "This Special Energy can provide Energy for generic attack costs, but remaining printed effects are not executable yet."
+    "This Special Energy can provide its printed Energy for attack costs, but remaining printed effects are not executable yet."
   end
 
   defp unsupported_energy_reason(_card) do

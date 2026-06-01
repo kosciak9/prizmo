@@ -566,7 +566,7 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
 
   defp special_energy_pending_note(%{provides: provides})
        when is_list(provides) and provides != [] do
-    "This Special Energy can provide Energy for generic attack costs, but remaining printed effects are still pending."
+    "This Special Energy can provide its printed Energy for attack costs, but remaining printed effects are still pending."
   end
 
   defp special_energy_pending_note(_card) do

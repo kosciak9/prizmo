@@ -31,6 +31,13 @@ defmodule Prizmo.TcgEngine.EnergyEffects do
         %{type: :team_rocket_energy_attachment_and_dual_provides} ->
           require_team_rocket_energy_target(energy_card, target_card)
 
+        %{type: effect_type}
+        when effect_type in [
+               :grass_pokemon_hp_plus_20_energy,
+               :bench_basic_psychic_from_deck_when_attached_to_psychic
+             ] ->
+          {:ok, nil}
+
         %{type: :draw_cards_on_attach_from_hand, count: count}
         when is_integer(count) and count > 0 ->
           draw_cards_on_attach(game, player, energy_card, target_card, count)

@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-06-01] iteration 199 | Typed Special Energy providers
+- Task attempted: advanced arbitrary-deck Special Energy safety by inferring typed provider text for Growing Grass Energy and Telepathic Psychic Energy while keeping their unresolved HP/search text explicit as pending card behavior.
+- Files changed: updated `lib/prizmo/tcg_engine/card_catalog.ex`, `lib/prizmo/tcg_engine/energy_effects.ex`, `lib/prizmo/tcg_engine/game_view.ex`, `lib/prizmo/tcg_engine/game_view/action_affordances.ex`, the canonical north-star article, this log, and the TCG engine playtest handoff.
+- Validation: `mix format`, `mix compile --warnings-as-errors`, rollback Tidewave validation, `mix test test/prizmo/tcg_engine/mechanics_test.exs`, and final `mix check` passed. Rollback validation confirmed `POR-086` provides `[:grass]`, `POR-088` provides `[:psychic]`, both pay their typed and Colorless costs through `AttackCosts.paid?/2`, both attach through the generic command without rollback, and both remain visible as pending Special Energy text in the viewer read model/action rail.
+- Remaining/blocking notes: this is provider-only support for those cards. Growing Grass Energy's +20 HP effect and Telepathic Psychic Energy's deck-search/Bench effect are still intentionally pending. Broader Trainer/Special Energy behavior and the benchmarked card-table UI density/polish remain future north-star work.
+
 ## [2026-06-01] iteration 198 | Mist and Team Rocket Energy support
 - Task attempted: advanced arbitrary-deck Special Energy correctness by matching Mist Energy and Team Rocket's Energy behavior overlays to the Ash-backed attach/effect path instead of leaving them as pending or rollback-prone special text.
 - Files changed: updated `lib/prizmo/tcg_engine/energy_effects.ex`, `lib/prizmo/tcg_engine/attack_prevention.ex`, `lib/prizmo/tcg_engine/attack_effects.ex`, `lib/prizmo/tcg_engine/game_view.ex`, `lib/prizmo/tcg_engine/game_view/action_affordances.ex`, the canonical north-star article, this log, and the TCG engine playtest handoff.
