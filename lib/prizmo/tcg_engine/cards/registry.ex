@@ -301,6 +301,24 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     ]
   }
 
+  @unfair_stamp %CardDefinition{
+    id: "TWM-165",
+    kind: :trainer,
+    trainer_type: :item,
+    play_window: :action_window,
+    effects: [
+      %Effect{
+        key: :shuffle_each_player_hand_into_deck_then_draw,
+        type: :shuffle_each_player_hand_into_deck_then_draw,
+        params: %{
+          player_draw_count: 5,
+          opponent_draw_count: 2,
+          requires_own_pokemon_knocked_out_last_turn: true
+        }
+      }
+    ]
+  }
+
   @lanas_aid %CardDefinition{
     id: "TWM-155",
     kind: :trainer,
@@ -517,6 +535,7 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     @rare_candy.id => @rare_candy,
     @sacred_ash.id => @sacred_ash,
     @secret_box.id => @secret_box,
+    @unfair_stamp.id => @unfair_stamp,
     @team_rockets_archer.id => @team_rockets_archer,
     @team_rockets_ariana.id => @team_rockets_ariana,
     @team_rockets_giovanni.id => @team_rockets_giovanni,

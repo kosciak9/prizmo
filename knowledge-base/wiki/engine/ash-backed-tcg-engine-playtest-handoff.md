@@ -1,6 +1,6 @@
 # Ash-backed TCG Engine Playtest Handoff
 
-- Updated: 2026-06-01 (batch 225)
+- Updated: 2026-06-01 (batch 226)
 - Sources: Project codebase; local validation; wiki log
 - Raw: N/A — operational handoff
 
@@ -11,6 +11,13 @@
 - Highest-value feasible batches to prefer when available: open-deck game creation and catalog-backed deck validation; engine-owned persisted RNG for shuffle, opening hands, prizes, and draws; safe setup for arbitrary loaded decks with explicit unsupported-card behavior; TCG layout benchmark notes followed by card-front/card-back board improvements; compact experienced-player action and prompt surfaces; then broader generic mechanics and card behavior. If another fixture-backed mechanic slice is the highest-value feasible step, do it and record how it protects correctness or advances the north star.
 - UI batches must benchmark Pokémon TCG and at least one other TCG layout before substantial layout changes, then record what Prizmo adopts or rejects in the wiki/log for the batch. Batch 219 completed this benchmark; Prizmo adopted overlapping card backs for opponent hand, card back zone visuals for deck/prizes, top-card discard preview, and stadium card art. Prizmo deferred Hearthstone-style board interactivity/fanning and PTCGL-style exact zone replication.
 - Keep raw payloads, IDs, debug counters, and tutorial copy out of the normal play path. The product target is a serious, dense card table for players who already know Pokémon TCG.
+
+## Iteration 226 handoff
+
+- Current state: moved Unfair Stamp (`TWM-165`) onto the Ash engine `play_card` path as a no-choice ACE SPEC both-player shuffle/draw effect. Requires the current player's own Pokémon to have been Knocked Out during the opponent's last turn. No durable game command was executed against long-lived playtest game `f6df7025-7d0f-4d9b-9bc2-31c864de1d4e`, open-deck validation game `302a39ed-d15b-4fcb-8a13-80eb2eed71be`, or mulligan validation game `762faa63-a747-430a-ab00-b4ce3b59158a`. Last commit at iteration end: (after this batch).
+- Completed: Unfair Stamp now has an engine card definition using the generic `play_card` path. Its effect composes existing patterns: `shuffle_each_player_hand_into_deck_then_draw` with `player_draw_count: 5` / `opponent_draw_count: 2` (asymmetric draw from Archer), ACE SPEC marking from catalog metadata (via existing `require_ace_spec_available` and `maybe_mark_ace_spec_played`), and a new generic `requires_own_pokemon_knocked_out_last_turn` gate that checks for any own Pokémon KO from the previous turn (not just Team Rocket). The existing `previous_turn/2`, `require_previous_turn_was_opponents_turn/2`, and `knockout_prize_events_for_turn/2` functions were reused; `any_knockout_for_player?/2` was added for the generic KO check. `GameView` now treats Unfair Stamp as `engine_defined` with no pending Trainer text.
+- Validation: `mix compile --warnings-as-errors`, `node_modules/.bin/tsc --noEmit`, `mix test test/prizmo/tcg_engine/mechanics_test.exs` (12/0), and full `mix check` (all 12 gates) pass.
+- Recommended next atomic task: if the next batch stays on engine behavior, the strongest remaining bounded fixture-card gaps are Handheld Fan (`TWM-150`, complex triggered Energy-movement Tool effect in Alakazam), Risky Ruins (`MEG-127`, Stadium in Dragapult), or Brave Bangle (`WHT-080`, Tool +30 damage against Pokémon ex in Festival Lead). If the next batch returns to the product surface, large-hand density/fanning remains the strongest remaining UI-density candidate — the benchmark requirement is already satisfied from batch 219 and the event history has been polished. The previous handoff's mention of "Earthen Vessel (`POR-086`)" was inaccurate — POR-086 is Growing Grass Energy (an already-provider-supported Special Energy), not a search Item; future handoffs should verify card IDs against the catalog before repeating that reference.
 
 ## Iteration 225 handoff
 

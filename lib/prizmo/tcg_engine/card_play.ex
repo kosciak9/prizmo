@@ -938,7 +938,16 @@ defmodule Prizmo.TcgEngine.CardPlay do
         require_draw_until_hand_size_effect(game.id, player.player_id, effect)
 
       {:ok, %{type: :shuffle_each_player_hand_into_deck_then_draw} = effect} ->
-        require_previous_turn_team_rocket_knockout(game.id, turn, player.player_id, effect)
+        case effect.params do
+          %{requires_own_pokemon_knocked_out_last_turn: true} ->
+            require_previous_turn_own_knockout(game.id, turn, player.player_id, effect)
+
+          %{requires_team_rocket_knockout_last_turn: true} ->
+            require_previous_turn_team_rocket_knockout(game.id, turn, player.player_id, effect)
+
+          _other ->
+            :ok
+        end
 
       {:ok, _effect} ->
         :ok
@@ -985,6 +994,35 @@ defmodule Prizmo.TcgEngine.CardPlay do
   end
 
   defp require_previous_turn_team_rocket_knockout(_game_id, _turn, _player_id, _effect), do: :ok
+
+  defp require_previous_turn_own_knockout(game_id, %Turn{} = turn, player_id, %{
+         params: %{requires_own_pokemon_knocked_out_last_turn: true}
+       }) do
+    with {:ok, previous_turn} <- previous_turn(game_id, turn.turn_number),
+         :ok <- require_previous_turn_was_opponents_turn(previous_turn, player_id),
+         {:ok, previous_turn_knockout_events} <-
+           knockout_prize_events_for_turn(game_id, previous_turn.id) do
+      if Enum.any?(
+           previous_turn_knockout_events,
+           &any_knockout_for_player?(&1, player_id)
+         ) do
+        :ok
+      else
+        {:error, :unfair_stamp_requires_own_pokemon_ko_during_opponents_last_turn}
+      end
+    end
+  end
+
+  defp require_previous_turn_own_knockout(_game_id, _turn, _player_id, _effect), do: :ok
+
+  defp any_knockout_for_player?(%GameEvent{payload: payload}, player_id) do
+    payload
+    |> Map.get("knockouts", [])
+    |> Enum.any?(fn
+      %{"knocked_out_player_id" => ^player_id} -> true
+      _other -> false
+    end)
+  end
 
   defp previous_turn(_game_id, turn_number) when turn_number <= 1,
     do: {:error, :team_rockets_archer_requires_team_rocket_ko_during_opponents_last_turn}

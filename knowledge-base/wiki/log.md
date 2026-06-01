@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-06-01] iteration 226 | Unfair Stamp ACE SPEC shuffle/draw
+- Task attempted: moved Unfair Stamp (`TWM-165`) onto the generic Ash engine `play_card` path as a no-choice ACE SPEC both-player shuffle/draw effect that requires a previous-turn own-Pokémon KO.
+- Files changed: updated `lib/prizmo/tcg_engine/cards/registry.ex` (added `@unfair_stamp` CardDefinition with `shuffle_each_player_hand_into_deck_then_draw` effect, `player_draw_count: 5`, `opponent_draw_count: 2`, `requires_own_pokemon_knocked_out_last_turn: true`), `lib/prizmo/tcg_engine/card_play.ex` (added `require_previous_turn_own_knockout/4` and `any_knockout_for_player?/2` for the generic own-Pokémon KO gate, updated `require_effect_available/4` dispatch), and all three wiki files.
+- Validation: `mix compile --warnings-as-errors`, `node_modules/.bin/tsc --noEmit`, `mix test test/prizmo/tcg_engine/mechanics_test.exs` (12/0), and full `mix check` (all 12 gates) pass.
+- Remaining/blocking notes: Unfair Stamp now composes existing patterns: both-player shuffle from Judge/Archer, asymmetric draw counts from Archer (5 self / 2 opponent), ACE SPEC marking from Secret Box, and the new generic own-Pokémon KO gate. No prompt/React surface changes were needed — the effect is no-choice. If the next batch stays on engine behavior, the strongest remaining bounded fixture-card gaps are Handheld Fan (`TWM-150`, complex triggered Energy-movement Tool effect in Alakazam), Risky Ruins (`MEG-127`, Stadium in Dragapult), or Brave Bangle (`WHT-080`, Tool in Festival Lead). If the next batch returns to the product surface, large-hand density/fanning remains the strongest remaining UI-density candidate.
+
 ## [2026-06-01] iteration 225 | Event history polish and Factory documentation
 - Task attempted: two-pronged batch. (1) Documented the pre-existing Factory (`DRI-173`) Stadium implementation that was committed without wiki updates. (2) Delivered event-history visual polish — the first product-surface UI batch since iteration 219.
 - Wiki update: added canonical north-star paragraph, handoff section, and log entry for Team Rocket's Factory, which draws 2 cards once per turn after playing a Team Rocket Supporter, with legality gates derived from persisted `card_play_completed` events.
