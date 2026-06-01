@@ -23,8 +23,10 @@ defmodule Prizmo.TcgEngine.AttackDamage do
       when is_map(attack) and is_map(opts) do
     with {:ok, damage} <- base_damage(attack),
          {:ok, damage} <-
-           apply_effect(damage, attacker_card, defender_card, Map.get(attack, :effect), opts) do
-      apply_brave_bangle_bonus(damage, attacker_card, defender_card)
+           apply_effect(damage, attacker_card, defender_card, Map.get(attack, :effect), opts),
+         {:ok, damage} <-
+           apply_brave_bangle_bonus(damage, attacker_card, defender_card) do
+      apply_black_belts_training_bonus(damage, attacker_card, defender_card)
     end
   end
 
@@ -317,6 +319,45 @@ defmodule Prizmo.TcgEngine.AttackDamage do
 
   defp apply_effect(_damage, _attacker_card, _defender_card, effect) do
     {:error, {:unsupported_attack_effect, AttackEffects.type(effect)}}
+  end
+
+  defp apply_black_belts_training_bonus(
+         damage,
+         %CardInstance{} = attacker_card,
+         %CardInstance{} = defender_card
+       ) do
+    with {:ok, defender_metadata} <- CardCatalog.fetch(defender_card.card_id) do
+      if pokemon_ex?(defender_metadata) and
+           black_belts_training_played_this_turn?(attacker_card) do
+        {:ok, damage + 40}
+      else
+        {:ok, damage}
+      end
+    end
+  end
+
+  defp black_belts_training_played_this_turn?(%CardInstance{
+         game_id: game_id,
+         owner_player_id: player_id
+       }) do
+    with {:ok, turn} <- TurnStore.current_turn(game_id) do
+      events =
+        GameEvent
+        |> Ash.Query.filter(
+          game_id == ^game_id and player_id == ^player_id and type == "card_play_completed" and
+            turn_id == ^turn.id
+        )
+        |> Ash.Query.sort(index: :asc)
+        |> Ash.read()
+
+      case events do
+        {:ok, events} ->
+          {:ok, Enum.any?(events, &(&1.payload["card_id"] == "JTG-143"))}
+
+        {:error, reason} ->
+          {:error, reason}
+      end
+    end
   end
 
   defp apply_brave_bangle_bonus(

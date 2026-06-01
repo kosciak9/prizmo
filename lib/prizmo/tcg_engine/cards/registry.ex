@@ -494,6 +494,20 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     ]
   }
 
+  @black_belts_training %CardDefinition{
+    id: "JTG-143",
+    kind: :trainer,
+    trainer_type: :supporter,
+    play_window: :action_window,
+    effects: [
+      %Effect{
+        key: :turn_bonus_attack_damage_to_opponent_active_pokemon_ex,
+        type: :turn_bonus_attack_damage_to_opponent_active_pokemon_ex,
+        params: %{bonus_damage: 40}
+      }
+    ]
+  }
+
   @team_rockets_proton %CardDefinition{
     id: "DRI-177",
     kind: :trainer,
@@ -538,6 +552,7 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     @unfair_stamp.id => @unfair_stamp,
     @team_rockets_archer.id => @team_rockets_archer,
     @team_rockets_ariana.id => @team_rockets_ariana,
+    @black_belts_training.id => @black_belts_training,
     @team_rockets_giovanni.id => @team_rockets_giovanni,
     @team_rockets_proton.id => @team_rockets_proton,
     @team_rockets_transceiver.id => @team_rockets_transceiver,
