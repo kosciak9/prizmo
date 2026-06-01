@@ -103,6 +103,12 @@ const BASE_CARD_SUMMARY_FIELDS = [
   'image',
   'category',
   'stage',
+  'rulesStatus',
+  'rulesLabel',
+  'rulesNote',
+  'executableAttackCount',
+  'unsupportedAttackCount',
+  'unsupportedAbilityCount',
   'ownerPlayerId',
   'zone',
   'position',
@@ -321,6 +327,12 @@ type CardSummary = {
   image: string | null
   category: string | null
   stage: string | null
+  rulesStatus: string
+  rulesLabel: string
+  rulesNote: string
+  executableAttackCount: number
+  unsupportedAttackCount: number
+  unsupportedAbilityCount: number
   ownerPlayerId: string
   zone: string
   position: number
@@ -5007,7 +5019,7 @@ function ActionWindowGuide({
         actionCountLabel(viewerPlayer?.handCount ?? 0, 'card')
       } in hand, and ${viewerPlayer?.bench.length ?? 0} on Bench.`
     : `${turnOwnerLabel} owns this action window. This tab is ${viewerLabel}; use the matching seat for commands.`
-  const handDetail = handGroup
+  const rawHandDetail = handGroup
     ? handActionGuideDetail(handGroup, basicBenchOptions, evolutionOptions, playCardOptions, handChoiceCount, {
         hasBattleActions: Boolean(battleGroup),
         hasTurnFlow: Boolean(turnGroup)
@@ -5017,6 +5029,8 @@ function ActionWindowGuide({
       : turnGroup
         ? 'No hand or board command is legal from this view. Only turn flow remains.'
         : 'No hand or board command is legal from this view. Finish the required choice before more actions appear.'
+  const handRulesDetail = handRulesSupportActionDetail(viewerPlayer)
+  const handDetail = handRulesDetail ? `${rawHandDetail} ${handRulesDetail}` : rawHandDetail
   const battleDetail = battleGroup
     ? turnGroup
       ? 'Battle decisions and Pass are both legal. Attack when the board is set, otherwise pass the turn.'
@@ -5218,6 +5232,21 @@ function handActionFollowUpPhrase({
   }
 
   return 'before the next engine decision'
+}
+
+function handRulesSupportActionDetail(player: PlayerView | null) {
+  const counts = rulesSupportCounts(player?.hand ?? [])
+
+  if (counts.total === 0) {
+    return null
+  }
+
+  const verb = counts.total === 1 ? 'shows' : 'show'
+
+  return `${actionCountLabel(
+    counts.total,
+    'hand card'
+  )} ${verb} partial or unsupported rules badges; if no card-attached action or Play button appears, that card text is pending.`
 }
 
 function formatPhraseList(phrases: string[]) {
@@ -6561,17 +6590,20 @@ function PrivateHandZone({
       </div>
 
       {isViewer ? (
-        player.hand.length > 0 ? (
-          <div className="grid max-h-80 grid-cols-2 gap-2 overflow-auto pr-1">
-            {player.hand.map(card => (
-              <HandCardTile card={card} intent={cardIntentsById.get(card.id)} key={card.id} />
-            ))}
-          </div>
-        ) : (
-          <p className="rounded-xl bg-secondary/45 px-3 py-4 text-center text-sm text-muted-foreground">
-            Empty.
-          </p>
-        )
+        <>
+          <HandRulesSupportNotice cards={player.hand} />
+          {player.hand.length > 0 ? (
+            <div className="grid max-h-80 grid-cols-2 gap-2 overflow-auto pr-1">
+              {player.hand.map(card => (
+                <HandCardTile card={card} intent={cardIntentsById.get(card.id)} key={card.id} />
+              ))}
+            </div>
+          ) : (
+            <p className="rounded-xl bg-secondary/45 px-3 py-4 text-center text-sm text-muted-foreground">
+              Empty.
+            </p>
+          )}
+        </>
       ) : (
         <div className="rounded-xl bg-muted/55 px-3 py-4 text-center text-sm text-muted-foreground">
           {player.handCount} hidden
@@ -6581,10 +6613,36 @@ function PrivateHandZone({
   )
 }
 
+function HandRulesSupportNotice({ cards }: { cards: CardSummary[] }) {
+  const counts = rulesSupportCounts(cards)
+
+  if (counts.total === 0) {
+    return null
+  }
+
+  const detail =
+    counts.unsupported > 0 && counts.partial > 0
+      ? `${counts.unsupported} unsupported and ${counts.partial} partial cards have visible badges.`
+      : counts.unsupported > 0
+        ? `${actionCountLabel(counts.unsupported, 'card')} ${counts.unsupported === 1 ? 'has' : 'have'} card text that is not executable yet.`
+        : `${actionCountLabel(counts.partial, 'card')} ${counts.partial === 1 ? 'has' : 'have'} only partial card-text support.`
+
+  return (
+    <div className="mb-2 rounded-xl border border-attention/25 bg-attention/10 px-3 py-2 text-xs leading-5 text-attention">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="font-semibold">Rules coverage</p>
+        <StatusBadge tone="warning">{counts.total} flagged</StatusBadge>
+      </div>
+      <p className="mt-1 text-attention/90">{detail} Legal generic actions still appear as card badges or action buttons.</p>
+    </div>
+  )
+}
+
 function HandCardTile({ card, intent }: { card: CardSummary; intent?: CardIntent }) {
   const content = (
     <>
       <CardArt card={card} variant="hand" />
+      <RulesSupportBadge card={card} compact />
       {intent ? <CardIntentBadge intent={intent} compact /> : null}
     </>
   )
@@ -7032,6 +7090,7 @@ function CardPill({
         {attachedCards.length > 0 ? (
           <p className="mt-1 text-[0.68rem] font-medium text-muted-foreground">{attachedCards.length} attached</p>
         ) : null}
+        <RulesSupportBadge card={card} compact />
         {intent ? <CardIntentBadge intent={intent} compact /> : null}
       </>
     )
@@ -7079,6 +7138,8 @@ function CardPill({
           </div>
         ) : null}
 
+        <RulesSupportCallout card={card} />
+
         {evolutionStackCards.length > 0 ? (
           <AttachedCardGroup cards={evolutionStackCards} title="Evolution" titleSuffix="evolved under" />
         ) : null}
@@ -7109,6 +7170,72 @@ function CardPill({
       {content}
     </div>
   )
+}
+
+function RulesSupportCallout({ card }: { card: CardSummary }) {
+  if (!rulesSupportNeedsNotice(card)) {
+    return null
+  }
+
+  const details = rulesSupportDetails(card)
+
+  return (
+    <div className="mt-3 rounded-lg border border-attention/25 bg-attention/10 px-2.5 py-2 text-xs leading-5 text-attention">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="font-semibold">{card.rulesLabel}</p>
+        <StatusBadge tone={rulesSupportTone(card)}>{formatEventType(card.rulesStatus)}</StatusBadge>
+      </div>
+      <p className="mt-1 text-attention/90">{card.rulesNote}</p>
+      {details.length > 0 ? (
+        <p className="mt-1 font-medium text-attention/90">{details.join(' · ')}</p>
+      ) : null}
+    </div>
+  )
+}
+
+function RulesSupportBadge({ card, compact = false }: { card: CardSummary; compact?: boolean }) {
+  if (!rulesSupportNeedsNotice(card)) {
+    return null
+  }
+
+  const className = compact
+    ? 'mt-1 inline-flex rounded-full bg-attention/12 px-2 py-0.5 text-[0.62rem] font-semibold uppercase tracking-[0.1em] text-attention'
+    : 'inline-flex rounded-full bg-attention/12 px-2 py-0.5 text-xs font-semibold text-attention'
+
+  return <span className={className}>{card.rulesLabel}</span>
+}
+
+function rulesSupportNeedsNotice(card: CardSummary) {
+  return ['partial', 'unsupported', 'unknown'].includes(card.rulesStatus)
+}
+
+function rulesSupportTone(card: CardSummary): 'active' | 'neutral' | 'warning' {
+  return card.rulesStatus === 'engine_defined' || card.rulesStatus === 'generic' ? 'active' : 'warning'
+}
+
+function rulesSupportCounts(cards: CardSummary[]) {
+  return cards.reduce(
+    (counts, card) => {
+      if (card.rulesStatus === 'unsupported' || card.rulesStatus === 'unknown') {
+        return { ...counts, total: counts.total + 1, unsupported: counts.unsupported + 1 }
+      }
+
+      if (card.rulesStatus === 'partial') {
+        return { ...counts, total: counts.total + 1, partial: counts.partial + 1 }
+      }
+
+      return counts
+    },
+    { partial: 0, total: 0, unsupported: 0 }
+  )
+}
+
+function rulesSupportDetails(card: CardSummary) {
+  return [
+    card.executableAttackCount > 0 ? `${card.executableAttackCount} executable attacks` : null,
+    card.unsupportedAttackCount > 0 ? `${card.unsupportedAttackCount} unsupported attacks` : null,
+    card.unsupportedAbilityCount > 0 ? `${card.unsupportedAbilityCount} unsupported abilities` : null
+  ].filter((detail): detail is string => Boolean(detail))
 }
 
 function CardIntentDetail({ intent }: { intent: CardIntent }) {

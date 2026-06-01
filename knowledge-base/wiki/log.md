@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-06-01] iteration 187 | Unsupported card visibility
+- Task attempted: made arbitrary loaded decks safer and clearer by surfacing per-card rules support and unsupported card text in the Ash-backed read model and React playtest board.
+- Files changed: updated `lib/prizmo/tcg_engine/game_view.ex`, `lib/prizmo/tcg_engine/game_view/fields.ex`, `lib/prizmo_web/spa/features/home/routes/index.tsx`, the canonical north-star article, this log, and the TCG engine playtest handoff.
+- Validation: `mix format`, `mix compile --warnings-as-errors`, `mix test test/prizmo/tcg_engine/mechanics_test.exs`, `mix ash_typescript.codegen`, `node_modules/.bin/tsc --noEmit --ignoreDeprecations 6.0`, and `mix ash_typescript.codegen --check` passed; a follow-up format/compile/TypeScript/codegen-check pass also passed after UI copy cleanup. Tidewave read-model eval on open-deck game `a0b7a99e-2fb7-4d40-bec4-cdd35b16f1c1` confirmed visible card rules statuses and support counts while preserving hidden opponent hand data. Browser smoke on the same game confirmed the `Rules coverage` hand notice and `Card text pending` badge/callout render with zero application console errors; only existing local Geist font decode warnings appeared.
+- Remaining/blocking notes: card-level unsupported visibility is now explicit, but named blocked/unsupported attack, ability, and Trainer affordances are still a follow-up. Other high-value next work remains decklist import ergonomics or a true two-independent-browser milestone pass.
+
 ## [2026-06-01] iteration 186 | Open-deck setup browser validation
 - Task attempted: validated the newly wired open-deck React SPA path through normal setup and first action-window recovery using catalog-ID decklists derived from committed fixtures and an explicit deterministic seed.
 - Files changed: updated the canonical north-star article, this log, and the TCG engine playtest handoff; no product source changed.

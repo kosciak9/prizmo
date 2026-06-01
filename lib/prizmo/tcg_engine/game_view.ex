@@ -4,6 +4,7 @@ defmodule Prizmo.TcgEngine.GameView do
   alias Prizmo.TcgEngine.AttackEffects
   alias Prizmo.TcgEngine.CardCatalog
   alias Prizmo.TcgEngine.CardInstance
+  alias Prizmo.TcgEngine.Cards.Registry, as: EngineCardRegistry
   alias Prizmo.TcgEngine.CardStore
   alias Prizmo.TcgEngine.Game
   alias Prizmo.TcgEngine.GameEvent
@@ -292,6 +293,7 @@ defmodule Prizmo.TcgEngine.GameView do
 
   defp card_summary(%CardInstance{} = card) do
     catalog = catalog_card(card.card_id)
+    rules_summary = rules_summary(card.card_id, catalog)
 
     %{
       id: card.id,
@@ -301,6 +303,12 @@ defmodule Prizmo.TcgEngine.GameView do
       image: Map.get(catalog, :image),
       category: stringify(Map.get(catalog, :category)),
       stage: stringify(Map.get(catalog, :stage)),
+      rules_status: rules_summary.status,
+      rules_label: rules_summary.label,
+      rules_note: rules_summary.note,
+      executable_attack_count: rules_summary.executable_attack_count,
+      unsupported_attack_count: rules_summary.unsupported_attack_count,
+      unsupported_ability_count: rules_summary.unsupported_ability_count,
       owner_player_id: card.owner_player_id,
       zone: stringify(card.zone),
       position: card.position,
@@ -375,6 +383,161 @@ defmodule Prizmo.TcgEngine.GameView do
       {:error, _reason} -> %{}
     end
   end
+
+  defp rules_summary(_card_id, %{id: nil}) do
+    rules_summary(
+      :unknown,
+      "Catalog missing",
+      "This card could not be resolved in the committed catalog."
+    )
+  end
+
+  defp rules_summary(card_id, %{supertype: :trainer} = card) do
+    case EngineCardRegistry.fetch(card_id) do
+      {:ok, %{play_window: :action_window}} ->
+        rules_summary(
+          :engine_defined,
+          "Engine-defined",
+          "This Trainer has authored engine behavior and appears as a Play action when costs and timing are legal."
+        )
+
+      {:ok, _definition} ->
+        rules_summary(
+          :partial,
+          "Timing pending",
+          "This Trainer has authored behavior, but its play window is not exposed in the current action surface."
+        )
+
+      {:error, _reason} ->
+        rules_summary(
+          :unsupported,
+          unsupported_trainer_label(card),
+          "Known catalog card; Trainer text has no executable engine behavior yet, so no Play button appears."
+        )
+    end
+  end
+
+  defp rules_summary(_card_id, %{supertype: :energy, energy_type: :basic}) do
+    rules_summary(
+      :generic,
+      "Generic Energy",
+      "Basic Energy can attach through the generic engine action."
+    )
+  end
+
+  defp rules_summary(_card_id, %{supertype: :energy}) do
+    rules_summary(
+      :partial,
+      "Special text pending",
+      "This Energy can attach through the generic engine action; special card text is not executable yet."
+    )
+  end
+
+  defp rules_summary(card_id, %{supertype: :pokemon} = card) do
+    %{executable: executable_attack_count, unsupported: unsupported_attack_count} =
+      attack_support_counts(card_id, card)
+
+    unsupported_ability_count = unsupported_ability_count(card)
+
+    cond do
+      unsupported_attack_count == 0 and unsupported_ability_count == 0 and
+          executable_attack_count > 0 ->
+        rules_summary(
+          :engine_defined,
+          "Executable attacks",
+          "This Pokémon has executable attacks for the current engine slice.",
+          executable_attack_count,
+          unsupported_attack_count,
+          unsupported_ability_count
+        )
+
+      executable_attack_count > 0 ->
+        rules_summary(
+          :partial,
+          "Partial attacks",
+          "Some attacks are executable; unsupported attacks or abilities are omitted from legal actions.",
+          executable_attack_count,
+          unsupported_attack_count,
+          unsupported_ability_count
+        )
+
+      unsupported_attack_count > 0 or unsupported_ability_count > 0 ->
+        rules_summary(
+          :unsupported,
+          "Card text pending",
+          "Generic board actions can still use this Pokémon, but attacks or abilities are not executable yet.",
+          executable_attack_count,
+          unsupported_attack_count,
+          unsupported_ability_count
+        )
+
+      true ->
+        rules_summary(
+          :generic,
+          "Generic Pokémon",
+          "Setup, Bench, evolution, retreat, attachments, and other generic board actions can use this Pokémon."
+        )
+    end
+  end
+
+  defp rules_summary(_card_id, _card) do
+    rules_summary(
+      :unknown,
+      "Catalog only",
+      "This card is known to the catalog, but the engine has no executable card-specific behavior for it yet."
+    )
+  end
+
+  defp rules_summary(status, label, note) do
+    rules_summary(status, label, note, 0, 0, 0)
+  end
+
+  defp rules_summary(
+         status,
+         label,
+         note,
+         executable_attack_count,
+         unsupported_attack_count,
+         unsupported_ability_count
+       ) do
+    %{
+      status: Atom.to_string(status),
+      label: label,
+      note: note,
+      executable_attack_count: executable_attack_count,
+      unsupported_attack_count: unsupported_attack_count,
+      unsupported_ability_count: unsupported_ability_count
+    }
+  end
+
+  defp unsupported_trainer_label(%{trainer_type: trainer_type})
+       when trainer_type not in [nil, :unknown] do
+    "Unsupported #{trainer_type |> Atom.to_string() |> String.capitalize()}"
+  end
+
+  defp unsupported_trainer_label(_card), do: "Unsupported Trainer"
+
+  defp attack_support_counts(card_id, %{attacks: attacks}) when is_map(attacks) do
+    Enum.reduce(attacks, %{executable: 0, unsupported: 0}, fn {attack_id, _attack}, counts ->
+      case CardCatalog.fetch_attack(card_id, attack_id) do
+        {:ok, _attack} -> Map.update!(counts, :executable, &(&1 + 1))
+        {:error, _reason} -> Map.update!(counts, :unsupported, &(&1 + 1))
+      end
+    end)
+  end
+
+  defp attack_support_counts(_card_id, _card), do: %{executable: 0, unsupported: 0}
+
+  defp unsupported_ability_count(%{abilities: abilities}) when is_map(abilities) do
+    Enum.count(abilities, fn {_ability_id, ability} ->
+      present_text?(Map.get(ability, :raw_effect)) and is_nil(Map.get(ability, :effect))
+    end)
+  end
+
+  defp unsupported_ability_count(_card), do: 0
+
+  defp present_text?(text) when is_binary(text), do: String.trim(text) != ""
+  defp present_text?(_text), do: false
 
   defp stringify(nil), do: nil
   defp stringify(value) when is_atom(value), do: Atom.to_string(value)
