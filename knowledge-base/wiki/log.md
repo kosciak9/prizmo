@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-06-01] iteration 186 | Open-deck setup browser validation
+- Task attempted: validated the newly wired open-deck React SPA path through normal setup and first action-window recovery using catalog-ID decklists derived from committed fixtures and an explicit deterministic seed.
+- Files changed: updated the canonical north-star article, this log, and the TCG engine playtest handoff; no product source changed.
+- Validation: Playwright created game `a0b7a99e-2fb7-4d40-bec4-cdd35b16f1c1` from two 60-card open decklists with seed `setup-validation-2026-06-01`, then drove coin toss, starting-player choice, opening Active choices, optional Player 2 setup Bench, both setup-ready clicks, auto prize placement, setup completion, first-turn draw, and first action window through the browser. A Player 1 reload and Player 2 second tab both recovered the in-progress board with 16 events. Tidewave SQL/read-model checks confirmed explicit RNG metadata, completed setup, Turn 1 `action_window`, expected event sequence, per-player zones/prizes, hidden Player 2 hand from Player 1, and no matching error logs; browser console had no application errors, only local font decode warnings.
+- Remaining/blocking notes: no code blocker was found. Next high-value work is unsupported-card behavior visibility for arbitrary loaded decks, decklist import ergonomics, or a later true two-independent-browser milestone pass.
+
 ## [2026-06-01] iteration 185 | SPA open-deck game creation
 - Task attempted: advanced the open-deck north-star path by wiring the React SPA create/reconnect rail to catalog-backed arbitrary decklist creation with client-side decklist parsing and optional deterministic seed support.
 - Files changed: updated `lib/prizmo_web/spa/features/home/routes/index.tsx`, the canonical north-star article, this log, and the TCG engine playtest handoff.
