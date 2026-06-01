@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-06-01] iteration 215 | Lana's Aid discard recovery
+- Task attempted: advanced arbitrary-deck Supporter playability by moving Lana's Aid (`TWM-155`) onto the generic Ash engine `play_card` path as a multi-card discard recovery effect for non-rule-box Pokémon and Basic Energy.
+- Files changed: updated `lib/prizmo/tcg_engine/cards/registry.ex`, `lib/prizmo/tcg_engine/card_play.ex`, `lib/prizmo_web/spa/features/home/routes/index.tsx`, the canonical north-star article, this log, and the TCG engine playtest handoff.
+- Validation: `mix format`, `mix compile --warnings-as-errors`, `node_modules/.bin/tsc --noEmit --ignoreDeprecations 6.0`, `mix test test/prizmo/tcg_engine/mechanics_test.exs`, `git diff --check`, rollback Tidewave validation, SQL rollback cleanup verification, and final `mix check` passed. Rollback validation confirmed prompt bounds `1..3`, legal-choice exclusion for invalid Trainer and rule-box Pokémon discard cards, three valid discard-to-hand recoveries in one effect payload, completed pending effect/card play, Supporter flagging, and engine-defined read-model status with no persisted scratch games.
+- Remaining/blocking notes: this covers Lana's Aid's normal one-to-three-card discard recovery for non-rule-box Pokémon and Basic Energy. Other pending Trainers such as Secret Box/Sacred Ash/Team Rocket's Transceiver, additional printed Tool/Stadium effects, and the benchmarked card-table density/polish batch remain open.
+
 ## [2026-06-01] iteration 214 | Festival Grounds Stadium behavior
 - Task attempted: advanced arbitrary-deck Stadium correctness by turning Festival Grounds (`TWM-149`) Special-Condition recovery/immunity text into executable Ash-engine behavior while keeping the generic Stadium action surface intact.
 - Files changed: added `lib/prizmo/tcg_engine/stadium_effects.ex`; updated `lib/prizmo/tcg_engine/mechanics.ex`, `lib/prizmo/tcg_engine/attack_effects.ex`, `lib/prizmo/tcg_engine/card_play.ex`, `lib/prizmo/tcg_engine/game_view.ex`, `lib/prizmo/tcg_engine/game_view/action_affordances.ex`, the canonical north-star article, this log, and the TCG engine playtest handoff.

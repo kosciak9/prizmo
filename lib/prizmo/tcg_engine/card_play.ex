@@ -387,16 +387,16 @@ defmodule Prizmo.TcgEngine.CardPlay do
          %{type: :recover_discard_to_hand} = effect,
          target_ids
        ) do
-    with {:ok, [target_card]} <-
+    with {:ok, target_cards} <-
            validate_recover_discard_to_hand_effect(game.id, player.player_id, effect, target_ids),
-         {:ok, moved_target} <-
-           CardStore.move_discard_card_to_hand(game.id, player.player_id, target_card),
+         {:ok, moved_targets} <-
+           move_discard_cards_to_hand(game.id, player.player_id, target_cards),
          {:ok, _event} <-
            write_event_and_snapshot(game.id, :cards_moved, player.player_id, %{
              reason: :effect_resolution,
              source: EventPayloads.card_source(card),
              effect_key: effect.key,
-             cards: EventPayloads.moved_cards([moved_target], :discard, :hand)
+             cards: EventPayloads.moved_cards(moved_targets, :discard, :hand)
            }) do
       complete_play_card_resolution(game, turn, player, card, effect)
     end
@@ -776,6 +776,12 @@ defmodule Prizmo.TcgEngine.CardPlay do
 
   defp move_search_targets(_game, _turn, _player, effect, _target_cards) do
     {:error, {:unsupported_search_deck_destination, Map.get(effect.params, :destination)}}
+  end
+
+  defp move_discard_cards_to_hand(game_id, player_id, target_cards) do
+    target_cards
+    |> Enum.map(&CardStore.move_discard_card_to_hand(game_id, player_id, &1))
+    |> collect_results()
   end
 
   defp search_effect_destination_zone(%{params: %{destination: :bench}}), do: :bench
@@ -1519,6 +1525,13 @@ defmodule Prizmo.TcgEngine.CardPlay do
     else
       {:error, {:no_matching_recover_discard_filter, card.card_id}}
     end
+  end
+
+  defp require_recover_discard_to_hand_filter(%CardInstance{} = card, %{
+         kind: :pokemon,
+         rule_box?: false
+       }) do
+    require_non_rule_box_pokemon_card(card.card_id)
   end
 
   defp require_recover_discard_to_hand_filter(%CardInstance{} = card, %{kind: :pokemon}) do

@@ -181,6 +181,30 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     ]
   }
 
+  @lanas_aid %CardDefinition{
+    id: "TWM-155",
+    kind: :trainer,
+    trainer_type: :supporter,
+    play_window: :action_window,
+    effects: [
+      %Effect{
+        key: :recover_non_rule_box_pokemon_or_basic_energy_from_discard,
+        type: :recover_discard_to_hand,
+        params: %{
+          filter: %{
+            any: [
+              %{kind: :pokemon, rule_box?: false},
+              %{kind: :energy, energy_type: :basic}
+            ]
+          },
+          min_count: 1,
+          max_count: 3,
+          destination: :hand
+        }
+      }
+    ]
+  }
+
   @pokegear_3_0 %CardDefinition{
     id: "SVI-186",
     kind: :trainer,
@@ -308,6 +332,7 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     @energy_switch.id => @energy_switch,
     @hilda.id => @hilda,
     @judge.id => @judge,
+    @lanas_aid.id => @lanas_aid,
     @lillies_determination.id => @lillies_determination,
     @night_stretcher.id => @night_stretcher,
     @poke_pad.id => @poke_pad,

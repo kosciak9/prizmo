@@ -8807,6 +8807,8 @@ function promptSubmitLabel(choiceKey: string, selectedCount: number, max: number
       return `Move selected Energy ${selectedCount}/${max}`
     case 'recover_pokemon_or_basic_energy_from_discard':
       return `Recover selected card ${selectedCount}/${max}`
+    case 'recover_non_rule_box_pokemon_or_basic_energy_from_discard':
+      return `Recover selected cards ${selectedCount}/${max}`
     case 'knockout_prize_cards':
       return `Take selected Prizes ${selectedCount}/${max}`
     default:
@@ -8868,6 +8870,13 @@ function promptGuidanceMessages(
     return [
       'Bug Catching Set only exposes Grass Pokémon and Basic Grass Energy found in the top 7 cards of your deck. You may submit no selection.',
       `This prompt accepts ${promptChoiceInstruction(min, max)} from ${legalChoiceCount} legal Grass choices, then shuffles.`
+    ]
+  }
+
+  if (choiceKey === 'recover_non_rule_box_pokemon_or_basic_energy_from_discard') {
+    return [
+      "Lana's Aid can recover up to 3 cards from discard in any mix of non-rule-box Pokémon and Basic Energy.",
+      `This prompt accepts ${promptChoiceInstruction(min, max)} from ${legalChoiceCount} legal discard choices.`
     ]
   }
 
