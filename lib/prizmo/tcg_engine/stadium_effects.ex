@@ -7,6 +7,7 @@ defmodule Prizmo.TcgEngine.StadiumEffects do
   alias Prizmo.TcgEngine.CardInstance
   alias Prizmo.TcgEngine.CardStore
   alias Prizmo.TcgEngine.GameEvent
+  alias Prizmo.TcgEngine.Turn
 
   require Ash.Query
 
@@ -18,6 +19,8 @@ defmodule Prizmo.TcgEngine.StadiumEffects do
   @risky_ruins_effect :damage_on_bench_for_basic_non_darkness
   @risky_ruins_card_id "MEG-127"
   @risky_ruins_damage 20
+  @forest_of_vitality_effect :same_turn_grass_evolution_exception
+  @forest_of_vitality_card_id "MEG-117"
 
   def supported_stadium?(%{
         supertype: :trainer,
@@ -38,6 +41,13 @@ defmodule Prizmo.TcgEngine.StadiumEffects do
         trainer_type: :stadium,
         effect: %{type: @risky_ruins_effect}
       }), do: true
+
+  def supported_stadium?(%{
+        supertype: :trainer,
+        trainer_type: :stadium,
+        effect: %{type: @forest_of_vitality_effect}
+      }),
+      do: true
 
   def supported_stadium?(_card), do: false
 
@@ -111,6 +121,73 @@ defmodule Prizmo.TcgEngine.StadiumEffects do
        when type != :darkness, do: true
 
   defp risky_ruins_target?(_catalog_card), do: false
+
+  @doc """
+  Waives the same-turn evolution restriction when Forest of Vitality is active
+  and the evolution card is a Grass-type Pokémon. Applies only when the target
+  card entered play this turn (turn_entered_play == turn_number) and it's not
+  the first turn of the game.
+
+  Returns `:ok` when:
+  - The target did NOT enter play this turn (normal case — no stadium needed), OR
+  - Forest of Vitality is the active Stadium AND the evolution card is Grass AND
+    it's not turn 1.
+
+  Returns `{:error, :target_entered_play_this_turn}` when the target entered play
+  this turn but Forest of Vitality does not apply.
+  """
+  def require_or_waive_same_turn_evolution(_game_id, _target_card, _evolution_card_id, %Turn{
+        turn_number: turn_number
+      })
+      when turn_number <= 1, do: {:error, :cannot_evolve_on_first_turn}
+
+  def require_or_waive_same_turn_evolution(
+        game_id,
+        %CardInstance{turn_entered_play: turn_entered_play} = _target_card,
+        evolution_card_id,
+        %Turn{turn_number: turn_number}
+      )
+      when is_binary(game_id) and is_binary(evolution_card_id) do
+    cond do
+      is_nil(turn_entered_play) ->
+        {:error, :target_play_turn_unknown}
+
+      turn_entered_play < turn_number ->
+        # Target entered play on a previous turn — normal evolution, no stadium needed
+        :ok
+
+      turn_entered_play == turn_number ->
+        # Target entered play this turn — check Forest of Vitality exception
+        with {:ok, stadiums} <- CardStore.cards_in_zone(game_id, :stadium),
+             true <-
+               Enum.any?(
+                 stadiums,
+                 &match?(%CardInstance{card_id: @forest_of_vitality_card_id}, &1)
+               ),
+             {:ok, catalog_card} <- CardCatalog.fetch(evolution_card_id),
+             true <- grass_type?(catalog_card) do
+          :ok
+        else
+          _other -> {:error, :target_entered_play_this_turn}
+        end
+
+      true ->
+        {:error, :target_play_turn_unknown}
+    end
+  end
+
+  def require_or_waive_same_turn_evolution(_game_id, _target_card, _evolution_card_id, _turn) do
+    {:error, :target_play_turn_unknown}
+  end
+
+  def forest_of_vitality_active?(game_id) when is_binary(game_id) do
+    with {:ok, stadiums} <- CardStore.cards_in_zone(game_id, :stadium) do
+      {:ok, Enum.any?(stadiums, &match?(%CardInstance{card_id: @forest_of_vitality_card_id}, &1))}
+    end
+  end
+
+  defp grass_type?(%{supertype: :pokemon, type: :grass}), do: true
+  defp grass_type?(_catalog_card), do: false
 
   def require_team_rockets_factory_available(game_id, turn_id, player_id)
       when is_binary(game_id) and is_binary(turn_id) and is_binary(player_id) do

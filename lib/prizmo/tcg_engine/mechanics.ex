@@ -1101,7 +1101,13 @@ defmodule Prizmo.TcgEngine.Mechanics do
            :ok <- require_card_owned_by_player(target_card, player_id),
            :ok <- require_card_zone(evolution_card, :hand),
            :ok <- require_in_play_pokemon_zone(target_card),
-           :ok <- require_can_evolve_target(target_card, turn.turn_number),
+           :ok <-
+             StadiumEffects.require_or_waive_same_turn_evolution(
+               game.id,
+               target_card,
+               evolution_card.card_id,
+               turn
+             ),
            :ok <- require_evolves_from(evolution_card.card_id, target_card.card_id),
            evolve_action = evolve_action_for_zone(target_card.zone),
            target_position = target_card.position,

@@ -120,7 +120,7 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
       attach_tool_affordance(player, cards),
       retreat_affordance(player, current_turn, cards)
     ] ++
-      evolve_from_hand_affordances(player, current_turn, cards) ++
+      evolve_from_hand_affordances(player, current_turn, cards, all_cards) ++
       declare_attack_affordances(player, current_turn, cards, all_cards) ++
       unsupported_card_text_affordances(player, current_turn, cards, all_cards) ++
       [
@@ -260,15 +260,23 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
   defp evolve_from_hand_affordances(
          %GamePlayer{} = player,
          %Turn{turn_number: turn_number},
-         cards
+         cards,
+         all_cards
        )
        when turn_number > 1 do
+    forest_of_vitality = forest_of_vitality_active?(all_cards)
     evolution_cards = cards |> hand_cards() |> Enum.filter(&evolution_pokemon?/1)
-    targets = Enum.filter(in_play_pokemon_cards(cards), &can_evolve_target?(&1, turn_number))
+
+    targets =
+      Enum.filter(
+        in_play_pokemon_cards(cards),
+        &can_evolve_target?(&1, turn_number, forest_of_vitality)
+      )
 
     for evolution_card <- evolution_cards,
         target_card <- targets,
-        evolves_from?(evolution_card, target_card) do
+        evolves_from?(evolution_card, target_card),
+        same_turn_grass_ok?(evolution_card, target_card, turn_number, forest_of_vitality) do
       affordance(:evolve_from_hand, "Evolve Pokémon", :command, player.player_id,
         source_card_instance_ids: [evolution_card.id],
         target_card_instance_ids: [target_card.id],
@@ -278,7 +286,7 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
     end
   end
 
-  defp evolve_from_hand_affordances(_player, _current_turn, _cards), do: []
+  defp evolve_from_hand_affordances(_player, _current_turn, _cards, _all_cards), do: []
 
   defp retreat_affordance(%GamePlayer{retreated_this_turn?: true}, _current_turn, _cards), do: nil
 
@@ -461,12 +469,48 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
     )
   end
 
-  defp can_evolve_target?(%CardInstance{turn_entered_play: turn_entered_play}, turn_number)
+  defp can_evolve_target?(
+         %CardInstance{turn_entered_play: turn_entered_play},
+         turn_number,
+         forest_of_vitality?
+       )
        when is_integer(turn_entered_play) do
-    turn_entered_play < turn_number
+    turn_entered_play < turn_number or
+      (forest_of_vitality? and turn_entered_play == turn_number)
   end
 
-  defp can_evolve_target?(_card, _turn_number), do: false
+  defp can_evolve_target?(_card, _turn_number, _forest_of_vitality?), do: false
+
+  defp forest_of_vitality_active?(cards) do
+    Enum.any?(cards, fn card ->
+      card.zone == :stadium and card.card_id == "MEG-117"
+    end)
+  end
+
+  defp grass_type_card?(card_id) do
+    case CardCatalog.fetch(card_id) do
+      {:ok, %{supertype: :pokemon, type: :grass}} -> true
+      _ -> false
+    end
+  end
+
+  defp same_turn_grass_ok?(evolution_card, target_card, turn_number, forest_of_vitality?) do
+    same_turn? = target_card.turn_entered_play == turn_number
+
+    cond do
+      not same_turn? ->
+        # Normal evolution from a previous-turn target — always allowed
+        true
+
+      forest_of_vitality? and grass_type_card?(evolution_card.card_id) ->
+        # Same-turn Grass evolution under Forest of Vitality
+        true
+
+      true ->
+        # Same-turn evolution without Forest of Vitality exception
+        false
+    end
+  end
 
   defp evolves_from?(%CardInstance{card_id: evolution_card_id}, %CardInstance{
          card_id: target_card_id

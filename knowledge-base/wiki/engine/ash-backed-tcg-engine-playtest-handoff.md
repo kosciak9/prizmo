@@ -1,6 +1,6 @@
 # Ash-backed TCG Engine Playtest Handoff
 
-- Updated: 2026-06-01 (batch 232)
+- Updated: 2026-06-01 (batch 233)
 - Sources: Project codebase; local validation; wiki log
 - Raw: N/A — operational handoff
 
@@ -11,6 +11,13 @@
 - Highest-value feasible batches to prefer when available: open-deck game creation and catalog-backed deck validation; engine-owned persisted RNG for shuffle, opening hands, prizes, and draws; safe setup for arbitrary loaded decks with explicit unsupported-card behavior; TCG layout benchmark notes followed by card-front/card-back board improvements; compact experienced-player action and prompt surfaces; then broader generic mechanics and card behavior. If another fixture-backed mechanic slice is the highest-value feasible step, do it and record how it protects correctness or advances the north star.
 - UI batches must benchmark Pokémon TCG and at least one other TCG layout before substantial layout changes, then record what Prizmo adopts or rejects in the wiki/log for the batch. Batch 219 completed this benchmark; Prizmo adopted overlapping card backs for opponent hand, card back zone visuals for deck/prizes, top-card discard preview, and stadium card art. Prizmo deferred Hearthstone-style board interactivity/fanning and PTCGL-style exact zone replication.
 - Keep raw payloads, IDs, debug counters, and tutorial copy out of the normal play path. The product target is a serious, dense card table for players who already know Pokémon TCG.
+
+## Iteration 233 handoff
+
+- Current state: moved Forest of Vitality (`MEG-117`) from pending Stadium text into executable Ash-engine behavior. Forest of Vitality was the strongest remaining bounded fixture-card gap from the Alakazam fixture deck, listed in the handoff since iteration 232. No durable game command was executed against any long-lived playtest or validation games. Last commit at iteration end: (after this batch).
+- Completed: `StadiumEffects` now recognizes the `:same_turn_grass_evolution_exception` effect type from MEG-117's authored behavior overlay. `StadiumEffects.require_or_waive_same_turn_evolution/4` is called from `Mechanics.evolve_from_hand/4` after the target card is validated and before the evolution action proceeds. It returns `:ok` when the target did not enter play this turn (normal case), or when Forest of Vitality is the active Stadium AND the evolution card is Grass type AND it is not turn 1. `StadiumEffects.forest_of_vitality_active?/1` checks card zone for MEG-117. `supported_stadium?` now returns true for the MEG-117 effect type, so `GameView` reports Forest of Vitality as `Engine-defined Stadium` — no separate GameView changes were needed. No CardDefinition was needed in the registry — Stadium cards are played through the existing generic `play_stadium` command. The affordance view (`ActionAffordances`) was updated: `evolve_from_hand_affordances` now accepts `all_cards` to detect Forest of Vitality activity, `can_evolve_target?/3` allows same-turn targets when the Stadium is active, and `same_turn_grass_ok?/4` guards the cross-product to ensure only Grass evolution cards are offered for same-turn evolve targets.
+- Validation: `mix compile --warnings-as-errors`, `node_modules/.bin/tsc --noEmit`, `mix test` (142/0), and full `mix check` (all 12 gates) pass cleanly. Catalog verification confirmed `supported_stadium_card?("MEG-117")` returns true and the catalog record includes `effect: %{type: :same_turn_grass_evolution_exception, except_first_turn?: true}`.
+- Recommended next atomic task: this closes the Forest of Vitality bounded fixture-card gap from the Alakazam deck. The Rare Candy same-turn evolution exception under Forest of Vitality remains future work. If the next batch stays on engine behavior, Black Belt's Training (`JTG-143`, Supporter damage boost in Festival Lead) or Kieran (`TWM-154`, choice Supporter in Festival Lead) are the strongest remaining bounded fixture-card gaps. If the next batch returns to the product surface, turn transition animations, card-slide-in for drawn cards, or damage counter animation remain open UI polish candidates. Catalog note: JTG-143 and TWM-154 should be verified against the committed catalog before implementation.
 
 ## Iteration 230 handoff
 
