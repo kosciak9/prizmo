@@ -585,6 +585,20 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
     :colorless in provides
   end
 
+  defp supported_special_energy?(%{
+         effect: %{type: :prevent_opponent_attack_effects_to_attached_pokemon},
+         provides: provides
+       })
+       when is_list(provides) do
+    :colorless in provides
+  end
+
+  defp supported_special_energy?(%{
+         effect: %{type: :team_rocket_energy_attachment_and_dual_provides},
+         name: "Team Rocket's Energy"
+       }),
+       do: true
+
   defp supported_special_energy?(_card), do: false
 
   defp unsupported_attack_note({:unsupported_attack_effect, _card_id, _attack_id, effect_type}) do

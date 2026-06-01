@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-06-01] iteration 198 | Mist and Team Rocket Energy support
+- Task attempted: advanced arbitrary-deck Special Energy correctness by matching Mist Energy and Team Rocket's Energy behavior overlays to the Ash-backed attach/effect path instead of leaving them as pending or rollback-prone special text.
+- Files changed: updated `lib/prizmo/tcg_engine/energy_effects.ex`, `lib/prizmo/tcg_engine/attack_prevention.ex`, `lib/prizmo/tcg_engine/attack_effects.ex`, `lib/prizmo/tcg_engine/game_view.ex`, `lib/prizmo/tcg_engine/game_view/action_affordances.ex`, the canonical north-star article, this log, and the TCG engine playtest handoff.
+- Validation: `mix format`, `mix compile --warnings-as-errors`, rollback Tidewave validations, `mix test test/prizmo/tcg_engine/mechanics_test.exs`, `git diff --check`, and final `mix check` passed. Rollback validation confirmed Mist Energy legal attach/read-model status, Team Rocket's Energy legal attach/read-model status, Team Rocket's Energy illegal non-Team-Rocket target rejection, and Mist Energy preventing Munkidori `Mind Bend` Confusion while preserving 60 attack damage and recording the `TEF-161` prevention payload.
+- Remaining/blocking notes: Mist Energy now covers Ash attack-effect prevention hooks such as status/retreat/energy-discard effect paths and damage-counter-style effect damage, while normal attack damage is intentionally not prevented. Broader Special Energy effects, additional Trainer effects, richer card behavior, and the benchmarked card-table UI density/polish remain future north-star work.
+
 ## [2026-06-01] iteration 197 | Enriching Energy attach draw
 - Task attempted: advanced arbitrary-deck card-behavior support by turning Enriching Energy's Special Energy text from a pending notice into an executable attach-from-hand draw effect in the Ash-backed engine.
 - Files changed: added `lib/prizmo/tcg_engine/energy_effects.ex`; updated `lib/prizmo/tcg_engine/mechanics.ex`, `lib/prizmo/tcg/cards/behaviors/ssp.ex`, `lib/prizmo/tcg_engine/game_view.ex`, `lib/prizmo/tcg_engine/game_view/action_affordances.ex`, the canonical north-star article, this log, and the TCG engine playtest handoff.

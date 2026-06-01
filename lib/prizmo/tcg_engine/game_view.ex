@@ -573,7 +573,7 @@ defmodule Prizmo.TcgEngine.GameView do
       rules_summary(
         :engine_defined,
         "Engine-defined Energy",
-        "This Special Energy provides its catalog Energy type and executes its attach-from-hand effect."
+        "This Special Energy provides its supported Energy type and enforces its authored engine text."
       )
     else
       rules_summary(
@@ -824,6 +824,20 @@ defmodule Prizmo.TcgEngine.GameView do
        when is_integer(count) and count > 0 and is_list(provides) do
     :colorless in provides
   end
+
+  defp supported_special_energy?(%{
+         effect: %{type: :prevent_opponent_attack_effects_to_attached_pokemon},
+         provides: provides
+       })
+       when is_list(provides) do
+    :colorless in provides
+  end
+
+  defp supported_special_energy?(%{
+         effect: %{type: :team_rocket_energy_attachment_and_dual_provides},
+         name: "Team Rocket's Energy"
+       }),
+       do: true
 
   defp supported_special_energy?(_card), do: false
 

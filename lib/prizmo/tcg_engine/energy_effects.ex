@@ -25,6 +25,12 @@ defmodule Prizmo.TcgEngine.EnergyEffects do
         nil ->
           {:ok, nil}
 
+        %{type: :prevent_opponent_attack_effects_to_attached_pokemon} ->
+          {:ok, nil}
+
+        %{type: :team_rocket_energy_attachment_and_dual_provides} ->
+          require_team_rocket_energy_target(energy_card, target_card)
+
         %{type: :draw_cards_on_attach_from_hand, count: count}
         when is_integer(count) and count > 0 ->
           draw_cards_on_attach(game, player, energy_card, target_card, count)
@@ -37,6 +43,24 @@ defmodule Prizmo.TcgEngine.EnergyEffects do
       end
     end
   end
+
+  defp require_team_rocket_energy_target(
+         %CardInstance{} = energy_card,
+         %CardInstance{} = target_card
+       ) do
+    with {:ok, target_catalog_card} <- CardCatalog.fetch(target_card.card_id) do
+      if team_rocket_pokemon?(target_catalog_card) do
+        {:ok, nil}
+      else
+        {:error,
+         {:team_rocket_energy_requires_team_rocket_pokemon, energy_card.card_id,
+          target_card.card_id}}
+      end
+    end
+  end
+
+  defp team_rocket_pokemon?(%{supertype: :pokemon, name: "Team Rocket's " <> _name}), do: true
+  defp team_rocket_pokemon?(_card), do: false
 
   defp draw_cards_on_attach(
          %Game{} = game,

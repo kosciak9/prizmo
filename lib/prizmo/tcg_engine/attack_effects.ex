@@ -934,16 +934,19 @@ defmodule Prizmo.TcgEngine.AttackEffects do
          attacking_player_id,
          %CardInstance{} = target_card
        ) do
-    with {:ok, turn} <- TurnStore.current_turn(game_id),
-         true <-
-           AttackPrevention.damage_and_effects_prevented_this_turn?(
-             target_card,
-             turn,
-             attacking_player_id
-           ) do
-      {:prevented, AttackPrevention.prevention_payload(target_card, turn)}
-    else
-      _not_prevented -> :not_prevented
+    case TurnStore.current_turn(game_id) do
+      {:ok, turn} ->
+        case AttackPrevention.attack_effect_prevention_payload(
+               target_card,
+               turn,
+               attacking_player_id
+             ) do
+          {:error, _reason} -> :not_prevented
+          result -> result
+        end
+
+      {:error, _reason} ->
+        :not_prevented
     end
   end
 
@@ -1580,7 +1583,7 @@ defmodule Prizmo.TcgEngine.AttackEffects do
          damage,
          _kind
        ) do
-    prevented_bench_attack_damage_by_marker_result(
+    prevented_bench_attack_effect_damage_result(
       game_id,
       attacking_player_id,
       bench_target,
@@ -1611,6 +1614,35 @@ defmodule Prizmo.TcgEngine.AttackEffects do
            damage_prevented?: true
          },
          AttackPrevention.prevention_payload(bench_target, turn)
+       )}
+    else
+      _not_prevented -> :not_prevented
+    end
+  end
+
+  defp prevented_bench_attack_effect_damage_result(
+         game_id,
+         attacking_player_id,
+         bench_target,
+         damage
+       ) do
+    with {:ok, turn} <- TurnStore.current_turn(game_id),
+         {:prevented, prevention_payload} <-
+           AttackPrevention.attack_effect_prevention_payload(
+             bench_target,
+             turn,
+             attacking_player_id
+           ) do
+      {:ok,
+       Map.merge(
+         %{
+           damage: 0,
+           prevented_damage: damage,
+           resulting_damage: bench_target.damage,
+           knocked_out?: false,
+           damage_prevented?: true
+         },
+         prevention_payload
        )}
     else
       _not_prevented -> :not_prevented
