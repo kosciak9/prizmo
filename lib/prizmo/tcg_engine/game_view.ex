@@ -382,6 +382,25 @@ defmodule Prizmo.TcgEngine.GameView do
     }
   end
 
+  defp public_event_details(%GameEvent{type: "coin_flipped", payload: payload}) do
+    card_name = payload_card_name(payload, "source_card_id", "Trainer")
+
+    result =
+      payload
+      |> payload_value("result")
+      |> stringify()
+      |> case do
+        nil -> "a coin"
+        value -> value
+      end
+
+    %{
+      public_note: "#{card_name} flipped #{result}.",
+      public_card_count: 0,
+      public_revealed_cards: []
+    }
+  end
+
   defp public_event_details(%GameEvent{type: "cards_moved", payload: payload}) do
     if payload_value(payload, "public_reveal") == true do
       revealed_cards = public_revealed_cards(payload, "revealed_cards")
@@ -544,6 +563,20 @@ defmodule Prizmo.TcgEngine.GameView do
     payload
     |> prompt_choice_card_instances(cards)
     |> Enum.filter(&(&1.owner_player_id != player_id and &1.zone == :bench))
+    |> Enum.map(&card_view(&1, attached_cards_by_target))
+  end
+
+  defp legal_choice_cards(
+         %Prompt{
+           payload: %{"choice_key" => "discard_opponent_attached_energy_if_heads"} = payload,
+           player_id: player_id
+         },
+         cards,
+         attached_cards_by_target
+       ) do
+    payload
+    |> prompt_choice_card_instances(cards)
+    |> Enum.filter(&(&1.owner_player_id != player_id and &1.zone == :attached))
     |> Enum.map(&card_view(&1, attached_cards_by_target))
   end
 

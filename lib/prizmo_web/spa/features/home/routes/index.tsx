@@ -56,6 +56,7 @@ const SHUFFLE_ATTACHED_ENERGY_INTO_DECK_THEN_DAMAGE_OPPONENT_BENCH_EFFECT =
   'shuffle_attached_energy_into_deck_then_damage_opponent_bench'
 const COPY_OPPONENT_ACTIVE_TERA_POKEMON_ATTACK_EFFECT = 'copy_opponent_active_tera_pokemon_attack'
 const ULTRA_BALL_CARD_ID = 'MEG-131'
+const CRUSHING_HAMMER_CARD_ID = 'POR-071'
 const SECRET_BOX_CARD_ID = 'TWM-163'
 const BENCH_SLOT_COUNT = 5
 const EXPECTED_OPEN_DECK_CARD_COUNT = 60
@@ -8676,7 +8677,11 @@ function promptChoiceInstruction(min: number, max: number) {
 }
 
 function trainerPlayCardPromptGuide(action: ActionAffordance, cardsById: Map<string, CardSummary>): PromptFlowGuide | null {
-  return ultraBallPlayCardPromptGuide(action, cardsById) ?? secretBoxPlayCardPromptGuide(action, cardsById)
+  return (
+    ultraBallPlayCardPromptGuide(action, cardsById) ??
+    crushingHammerPlayCardPromptGuide(action, cardsById) ??
+    secretBoxPlayCardPromptGuide(action, cardsById)
+  )
 }
 
 function ultraBallPlayCardPromptGuide(action: ActionAffordance, cardsById: Map<string, CardSummary>): PromptFlowGuide | null {
@@ -8765,13 +8770,60 @@ function secretBoxPlayCardPromptGuide(action: ActionAffordance, cardsById: Map<s
   }
 }
 
+function crushingHammerPlayCardPromptGuide(action: ActionAffordance, cardsById: Map<string, CardSummary>): PromptFlowGuide | null {
+  if (action.key !== 'play_card') {
+    return null
+  }
+
+  const hasCrushingHammerSource = action.sourceCardInstanceIds.some(cardInstanceId => {
+    const card = cardsById.get(cardInstanceId)
+
+    return card?.cardId === CRUSHING_HAMMER_CARD_ID
+  })
+
+  if (!hasCrushingHammerSource) {
+    return null
+  }
+
+  return {
+    eyebrow: 'Trainer prompt path',
+    title: 'Crushing Hammer flips first, then may target Energy',
+    detail:
+      'Play the Item here. The engine flips a coin immediately; heads opens an attached-Energy prompt, tails ends the effect with no discard.',
+    steps: [
+      {
+        label: 'play',
+        title: 'Start Crushing Hammer',
+        detail: 'The card-play command starts the Item and resolves the coin flip server-side.',
+        tone: 'focus'
+      },
+      {
+        label: 'flip',
+        title: 'Resolve the coin flip',
+        detail: 'Heads opens a prompt over one attached Energy on your opponent’s Pokémon.',
+        tone: 'next'
+      },
+      {
+        label: 'discard',
+        title: 'Discard only on heads',
+        detail: 'If tails, the Item finishes immediately with no Energy discarded.',
+        tone: 'next'
+      }
+    ]
+  }
+}
+
 function trainerPromptFlowGuide(
   choiceKey: string,
   min: number,
   max: number,
   legalChoiceCount: number
 ): PromptFlowGuide | null {
-  return ultraBallPromptFlowGuide(choiceKey, min, max, legalChoiceCount) ?? secretBoxPromptFlowGuide(choiceKey, min, max, legalChoiceCount)
+  return (
+    ultraBallPromptFlowGuide(choiceKey, min, max, legalChoiceCount) ??
+    crushingHammerPromptFlowGuide(choiceKey, min, max, legalChoiceCount) ??
+    secretBoxPromptFlowGuide(choiceKey, min, max, legalChoiceCount)
+  )
 }
 
 function ultraBallPromptFlowGuide(
@@ -8837,6 +8889,44 @@ function ultraBallPromptFlowGuide(
   }
 
   return null
+}
+
+function crushingHammerPromptFlowGuide(
+  choiceKey: string,
+  min: number,
+  max: number,
+  legalChoiceCount: number
+): PromptFlowGuide | null {
+  if (choiceKey !== 'discard_opponent_attached_energy_if_heads') {
+    return null
+  }
+
+  return {
+    eyebrow: 'Crushing Hammer prompt',
+    title: 'Choose the Energy to discard after heads',
+    detail:
+      'The server-side coin flip already resolved to heads. Finish Crushing Hammer by choosing one attached Energy from your opponent’s board.',
+    steps: [
+      {
+        label: 'play',
+        title: 'Item started',
+        detail: 'Crushing Hammer is resolving from the prior action.',
+        tone: 'complete'
+      },
+      {
+        label: 'flip',
+        title: 'Heads confirmed',
+        detail: 'The Item only opens this prompt when the coin flip succeeds.',
+        tone: 'complete'
+      },
+      {
+        label: 'discard',
+        title: 'Discard attached Energy',
+        detail: `${promptChoiceInstruction(min, max)} from ${legalChoiceCount} legal attached Energy choices.`,
+        tone: 'focus'
+      }
+    ]
+  }
 }
 
 function secretBoxPromptFlowGuide(
@@ -8936,6 +9026,8 @@ function promptSubmitLabel(choiceKey: string, selectedCount: number, max: number
       return `Resolve Rare Candy evolution ${selectedCount}/${max}`
     case 'search_basic_energy_split_hand_attach_to_pokemon':
       return `Resolve Crispin Energy choices ${selectedCount}/${max}`
+    case 'discard_opponent_attached_energy_if_heads':
+      return `Discard selected Energy ${selectedCount}/${max}`
     case 'switch_opponent_bench_to_active':
       return `Switch chosen Pokémon ${selectedCount}/${max}`
     case 'move_basic_energy_between_own_pokemon':
@@ -9028,6 +9120,13 @@ function promptGuidanceMessages(
     return [
       "Team Rocket's Transceiver searches your deck for one Supporter with \"Team Rocket\" in its name.",
       `This prompt accepts ${promptChoiceInstruction(min, max)} from ${legalChoiceCount} legal Team Rocket Supporter choices, then shuffles.`
+    ]
+  }
+
+  if (choiceKey === 'discard_opponent_attached_energy_if_heads') {
+    return [
+      'Crushing Hammer only opens this prompt after a heads coin flip. Choose one attached Energy on your opponent’s board to discard.',
+      `This prompt accepts ${promptChoiceInstruction(min, max)} from ${legalChoiceCount} legal attached Energy choices.`
     ]
   }
 

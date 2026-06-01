@@ -4,6 +4,7 @@ defmodule Prizmo.TcgEngine.CardPlay do
   import Prizmo.TcgEngine.CardMetadataRequirements,
     only: [
       require_basic_pokemon: 1,
+      require_energy: 1,
       require_basic_energy: 1,
       require_night_stretcher_target: 1,
       require_non_rule_box_pokemon_card: 1,
@@ -48,6 +49,8 @@ defmodule Prizmo.TcgEngine.CardPlay do
   alias Prizmo.TcgEngine.StadiumEffects
   alias Prizmo.TcgEngine.TrainerPlay
   alias Prizmo.TcgEngine.TurnStore
+
+  @coin_faces [:heads, :tails]
 
   def require_playable_trainer_definition(
         %GamePlayer{} = player,
@@ -274,22 +277,101 @@ defmodule Prizmo.TcgEngine.CardPlay do
              source: EventPayloads.card_source(card),
              effect_key: effect.key
            }) do
-      case EffectRunner.selected_choice(choices, effect) do
-        {:ok, target_ids} ->
-          complete_play_card_effect(game, turn, player, card, effect, target_ids)
-
-        :missing ->
-          suspend_play_card_for_choice(
+      case effect.type do
+        :flip_coin_then_discard_opponent_attached_energy ->
+          resolve_coin_flip_then_discard_opponent_attached_energy(
             game,
             turn,
             player,
             card,
             definition,
-            choices,
-            :resolving_effect,
-            effect.key
+            effect,
+            choices
           )
+
+        _other ->
+          case EffectRunner.selected_choice(choices, effect) do
+            {:ok, target_ids} ->
+              complete_play_card_effect(game, turn, player, card, effect, target_ids)
+
+            :missing ->
+              suspend_play_card_for_choice(
+                game,
+                turn,
+                player,
+                card,
+                definition,
+                choices,
+                :resolving_effect,
+                effect.key
+              )
+          end
       end
+    end
+  end
+
+  defp resolve_coin_flip_then_discard_opponent_attached_energy(
+         game,
+         turn,
+         player,
+         card,
+         definition,
+         effect,
+         choices
+       ) do
+    with {:ok, result} <- flip_coin_for_effect(game, turn, player, card, effect),
+         {:ok, _event} <-
+           write_effect_coin_flipped(game, turn, player.player_id, card, effect, result) do
+      case result do
+        :heads ->
+          case EffectRunner.selected_choice(choices, effect) do
+            {:ok, target_ids} ->
+              complete_play_card_effect(game, turn, player, card, effect, target_ids)
+
+            :missing ->
+              suspend_play_card_for_choice(
+                game,
+                turn,
+                player,
+                card,
+                definition,
+                choices,
+                :resolving_effect,
+                effect.key
+              )
+          end
+
+        :tails ->
+          complete_play_card_resolution(game, turn, player, card, effect)
+      end
+    end
+  end
+
+  defp complete_play_card_effect(
+         game,
+         turn,
+         player,
+         card,
+         %{type: :flip_coin_then_discard_opponent_attached_energy} = effect,
+         target_ids
+       ) do
+    with {:ok, [target_energy_card]} <-
+           validate_opponent_attached_energy_discard_effect(
+             game.id,
+             player.player_id,
+             effect,
+             target_ids
+           ),
+         {:ok, discarded_energy_card} <- discard_attached_energy_card(game, target_energy_card),
+         {:ok, _event} <-
+           write_event_and_snapshot(game.id, :cards_moved, player.player_id, %{
+             reason: :effect_resolution,
+             source: EventPayloads.card_source(card),
+             effect_key: effect.key,
+             affected_player_id: discarded_energy_card.owner_player_id,
+             cards: EventPayloads.moved_cards([discarded_energy_card], :attached, :discard)
+           }) do
+      complete_play_card_resolution(game, turn, player, card, effect)
     end
   end
 
@@ -764,6 +846,16 @@ defmodule Prizmo.TcgEngine.CardPlay do
     end
   end
 
+  defp validate_opponent_attached_energy_discard_effect(game_id, player_id, effect, target_ids) do
+    with {:ok, target_ids} <- EffectRunner.validate_choice_selection(effect, target_ids),
+         {:ok, target_cards} <- CardStore.get_cards(game_id, target_ids),
+         :ok <- require_all_opponent_cards(target_cards, player_id),
+         :ok <- require_all_in_zone(target_cards, :attached),
+         :ok <- require_all_energy_cards(target_cards) do
+      {:ok, target_cards}
+    end
+  end
+
   defp validate_energy_switch_effect(game_id, player_id, effect, target_ids) do
     with {:ok, target_ids} <- EffectRunner.validate_choice_selection(effect, target_ids),
          {:ok, target_cards} <- CardStore.get_cards(game_id, target_ids),
@@ -850,6 +942,18 @@ defmodule Prizmo.TcgEngine.CardPlay do
        ) do
     cards
     |> crispin_choice_cards(player_id)
+    |> Enum.map(& &1.id)
+    |> then(&{:ok, &1})
+  end
+
+  defp effect_choice_ids(
+         cards,
+         player_id,
+         %{type: :flip_coin_then_discard_opponent_attached_energy},
+         _current_turn
+       ) do
+    cards
+    |> opponent_attached_energy_choice_cards(player_id)
     |> Enum.map(& &1.id)
     |> then(&{:ok, &1})
   end
@@ -956,6 +1060,7 @@ defmodule Prizmo.TcgEngine.CardPlay do
              :search_deck,
              :search_top_deck,
              :search_basic_energy_split_hand_attach,
+             :flip_coin_then_discard_opponent_attached_energy,
              :switch_opponent_bench_to_active,
              :discard_opponent_special_energy,
              :move_basic_energy_between_own_pokemon,
@@ -1108,6 +1213,16 @@ defmodule Prizmo.TcgEngine.CardPlay do
     cards
     |> Enum.filter(
       &(&1.owner_player_id != player_id and &1.zone == :attached and special_energy_card?(&1))
+    )
+    |> Enum.sort_by(
+      &{&1.owner_player_id, &1.attached_to_card_instance_id, &1.position, &1.instance_id}
+    )
+  end
+
+  defp opponent_attached_energy_choice_cards(cards, player_id) do
+    cards
+    |> Enum.filter(
+      &(&1.owner_player_id != player_id and &1.zone == :attached and energy_card?(&1))
     )
     |> Enum.sort_by(
       &{&1.owner_player_id, &1.attached_to_card_instance_id, &1.position, &1.instance_id}
@@ -1426,6 +1541,8 @@ defmodule Prizmo.TcgEngine.CardPlay do
     match?({:ok, %{supertype: :energy, energy_type: :special}}, CardCatalog.fetch(card_id))
   end
 
+  defp energy_card?(%CardInstance{card_id: card_id}), do: require_energy(card_id) == :ok
+
   defp crispin_basic_energy_card?(%CardInstance{} = card, player_id) do
     card.owner_player_id == player_id and card.zone == :deck and
       require_basic_energy(card.card_id) == :ok and
@@ -1603,6 +1720,12 @@ defmodule Prizmo.TcgEngine.CardPlay do
     |> collect_ok_results()
   end
 
+  defp require_all_energy_cards(cards) do
+    cards
+    |> Enum.map(&require_energy(&1.card_id))
+    |> collect_ok_results()
+  end
+
   defp matches_recover_discard_to_hand_filter?(%CardInstance{} = card, filter) do
     require_recover_discard_to_hand_filter(card, filter) == :ok
   end
@@ -1648,6 +1771,71 @@ defmodule Prizmo.TcgEngine.CardPlay do
     with {:ok, position} <- CardStore.next_discard_position(game.id, card.owner_player_id) do
       update(card, :discard, %{position: position, attached_to_card_instance_id: nil})
     end
+  end
+
+  defp flip_coin_for_effect(%Game{rng_seed: seed}, turn, %GamePlayer{} = player, card, effect)
+       when is_binary(seed) do
+    Rng.choice(
+      @coin_faces,
+      seed,
+      effect_coin_flip_rng_context(player.player_id, turn, card, effect)
+    )
+  end
+
+  defp flip_coin_for_effect(%Game{}, _turn, _player, _card, _effect),
+    do: {:ok, Enum.random(@coin_faces)}
+
+  defp write_effect_coin_flipped(%Game{} = game, turn, player_id, card, effect, result) do
+    payload =
+      maybe_put_effect_coin_flip_rng_payload(
+        %{
+          turn_id: turn.id,
+          source: EventPayloads.card_source(card),
+          source_card_id: card.card_id,
+          effect_key: effect.key,
+          result: result
+        },
+        game,
+        turn,
+        player_id,
+        card,
+        effect
+      )
+
+    write_event_and_snapshot(game.id, :coin_flipped, player_id, payload)
+  end
+
+  defp maybe_put_effect_coin_flip_rng_payload(
+         payload,
+         %Game{rng_seed: seed} = game,
+         turn,
+         player_id,
+         card,
+         effect
+       )
+       when is_binary(seed) do
+    Map.merge(payload, %{
+      rng_algorithm: game.rng_algorithm || Rng.algorithm(),
+      rng_context: effect_coin_flip_rng_context_label(player_id, turn, card, effect),
+      rng_seed_source: game.rng_seed_source
+    })
+  end
+
+  defp maybe_put_effect_coin_flip_rng_payload(
+         payload,
+         %Game{},
+         _turn,
+         _player_id,
+         _card,
+         _effect
+       ), do: payload
+
+  defp effect_coin_flip_rng_context(player_id, turn, card, effect) do
+    {:trainer_effect_coin_flip, player_id, turn.turn_number, card.card_id, effect.key}
+  end
+
+  defp effect_coin_flip_rng_context_label(player_id, turn, card, effect) do
+    "trainer_effect_coin_flip:#{player_id}:turn_#{turn.turn_number}:#{card.card_id}:#{effect.key}"
   end
 
   defp maybe_attach_crispin_energy(_game, nil, nil), do: {:ok, {nil, nil}}

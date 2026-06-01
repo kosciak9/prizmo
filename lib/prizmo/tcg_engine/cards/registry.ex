@@ -149,6 +149,20 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     ]
   }
 
+  @crushing_hammer %CardDefinition{
+    id: "POR-071",
+    kind: :trainer,
+    trainer_type: :item,
+    play_window: :action_window,
+    effects: [
+      %Effect{
+        key: :discard_opponent_attached_energy_if_heads,
+        type: :flip_coin_then_discard_opponent_attached_energy,
+        params: %{count: 1}
+      }
+    ]
+  }
+
   @energy_switch %CardDefinition{
     id: "MEG-115",
     kind: :trainer,
@@ -406,6 +420,7 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     @boss_orders.id => @boss_orders,
     @bug_catching_set.id => @bug_catching_set,
     @buddy_buddy_poffin.id => @buddy_buddy_poffin,
+    @crushing_hammer.id => @crushing_hammer,
     @crispin.id => @crispin,
     @dawn.id => @dawn,
     @enhanced_hammer.id => @enhanced_hammer,
