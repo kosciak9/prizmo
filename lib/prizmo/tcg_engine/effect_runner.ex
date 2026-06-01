@@ -7,7 +7,8 @@ defmodule Prizmo.TcgEngine.EffectRunner do
     :search_deck,
     :switch_opponent_bench_to_active,
     :discard_opponent_special_energy,
-    :move_basic_energy_between_own_pokemon
+    :move_basic_energy_between_own_pokemon,
+    :recover_discard_to_hand
   ]
 
   def first_effect(definition) do

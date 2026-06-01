@@ -8503,6 +8503,8 @@ function promptSubmitLabel(choiceKey: string, selectedCount: number, max: number
       return `Switch chosen Pokémon ${selectedCount}/${max}`
     case 'move_basic_energy_between_own_pokemon':
       return `Move selected Energy ${selectedCount}/${max}`
+    case 'recover_pokemon_or_basic_energy_from_discard':
+      return `Recover selected card ${selectedCount}/${max}`
     case 'knockout_prize_cards':
       return `Take selected Prizes ${selectedCount}/${max}`
     default:

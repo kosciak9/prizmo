@@ -135,6 +135,24 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     ]
   }
 
+  @night_stretcher %CardDefinition{
+    id: "ASC-196",
+    kind: :trainer,
+    trainer_type: :item,
+    play_window: :action_window,
+    effects: [
+      %Effect{
+        key: :recover_pokemon_or_basic_energy_from_discard,
+        type: :recover_discard_to_hand,
+        params: %{
+          filter: %{any: [%{kind: :pokemon}, %{kind: :energy, energy_type: :basic}]},
+          count: 1,
+          destination: :hand
+        }
+      }
+    ]
+  }
+
   @ultra_ball %CardDefinition{
     id: "MEG-131",
     kind: :trainer,
@@ -212,6 +230,7 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     @hilda.id => @hilda,
     @judge.id => @judge,
     @lillies_determination.id => @lillies_determination,
+    @night_stretcher.id => @night_stretcher,
     @poke_pad.id => @poke_pad,
     @ultra_ball.id => @ultra_ball
   }

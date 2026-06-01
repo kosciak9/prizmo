@@ -4,6 +4,7 @@ defmodule Prizmo.TcgEngine.CardPlay do
   import Prizmo.TcgEngine.CardMetadataRequirements,
     only: [
       require_basic_energy: 1,
+      require_night_stretcher_target: 1,
       require_non_rule_box_pokemon_card: 1,
       require_poffin_targets: 1,
       require_pokemon_card: 1,
@@ -297,6 +298,29 @@ defmodule Prizmo.TcgEngine.CardPlay do
          turn,
          player,
          card,
+         %{type: :recover_discard_to_hand} = effect,
+         target_ids
+       ) do
+    with {:ok, [target_card]} <-
+           validate_recover_discard_to_hand_effect(game.id, player.player_id, effect, target_ids),
+         {:ok, moved_target} <-
+           CardStore.move_discard_card_to_hand(game.id, player.player_id, target_card),
+         {:ok, _event} <-
+           write_event_and_snapshot(game.id, :cards_moved, player.player_id, %{
+             reason: :effect_resolution,
+             source: EventPayloads.card_source(card),
+             effect_key: effect.key,
+             cards: EventPayloads.moved_cards([moved_target], :discard, :hand)
+           }) do
+      complete_play_card_resolution(game, turn, player, card, effect)
+    end
+  end
+
+  defp complete_play_card_effect(
+         game,
+         turn,
+         player,
+         card,
          %{type: :move_basic_energy_between_own_pokemon} = effect,
          target_ids
        ) do
@@ -551,6 +575,15 @@ defmodule Prizmo.TcgEngine.CardPlay do
     end
   end
 
+  defp validate_recover_discard_to_hand_effect(game_id, player_id, effect, target_ids) do
+    with {:ok, target_ids} <- EffectRunner.validate_choice_selection(effect, target_ids),
+         {:ok, target_cards} <- CardStore.get_cards(game_id, target_ids),
+         :ok <- require_all_owned_in_zone(target_cards, player_id, :discard),
+         :ok <- require_all_recover_discard_to_hand_filters(target_cards, effect.params.filter) do
+      {:ok, target_cards}
+    end
+  end
+
   defp move_search_targets(game, _turn, player, %{params: %{destination: :hand}}, target_cards) do
     target_cards
     |> Enum.map(&CardStore.move_deck_card_to_hand(game.id, player.player_id, &1))
@@ -596,6 +629,13 @@ defmodule Prizmo.TcgEngine.CardPlay do
     |> then(&{:ok, &1})
   end
 
+  defp effect_choice_ids(cards, player_id, %{type: :recover_discard_to_hand} = choice_step) do
+    cards
+    |> recover_discard_to_hand_choice_cards(player_id, choice_step)
+    |> Enum.map(& &1.id)
+    |> then(&{:ok, &1})
+  end
+
   defp effect_choice_ids(_cards, _player_id, choice_step) do
     {:error, {:unsupported_choice_step, choice_step.key, choice_step.type}}
   end
@@ -631,7 +671,8 @@ defmodule Prizmo.TcgEngine.CardPlay do
              :search_deck,
              :switch_opponent_bench_to_active,
              :discard_opponent_special_energy,
-             :move_basic_energy_between_own_pokemon
+             :move_basic_energy_between_own_pokemon,
+             :recover_discard_to_hand
            ] ->
         effect_choice_ids(cards, player_id, choice_step)
 
@@ -728,6 +769,15 @@ defmodule Prizmo.TcgEngine.CardPlay do
     else
       legal_source_cards ++ legal_target_cards
     end
+  end
+
+  defp recover_discard_to_hand_choice_cards(cards, player_id, choice_step) do
+    cards
+    |> Enum.filter(
+      &(&1.owner_player_id == player_id and &1.zone == :discard and
+          matches_recover_discard_to_hand_filter?(&1, choice_step.params.filter))
+    )
+    |> Enum.sort_by(&{&1.position, &1.instance_id})
   end
 
   defp energy_switch_source_cards(cards, player_id) do
@@ -898,6 +948,40 @@ defmodule Prizmo.TcgEngine.CardPlay do
     cards
     |> Enum.map(&require_special_energy(&1.card_id))
     |> collect_ok_results()
+  end
+
+  defp matches_recover_discard_to_hand_filter?(%CardInstance{} = card, filter) do
+    require_recover_discard_to_hand_filter(card, filter) == :ok
+  end
+
+  defp require_all_recover_discard_to_hand_filters(cards, filter) do
+    cards
+    |> Enum.map(&require_recover_discard_to_hand_filter(&1, filter))
+    |> collect_ok_results()
+  end
+
+  defp require_recover_discard_to_hand_filter(%CardInstance{} = card, %{any: filters})
+       when is_list(filters) do
+    if Enum.any?(filters, &(require_recover_discard_to_hand_filter(card, &1) == :ok)) do
+      :ok
+    else
+      {:error, {:no_matching_recover_discard_filter, card.card_id}}
+    end
+  end
+
+  defp require_recover_discard_to_hand_filter(%CardInstance{} = card, %{kind: :pokemon}) do
+    require_pokemon_card(card.card_id)
+  end
+
+  defp require_recover_discard_to_hand_filter(%CardInstance{} = card, %{
+         kind: :energy,
+         energy_type: :basic
+       }) do
+    require_basic_energy(card.card_id)
+  end
+
+  defp require_recover_discard_to_hand_filter(%CardInstance{} = card, _filter) do
+    require_night_stretcher_target(card.card_id)
   end
 
   defp discard_attached_energy_card(game, %CardInstance{} = card) do

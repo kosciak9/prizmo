@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-06-01] iteration 207 | Night Stretcher discard recovery
+- Task attempted: advanced arbitrary-deck Item safety by moving Night Stretcher (`ASC-196`) onto the generic `play_card` path as an engine-defined prompt effect that recovers one own Pokémon or Basic Energy from discard to hand.
+- Files changed: updated `lib/prizmo/tcg_engine/cards/registry.ex`, `lib/prizmo/tcg_engine/effect_runner.ex`, `lib/prizmo/tcg_engine/card_play.ex`, `lib/prizmo_web/spa/features/home/routes/index.tsx`, the canonical north-star article, this log, and the TCG engine playtest handoff.
+- Validation: `mix format`, `mix compile --warnings-as-errors`, `mix test test/prizmo/tcg_engine/mechanics_test.exs`, `node_modules/.bin/tsc --noEmit --ignoreDeprecations 6.0`, `git diff --check`, rollback Tidewave validation, cleanup SQL proving no scratch validation game remained, and final `mix check` passed. Rollback validation confirmed Night Stretcher appears as an engine-defined Play source, opens a one-card discard-recovery prompt, includes valid Basic Energy from discard while excluding an invalid discarded Trainer, exposes the viewer prompt choice card from discard, resolves through `choose_prompt`, moves the selected target to hand, leaves Night Stretcher in discard, completes its pending effect, and writes the expected prompt/effect/card-play suffix.
+- Remaining/blocking notes: this covers Night Stretcher's printed Pokémon-or-Basic-Energy discard recovery through the generic Item path. It does not cover Crispin's split Energy search/attach, Rare Candy evolution shortcuts, top-N search Items like Pokégear/Bug Catching Set, broader Tools, or the benchmarked card-table density/polish batch.
+
 ## [2026-06-01] iteration 206 | Energy Switch generic attachment move
 - Task attempted: advanced arbitrary-deck Item safety by moving Energy Switch (`MEG-115`) onto the generic `play_card` path as an engine-defined prompt effect that moves one attached Basic Energy between the active player's own Pokémon.
 - Files changed: updated `lib/prizmo/tcg_engine/cards/registry.ex`, `lib/prizmo/tcg_engine/effect_runner.ex`, `lib/prizmo/tcg_engine/card_play.ex`, `lib/prizmo_web/spa/features/home/routes/index.tsx`, the canonical north-star article, this log, and the TCG engine playtest handoff.
