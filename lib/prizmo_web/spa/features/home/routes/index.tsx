@@ -15,6 +15,7 @@ import {
   runCreateOpenDeckTcgEngineGame,
   runCreateTcgEngineGame,
   runDeclareTcgEngineAttack,
+  runDrawTcgEngineMulliganBonus,
   runDrawTcgEngineCardForTurn,
   runDrawTcgEngineOpeningHand,
   runEvolveTcgEngineFromHand,
@@ -199,6 +200,9 @@ const GAME_STATE_FIELDS = [
       'retreatedThisTurn',
       'aceSpecPlayedThisGame',
       'setupReady',
+      'mulligansTaken',
+      'mulliganBonusDrawsTaken',
+      'mulliganBonusDrawsAvailable',
       'deckCount',
       'handCount',
       'prizeCount',
@@ -376,6 +380,9 @@ type PlayerView = {
   retreatedThisTurn: boolean
   aceSpecPlayedThisGame: boolean
   setupReady: boolean
+  mulligansTaken: number
+  mulliganBonusDrawsTaken: number
+  mulliganBonusDrawsAvailable: number
   deckCount: number
   handCount: number
   prizeCount: number
@@ -532,6 +539,12 @@ type MulliganOpeningHandInput = {
   playerId: PlayerId
 }
 
+type DrawMulliganBonusInput = {
+  gameId: string
+  playerId: PlayerId
+  count: number
+}
+
 type EvolveFromHandInput = {
   gameId: string
   playerId: PlayerId
@@ -672,6 +685,11 @@ type ChooseStartingPlayerCommand = {
 
 type TurnPlayerCommand = {
   playerId: string
+}
+
+type DrawMulliganBonusCommand = {
+  playerId: string
+  count: number
 }
 
 type GameState = {
@@ -859,6 +877,13 @@ export function HomeRoute() {
 
   const mulliganOpeningHandMutation = useMutation({
     mutationFn: (input: MulliganOpeningHandInput) => mulliganOpeningHand(input),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['tcg-engine', 'game-state'] })
+    }
+  })
+
+  const drawMulliganBonusMutation = useMutation({
+    mutationFn: (input: DrawMulliganBonusInput) => drawMulliganBonus(input),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['tcg-engine', 'game-state'] })
     }
@@ -1098,6 +1123,11 @@ export function HomeRoute() {
       mulliganOpeningHandMutation.error,
       'Opening mulligan failed',
       'The opening hand was not redrawn. Retry only when this viewer has no visible Basic before choosing an Active Pokémon.'
+    ) ??
+    commandErrorNotice(
+      drawMulliganBonusMutation.error,
+      'Mulligan bonus draw failed',
+      'No bonus cards were drawn. Confirm the opponent has unresolved opening-hand mulligans and draw before this player is setup-ready.'
     ) ??
     commandErrorNotice(
       chooseSetupBenchMutation.error,
@@ -1511,6 +1541,15 @@ export function HomeRoute() {
                     })
                   }
                 }}
+                onDrawMulliganBonus={({ playerId, count }) => {
+                  if (isPlayerId(playerId)) {
+                    drawMulliganBonusMutation.mutate({
+                      gameId: normalisedGameId,
+                      playerId,
+                      count
+                    })
+                  }
+                }}
                 onChooseSetupBench={({ playerId, cardInstanceId }) => {
                   if (isPlayerId(playerId)) {
                     chooseSetupBenchMutation.mutate({
@@ -1674,6 +1713,11 @@ export function HomeRoute() {
                 mulliganOpeningHandPendingPlayerId={
                   mulliganOpeningHandMutation.isPending
                     ? mulliganOpeningHandMutation.variables?.playerId ?? null
+                    : null
+                }
+                drawMulliganBonusPendingPlayerId={
+                  drawMulliganBonusMutation.isPending
+                    ? drawMulliganBonusMutation.variables?.playerId ?? null
                     : null
                 }
                 chooseSetupBenchPendingCardId={
@@ -2064,6 +2108,20 @@ async function mulliganOpeningHand(input: MulliganOpeningHandInput): Promise<Cre
   return result.data as CreatedGame
 }
 
+async function drawMulliganBonus(input: DrawMulliganBonusInput): Promise<CreatedGame> {
+  const result = await runDrawTcgEngineMulliganBonus({
+    input,
+    fields: GAME_RESOURCE_FIELDS,
+    headers: buildAshRpcHeaders()
+  })
+
+  if (!result.success) {
+    throw new Error(rpcErrorMessage(result.errors))
+  }
+
+  return result.data as CreatedGame
+}
+
 async function chooseSetupBenchFromHand(input: {
   gameId: string
   playerId: PlayerId
@@ -2362,6 +2420,7 @@ function GameStateWorkbench({
   onChooseSetupActive,
   onChooseSetupBench,
   onChooseStartingPlayer,
+  onDrawMulliganBonus,
   onMulliganOpeningHand,
   onChoosePrompt,
   onChooseReplacementActive,
@@ -2381,6 +2440,7 @@ function GameStateWorkbench({
   chooseSetupActivePendingCardId,
   chooseSetupBenchPendingCardId,
   chooseStartingPlayerPending,
+  drawMulliganBonusPendingPlayerId,
   chooseReplacementActivePendingCardId,
   declareAttackPendingKey,
   endTurnPendingPlayerId,
@@ -2408,6 +2468,7 @@ function GameStateWorkbench({
   onChooseSetupActive: (input: SetupCardCommand) => void
   onChooseSetupBench: (input: SetupCardCommand) => void
   onChooseStartingPlayer: (input: ChooseStartingPlayerCommand) => void
+  onDrawMulliganBonus: (input: DrawMulliganBonusCommand) => void
   onMulliganOpeningHand: (input: TurnPlayerCommand) => void
   onChoosePrompt: (input: ChoosePromptCommand) => void
   onChooseReplacementActive: (input: ChooseReplacementActiveCommand) => void
@@ -2427,6 +2488,7 @@ function GameStateWorkbench({
   chooseSetupActivePendingCardId: string | null
   chooseSetupBenchPendingCardId: string | null
   chooseStartingPlayerPending: boolean
+  drawMulliganBonusPendingPlayerId: string | null
   chooseReplacementActivePendingCardId: string | null
   declareAttackPendingKey: string | null
   endTurnPendingPlayerId: string | null
@@ -2508,8 +2570,10 @@ function GameStateWorkbench({
             onChooseSetupActive={onChooseSetupActive}
             onChooseSetupBench={onChooseSetupBench}
             onChooseStartingPlayer={onChooseStartingPlayer}
+            onDrawMulliganBonus={onDrawMulliganBonus}
             onFinishSetupChoices={onFinishSetupChoices}
             onMulliganOpeningHand={onMulliganOpeningHand}
+            drawMulliganBonusPendingPlayerId={drawMulliganBonusPendingPlayerId}
             mulliganOpeningHandPendingPlayerId={mulliganOpeningHandPendingPlayerId}
             viewerPlayerId={viewerPlayerId}
           />
@@ -2907,8 +2971,10 @@ function GameFlowPanel({
   onChooseSetupActive,
   onChooseSetupBench,
   onChooseStartingPlayer,
+  onDrawMulliganBonus,
   onFinishSetupChoices,
   onMulliganOpeningHand,
+  drawMulliganBonusPendingPlayerId,
   mulliganOpeningHandPendingPlayerId,
   viewerPlayerId
 }: {
@@ -2923,8 +2989,10 @@ function GameFlowPanel({
   onChooseSetupActive: (input: SetupCardCommand) => void
   onChooseSetupBench: (input: SetupCardCommand) => void
   onChooseStartingPlayer: (input: ChooseStartingPlayerCommand) => void
+  onDrawMulliganBonus: (input: DrawMulliganBonusCommand) => void
   onFinishSetupChoices: (input: TurnPlayerCommand) => void
   onMulliganOpeningHand: (input: TurnPlayerCommand) => void
+  drawMulliganBonusPendingPlayerId: string | null
   mulliganOpeningHandPendingPlayerId: string | null
   viewerPlayerId: PlayerId
 }) {
@@ -2972,6 +3040,16 @@ function GameFlowPanel({
   )
   const mulliganOpeningHandPending = mulliganOpeningHandPendingPlayerId === viewerPlayerId
   const canMulliganOpeningHand = viewerNeedsOpeningMulligan && !mulliganOpeningHandPendingPlayerId
+  const mulliganBonusDrawCount = viewerPlayer?.mulliganBonusDrawsAvailable ?? 0
+  const drawMulliganBonusPending = drawMulliganBonusPendingPlayerId === viewerPlayerId
+  const canDrawMulliganBonus = Boolean(
+    choosingSetupBench &&
+      viewerPlayer &&
+      !viewerPlayer.setupReady &&
+      viewerPlayer.active &&
+      mulliganBonusDrawCount > 0 &&
+      !drawMulliganBonusPendingPlayerId
+  )
   const canChooseSetupBench = Boolean(
     choosingSetupBench &&
       viewerPlayer &&
@@ -3073,12 +3151,34 @@ function GameFlowPanel({
                 trailing={<StatusBadge tone={viewerPlayer?.bench.length ? 'active' : 'neutral'}>{viewerPlayer?.bench.length ?? 0}/5</StatusBadge>}
               >
                 <p className="text-sm text-muted-foreground">
-                  {canChooseSetupBench ? 'Pick Basics from hand.' : 'Bench is optional.'}
+                  {mulliganBonusDrawCount > 0
+                    ? `${actionCountLabel(mulliganBonusDrawCount, 'bonus draw')} available from ${formatPlayerId(opponentPlayerId(viewerPlayerId))} mulligans before prizes.`
+                    : canChooseSetupBench
+                      ? 'Pick Basics from hand.'
+                      : 'Bench is optional.'}
                 </p>
+
+                {mulliganBonusDrawCount > 0 ? (
+                  <ActionCommandButton
+                    className="mt-2"
+                    disabled={!canDrawMulliganBonus}
+                    onClick={() =>
+                      onDrawMulliganBonus({
+                        playerId: viewerPlayerId,
+                        count: mulliganBonusDrawCount
+                      })
+                    }
+                    tone="secondary"
+                  >
+                    {drawMulliganBonusPending
+                      ? 'Drawing...'
+                      : `Draw ${actionCountLabel(mulliganBonusDrawCount, 'bonus card')}`}
+                  </ActionCommandButton>
+                ) : null}
 
                 <ActionCommandButton
                   className="mt-2"
-                  disabled={!canFinishSetupChoices}
+                  disabled={!canFinishSetupChoices || drawMulliganBonusPending}
                   onClick={() => onFinishSetupChoices({ playerId: viewerPlayerId })}
                   tone="primary"
                 >
@@ -6198,6 +6298,10 @@ function cardLocationLabel(card: CardSummary | undefined, fallback: string) {
 
 function actionCountLabel(count: number, singular: string, plural = `${singular}s`) {
   return `${count} ${count === 1 ? singular : plural}`
+}
+
+function opponentPlayerId(playerId: PlayerId): PlayerId {
+  return playerId === PLAYER_ONE_ID ? PLAYER_TWO_ID : PLAYER_ONE_ID
 }
 
 function retreatCostSummary(requiredSourceCount: number) {

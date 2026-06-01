@@ -107,10 +107,45 @@ defmodule Prizmo.TcgEngine.GameSetup do
     end
   end
 
+  def mulligan_stats(%Game{} = game, players) when is_list(players) do
+    player_ids = Enum.map(players, & &1.player_id)
+
+    with {:ok, events} <- setup_mulligan_events(game) do
+      base_stats =
+        Map.new(player_ids, fn player_id ->
+          {player_id,
+           %{
+             mulligans_taken: opening_hand_mulligan_count(events, player_id),
+             mulligan_bonus_draws_taken: mulligan_bonus_draw_count(events, player_id)
+           }}
+        end)
+
+      {:ok,
+       Map.new(player_ids, fn player_id ->
+         opponent_player_id = opponent_player_id(player_ids, player_id)
+         player_stats = Map.fetch!(base_stats, player_id)
+         opponent_stats = Map.get(base_stats, opponent_player_id, %{mulligans_taken: 0})
+         available = opponent_stats.mulligans_taken - player_stats.mulligan_bonus_draws_taken
+
+         {player_id, Map.put(player_stats, :mulligan_bonus_draws_available, max(available, 0))}
+       end)}
+    end
+  end
+
+  def available_mulligan_bonus_draws(%Game{} = game, player_id) when is_binary(player_id) do
+    with {:ok, players} <- PlayerStore.list_players(game.id),
+         {:ok, stats_by_player} <- mulligan_stats(game, players) do
+      case Map.fetch(stats_by_player, player_id) do
+        {:ok, %{mulligan_bonus_draws_available: available}} -> {:ok, available}
+        :error -> {:error, :player_not_found}
+      end
+    end
+  end
+
   def mulligan_opening_hand(%Game{} = game, %GamePlayer{} = player) do
     with {:ok, hand_cards} <- CardStore.cards_in_zone(game.id, player.player_id, :hand),
          :ok <- require_opening_hand_without_basic(hand_cards),
-         {:ok, mulligan_number} <- next_mulligan_number(game.id, player.player_id),
+         {:ok, mulligan_number} <- next_mulligan_number(game, player.player_id),
          returned_card_ids = MapSet.new(hand_cards, & &1.id),
          {:ok, _returned_cards} <- return_hand_to_deck(game.id, player.player_id, hand_cards),
          {:ok, shuffled_cards} <- reshuffle_player_deck(game, player, mulligan_number),
@@ -130,6 +165,31 @@ defmodule Prizmo.TcgEngine.GameSetup do
        })}
     end
   end
+
+  def draw_mulligan_bonus_cards(%Game{} = game, %GamePlayer{} = player, count)
+      when is_integer(count) do
+    with :ok <- require_positive_bonus_count(count),
+         {:ok, available} <- available_mulligan_bonus_draws(game, player.player_id),
+         :ok <- require_available_bonus_count(count, available),
+         {:ok, opponent_player_id} <- game_opponent_player_id(game.id, player.player_id),
+         {:ok, cards} <- CardStore.deck_cards_for_player(player.id, count),
+         :ok <- require_enough_deck_cards(cards, count),
+         {:ok, starting_position} <-
+           CardStore.next_hand_position_result(game.id, player.player_id),
+         {:ok, drawn_cards} <- draw_cards_to_hand(cards, starting_position) do
+      {:ok,
+       %{
+         player_id: player.player_id,
+         opponent_player_id: opponent_player_id,
+         card_count: length(drawn_cards),
+         available_before: available,
+         cards: EventPayloads.moved_cards(drawn_cards, :deck, :hand)
+       }}
+    end
+  end
+
+  def draw_mulligan_bonus_cards(%Game{}, %GamePlayer{}, count),
+    do: {:error, {:invalid_mulligan_bonus_count, count}}
 
   def require_no_setup_cards_moved(game_id) do
     case CardStore.non_deck_cards(game_id) do
@@ -214,14 +274,68 @@ defmodule Prizmo.TcgEngine.GameSetup do
     Enum.any?(hand_cards, &CardCatalog.basic_pokemon?(&1.card_id))
   end
 
-  defp next_mulligan_number(game_id, player_id) do
-    case GameEvent
-         |> Ash.Query.filter(
-           game_id == ^game_id and player_id == ^player_id and type == "opening_hand_mulligan"
-         )
-         |> Ash.read() do
-      {:ok, events} -> {:ok, length(events) + 1}
+  defp next_mulligan_number(%Game{} = game, player_id) do
+    case setup_mulligan_events(game) do
+      {:ok, events} -> {:ok, opening_hand_mulligan_count(events, player_id) + 1}
       {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp setup_mulligan_events(%Game{id: game_id, cursor_index: cursor_index}) do
+    GameEvent
+    |> Ash.Query.filter(game_id == ^game_id and index <= ^cursor_index)
+    |> Ash.Query.sort(index: :asc)
+    |> Ash.read()
+    |> case do
+      {:ok, events} ->
+        {:ok,
+         Enum.filter(events, &(&1.type in ["opening_hand_mulligan", "mulligan_bonus_drawn"]))}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  defp opening_hand_mulligan_count(events, player_id) do
+    Enum.count(events, &(&1.type == "opening_hand_mulligan" and &1.player_id == player_id))
+  end
+
+  defp mulligan_bonus_draw_count(events, player_id) do
+    events
+    |> Enum.filter(&(&1.type == "mulligan_bonus_drawn" and &1.player_id == player_id))
+    |> Enum.map(&payload_card_count/1)
+    |> Enum.sum()
+  end
+
+  defp payload_card_count(%GameEvent{payload: payload}) do
+    case Map.get(payload, "card_count") || Map.get(payload, :card_count) do
+      count when is_integer(count) -> count
+      count when is_binary(count) -> parse_positive_integer(count)
+      _other -> 1
+    end
+  end
+
+  defp parse_positive_integer(value) do
+    case Integer.parse(value) do
+      {count, ""} when count > 0 -> count
+      _other -> 1
+    end
+  end
+
+  defp opponent_player_id(player_ids, player_id) do
+    Enum.find(player_ids, &(&1 != player_id))
+  end
+
+  defp game_opponent_player_id(game_id, player_id) do
+    with {:ok, players} <- PlayerStore.list_players(game_id) do
+      players
+      |> Enum.map(& &1.player_id)
+      |> Enum.reject(&(&1 == player_id))
+      |> case do
+        [opponent_player_id] -> {:ok, opponent_player_id}
+        [] -> {:error, :opponent_player_not_found}
+        _many -> {:error, :expected_two_distinct_players}
+      end
     end
   end
 
@@ -266,6 +380,27 @@ defmodule Prizmo.TcgEngine.GameSetup do
 
   defp mulligan_rng_context_label(player_id, mulligan_number) do
     "opening_hand_mulligan:#{player_id}:#{mulligan_number}"
+  end
+
+  defp require_positive_bonus_count(count) when count > 0, do: :ok
+
+  defp require_positive_bonus_count(count), do: {:error, {:invalid_mulligan_bonus_count, count}}
+
+  defp require_available_bonus_count(count, available) when count <= available, do: :ok
+
+  defp require_available_bonus_count(count, available),
+    do: {:error, {:too_many_mulligan_bonus_cards, count, available}}
+
+  defp require_enough_deck_cards(cards, count) when length(cards) == count, do: :ok
+
+  defp require_enough_deck_cards(cards, count),
+    do: {:error, {:cannot_draw_mulligan_bonus_from_deck, count, length(cards)}}
+
+  defp draw_cards_to_hand(cards, starting_position) do
+    cards
+    |> Enum.with_index(starting_position)
+    |> Enum.map(fn {card, position} -> update(card, :draw_to_hand, %{position: position}) end)
+    |> collect_results()
   end
 
   defp move_fact({:ok, cards}, player_id, from_zone, to_zone) do

@@ -232,6 +232,16 @@ defmodule Prizmo.TcgEngine.Mechanics do
     FlowInterpreter.dispatch(game_or_id, :mulligan_opening_hand, %{player_id: player_id})
   end
 
+  @spec draw_mulligan_bonus(Game.t() | String.t(), String.t(), pos_integer()) ::
+          {:ok, Game.t()} | {:error, term()}
+  def draw_mulligan_bonus(game_or_id, player_id, count)
+      when is_binary(player_id) and is_integer(count) do
+    FlowInterpreter.dispatch(game_or_id, :draw_mulligan_bonus, %{
+      player_id: player_id,
+      count: count
+    })
+  end
+
   defp choose_active_from_hand_legacy(%Game{} = game, player_id, card_instance_id) do
     transaction(fn ->
       with {:ok, game} <- get_game(game.id),

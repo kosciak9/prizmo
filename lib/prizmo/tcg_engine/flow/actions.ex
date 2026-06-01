@@ -261,6 +261,32 @@ defmodule Prizmo.TcgEngine.Flow.Actions do
     end
   end
 
+  def draw_mulligan_bonus(%Context{game: %Game{} = game} = context, attrs) do
+    player_id = Map.fetch!(attrs, :player_id)
+    count = Map.fetch!(attrs, :count)
+
+    with :ok <- require_player(context, player_id),
+         :ok <- require_setup_player_not_ready(context, player_id),
+         :ok <- require_player_has_active(game.id, player_id),
+         {:ok, setup} <- SetupStore.require_setup_status(game.id, :hands_drawn),
+         :ok <- require_no_prizes_placed(game.id),
+         %GamePlayer{} = player <- player(context, player_id),
+         {:ok, bonus_fact} <- GameSetup.draw_mulligan_bonus_cards(game, player, count),
+         {:ok, event} <-
+           write_event(
+             game,
+             :mulligan_bonus_drawn,
+             player_id,
+             setup_mulligan_payload(setup, bonus_fact)
+           ),
+         {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do
+      {:ok, game}
+    else
+      nil -> {:error, :player_not_found}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
   def finish_setup_choices(%Context{game: %Game{} = game} = context, attrs) do
     player_id = Map.fetch!(attrs, :player_id)
 

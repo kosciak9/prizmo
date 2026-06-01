@@ -131,6 +131,32 @@ defmodule Prizmo.TcgEngine.Game.ActionCommands do
       end
     end
 
+    action :draw_mulligan_bonus_command, :struct do
+      description "Draw optional setup bonus cards for an opponent opening-hand mulligan."
+
+      constraints instance_of: Game
+
+      argument :game_id, :uuid do
+        allow_nil? false
+      end
+
+      argument :player_id, :string do
+        allow_nil? false
+      end
+
+      argument :count, :integer do
+        allow_nil? false
+      end
+
+      run fn input, _context ->
+        Mechanics.draw_mulligan_bonus(
+          input.arguments.game_id,
+          input.arguments.player_id,
+          input.arguments.count
+        )
+      end
+    end
+
     action :choose_setup_bench_from_hand_command, :struct do
       description "Choose a player's setup Benched Pokémon from hand through the mechanics layer."
 

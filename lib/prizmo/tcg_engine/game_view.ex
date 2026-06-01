@@ -9,6 +9,7 @@ defmodule Prizmo.TcgEngine.GameView do
   alias Prizmo.TcgEngine.CardStore
   alias Prizmo.TcgEngine.Game
   alias Prizmo.TcgEngine.GameEvent
+  alias Prizmo.TcgEngine.GameSetup
   alias Prizmo.TcgEngine.GameStore
   alias Prizmo.TcgEngine.GameView.ActionAffordances
   alias Prizmo.TcgEngine.PlayerStore
@@ -27,6 +28,7 @@ defmodule Prizmo.TcgEngine.GameView do
          :ok <- require_viewer(players, viewer_player_id),
          {:ok, cards} <- CardStore.list_cards(game.id),
          {:ok, events} <- list_events(game),
+         {:ok, mulligan_stats} <- GameSetup.mulligan_stats(game, players),
          {:ok, setup} <- maybe_setup(game.id),
          {:ok, current_turn} <- maybe_current_turn(game.id),
          {:ok, awaiting_prompts} <- list_awaiting_prompts(game.id) do
@@ -62,7 +64,14 @@ defmodule Prizmo.TcgEngine.GameView do
              viewer_player_id
            ),
          stadium: stadium_view(cards, attached_cards_by_target),
-         players: player_views(players, cards, viewer_player_id, attached_cards_by_target),
+         players:
+           player_views(
+             players,
+             cards,
+             viewer_player_id,
+             attached_cards_by_target,
+             mulligan_stats
+           ),
          events: Enum.map(events, &event_view/1),
          prompts: Enum.map(prompts, &prompt_view(&1, cards, attached_cards_by_target))
        }}
@@ -209,12 +218,13 @@ defmodule Prizmo.TcgEngine.GameView do
     |> card_view(attached_cards_by_target)
   end
 
-  defp player_views(players, cards, viewer_player_id, attached_cards_by_target) do
+  defp player_views(players, cards, viewer_player_id, attached_cards_by_target, mulligan_stats) do
     cards_by_player = Enum.group_by(cards, & &1.owner_player_id)
 
     Enum.map(players, fn player ->
       player_cards = Map.get(cards_by_player, player.player_id, [])
       viewer? = player.player_id == viewer_player_id
+      player_mulligan_stats = Map.fetch!(mulligan_stats, player.player_id)
 
       %{
         player_id: player.player_id,
@@ -224,6 +234,9 @@ defmodule Prizmo.TcgEngine.GameView do
         retreated_this_turn: player.retreated_this_turn?,
         ace_spec_played_this_game: player.ace_spec_played_this_game?,
         setup_ready: player.setup_ready?,
+        mulligans_taken: player_mulligan_stats.mulligans_taken,
+        mulligan_bonus_draws_taken: player_mulligan_stats.mulligan_bonus_draws_taken,
+        mulligan_bonus_draws_available: player_mulligan_stats.mulligan_bonus_draws_available,
         deck_count: zone_count(player_cards, :deck),
         hand_count: zone_count(player_cards, :hand),
         prize_count: zone_count(player_cards, :prize),
