@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-06-01] iteration 214 | Festival Grounds Stadium behavior
+- Task attempted: advanced arbitrary-deck Stadium correctness by turning Festival Grounds (`TWM-149`) Special-Condition recovery/immunity text into executable Ash-engine behavior while keeping the generic Stadium action surface intact.
+- Files changed: added `lib/prizmo/tcg_engine/stadium_effects.ex`; updated `lib/prizmo/tcg_engine/mechanics.ex`, `lib/prizmo/tcg_engine/attack_effects.ex`, `lib/prizmo/tcg_engine/card_play.ex`, `lib/prizmo/tcg_engine/game_view.ex`, `lib/prizmo/tcg_engine/game_view/action_affordances.ex`, the canonical north-star article, this log, and the TCG engine playtest handoff.
+- Validation: `mix format`, `mix compile --warnings-as-errors`, `mix test test/prizmo/tcg_engine/mechanics_test.exs`, `git diff --check`, and rollback Tidewave validation passed before the wiki update. Rollback validation confirmed Stadium-play recovery, attach-after-Stadium recovery, direct status prevention, attack-effect status prevention with damage preserved, engine-defined read-model status, hidden/no-op payload hygiene, and a Crispin regression smoke for the touched attach-from-deck path.
+- Remaining/blocking notes: this closes Festival Grounds condition recovery/immunity for the currently supported status paths. Other printed Tool/Stadium effects, additional pending Trainer behavior, and the benchmarked card-table density/polish batch remain open.
+
 ## [2026-06-01] iteration 213 | Partial Crispin search
 - Task attempted: advanced arbitrary-deck Supporter playability by completing Crispin's partial one-Basic-Energy use while preserving the existing two-different-Basic-Energy search/attach path.
 - Files changed: updated `lib/prizmo/tcg_engine/cards/registry.ex`, `lib/prizmo/tcg_engine/card_play.ex`, `lib/prizmo_web/spa/features/home/routes/index.tsx`, the canonical north-star article, this log, and the TCG engine playtest handoff.

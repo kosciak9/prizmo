@@ -76,6 +76,7 @@ defmodule Prizmo.TcgEngine.Mechanics do
   alias Prizmo.TcgEngine.AttackEffects
   alias Prizmo.TcgEngine.AttackRequirements
   alias Prizmo.TcgEngine.CardCatalog
+  alias Prizmo.TcgEngine.CardInstance
   alias Prizmo.TcgEngine.CardPlay
   alias Prizmo.TcgEngine.Cards.Registry, as: EngineCardRegistry
   alias Prizmo.TcgEngine.ChoiceValidator
@@ -91,6 +92,7 @@ defmodule Prizmo.TcgEngine.Mechanics do
   alias Prizmo.TcgEngine.Rng
   alias Prizmo.TcgEngine.Setup
   alias Prizmo.TcgEngine.SnapshotRestorer
+  alias Prizmo.TcgEngine.StadiumEffects
   alias Prizmo.TcgEngine.Turn
   alias Prizmo.TcgEngine.ZoneActions
 
@@ -427,14 +429,25 @@ defmodule Prizmo.TcgEngine.Mechanics do
                attached_to_card_instance_id: target_card.id,
                position: position
              }),
+           {:ok, recovered_special_condition} <-
+             StadiumEffects.recover_special_condition(game.id, target_card),
            {:ok, _player} <- update(player, :mark_energy_attached, %{}),
            {:ok, _attach_event} <-
-             write_event_and_snapshot(game.id, :attach_energy, player_id, %{
-               turn_id: turn.id,
-               energy_card_instance_id: energy_card.id,
-               target_card_instance_id: target_card.id,
-               position: position
-             }),
+             write_event_and_snapshot(
+               game.id,
+               :attach_energy,
+               player_id,
+               maybe_put(
+                 %{
+                   turn_id: turn.id,
+                   energy_card_instance_id: energy_card.id,
+                   target_card_instance_id: target_card.id,
+                   position: position
+                 },
+                 :recovered_special_condition,
+                 recovered_special_condition
+               )
+             ),
            {:ok, effect_event} <-
              EnergyEffects.after_attach_from_hand(game, player, energy_card, target_card),
            {:ok, _effect_event} <-
@@ -880,12 +893,23 @@ defmodule Prizmo.TcgEngine.Mechanics do
            :ok <- require_ace_spec_available(player, metadata),
            {:ok, _discarded_stadiums} <- discard_existing_stadiums(game.id),
            {:ok, _card} <- update(card, :play_stadium, %{position: 1}),
+           {:ok, recovered_special_conditions} <-
+             StadiumEffects.recover_special_conditions(game.id),
            {:ok, _player} <- mark_trainer_flags(player, metadata),
            {:ok, event} <-
-             write_event(game, :play_stadium, player_id, %{
-               turn_id: turn.id,
-               card_instance_id: card.id
-             }),
+             write_event(
+               game,
+               :play_stadium,
+               player_id,
+               maybe_put_non_empty(
+                 %{
+                   turn_id: turn.id,
+                   card_instance_id: card.id
+                 },
+                 :recovered_special_conditions,
+                 recovered_special_conditions
+               )
+             ),
            {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do
         get_game(game.id)
       end
@@ -1231,16 +1255,36 @@ defmodule Prizmo.TcgEngine.Mechanics do
            {:ok, target_card} <- get_card(game.id, target_card_instance_id),
            :ok <- require_in_play_pokemon_zone(target_card),
            :ok <- require_supported_status(status),
-           {:ok, _target_card} <- update(target_card, :set_status, %{status: status}),
+           {:ok, status_payload} <- maybe_set_pokemon_status(game.id, target_card, status),
            {:ok, event} <-
-             write_event(game, :set_pokemon_status, player_id, %{
-               target_card_instance_id: target_card.id,
-               status: if(status, do: Atom.to_string(status))
-             }),
+             write_event(
+               game,
+               :set_pokemon_status,
+               player_id,
+               Map.merge(
+                 %{
+                   target_card_instance_id: target_card.id,
+                   status: if(status, do: Atom.to_string(status))
+                 },
+                 status_payload
+               )
+             ),
            {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do
         get_game(game.id)
       end
     end)
+  end
+
+  defp maybe_set_pokemon_status(game_id, %CardInstance{} = target_card, status) do
+    case StadiumEffects.status_condition_prevention_payload(game_id, target_card, status) do
+      {:prevented, prevention_payload} ->
+        {:ok, Map.put(prevention_payload, :status_applied?, false)}
+
+      :not_prevented ->
+        with {:ok, _target_card} <- update(target_card, :set_status, %{status: status}) do
+          {:ok, %{status_applied?: true}}
+        end
+    end
   end
 
   @spec declare_attack(Game.t() | String.t(), String.t(), atom() | String.t()) ::
@@ -1987,6 +2031,9 @@ defmodule Prizmo.TcgEngine.Mechanics do
 
   defp maybe_put(map, _key, nil), do: map
   defp maybe_put(map, key, value), do: Map.put(map, key, value)
+
+  defp maybe_put_non_empty(map, _key, []), do: map
+  defp maybe_put_non_empty(map, key, value), do: maybe_put(map, key, value)
 
   defp setup_move_payload(%Setup{} = setup, player_facts) do
     %{

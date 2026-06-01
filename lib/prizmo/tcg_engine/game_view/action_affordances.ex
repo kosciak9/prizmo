@@ -15,6 +15,7 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
   alias Prizmo.TcgEngine.Requirements
   alias Prizmo.TcgEngine.RetreatCosts
   alias Prizmo.TcgEngine.RetreatLocks
+  alias Prizmo.TcgEngine.StadiumEffects
   alias Prizmo.TcgEngine.ToolEffects
   alias Prizmo.TcgEngine.Turn
 
@@ -633,6 +634,9 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
 
   defp supported_trainer_text?(%{trainer_type: :tool} = card),
     do: ToolEffects.supported_tool?(card)
+
+  defp supported_trainer_text?(%{trainer_type: :stadium} = card),
+    do: StadiumEffects.supported_stadium?(card)
 
   defp supported_trainer_text?(_card), do: false
 

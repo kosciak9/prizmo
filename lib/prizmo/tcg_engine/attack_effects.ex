@@ -54,6 +54,7 @@ defmodule Prizmo.TcgEngine.AttackEffects do
   alias Prizmo.TcgEngine.PlayerStore
   alias Prizmo.TcgEngine.Prompt
   alias Prizmo.TcgEngine.RetreatLocks
+  alias Prizmo.TcgEngine.StadiumEffects
   alias Prizmo.TcgEngine.TeraBenchProtection
   alias Prizmo.TcgEngine.TurnStore
 
@@ -837,7 +838,12 @@ defmodule Prizmo.TcgEngine.AttackEffects do
 
   defp set_defender_status(game_id, attacking_player_id, %CardInstance{} = defender_card, status) do
     with {:ok, current_defender_card} <- get_card(game_id, defender_card.id) do
-      case attack_effect_prevention_payload(game_id, attacking_player_id, current_defender_card) do
+      case status_condition_prevention_payload(
+             game_id,
+             attacking_player_id,
+             current_defender_card,
+             status
+           ) do
         {:prevented, prevention_payload} ->
           {:ok,
            Map.merge(
@@ -875,6 +881,21 @@ defmodule Prizmo.TcgEngine.AttackEffects do
                }}
           end
       end
+    end
+  end
+
+  defp status_condition_prevention_payload(
+         game_id,
+         attacking_player_id,
+         %CardInstance{} = target_card,
+         status
+       ) do
+    case attack_effect_prevention_payload(game_id, attacking_player_id, target_card) do
+      {:prevented, prevention_payload} ->
+        {:prevented, prevention_payload}
+
+      :not_prevented ->
+        StadiumEffects.status_condition_prevention_payload(game_id, target_card, status)
     end
   end
 

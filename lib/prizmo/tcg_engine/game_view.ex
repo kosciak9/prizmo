@@ -15,6 +15,7 @@ defmodule Prizmo.TcgEngine.GameView do
   alias Prizmo.TcgEngine.PlayerStore
   alias Prizmo.TcgEngine.Prompt
   alias Prizmo.TcgEngine.Setup
+  alias Prizmo.TcgEngine.StadiumEffects
   alias Prizmo.TcgEngine.ToolEffects
   alias Prizmo.TcgEngine.Turn
   alias Prizmo.TcgEngine.TurnStore
@@ -736,12 +737,20 @@ defmodule Prizmo.TcgEngine.GameView do
 
   defp unsupported_trainer_label(_card), do: "Unsupported Trainer"
 
-  defp generic_trainer_rules_summary(%{trainer_type: :stadium}) do
-    rules_summary(
-      :partial,
-      "Generic Stadium",
-      "This Stadium can be played through the generic engine action; printed Stadium text may still be pending."
-    )
+  defp generic_trainer_rules_summary(%{trainer_type: :stadium} = card) do
+    if StadiumEffects.supported_stadium?(card) do
+      rules_summary(
+        :engine_defined,
+        "Engine-defined Stadium",
+        "This Stadium can be played generically and its authored Stadium text is enforced by the engine."
+      )
+    else
+      rules_summary(
+        :partial,
+        "Generic Stadium",
+        "This Stadium can be played through the generic engine action; printed Stadium text may still be pending."
+      )
+    end
   end
 
   defp generic_trainer_rules_summary(%{trainer_type: :tool} = card) do
@@ -773,7 +782,7 @@ defmodule Prizmo.TcgEngine.GameView do
   end
 
   defp unsupported_action_summaries(card_id, %{supertype: :trainer} = card) do
-    if ToolEffects.supported_tool?(card) do
+    if supported_trainer_text?(card) do
       []
     else
       case EngineCardRegistry.fetch(card_id) do
@@ -802,6 +811,14 @@ defmodule Prizmo.TcgEngine.GameView do
   end
 
   defp unsupported_action_summaries(_card_id, _card), do: []
+
+  defp supported_trainer_text?(%{trainer_type: :stadium} = card),
+    do: StadiumEffects.supported_stadium?(card)
+
+  defp supported_trainer_text?(%{trainer_type: :tool} = card),
+    do: ToolEffects.supported_tool?(card)
+
+  defp supported_trainer_text?(_card), do: false
 
   defp unsupported_attack_summaries(card_id, %{attacks: attacks}) when is_map(attacks) do
     attacks

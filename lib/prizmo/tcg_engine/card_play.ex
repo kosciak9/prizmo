@@ -45,6 +45,7 @@ defmodule Prizmo.TcgEngine.CardPlay do
   alias Prizmo.TcgEngine.PlayerStore
   alias Prizmo.TcgEngine.Prompt
   alias Prizmo.TcgEngine.Rng
+  alias Prizmo.TcgEngine.StadiumEffects
   alias Prizmo.TcgEngine.TrainerPlay
   alias Prizmo.TcgEngine.TurnStore
 
@@ -350,20 +351,29 @@ defmodule Prizmo.TcgEngine.CardPlay do
            validate_crispin_effect(game.id, player.player_id, effect, target_ids),
          {:ok, moved_hand_energy_card} <-
            CardStore.move_deck_card_to_hand(game.id, player.player_id, hand_energy_card),
-         {:ok, moved_attached_energy_card} <-
+         {:ok, {moved_attached_energy_card, recovered_special_condition}} <-
            maybe_attach_crispin_energy(game, attach_energy_card, target_card),
          {:ok, _event} <-
-           write_event_and_snapshot(game.id, :cards_moved, player.player_id, %{
-             reason: :effect_resolution,
-             source: EventPayloads.card_source(card),
-             effect_key: effect.key,
-             cards:
-               crispin_moved_card_payloads(
-                 moved_hand_energy_card,
-                 moved_attached_energy_card,
-                 target_card
-               )
-           }),
+           write_event_and_snapshot(
+             game.id,
+             :cards_moved,
+             player.player_id,
+             maybe_put(
+               %{
+                 reason: :effect_resolution,
+                 source: EventPayloads.card_source(card),
+                 effect_key: effect.key,
+                 cards:
+                   crispin_moved_card_payloads(
+                     moved_hand_energy_card,
+                     moved_attached_energy_card,
+                     target_card
+                   )
+               },
+               :recovered_special_condition,
+               recovered_special_condition
+             )
+           ),
          {:ok, _event} <- maybe_shuffle_and_write_deck_shuffled(game, turn, player, card, effect) do
       complete_play_card_resolution(game, turn, player, card, effect)
     end
@@ -457,19 +467,30 @@ defmodule Prizmo.TcgEngine.CardPlay do
              attached_to_card_instance_id: target_card.id,
              position: position
            }),
+         {:ok, recovered_special_condition} <-
+           StadiumEffects.recover_special_condition(game.id, target_card),
          {:ok, _event} <-
-           write_event_and_snapshot(game.id, :cards_moved, player.player_id, %{
-             reason: :effect_resolution,
-             source: EventPayloads.card_source(card),
-             effect_key: effect.key,
-             cards: [
-               energy_switch_move_payload(
-                 moved_energy_card,
-                 source_target_card_instance_id,
-                 target_card.id
-               )
-             ]
-           }) do
+           write_event_and_snapshot(
+             game.id,
+             :cards_moved,
+             player.player_id,
+             maybe_put(
+               %{
+                 reason: :effect_resolution,
+                 source: EventPayloads.card_source(card),
+                 effect_key: effect.key,
+                 cards: [
+                   energy_switch_move_payload(
+                     moved_energy_card,
+                     source_target_card_instance_id,
+                     target_card.id
+                   )
+                 ]
+               },
+               :recovered_special_condition,
+               recovered_special_condition
+             )
+           ) do
       complete_play_card_resolution(game, turn, player, card, effect)
     end
   end
@@ -1521,18 +1542,22 @@ defmodule Prizmo.TcgEngine.CardPlay do
     end
   end
 
-  defp maybe_attach_crispin_energy(_game, nil, nil), do: {:ok, nil}
+  defp maybe_attach_crispin_energy(_game, nil, nil), do: {:ok, {nil, nil}}
 
   defp maybe_attach_crispin_energy(
          %Game{} = game,
          %CardInstance{} = energy_card,
          %CardInstance{} = target_card
        ) do
-    with {:ok, position} <- CardStore.next_attachment_position(game.id, target_card.id) do
-      update(energy_card, :attach_from_deck, %{
-        attached_to_card_instance_id: target_card.id,
-        position: position
-      })
+    with {:ok, position} <- CardStore.next_attachment_position(game.id, target_card.id),
+         {:ok, attached_energy} <-
+           update(energy_card, :attach_from_deck, %{
+             attached_to_card_instance_id: target_card.id,
+             position: position
+           }),
+         {:ok, recovered_special_condition} <-
+           StadiumEffects.recover_special_condition(game.id, target_card) do
+      {:ok, {attached_energy, recovered_special_condition}}
     end
   end
 
@@ -1616,6 +1641,9 @@ defmodule Prizmo.TcgEngine.CardPlay do
   end
 
   defp maybe_put_reveal_payload(payload, _card, _effect, _moved_cards), do: payload
+
+  defp maybe_put(map, _key, nil), do: map
+  defp maybe_put(map, key, value), do: Map.put(map, key, value)
 
   defp moved_card_payload(card, from_zone, to_zone, opts \\ []) do
     Map.merge(
