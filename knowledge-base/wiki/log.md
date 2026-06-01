@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-06-01] iteration 212 | Air Balloon retreat reduction
+- Task attempted: advanced arbitrary-deck Tool playability by turning Air Balloon's existing authored retreat-cost-reduction overlay into executable Ash-engine behavior for retreat commands, viewer affordances, event payloads, and card rules summaries.
+- Files changed: added `lib/prizmo/tcg_engine/tool_effects.ex` and `lib/prizmo/tcg_engine/retreat_costs.ex`; updated `lib/prizmo/tcg_engine/mechanics.ex`, `lib/prizmo/tcg_engine/game_view/action_affordances.ex`, `lib/prizmo/tcg_engine/game_view.ex`, the canonical north-star article, this log, and the TCG engine playtest handoff.
+- Validation: `mix format`, `mix compile --warnings-as-errors`, rollback Tidewave validation, `mix test test/prizmo/tcg_engine/mechanics_test.exs`, `git diff --check`, and final `mix check` passed. Rollback validation confirmed Air Balloon attaches through the public Tool command, reduces Abra's printed retreat cost from 1 to effective 0, exposes a zero-Energy retreat affordance, allows retreat with no Energy discarded, records printed/effective/reduction details in the retreat event, and reports Air Balloon as `Engine-defined Tool` with no pending unsupported actions.
+- Remaining/blocking notes: this covers Air Balloon's printed retreat modifier only. Other Tool/Stadium text, Festival Grounds-style Stadium effects, partial one-Energy Crispin semantics, and benchmarked card-table UI density/polish remain open.
+
 ## [2026-06-01] iteration 211 | Generic Tool and Stadium actions
 - Task attempted: advanced arbitrary-deck playability by exposing existing generic Stadium play and Pokémon Tool attachment mechanics through Ash action commands, TypeScript RPC, viewer action affordances, and the React SPA command surface while keeping printed Tool/Stadium text visibly pending.
 - Files changed: updated `lib/prizmo/tcg_engine.ex`, `lib/prizmo/tcg_engine/game.ex`, `lib/prizmo/tcg_engine/game/action_commands.ex`, `lib/prizmo/tcg_engine/game_view/action_affordances.ex`, `lib/prizmo/tcg_engine/game_view.ex`, `lib/prizmo_web/spa/lib/ash/client.ts`, `lib/prizmo_web/spa/features/home/routes/index.tsx`, the canonical north-star article, this log, and the TCG engine playtest handoff.

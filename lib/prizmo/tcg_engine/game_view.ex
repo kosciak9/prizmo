@@ -15,6 +15,7 @@ defmodule Prizmo.TcgEngine.GameView do
   alias Prizmo.TcgEngine.PlayerStore
   alias Prizmo.TcgEngine.Prompt
   alias Prizmo.TcgEngine.Setup
+  alias Prizmo.TcgEngine.ToolEffects
   alias Prizmo.TcgEngine.Turn
   alias Prizmo.TcgEngine.TurnStore
 
@@ -743,12 +744,20 @@ defmodule Prizmo.TcgEngine.GameView do
     )
   end
 
-  defp generic_trainer_rules_summary(%{trainer_type: :tool}) do
-    rules_summary(
-      :partial,
-      "Generic Tool",
-      "This Tool can attach through the generic engine action; printed Tool text may still be pending."
-    )
+  defp generic_trainer_rules_summary(%{trainer_type: :tool} = card) do
+    if ToolEffects.supported_tool?(card) do
+      rules_summary(
+        :engine_defined,
+        "Engine-defined Tool",
+        "This Tool attaches generically and its authored Tool text is enforced by the engine."
+      )
+    else
+      rules_summary(
+        :partial,
+        "Generic Tool",
+        "This Tool can attach through the generic engine action; printed Tool text may still be pending."
+      )
+    end
   end
 
   defp generic_trainer_rules_summary(card) do
@@ -764,21 +773,25 @@ defmodule Prizmo.TcgEngine.GameView do
   end
 
   defp unsupported_action_summaries(card_id, %{supertype: :trainer} = card) do
-    case EngineCardRegistry.fetch(card_id) do
-      {:ok, %{play_window: :action_window}} ->
-        []
+    if ToolEffects.supported_tool?(card) do
+      []
+    else
+      case EngineCardRegistry.fetch(card_id) do
+        {:ok, %{play_window: :action_window}} ->
+          []
 
-      {:ok, _definition} ->
-        unsupported_trainer_summaries(
-          card,
-          "This Trainer has authored behavior, but that timing window is not exposed in the current action surface."
-        )
+        {:ok, _definition} ->
+          unsupported_trainer_summaries(
+            card,
+            "This Trainer has authored behavior, but that timing window is not exposed in the current action surface."
+          )
 
-      {:error, _reason} ->
-        unsupported_trainer_summaries(
-          card,
-          unsupported_trainer_summary_reason(card)
-        )
+        {:error, _reason} ->
+          unsupported_trainer_summaries(
+            card,
+            unsupported_trainer_summary_reason(card)
+          )
+      end
     end
   end
 

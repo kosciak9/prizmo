@@ -87,6 +87,7 @@ defmodule Prizmo.TcgEngine.Mechanics do
   alias Prizmo.TcgEngine.PendingEffect
   alias Prizmo.TcgEngine.PendingEffects
   alias Prizmo.TcgEngine.Prompt
+  alias Prizmo.TcgEngine.RetreatCosts
   alias Prizmo.TcgEngine.Rng
   alias Prizmo.TcgEngine.Setup
   alias Prizmo.TcgEngine.SnapshotRestorer
@@ -1106,8 +1107,10 @@ defmodule Prizmo.TcgEngine.Mechanics do
            {:ok, bench_card} <- get_card(game.id, bench_card_instance_id),
            :ok <- require_card_owned_by_player(bench_card, player_id),
            :ok <- require_card_zone(bench_card, :bench),
-           {:ok, retreat_cost} <- retreat_cost(active_card.card_id),
-           :ok <- require_retreat_cost_paid(retreat_cost, energy_card_instance_ids),
+           {:ok, retreat_cost_details} <-
+             RetreatCosts.effective_retreat_cost_details(game.id, active_card),
+           :ok <-
+             require_retreat_cost_paid(retreat_cost_details.effective, energy_card_instance_ids),
            {:ok, energy_cards} <-
              attached_energy_cards_for_retreat(game.id, active_card.id, energy_card_instance_ids),
            {:ok, _discarded_energy} <- discard_retreat_energy(game.id, player_id, energy_cards),
@@ -1122,6 +1125,11 @@ defmodule Prizmo.TcgEngine.Mechanics do
                turn_id: turn.id,
                active_card_instance_id: active_card.id,
                bench_card_instance_id: bench_card.id,
+               printed_retreat_cost: retreat_cost_details.printed,
+               effective_retreat_cost: retreat_cost_details.effective,
+               retreat_cost_reduction: retreat_cost_details.reduction,
+               retreat_cost_reduction_card_instance_ids:
+                 retreat_cost_details.reduction_card_instance_ids,
                discarded_energy_card_instance_ids: Enum.map(energy_cards, & &1.id)
              }),
            {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do

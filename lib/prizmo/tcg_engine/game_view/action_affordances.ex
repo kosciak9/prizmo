@@ -13,7 +13,9 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
   alias Prizmo.TcgEngine.GamePlayer
   alias Prizmo.TcgEngine.Prompt
   alias Prizmo.TcgEngine.Requirements
+  alias Prizmo.TcgEngine.RetreatCosts
   alias Prizmo.TcgEngine.RetreatLocks
+  alias Prizmo.TcgEngine.ToolEffects
   alias Prizmo.TcgEngine.Turn
 
   @doc "Returns action affordances visible to the current game viewer."
@@ -246,7 +248,11 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
          false <- blocked_retreat_status?(active_card),
          false <- RetreatLocks.blocked_this_turn?(active_card, current_turn),
          target_ids when target_ids != [] <- cards |> bench_pokemon_cards() |> card_ids(),
-         {:ok, retreat_cost} <- retreat_cost(active_card),
+         {:ok, retreat_cost} <-
+           RetreatCosts.effective_retreat_cost(
+             active_card,
+             attached_cards_for(cards, active_card.id)
+           ),
          source_ids = cards |> active_attached_energy_cards(active_card.id) |> card_ids(),
          true <- length(source_ids) >= retreat_cost do
       affordance(:retreat, "Retreat Active Pokémon", :command, player.player_id,
@@ -427,20 +433,6 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
       evolution_card.evolves_from in [target_card.name, target_card.id]
     else
       _other -> false
-    end
-  end
-
-  defp retreat_cost(%CardInstance{card_id: card_id}) do
-    case CardCatalog.fetch(card_id) do
-      {:ok, %{retreat_count: retreat_count}}
-      when is_integer(retreat_count) and retreat_count >= 0 ->
-        {:ok, retreat_count}
-
-      {:ok, _card} ->
-        {:ok, 0}
-
-      {:error, reason} ->
-        {:error, reason}
     end
   end
 
@@ -625,6 +617,7 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
 
   defp trainer_pending_reason(card_id, %{raw_effect: raw_effect} = catalog_card) do
     with true <- present_text?(raw_effect),
+         false <- supported_trainer_text?(catalog_card),
          {:ok, definition} <- EngineCardRegistry.fetch(card_id),
          false <- Map.get(definition, :play_window) == :action_window do
       {:pending,
@@ -637,6 +630,11 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
         false
     end
   end
+
+  defp supported_trainer_text?(%{trainer_type: :tool} = card),
+    do: ToolEffects.supported_tool?(card)
+
+  defp supported_trainer_text?(_card), do: false
 
   defp trainer_pending_note(%{trainer_type: :stadium}) do
     "This Stadium can be played generically, but its printed Stadium text is not executable yet."
