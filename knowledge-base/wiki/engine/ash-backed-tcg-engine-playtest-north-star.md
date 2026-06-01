@@ -199,7 +199,8 @@ Important boundary: Electric should be a delivery and replay layer, not the rule
 - DiscardPreview component: face-up top discard card art with gradient count overlay.
 - Stadium card art: CardArt thumbnail in center divider alongside stadium name.
 - Hand density: tightened tile padding and grid gap.
-- Remaining UI work: hand fanning/overlap for very large hands (>10 cards), card-attached action affordances on the board, event history visual polish, board-feel animation, and further layout refinement as playtest loop matures.
+- Completed (batch 225): event history visual polish — turn separators, per-type colored category indicators, compressed layout, removed verbose explanation text, compact player badges.
+- Remaining UI work: hand fanning/overlap for very large hands (>10 cards), card-attached action affordances on the board, board-feel animation, and further layout refinement as playtest loop matures.
 
 ### 5. Expand core engine mechanics
 
