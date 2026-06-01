@@ -31,6 +31,7 @@ defmodule Prizmo.TcgEngine.CardPlay do
   alias Prizmo.TcgEngine.GamePlayer
   alias Prizmo.TcgEngine.GameStore
   alias Prizmo.TcgEngine.PendingEffects
+  alias Prizmo.TcgEngine.PlayerStore
   alias Prizmo.TcgEngine.Prompt
   alias Prizmo.TcgEngine.Rng
   alias Prizmo.TcgEngine.TrainerPlay
@@ -152,7 +153,7 @@ defmodule Prizmo.TcgEngine.CardPlay do
     state = pending_effect.state || %{}
 
     with {:ok, player} <-
-           Prizmo.TcgEngine.PlayerStore.get_player(game.id, Map.fetch!(state, "player_id")),
+           PlayerStore.get_player(game.id, Map.fetch!(state, "player_id")),
          {:ok, card} <- CardStore.get_card(game.id, Map.fetch!(state, "card_instance_id")),
          {:ok, definition} <- EngineCardRegistry.fetch(card.card_id),
          {:ok, turn} <- TurnStore.current_turn(game.id),
@@ -326,29 +327,32 @@ defmodule Prizmo.TcgEngine.CardPlay do
          %{type: :shuffle_hand_into_deck_then_draw} = effect,
          _target_ids
        ) do
-    with {:ok, hand_cards} <- CardStore.cards_in_zone(game.id, player.player_id, :hand),
-         returned_card_ids = MapSet.new(hand_cards, & &1.id),
-         {:ok, _returned_to_deck} <- return_hand_to_deck(game.id, player.player_id, hand_cards),
-         {:ok, shuffled_deck} <- shuffle_deck_for_effect(game, turn, player, card, effect),
-         returned_cards = Enum.filter(shuffled_deck, &MapSet.member?(returned_card_ids, &1.id)),
-         {:ok, _event} <-
-           write_event_and_snapshot(game.id, :cards_moved, player.player_id, %{
-             reason: :effect_resolution,
-             source: EventPayloads.card_source(card),
-             effect_key: effect.key,
-             cards: EventPayloads.moved_cards(returned_cards, :hand, :deck)
-           }),
-         {:ok, _event} <-
-           write_effect_deck_shuffled(game, turn, player, card, effect, shuffled_deck),
-         {:ok, draw_count} <- draw_count_for_effect(game.id, player.player_id, effect),
-         {:ok, drawn_cards} <- draw_cards_for_effect(game, player, draw_count),
-         {:ok, _event} <-
-           write_event_and_snapshot(game.id, :cards_moved, player.player_id, %{
-             reason: :effect_resolution,
-             source: EventPayloads.card_source(card),
-             effect_key: effect.key,
-             cards: EventPayloads.moved_cards(drawn_cards, :deck, :hand)
-           }) do
+    with :ok <- require_can_draw_after_hand_shuffle(game, player, effect),
+         {:ok, _summary} <-
+           shuffle_hand_into_deck_then_draw_for_player(game, turn, player, player, card, effect) do
+      complete_play_card_resolution(game, turn, player, card, effect)
+    end
+  end
+
+  defp complete_play_card_effect(
+         game,
+         turn,
+         player,
+         card,
+         %{type: :shuffle_each_player_hand_into_deck_then_draw} = effect,
+         _target_ids
+       ) do
+    with {:ok, affected_players} <- PlayerStore.list_players(game.id),
+         :ok <- require_each_player_can_draw_after_hand_shuffle(game, affected_players, effect),
+         {:ok, _summaries} <-
+           shuffle_each_player_hand_into_deck_then_draw(
+             game,
+             turn,
+             player,
+             card,
+             effect,
+             affected_players
+           ) do
       complete_play_card_resolution(game, turn, player, card, effect)
     end
   end
@@ -667,23 +671,98 @@ defmodule Prizmo.TcgEngine.CardPlay do
 
   defp shuffle_cards(cards, _seed, _context), do: Enum.shuffle(cards)
 
-  defp write_effect_deck_shuffled(%Game{} = game, turn, player, card, effect, shuffled_deck) do
+  defp shuffle_each_player_hand_into_deck_then_draw(
+         game,
+         turn,
+         action_player,
+         card,
+         effect,
+         affected_players
+       ) do
+    affected_players
+    |> Enum.map(
+      &shuffle_hand_into_deck_then_draw_for_player(game, turn, action_player, &1, card, effect)
+    )
+    |> collect_results()
+  end
+
+  defp shuffle_hand_into_deck_then_draw_for_player(
+         %Game{} = game,
+         turn,
+         action_player,
+         affected_player,
+         card,
+         effect
+       ) do
+    with {:ok, hand_cards} <- CardStore.cards_in_zone(game.id, affected_player.player_id, :hand),
+         returned_card_ids = MapSet.new(hand_cards, & &1.id),
+         {:ok, _returned_to_deck} <-
+           return_hand_to_deck(game.id, affected_player.player_id, hand_cards),
+         {:ok, shuffled_deck} <-
+           shuffle_deck_for_effect(game, turn, affected_player, card, effect),
+         returned_cards = Enum.filter(shuffled_deck, &MapSet.member?(returned_card_ids, &1.id)),
+         {:ok, _event} <-
+           write_event_and_snapshot(game.id, :cards_moved, affected_player.player_id, %{
+             reason: :effect_resolution,
+             source: EventPayloads.card_source(card),
+             effect_key: effect.key,
+             affected_player_id: affected_player.player_id,
+             cards: EventPayloads.moved_cards(returned_cards, :hand, :deck)
+           }),
+         {:ok, _event} <-
+           write_effect_deck_shuffled(
+             game,
+             turn,
+             affected_player.player_id,
+             card,
+             effect,
+             shuffled_deck
+           ),
+         {:ok, draw_count} <- draw_count_for_effect(game.id, affected_player.player_id, effect),
+         {:ok, drawn_cards} <- draw_cards_for_effect(game, affected_player, draw_count),
+         {:ok, _event} <-
+           write_event_and_snapshot(game.id, :cards_moved, affected_player.player_id, %{
+             reason: :effect_resolution,
+             source: EventPayloads.card_source(card),
+             effect_key: effect.key,
+             affected_player_id: affected_player.player_id,
+             cards: EventPayloads.moved_cards(drawn_cards, :deck, :hand)
+           }) do
+      {:ok,
+       %{
+         player_id: affected_player.player_id,
+         action_player_id: action_player.player_id,
+         returned_card_count: length(returned_cards),
+         drawn_card_count: length(drawn_cards)
+       }}
+    end
+  end
+
+  defp write_effect_deck_shuffled(
+         %Game{} = game,
+         turn,
+         affected_player_id,
+         card,
+         effect,
+         shuffled_deck
+       ) do
     payload =
       maybe_put_effect_rng_payload(
         %{
           source: EventPayloads.card_source(card),
           effect_key: effect.key,
+          affected_player_id: affected_player_id,
           shuffle: "trainer_effect",
           card_count: length(shuffled_deck)
         },
         game,
         turn,
-        player.player_id,
+        affected_player_id,
         card,
         effect
       )
 
-    write_event_and_snapshot(game.id, :deck_shuffled, player.player_id, payload)
+    write_event_and_snapshot(game.id, :deck_shuffled, affected_player_id, payload)
   end
 
   defp maybe_put_effect_rng_payload(
@@ -713,15 +792,42 @@ defmodule Prizmo.TcgEngine.CardPlay do
     "trainer_effect_shuffle:#{player_id}:turn_#{turn.turn_number}:#{card.card_id}:#{effect.key}"
   end
 
-  defp draw_count_for_effect(game_id, player_id, %{params: params}) do
+  defp require_each_player_can_draw_after_hand_shuffle(game, affected_players, effect) do
+    affected_players
+    |> Enum.map(&require_can_draw_after_hand_shuffle(game, &1, effect))
+    |> collect_ok_results()
+  end
+
+  defp require_can_draw_after_hand_shuffle(%Game{} = game, %GamePlayer{} = player, effect) do
+    with {:ok, draw_count} <- draw_count_for_effect(game.id, player.player_id, effect),
+         {:ok, hand_cards} <- CardStore.cards_in_zone(game.id, player.player_id, :hand),
+         {:ok, deck_count} <- CardStore.deck_count(game.id, player.player_id) do
+      available_after_shuffle = deck_count + length(hand_cards)
+
+      if available_after_shuffle >= draw_count do
+        :ok
+      else
+        {:error, {:cannot_draw_card_effect_from_deck, draw_count, available_after_shuffle}}
+      end
+    end
+  end
+
+  defp draw_count_for_effect(game_id, player_id, %{
+         params:
+           %{full_prize_count: full_prize_count, full_prize_draw_count: full_prize_draw_count} =
+             params
+       }) do
     with {:ok, prizes} <- CardStore.cards_in_zone(game_id, player_id, :prize) do
-      if length(prizes) == Map.fetch!(params, :full_prize_count) do
-        {:ok, Map.fetch!(params, :full_prize_draw_count)}
+      if length(prizes) == full_prize_count do
+        {:ok, full_prize_draw_count}
       else
         {:ok, Map.fetch!(params, :draw_count)}
       end
     end
   end
+
+  defp draw_count_for_effect(_game_id, _player_id, %{params: %{draw_count: draw_count}}),
+    do: {:ok, draw_count}
 
   defp draw_cards_for_effect(%Game{} = game, %GamePlayer{} = player, draw_count) do
     with {:ok, cards} <- CardStore.deck_cards_for_player(player.id, draw_count),

@@ -5,6 +5,20 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
   alias Prizmo.TcgEngine.Cards.Cost
   alias Prizmo.TcgEngine.Cards.Effect
 
+  @judge %CardDefinition{
+    id: "POR-076",
+    kind: :trainer,
+    trainer_type: :supporter,
+    play_window: :action_window,
+    effects: [
+      %Effect{
+        key: :shuffle_each_player_hand_into_deck_then_draw,
+        type: :shuffle_each_player_hand_into_deck_then_draw,
+        params: %{draw_count: 4}
+      }
+    ]
+  }
+
   @lillies_determination %CardDefinition{
     id: "MEG-119",
     kind: :trainer,
@@ -104,6 +118,7 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
   @cards %{
     @boss_orders.id => @boss_orders,
     @buddy_buddy_poffin.id => @buddy_buddy_poffin,
+    @judge.id => @judge,
     @lillies_determination.id => @lillies_determination,
     @poke_pad.id => @poke_pad,
     @ultra_ball.id => @ultra_ball

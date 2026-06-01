@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-06-01] iteration 203 | Judge both-player shuffle draw
+- Task attempted: advanced arbitrary-deck Supporter safety by moving Judge (`POR-076`) onto the generic `play_card` path as an engine-defined no-choice both-player shuffle-hand-into-deck then draw-4 effect.
+- Files changed: updated `lib/prizmo/tcg_engine/cards/registry.ex`, `lib/prizmo/tcg_engine/card_play.ex`, the canonical north-star article, this log, and the TCG engine playtest handoff.
+- Validation: `mix format`, `mix compile --warnings-as-errors`, rollback Tidewave validation, rollback cleanup SQL, `mix test test/prizmo/tcg_engine/mechanics_test.exs`, `git diff --check`, and final `mix check` passed. Rollback validation confirmed Judge appears as a generic Play source with `engine_defined` rules status, resolves without a prompt, discards/marks the Supporter, shuffles both players' hands into their own decks with distinct seeded RNG contexts but no `rng_seed`, draws four cards for each player, writes the expected domain-event suffix, preserves hidden opponent hands, and rolls back the scratch game.
+- Remaining/blocking notes: this covers Judge's printed both-player shuffle/draw effect through the generic Supporter path, not Dawn's staged Pokémon search, Hilda/Crispin multi-card search/attach effects, broader Item/Tool effects, or the benchmarked card-table density/polish batch.
+
 ## [2026-06-01] iteration 202 | Lillie's Determination shuffle draw
 - Task attempted: advanced arbitrary-deck Supporter safety by moving Lillie's Determination (`MEG-119`) onto the generic `play_card` path as an engine-defined no-choice shuffle-hand-into-deck then draw effect.
 - Files changed: updated `lib/prizmo/tcg_engine/cards/registry.ex`, `lib/prizmo/tcg_engine/effect_runner.ex`, `lib/prizmo/tcg_engine/card_play.ex`, the canonical north-star article, this log, and the TCG engine playtest handoff.
