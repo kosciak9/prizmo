@@ -416,6 +416,28 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     ]
   }
 
+  @team_rockets_proton %CardDefinition{
+    id: "DRI-177",
+    kind: :trainer,
+    trainer_type: :supporter,
+    play_window: :action_window,
+    first_turn_supporter_allowed_when_going_first?: true,
+    effects: [
+      %Effect{
+        key: :search_deck_for_basic_team_rocket_pokemon,
+        type: :search_deck,
+        params: %{
+          filter: %{kind: :pokemon, team_rocket?: true, stage: :basic},
+          min_count: 0,
+          max_count: 3,
+          destination: :hand,
+          reveal: true,
+          shuffle_after: true
+        }
+      }
+    ]
+  }
+
   @cards %{
     @boss_orders.id => @boss_orders,
     @bug_catching_set.id => @bug_catching_set,
@@ -435,6 +457,7 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     @rare_candy.id => @rare_candy,
     @sacred_ash.id => @sacred_ash,
     @secret_box.id => @secret_box,
+    @team_rockets_proton.id => @team_rockets_proton,
     @team_rockets_transceiver.id => @team_rockets_transceiver,
     @ultra_ball.id => @ultra_ball
   }

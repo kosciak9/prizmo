@@ -86,7 +86,7 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
       viewer_cards = Enum.filter(cards, &(&1.owner_player_id == viewer_player_id))
 
       player
-      |> available_action_window_affordances(current_turn, viewer_cards, cards)
+      |> available_action_window_affordances(game, current_turn, viewer_cards, cards)
       |> Enum.reject(&is_nil/1)
     else
       []
@@ -102,11 +102,17 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
 
   defp action_window_for_viewer?(_game, _current_turn, _viewer_player_id), do: false
 
-  defp available_action_window_affordances(nil, _current_turn, _cards, _all_cards), do: []
+  defp available_action_window_affordances(nil, _game, _current_turn, _cards, _all_cards), do: []
 
-  defp available_action_window_affordances(%GamePlayer{} = player, current_turn, cards, all_cards) do
+  defp available_action_window_affordances(
+         %GamePlayer{} = player,
+         %Game{} = game,
+         current_turn,
+         cards,
+         all_cards
+       ) do
     [
-      play_card_affordance(player, current_turn, cards, all_cards),
+      play_card_affordance(game, player, current_turn, cards, all_cards),
       play_stadium_affordance(player, cards),
       play_basic_to_bench_affordance(player, cards),
       attach_energy_affordance(player, cards),
@@ -121,11 +127,17 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
       ]
   end
 
-  defp play_card_affordance(%GamePlayer{} = player, current_turn, cards, all_cards) do
+  defp play_card_affordance(
+         %Game{} = game,
+         %GamePlayer{} = player,
+         current_turn,
+         cards,
+         all_cards
+       ) do
     source_ids =
       cards
       |> hand_cards()
-      |> Enum.filter(&engine_playable_card?(&1, all_cards, current_turn))
+      |> Enum.filter(&engine_playable_card?(game, player, &1, all_cards, current_turn))
       |> card_ids()
 
     if Enum.empty?(source_ids) do
@@ -739,10 +751,29 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
     do:
       "Discard #{retreat_cost} Energy attached to the Active Pokémon, then switch it with a Benched Pokémon."
 
-  defp engine_playable_card?(%CardInstance{card_id: card_id} = card, cards, current_turn) do
+  defp engine_playable_card?(
+         %Game{} = game,
+         %GamePlayer{} = player,
+         %CardInstance{card_id: card_id} = card,
+         cards,
+         current_turn
+       ) do
     case EngineCardRegistry.fetch(card_id) do
       {:ok, %{play_window: :action_window} = definition} ->
-        CardPlay.required_choices_available?(cards, card, definition, current_turn)
+        case CardPlay.require_playable_trainer_definition(
+               game,
+               current_turn,
+               player,
+               card,
+               player.player_id,
+               definition
+             ) do
+          {:ok, _metadata} ->
+            CardPlay.required_choices_available?(cards, card, definition, current_turn)
+
+          {:error, _reason} ->
+            false
+        end
 
       {:ok, _definition} ->
         false

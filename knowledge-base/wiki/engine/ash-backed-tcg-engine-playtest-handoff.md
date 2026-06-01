@@ -1,6 +1,6 @@
 # Ash-backed TCG Engine Playtest Handoff
 
-- Updated: 2026-06-01 (batch 220)
+- Updated: 2026-06-01 (batch 221)
 - Sources: Project codebase; local validation; wiki log
 - Raw: N/A — operational handoff
 
@@ -11,6 +11,13 @@
 - Highest-value feasible batches to prefer when available: open-deck game creation and catalog-backed deck validation; engine-owned persisted RNG for shuffle, opening hands, prizes, and draws; safe setup for arbitrary loaded decks with explicit unsupported-card behavior; TCG layout benchmark notes followed by card-front/card-back board improvements; compact experienced-player action and prompt surfaces; then broader generic mechanics and card behavior. If another fixture-backed mechanic slice is the highest-value feasible step, do it and record how it protects correctness or advances the north star.
 - UI batches must benchmark Pokémon TCG and at least one other TCG layout before substantial layout changes, then record what Prizmo adopts or rejects in the wiki/log for the batch. Batch 219 completed this benchmark; Prizmo adopted overlapping card backs for opponent hand, card back zone visuals for deck/prizes, top-card discard preview, and stadium card art. Prizmo deferred Hearthstone-style board interactivity/fanning and PTCGL-style exact zone replication.
 - Keep raw payloads, IDs, debug counters, and tutorial copy out of the normal play path. The product target is a serious, dense card table for players who already know Pokémon TCG.
+
+## Iteration 221 handoff
+
+- Current state: no durable game command was executed against long-lived playtest game `f6df7025-7d0f-4d9b-9bc2-31c864de1d4e`, open-deck validation game `302a39ed-d15b-4fcb-8a13-80eb2eed71be`, or mulligan validation game `762faa63-a747-430a-ab00-b4ce3b59158a`. Turn-1 Supporter and Proton validation used rollback-only Tidewave scenarios based on the Rocket's Mewtwo `27459` and Alakazam `27147` fixture decks, so no scratch game was persisted. Last commit at iteration start: `779f504 feat(tcg): support crushing hammer coin flip`.
+- Completed a rules-correctness plus Team Rocket Supporter batch: the Ash engine now enforces the normal first-player turn-1 Supporter restriction across `GameView.ActionAffordances`, generic `play_card`, and older direct Supporter helpers. Ordinary Supporters now stay hidden/unplayable in that state and reject with `:first_player_cannot_play_supporter_on_first_turn`. Team Rocket's Proton (`DRI-177`) now carries its printed exception and is engine-defined on the generic `play_card` path: it can be played on the first turn when going first, searches up to 3 Basic Team Rocket's Pokémon from deck to hand, reveals them publicly, shuffles through the existing engine-owned Trainer shuffle path, and opens `search_deck_for_basic_team_rocket_pokemon` when choices are not supplied upfront. The React prompt submit copy and guidance recognize that new choice key.
+- Validation: focused `mix test test/prizmo/tcg_engine/mechanics_test.exs`, rollback Tidewave verification of blocked Lillie's Determination on Player 1 turn 1, rollback Tidewave verification that Proton is visible/ legal with prompt key `search_deck_for_basic_team_rocket_pokemon`, `mix compile --warnings-as-errors`, `node_modules/.bin/tsc --noEmit`, `git diff --check`, and final `mix check` passed.
+- Recommended next atomic task: continue the supported-fixture Team Rocket gap with Team Rocket's Giovanni (`DRI-174`) now that Proton and the shared first-turn Supporter legality rule are in place. If the next batch leaves engine behavior for product-surface work instead, card-attached on-board action affordances remain the strongest UI-density candidate with the benchmark already satisfied.
 
 ## Iteration 220 handoff
 

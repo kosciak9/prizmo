@@ -9012,6 +9012,8 @@ function promptSubmitLabel(choiceKey: string, selectedCount: number, max: number
       return `Add Pokémon to hand ${selectedCount}/${max}`
     case 'search_deck_for_team_rocket_supporter':
       return `Add Team Rocket Supporter ${selectedCount}/${max}`
+    case 'search_deck_for_basic_team_rocket_pokemon':
+      return `Add Team Rocket Pokémon ${selectedCount}/${max}`
     case 'search_deck_for_item_tool_supporter_stadium':
       return `Add Trainer cards ${selectedCount}/${max}`
     case 'search_deck_for_basic_stage_1_stage_2_pokemon':
@@ -9120,6 +9122,13 @@ function promptGuidanceMessages(
     return [
       "Team Rocket's Transceiver searches your deck for one Supporter with \"Team Rocket\" in its name.",
       `This prompt accepts ${promptChoiceInstruction(min, max)} from ${legalChoiceCount} legal Team Rocket Supporter choices, then shuffles.`
+    ]
+  }
+
+  if (choiceKey === 'search_deck_for_basic_team_rocket_pokemon') {
+    return [
+      "Team Rocket's Proton can be played on the first turn when going first. Choose up to 3 Basic Team Rocket's Pokémon from your deck.",
+      `This prompt accepts ${promptChoiceInstruction(min, max)} from ${legalChoiceCount} legal Team Rocket Pokémon choices, then shuffles.`
     ]
   }
 

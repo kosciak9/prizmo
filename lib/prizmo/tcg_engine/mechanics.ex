@@ -480,7 +480,7 @@ defmodule Prizmo.TcgEngine.Mechanics do
            :ok <- require_card_owned_by_player(card, player_id),
            :ok <- require_card_zone(card, :hand),
            {:ok, metadata} <- require_trainer_type(card.card_id, [:item, :supporter]),
-           :ok <- require_supporter_available(player, metadata),
+           :ok <- require_supporter_available(player, metadata, game, turn),
            :ok <- require_ace_spec_available(player, metadata),
            {:ok, position} <- next_discard_position(game.id, player_id),
            {:ok, _card} <- update(card, :discard, %{position: position}),
@@ -510,7 +510,15 @@ defmodule Prizmo.TcgEngine.Mechanics do
            {:ok, poffin_card} <- get_card(game.id, poffin_card_instance_id),
            {:ok, targets} <- get_cards(game.id, target_card_instance_ids),
            :ok <-
-             CardPlay.require_trainer_card(player, poffin_card, player_id, "TEF-144", [:item]),
+             CardPlay.require_trainer_card(
+               game,
+               turn,
+               player,
+               poffin_card,
+               player_id,
+               "TEF-144",
+               [:item]
+             ),
            :ok <- require_all_owned_in_zone(targets, player_id, :deck),
            :ok <- require_poffin_targets(targets),
            {:ok, _poffin_card} <- discard_trainer_card(game, player, poffin_card, %{}),
@@ -540,7 +548,14 @@ defmodule Prizmo.TcgEngine.Mechanics do
            {:ok, card} <- get_card(game.id, card_instance_id),
            {:ok, definition} <- EngineCardRegistry.fetch(card.card_id),
            {:ok, metadata} <-
-             CardPlay.require_playable_trainer_definition(player, card, player_id, definition),
+             CardPlay.require_playable_trainer_definition(
+               game,
+               turn,
+               player,
+               card,
+               player_id,
+               definition
+             ),
            {:ok, choices} <- ChoiceValidator.normalize_payload(opts, definition),
            :ok <-
              CardPlay.require_required_choices_available(
@@ -757,7 +772,15 @@ defmodule Prizmo.TcgEngine.Mechanics do
            {:ok, discard_cards} <- get_cards(game.id, discard_card_instance_ids),
            {:ok, target_card} <- get_card(game.id, target_card_instance_id),
            :ok <-
-             CardPlay.require_trainer_card(player, ultra_ball_card, player_id, "MEG-131", [:item]),
+             CardPlay.require_trainer_card(
+               game,
+               turn,
+               player,
+               ultra_ball_card,
+               player_id,
+               "MEG-131",
+               [:item]
+             ),
            :ok <- require_all_owned_in_zone(discard_cards, player_id, :hand),
            :ok <- require_card_owned_by_player(target_card, player_id),
            :ok <- require_card_zone(target_card, :deck),
@@ -792,7 +815,15 @@ defmodule Prizmo.TcgEngine.Mechanics do
            {:ok, opponent_active_card} <- active_card(game.id, opponent_player_id),
            {:ok, target_bench_card} <- get_card(game.id, target_bench_card_instance_id),
            :ok <-
-             CardPlay.require_trainer_card(player, boss_card, player_id, "MEG-114", [:supporter]),
+             CardPlay.require_trainer_card(
+               game,
+               turn,
+               player,
+               boss_card,
+               player_id,
+               "MEG-114",
+               [:supporter]
+             ),
            :ok <- require_card_owned_by_player(target_bench_card, opponent_player_id),
            :ok <- require_card_zone(target_bench_card, :bench),
            {:ok, _boss_card} <- discard_trainer_card(game, player, boss_card, %{}),
@@ -828,7 +859,15 @@ defmodule Prizmo.TcgEngine.Mechanics do
            {:ok, stretcher_card} <- get_card(game.id, stretcher_card_instance_id),
            {:ok, target_card} <- get_card(game.id, target_card_instance_id),
            :ok <-
-             CardPlay.require_trainer_card(player, stretcher_card, player_id, "ASC-196", [:item]),
+             CardPlay.require_trainer_card(
+               game,
+               turn,
+               player,
+               stretcher_card,
+               player_id,
+               "ASC-196",
+               [:item]
+             ),
            :ok <- require_card_owned_by_player(target_card, player_id),
            :ok <- require_card_zone(target_card, :discard),
            :ok <- require_night_stretcher_target(target_card.card_id),
@@ -858,7 +897,15 @@ defmodule Prizmo.TcgEngine.Mechanics do
            {:ok, poke_pad_card} <- get_card(game.id, poke_pad_card_instance_id),
            {:ok, target_card} <- get_card(game.id, target_card_instance_id),
            :ok <-
-             CardPlay.require_trainer_card(player, poke_pad_card, player_id, "POR-081", [:item]),
+             CardPlay.require_trainer_card(
+               game,
+               turn,
+               player,
+               poke_pad_card,
+               player_id,
+               "POR-081",
+               [:item]
+             ),
            :ok <- require_card_owned_by_player(target_card, player_id),
            :ok <- require_card_zone(target_card, :deck),
            :ok <- require_non_rule_box_pokemon_card(target_card.card_id),

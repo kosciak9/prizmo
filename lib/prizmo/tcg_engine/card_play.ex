@@ -3,6 +3,7 @@ defmodule Prizmo.TcgEngine.CardPlay do
 
   import Prizmo.TcgEngine.CardMetadataRequirements,
     only: [
+      require_basic_team_rocket_pokemon_card: 1,
       require_basic_pokemon: 1,
       require_energy: 1,
       require_basic_energy: 1,
@@ -28,7 +29,7 @@ defmodule Prizmo.TcgEngine.CardPlay do
       evolve_action_for_zone: 1,
       require_evolution_allowed_this_turn: 1,
       require_in_play_pokemon_zone: 1,
-      require_supporter_available: 2
+      require_supporter_available: 5
     ]
 
   alias Prizmo.TcgEngine.CardCatalog
@@ -48,11 +49,14 @@ defmodule Prizmo.TcgEngine.CardPlay do
   alias Prizmo.TcgEngine.Rng
   alias Prizmo.TcgEngine.StadiumEffects
   alias Prizmo.TcgEngine.TrainerPlay
+  alias Prizmo.TcgEngine.Turn
   alias Prizmo.TcgEngine.TurnStore
 
   @coin_faces [:heads, :tails]
 
   def require_playable_trainer_definition(
+        %Game{} = game,
+        %Turn{} = turn,
         %GamePlayer{} = player,
         %CardInstance{} = card,
         player_id,
@@ -61,24 +65,31 @@ defmodule Prizmo.TcgEngine.CardPlay do
     with :ok <- require_card_owned_by_player(card, player_id),
          :ok <- require_card_zone(card, :hand),
          {:ok, metadata} <- require_trainer_type(card.card_id, [definition.trainer_type]),
-         :ok <- require_supporter_available(player, metadata),
+         :ok <-
+           require_supporter_available(player, metadata, game, turn,
+             allow_first_turn_when_going_first?:
+               definition.first_turn_supporter_allowed_when_going_first?
+           ),
          :ok <- require_ace_spec_available(player, metadata) do
       {:ok, metadata}
     end
   end
 
   def require_trainer_card(
+        %Game{} = game,
+        %Turn{} = turn,
         %GamePlayer{} = player,
         %CardInstance{} = card,
         player_id,
         expected_card_id,
-        allowed_types
+        allowed_types,
+        opts \\ []
       ) do
     with :ok <- require_card_owned_by_player(card, player_id),
          :ok <- require_card_zone(card, :hand),
          :ok <- Prizmo.TcgEngine.Requirements.require_card_id(card, expected_card_id),
          {:ok, metadata} <- require_trainer_type(card.card_id, allowed_types),
-         :ok <- require_supporter_available(player, metadata) do
+         :ok <- require_supporter_available(player, metadata, game, turn, opts) do
       require_ace_spec_available(player, metadata)
     end
   end
@@ -1336,6 +1347,14 @@ defmodule Prizmo.TcgEngine.CardPlay do
         {:error, {:target_not_in_top_deck, effect_key, look_count}}
       end
     end
+  end
+
+  defp require_search_filter(%CardInstance{} = card, %{
+         kind: :pokemon,
+         team_rocket?: true,
+         stage: :basic
+       }) do
+    require_basic_team_rocket_pokemon_card(card.card_id)
   end
 
   defp require_search_filter(%CardInstance{} = card, %{kind: :pokemon, stage: :basic, max_hp: 70}) do

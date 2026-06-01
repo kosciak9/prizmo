@@ -84,6 +84,39 @@ defmodule Prizmo.TcgEngine.Requirements do
 
   def require_supporter_available(%GamePlayer{}, _metadata), do: :ok
 
+  def require_supporter_available(player, metadata, game, turn, opts \\ [])
+
+  def require_supporter_available(
+        %GamePlayer{} = player,
+        %{trainer_type: :supporter} = metadata,
+        %Game{} = game,
+        %Turn{} = turn,
+        opts
+      ) do
+    with :ok <- require_supporter_available(player, metadata) do
+      require_supporter_turn_timing(game, turn, player, opts)
+    end
+  end
+
+  def require_supporter_available(%GamePlayer{} = player, metadata, %Game{}, %Turn{}, _opts),
+    do: require_supporter_available(player, metadata)
+
+  defp require_supporter_turn_timing(
+         %Game{first_player_id: first_player_id},
+         %Turn{turn_number: 1, active_player_id: active_player_id},
+         %GamePlayer{player_id: player_id},
+         opts
+       ) do
+    if active_player_id == first_player_id and player_id == first_player_id and
+         not Keyword.get(opts, :allow_first_turn_when_going_first?, false) do
+      {:error, :first_player_cannot_play_supporter_on_first_turn}
+    else
+      :ok
+    end
+  end
+
+  defp require_supporter_turn_timing(%Game{}, %Turn{}, %GamePlayer{}, _opts), do: :ok
+
   def require_ace_spec_available(%GamePlayer{} = player, %{ace_spec?: true}) do
     if player.ace_spec_played_this_game? do
       {:error, :ace_spec_already_played_this_game}

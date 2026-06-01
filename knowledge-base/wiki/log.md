@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-06-01] iteration 221 | Turn-1 Supporter legality and Team Rocket's Proton
+- Task attempted: closed a core turn-legality gap by enforcing the normal first-player turn-1 Supporter restriction across the Ash engine action surface, then moved Team Rocket's Proton (`DRI-177`) onto the generic `play_card` path with its printed first-turn exception.
+- Files changed: updated `lib/prizmo/tcg_engine/cards/card_definition.ex`, `lib/prizmo/tcg_engine/cards/registry.ex`, `lib/prizmo/tcg_engine/card_metadata_requirements.ex`, `lib/prizmo/tcg_engine/requirements.ex`, `lib/prizmo/tcg_engine/card_play.ex`, `lib/prizmo/tcg_engine/mechanics.ex`, `lib/prizmo/tcg_engine/game_view/action_affordances.ex`, `lib/prizmo_web/spa/features/home/routes/index.tsx`, `test/prizmo/tcg_engine/mechanics_test.exs`, the canonical north-star article, this log, and the TCG engine playtest handoff.
+- Validation: `mix test test/prizmo/tcg_engine/mechanics_test.exs`, rollback Tidewave verification that Lillie's Determination is hidden/blocked for Player 1 on turn 1, rollback Tidewave verification that Proton is visible/legal with prompt key `search_deck_for_basic_team_rocket_pokemon`, `mix compile --warnings-as-errors`, `node_modules/.bin/tsc --noEmit`, `git diff --check`, and final `mix check` passed.
+- Remaining/blocking notes: this batch fixes a correctness issue that would have made future Supporter ports unreliable and makes Rocket's Mewtwo safer on the first turn. Team Rocket's Giovanni remains the clearest next Team Rocket behavior gap on the Ash path; card-attached on-board action affordances remain the strongest current UI-density candidate if the next batch returns to the product surface.
+
 ## [2026-06-01] iteration 220 | Crushing Hammer coin-flip discard
 - Task attempted: advanced arbitrary-deck Trainer playability and in-game persisted RNG by moving Crushing Hammer (`POR-071`) onto the generic Ash engine `play_card` path as a coin-flip Item that only opens an opponent attached-Energy discard prompt on heads.
 - Files changed: updated `lib/prizmo/tcg_engine/cards/registry.ex`, `lib/prizmo/tcg_engine/effect_runner.ex`, `lib/prizmo/tcg_engine/card_play.ex`, `lib/prizmo/tcg_engine/game_view.ex`, `lib/prizmo_web/spa/features/home/routes/index.tsx`, the canonical north-star article, this log, and the TCG engine playtest handoff.

@@ -94,6 +94,28 @@ defmodule Prizmo.TcgEngine.CardMetadataRequirements do
     end
   end
 
+  def require_team_rocket_pokemon_card(card_id) do
+    case CardCatalog.fetch(card_id) do
+      {:ok, %{supertype: :pokemon, name: "Team Rocket's " <> _name}} ->
+        :ok
+
+      {:ok, %{supertype: :pokemon} = metadata} ->
+        {:error, {:not_team_rocket_pokemon, metadata.id}}
+
+      {:ok, metadata} ->
+        {:error, {:not_pokemon, metadata.id}}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  def require_basic_team_rocket_pokemon_card(card_id) do
+    with :ok <- require_basic_pokemon(card_id) do
+      require_team_rocket_pokemon_card(card_id)
+    end
+  end
+
   def require_night_stretcher_target(card_id) do
     case CardCatalog.fetch(card_id) do
       {:ok, %{supertype: :pokemon}} -> :ok

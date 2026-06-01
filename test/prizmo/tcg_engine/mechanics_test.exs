@@ -3,6 +3,7 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
 
   alias Prizmo.Tcg.Decks.Alakazam27147
   alias Prizmo.Tcg.Decks.Dragapult27431
+  alias Prizmo.Tcg.Decks.RocketMewtwo27459
   alias Prizmo.TcgEngine.CardCatalog
   alias Prizmo.TcgEngine.CardInstance
   alias Prizmo.TcgEngine.GameEvent
@@ -329,6 +330,69 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
                "card_play_completed"
              ]
     end
+
+    test "first player cannot play ordinary Supporters on turn 1, but Team Rocket's Proton remains legal" do
+      {:ok, game} = create_action_window_game_with_decks(RocketMewtwo27459, Alakazam27147)
+
+      lillie = draw_deck_card_to_hand(game.id, "player_1", "MEG-119", 1)
+      proton = draw_deck_card_to_hand(game.id, "player_1", "DRI-177", 2)
+
+      assert {:ok, view} = GameView.for_player(game.id, "player_1")
+      play_card = Enum.find(view.action_affordances, &(&1.key == "play_card"))
+      assert is_map(play_card)
+      refute lillie.id in play_card.source_card_instance_ids
+      assert proton.id in play_card.source_card_instance_ids
+
+      assert {:error, :first_player_cannot_play_supporter_on_first_turn} =
+               Mechanics.play_card(game, "player_1", lillie.id, %{})
+    end
+
+    test "Team Rocket's Proton searches up to 3 Basic Team Rocket Pokémon on the Ash path" do
+      {:ok, game} = create_action_window_game_with_decks(RocketMewtwo27459, Alakazam27147)
+
+      proton = draw_deck_card_to_hand(game.id, "player_1", "DRI-177", 1)
+      [target_1, target_2] = game.id |> deck_cards("player_1", "DRI-019") |> Enum.take(2)
+      target_3 = deck_card(game.id, "player_1", "DRI-051")
+
+      assert {:ok, game} =
+               Mechanics.play_card(game, "player_1", proton.id, %{
+                 choices: %{
+                   search_deck_for_basic_team_rocket_pokemon: [
+                     target_1.id,
+                     target_2.id,
+                     target_3.id
+                   ]
+                 }
+               })
+
+      assert zone(proton.id) == :discard
+      assert Enum.map([target_1, target_2, target_3], &zone(&1.id)) == [:hand, :hand, :hand]
+
+      assert event_types(game.id) == [
+               "start_setup",
+               "card_play_started",
+               "cards_moved",
+               "effect_started",
+               "cards_moved",
+               "deck_shuffled",
+               "effect_completed",
+               "card_play_completed"
+             ]
+
+      cards_moved_events =
+        GameEvent
+        |> Ash.Query.filter(game_id == ^game.id and type == "cards_moved")
+        |> Ash.Query.sort(index: :asc)
+        |> Ash.read!()
+
+      proton_effect_event = Enum.at(cards_moved_events, 1)
+
+      assert proton_effect_event.payload["effect_key"] ==
+               "search_deck_for_basic_team_rocket_pokemon"
+
+      assert proton_effect_event.payload["public_reveal"] == true
+      assert length(proton_effect_event.payload["cards"]) == 3
+    end
   end
 
   defp create_game do
@@ -374,10 +438,14 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
   end
 
   defp create_action_window_game do
+    create_action_window_game_with_decks(Dragapult27431, Alakazam27147)
+  end
+
+  defp create_action_window_game_with_decks(player_1_deck, player_2_deck) do
     with {:ok, game} <-
            Mechanics.create_game([
-             {"player_1", Dragapult27431},
-             {"player_2", Alakazam27147}
+             {"player_1", player_1_deck},
+             {"player_2", player_2_deck}
            ]),
          {:ok, game} <- Mechanics.start_setup(game),
          {:ok, game} <- ash_update(game, :complete_setup, %{}),
@@ -407,7 +475,19 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
     %{ultra_ball: ultra_ball, cost_cards: [cost_card_1, cost_card_2], target: target}
   end
 
+  defp draw_deck_card_to_hand(game_id, player_id, card_id, position) do
+    card = deck_card(game_id, player_id, card_id)
+    {:ok, card} = ash_update(card, :draw_to_hand, %{position: position})
+    card
+  end
+
   defp deck_card(game_id, player_id, card_id) do
+    game_id
+    |> deck_cards(player_id, card_id)
+    |> List.first()
+  end
+
+  defp deck_cards(game_id, player_id, card_id) do
     CardInstance
     |> Ash.Query.filter(
       game_id == ^game_id and owner_player_id == ^player_id and card_id == ^card_id and
@@ -415,7 +495,6 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
     )
     |> Ash.Query.sort(position: :asc)
     |> Ash.read!()
-    |> List.first()
   end
 
   defp deck_cards_except(game_id, player_id, excluded_ids) do
