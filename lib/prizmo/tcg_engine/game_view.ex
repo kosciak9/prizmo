@@ -336,14 +336,118 @@ defmodule Prizmo.TcgEngine.GameView do
   end
 
   defp event_view(%GameEvent{} = event) do
-    %{
+    event
+    |> public_event_details()
+    |> Map.merge(%{
       id: event.id,
       index: event.index,
       type: event.type,
       player_id: event.player_id,
       turn_id: event.turn_id
+    })
+  end
+
+  defp public_event_details(%GameEvent{type: "opening_hand_mulligan", payload: payload}) do
+    revealed_cards = public_revealed_cards(payload, "returned_cards")
+    card_count = payload_integer(payload, "returned_card_count") || length(revealed_cards)
+    mulligan_number = payload_integer(payload, "mulligan_number")
+
+    %{
+      public_note: opening_hand_mulligan_note(card_count, mulligan_number),
+      public_card_count: card_count,
+      public_revealed_cards: revealed_cards
     }
   end
+
+  defp public_event_details(%GameEvent{type: "mulligan_bonus_drawn", payload: payload}) do
+    card_count = payload_integer(payload, "card_count") || 0
+
+    %{
+      public_note: "Drew #{card_count} optional mulligan bonus #{pluralize("card", card_count)}.",
+      public_card_count: card_count,
+      public_revealed_cards: []
+    }
+  end
+
+  defp public_event_details(%GameEvent{}) do
+    %{
+      public_note: nil,
+      public_card_count: 0,
+      public_revealed_cards: []
+    }
+  end
+
+  defp opening_hand_mulligan_note(card_count, nil) do
+    "Revealed a #{card_count}-card opening hand with no Basic Pokémon and took a mulligan."
+  end
+
+  defp opening_hand_mulligan_note(card_count, mulligan_number) do
+    "Revealed a #{card_count}-card opening hand with no Basic Pokémon and took mulligan ##{mulligan_number}."
+  end
+
+  defp public_revealed_cards(payload, key) do
+    payload
+    |> payload_list(key)
+    |> Enum.map(&payload_card_id/1)
+    |> Enum.reject(&is_nil/1)
+    |> Enum.map(&public_revealed_card/1)
+  end
+
+  defp payload_card_id(card_payload) when is_map(card_payload),
+    do: payload_value(card_payload, "card_id")
+
+  defp payload_card_id(_card_payload), do: nil
+
+  defp public_revealed_card(card_id) when is_binary(card_id) do
+    catalog = catalog_card(card_id)
+
+    %{
+      card_id: card_id,
+      name: Map.get(catalog, :name, card_id),
+      image: Map.get(catalog, :image),
+      category: stringify(Map.get(catalog, :category)),
+      stage: stringify(Map.get(catalog, :stage))
+    }
+  end
+
+  defp payload_list(payload, key) do
+    case payload_value(payload, key) do
+      list when is_list(list) -> list
+      _other -> []
+    end
+  end
+
+  defp payload_integer(payload, key) do
+    case payload_value(payload, key) do
+      value when is_integer(value) -> value
+      value when is_binary(value) -> parse_integer(value)
+      _other -> nil
+    end
+  end
+
+  defp payload_value(payload, key) when is_map(payload) and is_binary(key) do
+    case payload_atom_key(key) do
+      nil -> Map.get(payload, key)
+      atom_key -> Map.get(payload, key) || Map.get(payload, atom_key)
+    end
+  end
+
+  defp payload_atom_key("card_count"), do: :card_count
+  defp payload_atom_key("card_id"), do: :card_id
+  defp payload_atom_key("mulligan_number"), do: :mulligan_number
+  defp payload_atom_key("returned_card_count"), do: :returned_card_count
+  defp payload_atom_key("returned_cards"), do: :returned_cards
+  defp payload_atom_key(_key), do: nil
+
+  defp parse_integer(value) do
+    case Integer.parse(value) do
+      {integer, ""} -> integer
+      _other -> nil
+    end
+  end
+
+  defp pluralize(word, 1), do: word
+  defp pluralize(word, _count), do: "#{word}s"
 
   defp prompt_view(%Prompt{} = prompt, cards, attached_cards_by_target) do
     %{

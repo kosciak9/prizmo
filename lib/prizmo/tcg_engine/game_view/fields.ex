@@ -124,12 +124,27 @@ defmodule Prizmo.TcgEngine.GameView.Fields do
     ]
   ]
 
+  @event_public_revealed_card_fields [
+    card_id: [type: :string, allow_nil?: false],
+    name: [type: :string, allow_nil?: false],
+    image: [type: :string],
+    category: [type: :string],
+    stage: [type: :string]
+  ]
+
   @event_view_fields [
     id: [type: :uuid, allow_nil?: false],
     index: [type: :integer, allow_nil?: false],
     type: [type: :string, allow_nil?: false],
     player_id: [type: :string],
-    turn_id: [type: :uuid]
+    turn_id: [type: :uuid],
+    public_note: [type: :string],
+    public_card_count: [type: :integer, allow_nil?: false],
+    public_revealed_cards: [
+      type: {:array, :map},
+      allow_nil?: false,
+      constraints: [items: [fields: @event_public_revealed_card_fields]]
+    ]
   ]
 
   @prompt_view_fields [

@@ -213,7 +213,18 @@ const GAME_STATE_FIELDS = [
       { discard: [...CARD_SUMMARY_FIELDS] }
     ]
   },
-  { events: ['id', 'index', 'type', 'playerId', 'turnId'] },
+  {
+    events: [
+      'id',
+      'index',
+      'type',
+      'playerId',
+      'turnId',
+      'publicNote',
+      'publicCardCount',
+      { publicRevealedCards: ['cardId', 'name', 'image', 'category', 'stage'] }
+    ]
+  },
   { prompts: ['id', 'promptType', 'status', 'playerId', 'payload'] }
 ] as unknown as GetTcgEngineGameStateFields
 
@@ -391,6 +402,14 @@ type PlayerView = {
   bench: CardSummary[]
   hand: CardSummary[]
   discard: CardSummary[]
+}
+
+type EventPublicRevealedCard = {
+  cardId: string
+  name: string
+  image: string | null
+  category: string | null
+  stage: string | null
 }
 
 type ActionAffordance = {
@@ -739,6 +758,9 @@ type GameState = {
     type: string
     playerId: string | null
     turnId: string | null
+    publicNote: string | null
+    publicCardCount: number
+    publicRevealedCards: EventPublicRevealedCard[]
   }>
   prompts: Array<{
     id: string
@@ -6863,11 +6885,20 @@ function EventHistoryPanel({ events }: { events: GameState['events'] }) {
           <ol className="max-h-80 space-y-2 overflow-auto pr-1" aria-label="Recent persisted game events">
             {latestEvents.map(event => (
               <li
-                className="grid gap-2 rounded-xl bg-secondary/65 px-3 py-2 text-sm sm:grid-cols-[4.5rem_minmax(0,1fr)_auto] sm:items-center"
+                className="grid gap-2 rounded-xl bg-secondary/65 px-3 py-2 text-sm sm:grid-cols-[4.5rem_minmax(0,1fr)_auto] sm:items-start"
                 key={event.id}
               >
                 <span className="font-mono text-xs text-muted-foreground">#{event.index}</span>
-                <span className="min-w-0 truncate font-medium text-foreground">{formatEventType(event.type)}</span>
+                <div className="min-w-0 space-y-2">
+                  <span className="block truncate font-medium text-foreground">{event.publicNote ?? formatEventType(event.type)}</span>
+                  {event.publicRevealedCards.length > 0 ? (
+                    <div className="flex gap-2 overflow-x-auto pb-1" aria-label="Publicly revealed mulligan hand">
+                      {event.publicRevealedCards.map((card, cardIndex) => (
+                        <RevealedEventCard key={`${event.id}-${card.cardId}-${cardIndex}`} card={card} />
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
                 {event.playerId ? <StatusBadge>{formatPlayerId(event.playerId)}</StatusBadge> : <span className="text-xs text-muted-foreground">engine</span>}
               </li>
             ))}
@@ -6878,6 +6909,48 @@ function EventHistoryPanel({ events }: { events: GameState['events'] }) {
       </div>
     </Panel>
   )
+}
+
+function RevealedEventCard({ card }: { card: EventPublicRevealedCard }) {
+  const [failed, setFailed] = useState(false)
+  const imageSrc = !failed ? eventCardImageSrc(card) : null
+
+  return (
+    <div className="flex min-w-28 items-center gap-2 rounded-lg bg-background/55 p-1.5 ring-1 ring-border/45">
+      <div className="flex aspect-[63/88] w-8 shrink-0 overflow-hidden rounded bg-muted/55 ring-1 ring-border/40">
+        {imageSrc ? (
+          <img
+            alt={`${card.name} revealed card image`}
+            className="h-full w-full object-contain"
+            decoding="async"
+            loading="lazy"
+            onError={() => setFailed(true)}
+            src={imageSrc}
+          />
+        ) : (
+          <span className="m-auto px-1 text-center text-[0.55rem] font-semibold leading-tight text-muted-foreground">
+            {card.name}
+          </span>
+        )}
+      </div>
+      <div className="min-w-0">
+        <p className="truncate text-xs font-semibold leading-tight text-foreground">{card.name}</p>
+        <p className="truncate text-[0.62rem] uppercase tracking-[0.12em] text-muted-foreground">{card.stage ?? card.category ?? card.cardId}</p>
+      </div>
+    </div>
+  )
+}
+
+function eventCardImageSrc(card: EventPublicRevealedCard) {
+  const tcgdexImage = tcgdexCardImageSrc(card.image, 'low')
+
+  if (tcgdexImage) {
+    return tcgdexImage
+  }
+
+  const match = /^MEE-(\d{3})$/.exec(card.cardId)
+
+  return match ? `/tcg/cards/limitless/MEE/MEE_${match[1]}_R_EN_SM.png` : null
 }
 
 function ZoneStack({
