@@ -5,6 +5,66 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
   alias Prizmo.TcgEngine.Cards.Cost
   alias Prizmo.TcgEngine.Cards.Effect
 
+  @dawn %CardDefinition{
+    id: "PFL-087",
+    kind: :trainer,
+    trainer_type: :supporter,
+    play_window: :action_window,
+    effects: [
+      %Effect{
+        key: :search_deck_for_basic_stage_1_stage_2_pokemon,
+        type: :search_deck,
+        params: %{
+          filter: %{
+            any: [
+              %{kind: :pokemon, stage: :basic},
+              %{kind: :pokemon, stage: :stage_1},
+              %{kind: :pokemon, stage: :stage_2}
+            ]
+          },
+          required_groups: [
+            %{filter: %{kind: :pokemon, stage: :basic}, count: 1},
+            %{filter: %{kind: :pokemon, stage: :stage_1}, count: 1},
+            %{filter: %{kind: :pokemon, stage: :stage_2}, count: 1}
+          ],
+          count: 3,
+          destination: :hand,
+          reveal: true,
+          shuffle_after: true
+        }
+      }
+    ]
+  }
+
+  @hilda %CardDefinition{
+    id: "WHT-084",
+    kind: :trainer,
+    trainer_type: :supporter,
+    play_window: :action_window,
+    effects: [
+      %Effect{
+        key: :search_deck_for_evolution_pokemon_and_energy,
+        type: :search_deck,
+        params: %{
+          filter: %{
+            any: [
+              %{kind: :pokemon, stages: [:stage_1, :stage_2]},
+              %{kind: :energy}
+            ]
+          },
+          required_groups: [
+            %{filter: %{kind: :pokemon, stages: [:stage_1, :stage_2]}, count: 1},
+            %{filter: %{kind: :energy}, count: 1}
+          ],
+          count: 2,
+          destination: :hand,
+          reveal: true,
+          shuffle_after: true
+        }
+      }
+    ]
+  }
+
   @judge %CardDefinition{
     id: "POR-076",
     kind: :trainer,
@@ -132,7 +192,9 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
   @cards %{
     @boss_orders.id => @boss_orders,
     @buddy_buddy_poffin.id => @buddy_buddy_poffin,
+    @dawn.id => @dawn,
     @enhanced_hammer.id => @enhanced_hammer,
+    @hilda.id => @hilda,
     @judge.id => @judge,
     @lillies_determination.id => @lillies_determination,
     @poke_pad.id => @poke_pad,

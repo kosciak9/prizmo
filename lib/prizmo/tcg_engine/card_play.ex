@@ -485,7 +485,9 @@ defmodule Prizmo.TcgEngine.CardPlay do
     with {:ok, target_ids} <- EffectRunner.validate_search_deck_selection(effect, target_ids),
          {:ok, target_cards} <- CardStore.get_cards(game_id, target_ids),
          :ok <- require_all_owned_in_zone(target_cards, player_id, :deck),
-         :ok <- require_all_search_filters(target_cards, effect.params.filter) do
+         :ok <- require_all_search_filters(target_cards, effect.params.filter),
+         :ok <-
+           require_required_search_groups(target_cards, Map.get(effect.params, :required_groups)) do
       {:ok, target_cards}
     end
   end
@@ -630,10 +632,17 @@ defmodule Prizmo.TcgEngine.CardPlay do
   defp maybe_cap_bench_choice_max(max, _game_id, _player_id, _choice_step), do: max
 
   defp search_deck_choice_cards(cards, player_id, choice_step) do
-    cards
-    |> Enum.filter(&(&1.owner_player_id == player_id and &1.zone == :deck))
-    |> Enum.filter(&matches_search_filter?(&1, choice_step.params.filter))
-    |> maybe_hide_when_bench_full(cards, player_id, choice_step)
+    choices =
+      cards
+      |> Enum.filter(&(&1.owner_player_id == player_id and &1.zone == :deck))
+      |> Enum.filter(&matches_search_filter?(&1, choice_step.params.filter))
+      |> maybe_hide_when_bench_full(cards, player_id, choice_step)
+
+    if required_search_groups_available?(choices, Map.get(choice_step.params, :required_groups)) do
+      choices
+    else
+      []
+    end
   end
 
   defp opponent_bench_choice_cards(cards, player_id) do
@@ -677,6 +686,40 @@ defmodule Prizmo.TcgEngine.CardPlay do
     require_poffin_targets([card])
   end
 
+  defp require_search_filter(%CardInstance{} = card, %{kind: :pokemon, stage: stage}) do
+    case CardCatalog.fetch(card.card_id) do
+      {:ok, %{supertype: :pokemon, stage: ^stage}} ->
+        :ok
+
+      {:ok, %{supertype: :pokemon, stage: actual_stage}} ->
+        {:error, {:wrong_pokemon_stage, card.card_id, actual_stage, stage}}
+
+      {:ok, metadata} ->
+        {:error, {:not_pokemon, metadata.id}}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  defp require_search_filter(%CardInstance{} = card, %{kind: :pokemon, stages: stages})
+       when is_list(stages) do
+    case CardCatalog.fetch(card.card_id) do
+      {:ok, %{supertype: :pokemon, stage: stage}} ->
+        if stage in stages do
+          :ok
+        else
+          {:error, {:wrong_pokemon_stage, card.card_id, stage, stages}}
+        end
+
+      {:ok, metadata} ->
+        {:error, {:not_pokemon, metadata.id}}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
   defp require_search_filter(%CardInstance{} = card, %{kind: :pokemon, rule_box?: false}) do
     require_non_rule_box_pokemon_card(card.card_id)
   end
@@ -685,7 +728,51 @@ defmodule Prizmo.TcgEngine.CardPlay do
     require_pokemon_card(card.card_id)
   end
 
+  defp require_search_filter(%CardInstance{} = card, %{kind: :energy}) do
+    case CardCatalog.fetch(card.card_id) do
+      {:ok, %{supertype: :energy}} -> :ok
+      {:ok, metadata} -> {:error, {:not_energy, metadata.id}}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp require_search_filter(%CardInstance{} = card, %{any: filters}) when is_list(filters) do
+    if Enum.any?(filters, &(require_search_filter(card, &1) == :ok)) do
+      :ok
+    else
+      {:error, {:no_matching_search_filter, card.card_id}}
+    end
+  end
+
   defp require_search_filter(_card, _filter), do: {:error, :unsupported_search_filter}
+
+  defp require_required_search_groups(_target_cards, nil), do: :ok
+
+  defp require_required_search_groups(target_cards, required_groups)
+       when is_list(required_groups) do
+    required_groups
+    |> Enum.map(fn group ->
+      expected_count = Map.get(group, :count, 1)
+      actual_count = Enum.count(target_cards, &matches_search_filter?(&1, group.filter))
+
+      if actual_count == expected_count do
+        :ok
+      else
+        {:error, {:wrong_search_group_count, group.filter, actual_count, expected_count}}
+      end
+    end)
+    |> collect_ok_results()
+  end
+
+  defp required_search_groups_available?(_choices, nil), do: true
+
+  defp required_search_groups_available?(choices, required_groups)
+       when is_list(required_groups) do
+    Enum.all?(required_groups, fn group ->
+      expected_count = Map.get(group, :count, 1)
+      Enum.count(choices, &matches_search_filter?(&1, group.filter)) >= expected_count
+    end)
+  end
 
   defp special_energy_card?(%CardInstance{card_id: card_id}) do
     match?({:ok, %{supertype: :energy, energy_type: :special}}, CardCatalog.fetch(card_id))

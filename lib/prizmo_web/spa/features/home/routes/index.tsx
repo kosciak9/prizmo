@@ -8495,6 +8495,10 @@ function promptSubmitLabel(choiceKey: string, selectedCount: number, max: number
       return `Bench selected Pokémon ${selectedCount}/${max}`
     case 'search_deck_for_non_rule_box_pokemon':
       return `Add Pokémon to hand ${selectedCount}/${max}`
+    case 'search_deck_for_basic_stage_1_stage_2_pokemon':
+      return `Add staged Pokémon ${selectedCount}/${max}`
+    case 'search_deck_for_evolution_pokemon_and_energy':
+      return `Add Evolution + Energy ${selectedCount}/${max}`
     case 'switch_opponent_bench_to_active':
       return `Switch chosen Pokémon ${selectedCount}/${max}`
     case 'knockout_prize_cards':

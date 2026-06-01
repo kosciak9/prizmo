@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-06-01] iteration 205 | Dawn and Hilda grouped searches
+- Task attempted: advanced arbitrary-deck Supporter safety by moving Dawn (`PFL-087`) and Hilda (`WHT-084`) onto the generic `play_card` path as engine-defined multi-category deck-search effects.
+- Files changed: updated `lib/prizmo/tcg_engine/cards/registry.ex`, `lib/prizmo/tcg_engine/card_play.ex`, `lib/prizmo_web/spa/features/home/routes/index.tsx`, the canonical north-star article, this log, and the TCG engine playtest handoff.
+- Validation: `mix format`, `mix compile --warnings-as-errors`, `mix test test/prizmo/tcg_engine/mechanics_test.exs`, `node_modules/.bin/tsc --noEmit --ignoreDeprecations 6.0`, rollback Tidewave validation, cleanup SQL proving no scratch validation games remained, `git diff --check`, and final `mix check` passed. Rollback validation confirmed Dawn appears as an engine-defined Play source, opens a 3-card Basic/Stage 1/Stage 2 prompt, moves all selected Pokémon to hand, completes the pending effect, and writes the expected prompt/search/shuffle/completion events; Hilda appears as an engine-defined Play source, resolves with one Evolution Pokémon plus one Energy to hand, leaves no prompts, and stays engine-defined in discard.
+- Remaining/blocking notes: this covers exact required-group deck searches to hand for Dawn and Hilda. It does not cover Crispin's split Energy search/attach, Rare Candy evolution shortcuts, top-N search Items, broader Tools, or the benchmarked card-table density/polish batch.
+
 ## [2026-06-01] iteration 204 | Enhanced Hammer Special Energy discard
 - Task attempted: advanced arbitrary-deck Item safety by moving Enhanced Hammer (`TWM-148`) onto the generic `play_card` path as an engine-defined prompt effect that discards one opponent attached Special Energy.
 - Files changed: updated `lib/prizmo/tcg_engine/card_metadata_requirements.ex`, `lib/prizmo/tcg_engine/cards/registry.ex`, `lib/prizmo/tcg_engine/effect_runner.ex`, `lib/prizmo/tcg_engine/card_play.ex`, `lib/prizmo/tcg_engine/game_view.ex`, the canonical north-star article, this log, and the TCG engine playtest handoff.
