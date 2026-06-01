@@ -3,6 +3,8 @@ defmodule Prizmo.TcgEngine.EffectRunner do
 
   alias Prizmo.TcgEngine.ChoiceValidator
 
+  @choice_effect_types [:search_deck, :switch_opponent_bench_to_active]
+
   def first_effect(definition) do
     case definition.effects do
       [effect] -> {:ok, effect}
@@ -11,7 +13,14 @@ defmodule Prizmo.TcgEngine.EffectRunner do
     end
   end
 
-  def selected_choice(choices, effect), do: ChoiceValidator.fetch_choice(choices, effect.key)
+  def selected_choice(choices, effect) do
+    case ChoiceValidator.fetch_choice(choices, effect.key) do
+      {:ok, selected_choice} -> {:ok, selected_choice}
+      :missing -> maybe_auto_resolve_choice(effect)
+    end
+  end
+
+  def requires_choice?(%{type: type}), do: type in @choice_effect_types
 
   def validate_search_deck_selection(effect, target_ids) do
     validate_choice_selection(effect, target_ids, :wrong_search_deck_target_count)
@@ -28,6 +37,10 @@ defmodule Prizmo.TcgEngine.EffectRunner do
          :ok <- require_unique_ids(target_ids) do
       {:ok, target_ids}
     end
+  end
+
+  defp maybe_auto_resolve_choice(effect) do
+    if requires_choice?(effect), do: :missing, else: {:ok, []}
   end
 
   defp min_count(%{params: %{min_count: count}}), do: count

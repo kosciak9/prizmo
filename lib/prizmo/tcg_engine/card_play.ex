@@ -32,6 +32,7 @@ defmodule Prizmo.TcgEngine.CardPlay do
   alias Prizmo.TcgEngine.GameStore
   alias Prizmo.TcgEngine.PendingEffects
   alias Prizmo.TcgEngine.Prompt
+  alias Prizmo.TcgEngine.Rng
   alias Prizmo.TcgEngine.TrainerPlay
   alias Prizmo.TcgEngine.TurnStore
 
@@ -317,6 +318,41 @@ defmodule Prizmo.TcgEngine.CardPlay do
     end
   end
 
+  defp complete_play_card_effect(
+         game,
+         turn,
+         player,
+         card,
+         %{type: :shuffle_hand_into_deck_then_draw} = effect,
+         _target_ids
+       ) do
+    with {:ok, hand_cards} <- CardStore.cards_in_zone(game.id, player.player_id, :hand),
+         returned_card_ids = MapSet.new(hand_cards, & &1.id),
+         {:ok, _returned_to_deck} <- return_hand_to_deck(game.id, player.player_id, hand_cards),
+         {:ok, shuffled_deck} <- shuffle_deck_for_effect(game, turn, player, card, effect),
+         returned_cards = Enum.filter(shuffled_deck, &MapSet.member?(returned_card_ids, &1.id)),
+         {:ok, _event} <-
+           write_event_and_snapshot(game.id, :cards_moved, player.player_id, %{
+             reason: :effect_resolution,
+             source: EventPayloads.card_source(card),
+             effect_key: effect.key,
+             cards: EventPayloads.moved_cards(returned_cards, :hand, :deck)
+           }),
+         {:ok, _event} <-
+           write_effect_deck_shuffled(game, turn, player, card, effect, shuffled_deck),
+         {:ok, draw_count} <- draw_count_for_effect(game.id, player.player_id, effect),
+         {:ok, drawn_cards} <- draw_cards_for_effect(game, player, draw_count),
+         {:ok, _event} <-
+           write_event_and_snapshot(game.id, :cards_moved, player.player_id, %{
+             reason: :effect_resolution,
+             source: EventPayloads.card_source(card),
+             effect_key: effect.key,
+             cards: EventPayloads.moved_cards(drawn_cards, :deck, :hand)
+           }) do
+      complete_play_card_resolution(game, turn, player, card, effect)
+    end
+  end
+
   defp complete_play_card_effect(_game, _turn, _player, _card, effect, _target_ids) do
     {:error, {:unsupported_card_effect, effect.type}}
   end
@@ -498,7 +534,9 @@ defmodule Prizmo.TcgEngine.CardPlay do
     end
   end
 
-  defp choice_steps(definition), do: definition.costs ++ definition.effects
+  defp choice_steps(definition) do
+    definition.costs ++ Enum.filter(definition.effects, &EffectRunner.requires_choice?/1)
+  end
 
   defp require_required_choice_count(legal_choice_ids, definition, choice_key) do
     if required_choice_count_available?(legal_choice_ids, definition, choice_key) do
@@ -600,6 +638,112 @@ defmodule Prizmo.TcgEngine.CardPlay do
   end
 
   defp maybe_write_deck_shuffled(_game_id, _player_id, _card, _effect), do: {:ok, nil}
+
+  defp return_hand_to_deck(game_id, player_id, hand_cards) do
+    with {:ok, deck_count} <- CardStore.deck_count(game_id, player_id) do
+      hand_cards
+      |> Enum.with_index(deck_count + 1)
+      |> Enum.map(fn {card, position} ->
+        update(card, :shuffle_into_deck, %{attached_to_card_instance_id: nil, position: position})
+      end)
+      |> collect_results()
+    end
+  end
+
+  defp shuffle_deck_for_effect(%Game{} = game, turn, %GamePlayer{} = player, card, effect) do
+    context = effect_rng_context(player.player_id, turn, card, effect)
+
+    with {:ok, cards} <- CardStore.cards_in_zone(game.id, player.player_id, :deck) do
+      cards
+      |> shuffle_cards(game.rng_seed, context)
+      |> Enum.with_index(1)
+      |> Enum.map(fn {card, position} -> update(card, :reorder_deck, %{position: position}) end)
+      |> collect_results()
+    end
+  end
+
+  defp shuffle_cards(cards, seed, context) when is_binary(seed),
+    do: Rng.shuffle(cards, seed, context)
+
+  defp shuffle_cards(cards, _seed, _context), do: Enum.shuffle(cards)
+
+  defp write_effect_deck_shuffled(%Game{} = game, turn, player, card, effect, shuffled_deck) do
+    payload =
+      maybe_put_effect_rng_payload(
+        %{
+          source: EventPayloads.card_source(card),
+          effect_key: effect.key,
+          shuffle: "trainer_effect",
+          card_count: length(shuffled_deck)
+        },
+        game,
+        turn,
+        player.player_id,
+        card,
+        effect
+      )
+
+    write_event_and_snapshot(game.id, :deck_shuffled, player.player_id, payload)
+  end
+
+  defp maybe_put_effect_rng_payload(
+         payload,
+         %Game{rng_seed: seed} = game,
+         turn,
+         player_id,
+         card,
+         effect
+       )
+       when is_binary(seed) do
+    Map.merge(payload, %{
+      rng_algorithm: game.rng_algorithm || Rng.algorithm(),
+      rng_context: effect_rng_context_label(player_id, turn, card, effect),
+      rng_seed_source: game.rng_seed_source
+    })
+  end
+
+  defp maybe_put_effect_rng_payload(payload, %Game{}, _turn, _player_id, _card, _effect),
+    do: payload
+
+  defp effect_rng_context(player_id, turn, card, effect) do
+    {:trainer_effect_shuffle, player_id, turn.turn_number, card.card_id, effect.key}
+  end
+
+  defp effect_rng_context_label(player_id, turn, card, effect) do
+    "trainer_effect_shuffle:#{player_id}:turn_#{turn.turn_number}:#{card.card_id}:#{effect.key}"
+  end
+
+  defp draw_count_for_effect(game_id, player_id, %{params: params}) do
+    with {:ok, prizes} <- CardStore.cards_in_zone(game_id, player_id, :prize) do
+      if length(prizes) == Map.fetch!(params, :full_prize_count) do
+        {:ok, Map.fetch!(params, :full_prize_draw_count)}
+      else
+        {:ok, Map.fetch!(params, :draw_count)}
+      end
+    end
+  end
+
+  defp draw_cards_for_effect(%Game{} = game, %GamePlayer{} = player, draw_count) do
+    with {:ok, cards} <- CardStore.deck_cards_for_player(player.id, draw_count),
+         :ok <- require_enough_deck_cards(cards, draw_count),
+         {:ok, starting_position} <-
+           CardStore.next_hand_position_result(game.id, player.player_id) do
+      draw_cards_to_hand(cards, starting_position)
+    end
+  end
+
+  defp require_enough_deck_cards(cards, count) when length(cards) == count, do: :ok
+
+  defp require_enough_deck_cards(cards, count) do
+    {:error, {:cannot_draw_card_effect_from_deck, count, length(cards)}}
+  end
+
+  defp draw_cards_to_hand(cards, starting_position) do
+    cards
+    |> Enum.with_index(starting_position)
+    |> Enum.map(fn {card, position} -> update(card, :draw_to_hand, %{position: position}) end)
+    |> collect_results()
+  end
 
   defp opponent_active_card(game_id, player_id) do
     with {:ok, cards} <- CardStore.list_cards(game_id) do

@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-06-01] iteration 202 | Lillie's Determination shuffle draw
+- Task attempted: advanced arbitrary-deck Supporter safety by moving Lillie's Determination (`MEG-119`) onto the generic `play_card` path as an engine-defined no-choice shuffle-hand-into-deck then draw effect.
+- Files changed: updated `lib/prizmo/tcg_engine/cards/registry.ex`, `lib/prizmo/tcg_engine/effect_runner.ex`, `lib/prizmo/tcg_engine/card_play.ex`, the canonical north-star article, this log, and the TCG engine playtest handoff.
+- Validation: `mix format`, `mix compile --warnings-as-errors`, rollback Tidewave validation, `mix test test/prizmo/tcg_engine/mechanics_test.exs`, `git diff --check`, and final `mix check` passed. Rollback validation confirmed Lillie appears as a generic Play source with `engine_defined` rules status, resolves without a prompt, discards/marks the Supporter, shuffles seven remaining hand cards into the deck with seeded RNG metadata but no `rng_seed`, draws eight cards at six Prizes, leaves no awaiting prompts/pending effects, preserves hidden opponent hands, and rolls back the scratch game.
+- Remaining/blocking notes: this covers Lillie's printed shuffle/draw effect through the generic Supporter path, not Judge's both-player shuffle/draw, Dawn's staged Pokémon search, other Supporter/Item/Tool effects, or the benchmarked card-table density/polish batch.
+
 ## [2026-06-01] iteration 201 | Boss's Orders generic switching
 - Task attempted: advanced arbitrary-deck Trainer safety by moving Boss's Orders (`MEG-114`) onto the generic `play_card` path as an engine-defined Supporter that prompts for one opponent Bench Pokémon and switches it Active.
 - Files changed: updated `lib/prizmo/tcg_engine/cards/registry.ex`, `lib/prizmo/tcg_engine/card_play.ex`, `lib/prizmo/tcg_engine/effect_runner.ex`, `lib/prizmo/tcg_engine/game_view.ex`, `lib/prizmo/tcg_engine/game_view/action_affordances.ex`, `lib/prizmo_web/spa/features/home/routes/index.tsx`, the canonical north-star article, this log, and the TCG engine playtest handoff.
