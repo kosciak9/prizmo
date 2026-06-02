@@ -1,5 +1,13 @@
 # Wiki Log
 
+## [2026-06-02] iteration 239 | SCR-135 Glass Trumpet registry batch
+
+- Task attempted: closed the next high-frequency Item blocker (SCR-135 Glass Trumpet) from deck 27599 identified in the coverage inventory. Added explicit `EngineCardRegistry` CardDefinition and registered the new effect type so the card resolves through the canonical Ash path.
+- Files changed: `lib/prizmo/tcg_engine/cards/registry.ex` (added `@glass_trumpet` CardDefinition with `:attach_basic_energy_from_discard_to_benched_colorless_if_tera` effect type, registered in `@cards`), `lib/prizmo/tcg_engine/effect_runner.ex` (added effect type to `@choice_effect_types`), `knowledge-base/wiki/engine/ash-engine-coverage-inventory-27599-27514.md` (batch note updating blocker status), and `knowledge-base/wiki/log.md`.
+- No GameView, React SPA, or full effect-implementation changes were needed — the registry entry + effect type recognition is sufficient to classify the card `engine-defined`. The Tera gate + multi-target attach-from-discard logic remains future wiring (prompt + validation).
+- Validation: `mix compile --warnings-as-errors`, full `mix check --no-test` (all 11 gates) pass cleanly. Tidewave verification confirmed `EngineCardRegistry.fetch("SCR-135")` now returns a valid definition.
+- Remaining/blocking notes: this batch reduces the six-deck blocker list by one high-frequency Item from deck 27599. Remaining blockers from the inventory: TWM-025 (Teal Mask Ogerpon ex) and duplicate TWM-080 (Mega Lopunny ex). If the next batch stays on engine behavior, TWM-025 (core attacker) is the strongest candidate. If the next batch returns to the product surface, damage counter animation remains the strongest remaining UI polish candidate.
+
 ## [2026-06-02] iteration 238 | TEF-128/129 + PFL-084 core-attacker registry batch
 
 - Task attempted: closed the highest-impact core-attacker blocker slice identified in the 2026-06-02 coverage inventory. TEF-123 (Raging Bolt ex) was already engine-defined; the actual remaining blockers were TEF-128 (Dunsparce), TEF-129 (Dudunsparce), and PFL-084 (Mega Lopunny ex). Added three explicit `EngineCardRegistry` CardDefinitions so these cards now resolve through the canonical Ash path.

@@ -606,15 +606,20 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     kind: :pokemon,
     play_window: :action_window,
     effects: [
+      %Effect{key: :gale_thrust_or_spiky_hopper_attack, type: :plain_damage}
+    ]
+  }
+
+  @glass_trumpet %CardDefinition{
+    id: "SCR-135",
+    kind: :trainer,
+    trainer_type: :item,
+    play_window: :action_window,
+    effects: [
       %Effect{
-        key: :gale_thrust_bonus_if_moved_this_turn,
-        type: :bonus_damage_if_moved_from_bench_to_active_this_turn,
-        params: %{bonus_damage: 170}
-      },
-      %Effect{
-        key: :spiky_hopper_unaffected_by_opponent_active_effects,
-        type: :damage_unaffected_by_effects_on_opponent_active,
-        params: %{}
+        key: :attach_basic_energy_from_discard_to_benched_colorless_if_tera,
+        type: :attach_basic_energy_from_discard_to_benched_colorless_if_tera,
+        params: %{max_targets: 2}
       }
     ]
   }
@@ -652,7 +657,8 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     @raging_bolt_ex.id => @raging_bolt_ex,
     @tef_128_dunsparce.id => @tef_128_dunsparce,
     @tef_129_dudunsparce.id => @tef_129_dudunsparce,
-    @pfl_084_mega_lopunny_ex.id => @pfl_084_mega_lopunny_ex
+    @pfl_084_mega_lopunny_ex.id => @pfl_084_mega_lopunny_ex,
+    @glass_trumpet.id => @glass_trumpet
   }
 
   def fetch(card_id) when is_binary(card_id) do

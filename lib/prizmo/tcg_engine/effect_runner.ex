@@ -16,7 +16,8 @@ defmodule Prizmo.TcgEngine.EffectRunner do
     :move_basic_energy_between_own_pokemon,
     :recover_discard_to_hand,
     :recover_discard_to_deck,
-    :rare_candy_evolve
+    :rare_candy_evolve,
+    :attach_basic_energy_from_discard_to_benched_colorless_if_tera
   ]
 
   def first_effect(definition) do

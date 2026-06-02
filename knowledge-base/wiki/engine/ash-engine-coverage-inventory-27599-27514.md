@@ -33,7 +33,7 @@
 | MEG-131   | Ultra Ball                        | engine-defined      | Generic search path (Ultra Ball flow) |
 | MEG-115   | Energy Switch                     | engine-defined      | Explicit CardDefinition + move effect (iteration 206) |
 | ASC-196   | Night Stretcher                   | engine-defined      | Explicit CardDefinition + recover effect (iteration 207) |
-| SCR-135   | Glass Trumpet                     | blocker             | High-frequency Supporter; no CardDefinition or effect type |
+| SCR-135   | Glass Trumpet                     | engine-defined      | Explicit CardDefinition + effect type registered (iteration 239) |
 | TWM-165   | Unfair Stamp                      | engine-defined      | Explicit CardDefinition + ACE SPEC KO-gated shuffle/draw (iteration 226) |
 | SCR-131   | Area Zero Underdepths             | partial             | Stadium; generic play works, printed effect pending |
 | MEE-001   | Grass Energy                      | generic-supported   | Basic Energy |
@@ -42,7 +42,7 @@
 | MEE-006   | Fighting Energy                   | generic-supported   | Basic Energy |
 | MEE-003   | Water Energy                      | generic-supported   | Basic Energy |
 
-**Deck 27599 summary:** 28 unique. 3 blockers (TEF-123 Raging Bolt ex, TWM-025 Teal Mask Ogerpon ex, SCR-135 Glass Trumpet). 2 partial (SSP-170 Cyrano, TEF-145 Ciphermaniac's Codebreaking, SCR-131 Area Zero Underdepths). Rest engine-defined or generic-supported.
+**Deck 27599 summary:** 28 unique. 2 blockers (TEF-123 Raging Bolt ex, TWM-025 Teal Mask Ogerpon ex). 2 partial (SSP-170 Cyrano, TEF-145 Ciphermaniac's Codebreaking, SCR-131 Area Zero Underdepths). Rest engine-defined or generic-supported. SCR-135 Glass Trumpet moved to engine-defined in iteration 239.
 
 ## Deck 27514 — Lopunny Dudunsparce (22 unique cards)
 
@@ -83,7 +83,7 @@
 
 ## Next recommended atomic task (post-inventory)
 
-**2026-06-02 batch note (post-inventory):** TEF-123 (Raging Bolt ex) was already engine-defined via `@raging_bolt_ex` registry entry (pre-existing). The highest-impact core-attacker slice closed in the first post-inventory batch: TEF-128 (Dunsparce dig coin-flip prevention), TEF-129 (Dudunsparce run-away-draw Ability), and PFL-084 (Mega Lopunny ex gale-thrust / spiky-hopper attacks) now have explicit `EngineCardRegistry` CardDefinitions and are classified `engine-defined`. Remaining blockers from this inventory: TWM-025 (Teal Mask Ogerpon ex), SCR-135 (Glass Trumpet), and the duplicate TWM-080 (Mega Lopunny ex). Next highest-impact target: SCR-135 or TWM-025.
+**2026-06-02 batch note (post-inventory):** TEF-123 (Raging Bolt ex) was already engine-defined. Core-attacker slice (TEF-128/129 + PFL-084) closed in iteration 238. SCR-135 (Glass Trumpet) closed in iteration 239 via explicit CardDefinition + effect type registration. Remaining blockers: TWM-025 (Teal Mask Ogerpon ex) and the duplicate TWM-080 (Mega Lopunny ex). Next highest-impact target: TWM-025.
 
 ## Validation notes
 
