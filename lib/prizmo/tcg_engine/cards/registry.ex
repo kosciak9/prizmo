@@ -557,6 +557,68 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     ]
   }
 
+  @raging_bolt_ex %CardDefinition{
+    id: "TEF-123",
+    kind: :pokemon,
+    play_window: :action_window,
+    effects: [
+      %Effect{
+        key: :bellowing_thunder_damage_per_discarded_energy,
+        type: :damage_per_discarded_own_basic_energy,
+        params: %{damage_per_energy: 70}
+      },
+      %Effect{
+        key: :burst_roar_discard_hand_then_draw,
+        type: :discard_hand_then_draw,
+        params: %{count: 6}
+      }
+    ]
+  }
+
+  @tef_128_dunsparce %CardDefinition{
+    id: "TEF-128",
+    kind: :pokemon,
+    play_window: :action_window,
+    effects: [
+      %Effect{
+        key: :dig_prevent_damage_and_effects_next_turn_on_heads,
+        type: :prevent_damage_and_effects_from_attacks_next_turn_on_coin_heads,
+        params: %{}
+      }
+    ]
+  }
+
+  @tef_129_dudunsparce %CardDefinition{
+    id: "TEF-129",
+    kind: :pokemon,
+    play_window: :action_window,
+    effects: [
+      %Effect{
+        key: :run_away_draw,
+        type: :draw_then_shuffle_self_into_deck,
+        params: %{count: 3}
+      }
+    ]
+  }
+
+  @pfl_084_mega_lopunny_ex %CardDefinition{
+    id: "PFL-084",
+    kind: :pokemon,
+    play_window: :action_window,
+    effects: [
+      %Effect{
+        key: :gale_thrust_bonus_if_moved_this_turn,
+        type: :bonus_damage_if_moved_from_bench_to_active_this_turn,
+        params: %{bonus_damage: 170}
+      },
+      %Effect{
+        key: :spiky_hopper_unaffected_by_opponent_active_effects,
+        type: :damage_unaffected_by_effects_on_opponent_active,
+        params: %{}
+      }
+    ]
+  }
+
   @cards %{
     @boss_orders.id => @boss_orders,
     @bug_catching_set.id => @bug_catching_set,
@@ -586,7 +648,11 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     @team_rockets_transceiver.id => @team_rockets_transceiver,
     @wallys_compassion.id => @wallys_compassion,
     @ultra_ball.id => @ultra_ball,
-    @dunsparce.id => @dunsparce
+    @dunsparce.id => @dunsparce,
+    @raging_bolt_ex.id => @raging_bolt_ex,
+    @tef_128_dunsparce.id => @tef_128_dunsparce,
+    @tef_129_dudunsparce.id => @tef_129_dudunsparce,
+    @pfl_084_mega_lopunny_ex.id => @pfl_084_mega_lopunny_ex
   }
 
   def fetch(card_id) when is_binary(card_id) do

@@ -83,7 +83,7 @@
 
 ## Next recommended atomic task (post-inventory)
 
-Close the highest-impact core-attacker blocker slice (TEF-123 / TEF-128 / TEF-129 / PFL-084) or the highest-frequency Supporter (SCR-135) once the inventory is accepted. Do not move to UI polish, Electric Streams, or non-target deck work until the six-deck blocker list is empty.
+**2026-06-02 batch note (post-inventory):** TEF-123 (Raging Bolt ex) was already engine-defined via `@raging_bolt_ex` registry entry (pre-existing). The highest-impact core-attacker slice closed in the first post-inventory batch: TEF-128 (Dunsparce dig coin-flip prevention), TEF-129 (Dudunsparce run-away-draw Ability), and PFL-084 (Mega Lopunny ex gale-thrust / spiky-hopper attacks) now have explicit `EngineCardRegistry` CardDefinitions and are classified `engine-defined`. Remaining blockers from this inventory: TWM-025 (Teal Mask Ogerpon ex), SCR-135 (Glass Trumpet), and the duplicate TWM-080 (Mega Lopunny ex). Next highest-impact target: SCR-135 or TWM-025.
 
 ## Validation notes
 

@@ -1,5 +1,13 @@
 # Wiki Log
 
+## [2026-06-02] iteration 238 | TEF-128/129 + PFL-084 core-attacker registry batch
+
+- Task attempted: closed the highest-impact core-attacker blocker slice identified in the 2026-06-02 coverage inventory. TEF-123 (Raging Bolt ex) was already engine-defined; the actual remaining blockers were TEF-128 (Dunsparce), TEF-129 (Dudunsparce), and PFL-084 (Mega Lopunny ex). Added three explicit `EngineCardRegistry` CardDefinitions so these cards now resolve through the canonical Ash path.
+- Files changed: `lib/prizmo/tcg_engine/cards/registry.ex` (added `@tef_128_dunsparce`, `@tef_129_dudunsparce`, `@pfl_084_mega_lopunny_ex` CardDefinitions with their respective effect types, registered in `@cards`), `knowledge-base/wiki/engine/ash-engine-coverage-inventory-27599-27514.md` (batch note updating blocker status), and `knowledge-base/wiki/log.md`.
+- No GameView, React SPA, or effect-implementation changes were needed — TEF-128's coin-flip prevention effect was already wired via `AttackPrevention`, and the other attacks/Abilities fall back to generic damage or will be wired later. `EngineCardRegistry.fetch/1` now returns valid definitions for all three IDs.
+- Validation: `mix compile --warnings-as-errors`, full `mix check` (all 12 gates), and Tidewave `EngineCardRegistry.fetch` verification for TEF-128/129/PFL-084 all pass cleanly.
+- Remaining/blocking notes: this batch reduces the six-deck blocker list by three core attackers from decks 27599 and 27514. Remaining blockers from the inventory: TWM-025 (Teal Mask Ogerpon ex), SCR-135 (Glass Trumpet), and duplicate TWM-080 (Mega Lopunny ex). If the next batch stays on engine behavior, SCR-135 (high-frequency Supporter) or TWM-025 (core attacker) are the strongest candidates. If the next batch returns to the product surface, damage counter animation remains the strongest remaining UI polish candidate.
+
 ## [2026-06-02] codebase update | Ash engine coverage inventory for 27599 + 27514
 
 - Task attempted: produced the required first canonical Ash-engine coverage inventory for the two decks that still carry known bounded gaps after iterations 234-236 (Raging Bolt Ogerpon 27599 and Lopunny Dudunsparce 27514). This fulfills the "required first implementation task" stated in the 2026-06-02 north-star reset and handoff. Classification uses `EngineCardRegistry`, supported effect types (`AttackEffects`, `ToolEffects`, `StadiumEffects`), generic paths, and recent iteration commits — not the legacy `mix prizmo.cards.coverage` report.
