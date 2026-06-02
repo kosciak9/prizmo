@@ -36,6 +36,7 @@ export {
   startNextTcgEngineTurn as runStartNextTcgEngineTurn,
   startTcgEngineSetup as runStartTcgEngineSetup,
   undoTcgEngineGame as runUndoTcgEngineGame,
+  useTcgEngineMunkidoriAdrenaBrain as runUseTcgEngineMunkidoriAdrenaBrain,
   useTcgEngineTeamRocketsFactory as runUseTcgEngineTeamRocketsFactory,
 } from './generated/ash_rpc'
 
@@ -113,6 +114,8 @@ export type {
   StartTcgEngineSetupResult,
   UndoTcgEngineGameInput,
   UndoTcgEngineGameResult,
+  UseTcgEngineMunkidoriAdrenaBrainInput,
+  UseTcgEngineMunkidoriAdrenaBrainResult,
   UseTcgEngineTeamRocketsFactoryInput,
   UseTcgEngineTeamRocketsFactoryResult,
 } from './generated/ash_rpc'

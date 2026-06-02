@@ -38,6 +38,7 @@ import {
   runStartNextTcgEngineTurn,
   runStartTcgEngineSetup,
   runUndoTcgEngineGame,
+  runUseTcgEngineMunkidoriAdrenaBrain,
   runUseTcgEngineTeamRocketsFactory,
   type CreateOpenDeckTcgEngineGameFields,
   type CreateTcgEngineGameFields,
@@ -473,6 +474,17 @@ type PlayCardCommandOption = {
   baseLabel: string
 }
 
+type AdrenaBrainCommandOption = {
+  key: string
+  sourceCardInstanceId: string
+  fromCardInstanceId: string
+  targetCardInstanceId: string
+  damageCounters: number
+  sourceCard: CardSummary | undefined
+  fromCard: CardSummary | undefined
+  targetCard: CardSummary | undefined
+}
+
 type ActionRenderEntry = {
   key: string
   action: ActionAffordance
@@ -566,6 +578,23 @@ type TeamRocketsFactoryInput = {
 
 type TeamRocketsFactoryCommand = {
   playerId: string
+}
+
+type MunkidoriAdrenaBrainInput = {
+  gameId: string
+  playerId: PlayerId
+  sourceCardInstanceId: string
+  fromCardInstanceId: string
+  targetCardInstanceId: string
+  damageCounters: number
+}
+
+type MunkidoriAdrenaBrainCommand = {
+  playerId: string
+  sourceCardInstanceId: string
+  fromCardInstanceId: string
+  targetCardInstanceId: string
+  damageCounters: number
 }
 
 type PlayBasicToBenchInput = {
@@ -1031,6 +1060,14 @@ export function HomeRoute() {
     }
   })
 
+  const munkidoriAdrenaBrainMutation = useMutation({
+    mutationFn: (input: MunkidoriAdrenaBrainInput) => useMunkidoriAdrenaBrain(input),
+    onSuccess: async (_game, input) => {
+      clearUltraBallPostSearchHandoff(input.gameId, input.playerId)
+      await queryClient.invalidateQueries({ queryKey: ['tcg-engine', 'game-state'] })
+    }
+  })
+
   const playBasicToBenchMutation = useMutation({
     mutationFn: (input: PlayBasicToBenchInput) => playBasicToBench(input),
     onSuccess: async (_game, input) => {
@@ -1264,6 +1301,11 @@ export function HomeRoute() {
       playStadiumMutation.error,
       'Play Stadium failed',
       'The Stadium stayed in hand. Refresh state and confirm this viewer still has priority from the action window.'
+    ) ??
+    commandErrorNotice(
+      munkidoriAdrenaBrainMutation.error,
+      'Adrena-Brain failed',
+      'No damage counters moved. Refresh state and confirm Munkidori still has Darkness Energy, the source is damaged, and the target is in play.'
     ) ??
     commandErrorNotice(
       playBasicToBenchMutation.error,
@@ -1791,6 +1833,24 @@ export function HomeRoute() {
                     })
                   }
                 }}
+                onUseMunkidoriAdrenaBrain={({
+                  playerId,
+                  sourceCardInstanceId,
+                  fromCardInstanceId,
+                  targetCardInstanceId,
+                  damageCounters
+                }) => {
+                  if (isPlayerId(playerId)) {
+                    munkidoriAdrenaBrainMutation.mutate({
+                      gameId: normalisedGameId,
+                      playerId,
+                      sourceCardInstanceId,
+                      fromCardInstanceId,
+                      targetCardInstanceId,
+                      damageCounters
+                    })
+                  }
+                }}
                 onPlayBasicToBench={({ playerId, cardInstanceId }) => {
                   if (isPlayerId(playerId)) {
                     playBasicToBenchMutation.mutate({
@@ -1869,6 +1929,16 @@ export function HomeRoute() {
                 teamRocketsFactoryPendingPlayerId={
                   teamRocketsFactoryMutation.isPending
                     ? teamRocketsFactoryMutation.variables?.playerId ?? null
+                    : null
+                }
+                munkidoriAdrenaBrainPendingKey={
+                  munkidoriAdrenaBrainMutation.isPending && munkidoriAdrenaBrainMutation.variables
+                    ? adrenaBrainKey(
+                        munkidoriAdrenaBrainMutation.variables.sourceCardInstanceId,
+                        munkidoriAdrenaBrainMutation.variables.fromCardInstanceId,
+                        munkidoriAdrenaBrainMutation.variables.targetCardInstanceId,
+                        munkidoriAdrenaBrainMutation.variables.damageCounters
+                      )
                     : null
                 }
                 retreatPendingKey={
@@ -2418,6 +2488,20 @@ async function useTeamRocketsFactory(input: TeamRocketsFactoryInput): Promise<Cr
   return result.data as CreatedGame
 }
 
+async function useMunkidoriAdrenaBrain(input: MunkidoriAdrenaBrainInput): Promise<CreatedGame> {
+  const result = await runUseTcgEngineMunkidoriAdrenaBrain({
+    input,
+    fields: GAME_RESOURCE_FIELDS,
+    headers: buildAshRpcHeaders()
+  })
+
+  if (!result.success) {
+    throw new Error(rpcErrorMessage(result.errors))
+  }
+
+  return result.data as CreatedGame
+}
+
 async function playBasicToBench(input: PlayBasicToBenchInput): Promise<CreatedGame> {
   const result = await runPlayTcgEngineBasicToBench({
     input,
@@ -2614,6 +2698,7 @@ function GameStateWorkbench({
   onPlayBasicToBench,
   onPlayCard,
   onPlayStadium,
+  onUseMunkidoriAdrenaBrain,
   onUseTeamRocketsFactory,
   onRetreat,
   onResolveDeclaredAttack,
@@ -2637,6 +2722,7 @@ function GameStateWorkbench({
   promptPendingId,
   playCardPendingCardId,
   playStadiumPendingCardId,
+  munkidoriAdrenaBrainPendingKey,
   teamRocketsFactoryPendingPlayerId,
   resolveDeclaredAttackPendingPlayerId,
   retreatPendingKey
@@ -2668,6 +2754,7 @@ function GameStateWorkbench({
   onPlayBasicToBench: (input: PlayBasicToBenchCommand) => void
   onPlayCard: (input: PlayCardCommand) => void
   onPlayStadium: (input: PlayStadiumCommand) => void
+  onUseMunkidoriAdrenaBrain: (input: MunkidoriAdrenaBrainCommand) => void
   onUseTeamRocketsFactory: (input: TeamRocketsFactoryCommand) => void
   onRetreat: (input: RetreatCommand) => void
   onResolveDeclaredAttack: (input: ResolveDeclaredAttackCommand) => void
@@ -2691,6 +2778,7 @@ function GameStateWorkbench({
   promptPendingId: string | null
   playCardPendingCardId: string | null
   playStadiumPendingCardId: string | null
+  munkidoriAdrenaBrainPendingKey: string | null
   teamRocketsFactoryPendingPlayerId: string | null
   resolveDeclaredAttackPendingPlayerId: string | null
   retreatPendingKey: string | null
@@ -2700,6 +2788,7 @@ function GameStateWorkbench({
     playCardPendingCardId ||
       playStadiumPendingCardId ||
       teamRocketsFactoryPendingPlayerId ||
+      munkidoriAdrenaBrainPendingKey ||
       playBasicToBenchPendingCardId ||
       attachEnergyPendingKey ||
       attachToolPendingKey ||
@@ -2820,6 +2909,7 @@ function GameStateWorkbench({
             onPlayBasicToBench={onPlayBasicToBench}
             onPlayCard={onPlayCard}
             onPlayStadium={onPlayStadium}
+            onUseMunkidoriAdrenaBrain={onUseMunkidoriAdrenaBrain}
             onUseTeamRocketsFactory={onUseTeamRocketsFactory}
             onRetreat={onRetreat}
             attachEnergyPendingKey={attachEnergyPendingKey}
@@ -2830,6 +2920,7 @@ function GameStateWorkbench({
             playBasicToBenchPendingCardId={playBasicToBenchPendingCardId}
             playCardPendingCardId={playCardPendingCardId}
             playStadiumPendingCardId={playStadiumPendingCardId}
+            munkidoriAdrenaBrainPendingKey={munkidoriAdrenaBrainPendingKey}
             teamRocketsFactoryPendingPlayerId={teamRocketsFactoryPendingPlayerId}
             retreatPendingKey={retreatPendingKey}
             ultraBallPostSearchHandoff={ultraBallPostSearchHandoff}
@@ -5290,6 +5381,7 @@ function ActionAffordancesPanel({
   onPlayBasicToBench,
   onPlayCard,
   onPlayStadium,
+  onUseMunkidoriAdrenaBrain,
   onUseTeamRocketsFactory,
   onRetreat,
   attachEnergyPendingKey,
@@ -5300,6 +5392,7 @@ function ActionAffordancesPanel({
   playBasicToBenchPendingCardId,
   playCardPendingCardId,
   playStadiumPendingCardId,
+  munkidoriAdrenaBrainPendingKey,
   teamRocketsFactoryPendingPlayerId,
   retreatPendingKey,
   ultraBallPostSearchHandoff,
@@ -5319,6 +5412,7 @@ function ActionAffordancesPanel({
   onPlayBasicToBench: (input: PlayBasicToBenchCommand) => void
   onPlayCard: (input: PlayCardCommand) => void
   onPlayStadium: (input: PlayStadiumCommand) => void
+  onUseMunkidoriAdrenaBrain: (input: MunkidoriAdrenaBrainCommand) => void
   onUseTeamRocketsFactory: (input: TeamRocketsFactoryCommand) => void
   onRetreat: (input: RetreatCommand) => void
   attachEnergyPendingKey: string | null
@@ -5329,6 +5423,7 @@ function ActionAffordancesPanel({
   playBasicToBenchPendingCardId: string | null
   playCardPendingCardId: string | null
   playStadiumPendingCardId: string | null
+  munkidoriAdrenaBrainPendingKey: string | null
   teamRocketsFactoryPendingPlayerId: string | null
   retreatPendingKey: string | null
   ultraBallPostSearchHandoff: UltraBallPostSearchHandoff | null
@@ -5338,6 +5433,7 @@ function ActionAffordancesPanel({
     playCardPendingCardId ||
       playStadiumPendingCardId ||
       teamRocketsFactoryPendingPlayerId ||
+      munkidoriAdrenaBrainPendingKey ||
       playBasicToBenchPendingCardId ||
       attachEnergyPendingKey ||
       attachToolPendingKey ||
@@ -5423,11 +5519,13 @@ function ActionAffordancesPanel({
                     onPlayBasicToBench={onPlayBasicToBench}
                     onPlayCard={onPlayCard}
                     onPlayStadium={onPlayStadium}
+                    onUseMunkidoriAdrenaBrain={onUseMunkidoriAdrenaBrain}
                     onUseTeamRocketsFactory={onUseTeamRocketsFactory}
                     onRetreat={onRetreat}
                     playBasicToBenchPendingCardId={playBasicToBenchPendingCardId}
                     playCardPendingCardId={playCardPendingCardId}
                     playStadiumPendingCardId={playStadiumPendingCardId}
+                    munkidoriAdrenaBrainPendingKey={munkidoriAdrenaBrainPendingKey}
                     teamRocketsFactoryPendingPlayerId={teamRocketsFactoryPendingPlayerId}
                     postSearchBattleAttackIds={postSearchHandoff?.battleAttackIds ?? []}
                     postSearchBenchCardInstanceIds={postSearchHandoff?.benchableCardInstanceIds ?? []}
@@ -6006,11 +6104,13 @@ function ActionAffordanceCard({
   onPlayBasicToBench,
   onPlayCard,
   onPlayStadium,
+  onUseMunkidoriAdrenaBrain,
   onUseTeamRocketsFactory,
   onRetreat,
   playBasicToBenchPendingCardId,
   playCardPendingCardId,
   playStadiumPendingCardId,
+  munkidoriAdrenaBrainPendingKey,
   teamRocketsFactoryPendingPlayerId,
   postSearchBattleAttackIds,
   postSearchBenchCardInstanceIds,
@@ -6037,11 +6137,13 @@ function ActionAffordanceCard({
   onPlayBasicToBench: (input: PlayBasicToBenchCommand) => void
   onPlayCard: (input: PlayCardCommand) => void
   onPlayStadium: (input: PlayStadiumCommand) => void
+  onUseMunkidoriAdrenaBrain: (input: MunkidoriAdrenaBrainCommand) => void
   onUseTeamRocketsFactory: (input: TeamRocketsFactoryCommand) => void
   onRetreat: (input: RetreatCommand) => void
   playBasicToBenchPendingCardId: string | null
   playCardPendingCardId: string | null
   playStadiumPendingCardId: string | null
+  munkidoriAdrenaBrainPendingKey: string | null
   teamRocketsFactoryPendingPlayerId: string | null
   postSearchBattleAttackIds: string[]
   postSearchBenchCardInstanceIds: string[]
@@ -6058,6 +6160,7 @@ function ActionAffordanceCard({
   const repeatedBenchLabels = repeatedBasicBenchBaseLabels(benchOptions)
   const evolutionOptions = providedEvolutionOptions ?? evolutionCommandOptions(action, cardsById)
   const repeatedEvolutionLabels = repeatedEvolutionBaseLabels(evolutionOptions)
+  const adrenaBrainOptions = adrenaBrainCommandOptions(action, cardsById)
 
   return (
     <li className={`rounded-xl border px-3 py-2 text-sm ${actionSurfaceClassName(action)}`}>
@@ -6157,6 +6260,33 @@ function ActionAffordanceCard({
                 {isPending
                   ? `Using ${stadiumCard?.name ?? "Team Rocket's Factory"}...`
                   : `Use ${stadiumCard?.name ?? formatCardInstanceId(cardInstanceId)}`}
+              </ActionCommandButton>
+            )
+          })}
+        </div>
+      ) : null}
+
+      {adrenaBrainOptions.length > 0 ? (
+        <div className="mt-2 space-y-1.5">
+          {adrenaBrainOptions.map(option => {
+            const isPending = munkidoriAdrenaBrainPendingKey === option.key
+
+            return (
+              <ActionCommandButton
+                disabled={!canRunAction}
+                key={option.key}
+                onClick={() =>
+                  onUseMunkidoriAdrenaBrain({
+                    playerId: action.playerId,
+                    sourceCardInstanceId: option.sourceCardInstanceId,
+                    fromCardInstanceId: option.fromCardInstanceId,
+                    targetCardInstanceId: option.targetCardInstanceId,
+                    damageCounters: option.damageCounters
+                  })
+                }
+                tone="primary"
+              >
+                {isPending ? adrenaBrainPendingLabel(option) : adrenaBrainButtonLabel(option)}
               </ActionCommandButton>
             )
           })}
@@ -6482,6 +6612,7 @@ function actionSurfaceClassName(action: ActionAffordance) {
   switch (action.key) {
     case 'choose_replacement_active':
       return 'border-attention/35 bg-attention/10'
+    case 'adrena_brain':
     case 'declare_attack':
       return 'border-accent-mint/30 bg-accent-mint/10'
     case 'unsupported_attack':
@@ -6524,6 +6655,8 @@ function actionSummary(action: ActionAffordance) {
       return `${actionCountLabel(action.targetCardInstanceIds.length, 'Bench target')} with ${retreatCostSummary(
         action.requiredSourceCount
       )}.`
+    case 'adrena_brain':
+      return `Move up to ${action.requiredSourceCount} damage ${action.requiredSourceCount === 1 ? 'counter' : 'counters'} from your damaged Pokémon to an opponent Pokémon.`
     case 'declare_attack':
       return `${action.attackName ?? (action.attackId ? formatAttackId(action.attackId) : 'Attack')}: ${attackCostSummary(
         action.attackCost
@@ -6608,6 +6741,59 @@ function playCardCommandOptions(
       baseLabel: card?.name ?? formatCardInstanceId(cardInstanceId)
     }
   })
+}
+
+function adrenaBrainCommandOptions(
+  action: ActionAffordance,
+  cardsById: Map<string, CardSummary>
+): AdrenaBrainCommandOption[] {
+  if (action.key !== 'adrena_brain' || action.sourceCardInstanceIds.length < 2 || action.targetCardInstanceIds.length !== 1) {
+    return []
+  }
+
+  const sourceCardInstanceId = action.sourceCardInstanceIds[0]!
+  const fromCardInstanceId = action.sourceCardInstanceIds[1]!
+  const targetCardInstanceId = action.targetCardInstanceIds[0]!
+
+  return damageCounterOptions(action.requiredSourceCount).map(damageCounters => ({
+    key: adrenaBrainKey(sourceCardInstanceId, fromCardInstanceId, targetCardInstanceId, damageCounters),
+    sourceCardInstanceId,
+    fromCardInstanceId,
+    targetCardInstanceId,
+    damageCounters,
+    sourceCard: cardsById.get(sourceCardInstanceId),
+    fromCard: cardsById.get(fromCardInstanceId),
+    targetCard: cardsById.get(targetCardInstanceId)
+  }))
+}
+
+function damageCounterOptions(maxCounters: number) {
+  const count = Math.max(0, Math.floor(maxCounters))
+
+  return Array.from({ length: count }, (_value, index) => index + 1)
+}
+
+function adrenaBrainPendingLabel(option: AdrenaBrainCommandOption) {
+  return `Moving ${damageCounterLabel(option.damageCounters)}...`
+}
+
+function adrenaBrainButtonLabel(option: AdrenaBrainCommandOption) {
+  return `Move ${damageCounterLabel(option.damageCounters)} from ${cardBoardLabel(
+    option.fromCard,
+    option.fromCardInstanceId
+  )} to ${cardBoardLabel(option.targetCard, option.targetCardInstanceId)}`
+}
+
+function damageCounterLabel(count: number) {
+  return `${count} damage ${count === 1 ? 'counter' : 'counters'}`
+}
+
+function cardBoardLabel(card: CardSummary | undefined, cardInstanceId: string) {
+  if (!card) {
+    return formatCardInstanceId(cardInstanceId)
+  }
+
+  return `${cardLocationLabel(card, 'in play')} ${card.name}`
 }
 
 function repeatedBasicBenchBaseLabels(options: BasicBenchCommandOption[]) {
@@ -6931,6 +7117,7 @@ function actionGroupId(action: ActionAffordance): ActionGroupId {
     case 'attach_tool':
       return 'hand'
     case 'retreat':
+    case 'adrena_brain':
     case 'declare_attack':
       return 'battle'
     case 'pass':
@@ -9787,6 +9974,15 @@ function evolveKey(evolutionCardInstanceId: string, targetCardInstanceId: string
 
 function retreatKey(benchCardInstanceId: string, energyCardInstanceIds: string[]) {
   return `${benchCardInstanceId}:${energyCardInstanceIds.join(',')}`
+}
+
+function adrenaBrainKey(
+  sourceCardInstanceId: string,
+  fromCardInstanceId: string,
+  targetCardInstanceId: string,
+  damageCounters: number
+) {
+  return `${sourceCardInstanceId}:${fromCardInstanceId}:${targetCardInstanceId}:${damageCounters}`
 }
 
 function attackKey(playerId: string, attackId: string) {

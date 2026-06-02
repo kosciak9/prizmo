@@ -13,6 +13,7 @@ defmodule Prizmo.TcgEngine.Mechanics do
     only: [
       apply_attack_damage: 4,
       attached_energy_cards_for_retreat: 3,
+      discard_knocked_out_stack: 2,
       discard_retreat_energy: 3,
       knockout_prize_count: 1,
       resolve_replacement_active_after_knockout: 2
@@ -72,6 +73,7 @@ defmodule Prizmo.TcgEngine.Mechanics do
 
   import Prizmo.TcgEngine.TurnStore, only: [current_turn: 1]
 
+  alias Prizmo.TcgEngine.AbilityEffects
   alias Prizmo.TcgEngine.AttackDamage
   alias Prizmo.TcgEngine.AttackEffects
   alias Prizmo.TcgEngine.AttackRequirements
@@ -1000,6 +1002,74 @@ defmodule Prizmo.TcgEngine.Mechanics do
                public_note: team_rockets_factory_public_note(player_id, length(drawn_cards))
              }) do
         get_game(game.id)
+      end
+    end)
+  end
+
+  @spec use_munkidori_adrena_brain(
+          Game.t() | String.t(),
+          String.t(),
+          String.t(),
+          String.t(),
+          String.t(),
+          pos_integer()
+        ) :: {:ok, Game.t()} | {:error, term()}
+  def use_munkidori_adrena_brain(
+        game_or_id,
+        player_id,
+        source_card_instance_id,
+        from_card_instance_id,
+        target_card_instance_id,
+        damage_counters
+      )
+      when is_binary(player_id) and is_binary(source_card_instance_id) and
+             is_binary(from_card_instance_id) and
+             is_binary(target_card_instance_id) and is_integer(damage_counters) do
+    transaction(fn ->
+      with {:ok, game} <- get_game(game_or_id),
+           {:ok, turn} <- require_action_window_for_player(game, player_id),
+           :ok <- CardPlay.require_no_awaiting_pending_effect(game.id),
+           {:ok, source_card} <- get_card(game.id, source_card_instance_id),
+           {:ok, from_card} <- get_card(game.id, from_card_instance_id),
+           {:ok, target_card} <- get_card(game.id, target_card_instance_id),
+           {:ok, opponent_player_id} <- opponent_player_id(game.id, player_id),
+           :ok <- require_card_owned_by_player(source_card, player_id),
+           :ok <- AbilityEffects.require_adrena_brain_available(game.id, source_card, turn),
+           :ok <- require_card_owned_by_player(from_card, player_id),
+           :ok <- require_in_play_pokemon_zone(from_card),
+           :ok <- AbilityEffects.require_damage_counter_count(damage_counters, from_card),
+           :ok <- require_card_owned_by_player(target_card, opponent_player_id),
+           :ok <- require_in_play_pokemon_zone(target_card),
+           {:ok, ability_result} <-
+             move_adrena_brain_damage_counters(
+               game.id,
+               source_card,
+               from_card,
+               target_card,
+               turn,
+               damage_counters
+             ),
+           {:ok, event} <-
+             write_event(
+               game,
+               :ability_used,
+               player_id,
+               adrena_brain_event_payload(
+                 turn,
+                 source_card,
+                 from_card,
+                 target_card,
+                 ability_result
+               )
+             ),
+           {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do
+        resolve_adrena_brain_knockout(
+          game.id,
+          player_id,
+          target_card.owner_player_id,
+          target_card,
+          ability_result
+        )
       end
     end)
   end
@@ -2091,6 +2161,118 @@ defmodule Prizmo.TcgEngine.Mechanics do
     end
   end
 
+  defp move_adrena_brain_damage_counters(
+         game_id,
+         %CardInstance{} = source_card,
+         %CardInstance{} = from_card,
+         %CardInstance{} = target_card,
+         %Turn{} = turn,
+         damage_counters
+       ) do
+    moved_damage = AbilityEffects.damage_for_counters(damage_counters)
+    from_resulting_damage = max(from_card.damage - moved_damage, 0)
+    target_resulting_damage = target_card.damage + moved_damage
+
+    with {:ok, _from_card} <-
+           update(from_card, :set_damage, %{damage: from_resulting_damage}),
+         {:ok, current_source_card} <- get_card(game_id, source_card.id),
+         {:ok, _source_card} <-
+           update(current_source_card, :set_markers, %{
+             markers: AbilityEffects.put_adrena_brain_used_marker(current_source_card, turn)
+           }),
+         {:ok, _target_card} <-
+           update(target_card, :set_damage, %{damage: target_resulting_damage}),
+         {:ok, knocked_out?} <-
+           maybe_knock_out_after_adrena_brain(game_id, target_card, target_resulting_damage) do
+      {:ok,
+       %{
+         damage_counters: damage_counters,
+         moved_damage: moved_damage,
+         from_starting_damage: from_card.damage,
+         from_resulting_damage: from_resulting_damage,
+         target_starting_damage: target_card.damage,
+         target_resulting_damage: target_resulting_damage,
+         knocked_out?: knocked_out?
+       }}
+    end
+  end
+
+  defp maybe_knock_out_after_adrena_brain(game_id, %CardInstance{} = target_card, new_damage) do
+    with {:ok, target_hp} <- pokemon_hp(target_card.card_id) do
+      if new_damage < target_hp do
+        {:ok, false}
+      else
+        with {:ok, _discarded_cards} <- discard_knocked_out_stack(game_id, target_card) do
+          {:ok, true}
+        end
+      end
+    end
+  end
+
+  defp adrena_brain_event_payload(
+         %Turn{} = turn,
+         %CardInstance{} = source_card,
+         %CardInstance{} = from_card,
+         %CardInstance{} = target_card,
+         ability_result
+       ) do
+    %{
+      turn_id: turn.id,
+      source: EventPayloads.card_source(source_card),
+      source_card_id: source_card.card_id,
+      source_card_instance_id: source_card.id,
+      ability_id: Atom.to_string(AbilityEffects.adrena_brain_ability_id()),
+      effect_type: :move_damage_counters,
+      from_card_instance_id: from_card.id,
+      target_card_instance_id: target_card.id,
+      damage_counters: ability_result.damage_counters,
+      moved_damage: ability_result.moved_damage,
+      from_starting_damage: ability_result.from_starting_damage,
+      from_resulting_damage: ability_result.from_resulting_damage,
+      target_starting_damage: ability_result.target_starting_damage,
+      target_resulting_damage: ability_result.target_resulting_damage,
+      knocked_out?: ability_result.knocked_out?,
+      public_note: adrena_brain_public_note(ability_result.damage_counters)
+    }
+  end
+
+  defp resolve_adrena_brain_knockout(
+         game_id,
+         _attacking_player_id,
+         _knocked_out_player_id,
+         _target_card,
+         %{
+           knocked_out?: false
+         }
+       ) do
+    get_game(game_id)
+  end
+
+  defp resolve_adrena_brain_knockout(
+         game_id,
+         attacking_player_id,
+         knocked_out_player_id,
+         %CardInstance{} = target_card,
+         %{knocked_out?: true}
+       ) do
+    with {:ok, prize_records} <-
+           active_knockout_prize_records(game_id, knocked_out_player_id, target_card, %{
+             knocked_out?: true
+           }),
+         {:ok, game} <-
+           create_knockout_prize_selections(game_id, [
+             %{player_id: attacking_player_id, prize_records: prize_records}
+           ]) do
+      case target_card.zone do
+        :active ->
+          resolve_replacement_after_knockout(game, attacking_player_id, knocked_out_player_id)
+
+        _bench_or_other ->
+          {:ok, game}
+      end
+    end
+  end
+
   defp draw_team_rockets_factory_cards(game_id, player, draw_count) do
     with {:ok, cards} <- Prizmo.TcgEngine.CardStore.deck_cards_for_player(player.id, draw_count) do
       cards
@@ -2105,6 +2287,12 @@ defmodule Prizmo.TcgEngine.Mechanics do
 
   defp team_rockets_factory_public_note(player_id, card_count) do
     "Team Rocket's Factory let #{String.replace(player_id, "_", " ")} draw #{card_count} cards."
+  end
+
+  defp adrena_brain_public_note(1), do: "Adrena-Brain moved 1 damage counter."
+
+  defp adrena_brain_public_note(damage_counters) do
+    "Adrena-Brain moved #{damage_counters} damage counters."
   end
 
   defp collect_results(results) do

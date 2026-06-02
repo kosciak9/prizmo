@@ -1,5 +1,12 @@
 # Wiki Log
 
+## [2026-06-02] iteration 244 | Munkidori Adrena-Brain Ability command
+
+- Task attempted: closed the next visible Dragapult target-deck pending Ability from the screenshot. Munkidori (`TWM-095`) `Adrena-Brain` now has executable Ash mechanics and a React command path that moves 1-3 damage counters from an own damaged in-play Pokémon to an opponent in-play Pokémon while enforcing the Darkness Energy and once-per-turn requirements.
+- Files changed: `lib/prizmo/tcg/cards/behaviors/twm.ex` (Munkidori behavior overlay), `lib/prizmo/tcg_engine/ability_effects.ex` (Adrena-Brain legality, Darkness provider, counter, and marker helpers), `lib/prizmo/tcg_engine/cards/registry.ex` (Munkidori CardDefinition), `lib/prizmo/tcg_engine/mechanics.ex` (Ability command resolution, damage movement, event payload, KO/prize/replacement handling), `lib/prizmo/tcg_engine/game/action_commands.ex`, `lib/prizmo/tcg_engine/game.ex`, and `lib/prizmo/tcg_engine.ex` (Ash command/code interface/RPC), `lib/prizmo/tcg_engine/game_view/action_affordances.ex` and `lib/prizmo/tcg_engine/game_view.ex` (board affordances and public event note), `lib/prizmo_web/spa/lib/ash/client.ts` and generated Ash TypeScript RPC output, `lib/prizmo_web/spa/features/home/routes/index.tsx` (mutation, pending/error copy, command options, counter buttons), plus the handoff/log wiki files.
+- Validation: `mix format && mix compile --warnings-as-errors`, `mix ash_typescript.codegen --check`, focused `mix test test/prizmo/tcg_engine/mechanics_test.exs` (12/0), `node_modules/.bin/tsc --noEmit`, direct catalog/registry verification, a smoke check proving 1-counter movement plus same-turn second-use rejection, and full `mix check` (all 12 gates) pass.
+- Remaining/blocking notes: Munkidori's visible pending Ability gap is closed. The next high-value task is a fresh actual GameView/live-playability pending-text inventory across the six target decks after Budew and Munkidori, then the next target-deck mechanic from that inventory.
+
 ## [2026-06-02] iteration 243 | Budew Itchy Pollen Item lock + complete gameplay correction
 
 - Task attempted: corrected the mistaken DONE interpretation by recording that complete gameplay of all six target meta decks is the north star; registry/coverage entries alone are not completion. Closed one visible Dragapult target-deck pending attack from the screenshot: Budew (`ASC-016`) `Itchy Pollen`.

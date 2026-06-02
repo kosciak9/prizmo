@@ -557,6 +557,19 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     ]
   }
 
+  @munkidori %CardDefinition{
+    id: "TWM-095",
+    kind: :pokemon,
+    play_window: :action_window,
+    effects: [
+      %Effect{
+        key: :adrena_brain_move_damage_counters,
+        type: :move_damage_counters,
+        params: %{max_counters: 3, requires_attached_type: :darkness}
+      }
+    ]
+  }
+
   @dunsparce %CardDefinition{
     id: "JTG-120",
     kind: :pokemon,
@@ -752,6 +765,7 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     @glass_trumpet.id => @glass_trumpet,
     @teal_mask_ogerpon_ex.id => @teal_mask_ogerpon_ex,
     @mega_lopunny_ex_twm.id => @mega_lopunny_ex_twm,
+    @munkidori.id => @munkidori,
     @cyrano.id => @cyrano,
     @ciphermaniacs_codebreaking.id => @ciphermaniacs_codebreaking,
     @fan_rotom.id => @fan_rotom

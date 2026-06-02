@@ -1,6 +1,7 @@
 defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
   @moduledoc false
 
+  alias Prizmo.TcgEngine.AbilityEffects
   alias Prizmo.TcgEngine.AttackCosts
   alias Prizmo.TcgEngine.AttackEffects
   alias Prizmo.TcgEngine.AttackLocks
@@ -120,6 +121,7 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
       attach_tool_affordance(player, cards),
       retreat_affordance(player, current_turn, cards)
     ] ++
+      adrena_brain_affordances(player, current_turn, cards, all_cards) ++
       evolve_from_hand_affordances(player, current_turn, cards, all_cards) ++
       declare_attack_affordances(player, current_turn, cards, all_cards) ++
       unsupported_card_text_affordances(player, current_turn, cards, all_cards) ++
@@ -314,6 +316,40 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
     end
   end
 
+  defp adrena_brain_affordances(%GamePlayer{} = player, %Turn{} = current_turn, cards, all_cards) do
+    own_in_play_cards = in_play_pokemon_cards(cards)
+
+    damaged_from_cards =
+      Enum.filter(own_in_play_cards, &(AbilityEffects.movable_damage_counter_count(&1) > 0))
+
+    opponent_target_cards = opponent_in_play_pokemon_cards(all_cards, player.player_id)
+
+    for source_card <- own_in_play_cards,
+        AbilityEffects.adrena_brain_available?(
+          source_card,
+          attached_cards_for(cards, source_card.id),
+          current_turn
+        ),
+        from_card <- damaged_from_cards,
+        target_card <- opponent_target_cards do
+      max_counters = AbilityEffects.movable_damage_counter_count(from_card)
+
+      affordance(
+        :adrena_brain,
+        adrena_brain_label(from_card, target_card),
+        :command,
+        player.player_id,
+        source_card_instance_ids: [source_card.id, from_card.id],
+        target_card_instance_ids: [target_card.id],
+        required_source_count: max_counters,
+        choice_keys: ["damage_counters"],
+        note: adrena_brain_note(max_counters)
+      )
+    end
+  end
+
+  defp adrena_brain_affordances(_player, _current_turn, _cards, _all_cards), do: []
+
   defp declare_attack_affordances(
          %GamePlayer{} = player,
          %Turn{} = current_turn,
@@ -387,6 +423,12 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
 
   defp opponent_active_pokemon_card(cards, player_id) do
     Enum.find(cards, &(&1.zone == :active and &1.owner_player_id != player_id))
+  end
+
+  defp opponent_in_play_pokemon_cards(cards, player_id) do
+    cards
+    |> Enum.filter(&(&1.owner_player_id != player_id and &1.zone in [:active, :bench]))
+    |> Enum.sort_by(&{zone_sort(&1.zone), &1.position, &1.instance_id})
   end
 
   defp in_play_pokemon_cards(cards) do
@@ -797,6 +839,25 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
 
   defp attack_note(cost) do
     "Declaration validates attached Energy cost #{Enum.join(cost, ", ")}. Damage and effects resolve in follow-up attack commands."
+  end
+
+  defp adrena_brain_label(from_card, target_card) do
+    "Use Adrena-Brain: #{card_name(from_card)} → #{card_name(target_card)}"
+  end
+
+  defp adrena_brain_note(1) do
+    "Move 1 damage counter from one of your damaged Pokémon to one of your opponent's Pokémon in play."
+  end
+
+  defp adrena_brain_note(max_counters) do
+    "Move 1–#{max_counters} damage counters from one of your damaged Pokémon to one of your opponent's Pokémon in play."
+  end
+
+  defp card_name(%CardInstance{card_id: card_id}) do
+    case CardCatalog.fetch(card_id) do
+      {:ok, %{name: name}} when is_binary(name) -> name
+      _other -> card_id
+    end
   end
 
   defp present_text?(text) when is_binary(text), do: String.trim(text) != ""

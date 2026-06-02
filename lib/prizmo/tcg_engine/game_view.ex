@@ -428,6 +428,20 @@ defmodule Prizmo.TcgEngine.GameView do
     }
   end
 
+  defp public_event_details(%GameEvent{type: "ability_used", payload: payload}) do
+    if payload_value(payload, "ability_id") == "adrena_brain" do
+      %{
+        public_note:
+          payload_value(payload, "public_note") ||
+            "#{payload_card_name(payload, "source_card_id", "Munkidori")} used Adrena-Brain.",
+        public_card_count: 0,
+        public_revealed_cards: []
+      }
+    else
+      default_public_event_details()
+    end
+  end
+
   defp public_event_details(%GameEvent{type: "cards_moved", payload: payload}) do
     if payload_value(payload, "public_reveal") == true do
       revealed_cards = public_revealed_cards(payload, "revealed_cards")

@@ -36,6 +36,7 @@ defmodule Prizmo.TcgEngine do
       rpc_action :play_tcg_engine_card, :play_card_command
       rpc_action :play_tcg_engine_stadium, :play_stadium_command
       rpc_action :use_tcg_engine_team_rockets_factory, :use_team_rockets_factory_command
+      rpc_action :use_tcg_engine_munkidori_adrena_brain, :use_munkidori_adrena_brain_command
       rpc_action :play_tcg_engine_basic_to_bench, :play_basic_to_bench_command
       rpc_action :evolve_tcg_engine_from_hand, :evolve_from_hand_command
       rpc_action :attach_tcg_engine_energy, :attach_energy_command
@@ -121,6 +122,17 @@ defmodule Prizmo.TcgEngine do
       define :use_team_rockets_factory_for_game,
         action: :use_team_rockets_factory_command,
         args: [:game_id, :player_id]
+
+      define :use_munkidori_adrena_brain_for_game,
+        action: :use_munkidori_adrena_brain_command,
+        args: [
+          :game_id,
+          :player_id,
+          :source_card_instance_id,
+          :from_card_instance_id,
+          :target_card_instance_id,
+          :damage_counters
+        ]
 
       define :play_basic_to_bench_for_game,
         action: :play_basic_to_bench_command,

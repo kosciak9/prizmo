@@ -404,6 +404,47 @@ defmodule Prizmo.TcgEngine.Game.ActionCommands do
       end
     end
 
+    action :use_munkidori_adrena_brain_command, :struct do
+      description "Use Munkidori's Adrena-Brain Ability to move damage counters."
+
+      constraints instance_of: Game
+
+      argument :game_id, :uuid do
+        allow_nil? false
+      end
+
+      argument :player_id, :string do
+        allow_nil? false
+      end
+
+      argument :source_card_instance_id, :uuid do
+        allow_nil? false
+      end
+
+      argument :from_card_instance_id, :uuid do
+        allow_nil? false
+      end
+
+      argument :target_card_instance_id, :uuid do
+        allow_nil? false
+      end
+
+      argument :damage_counters, :integer do
+        allow_nil? false
+      end
+
+      run fn input, _context ->
+        Mechanics.use_munkidori_adrena_brain(
+          input.arguments.game_id,
+          input.arguments.player_id,
+          input.arguments.source_card_instance_id,
+          input.arguments.from_card_instance_id,
+          input.arguments.target_card_instance_id,
+          input.arguments.damage_counters
+        )
+      end
+    end
+
     action :play_basic_to_bench_command, :struct do
       description "Play a Basic Pokémon from hand to the Bench through the mechanics layer."
 

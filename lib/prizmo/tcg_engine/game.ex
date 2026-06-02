@@ -97,6 +97,17 @@ defmodule Prizmo.TcgEngine.Game do
     define :play_card_command, args: [:game_id, :player_id, :card_instance_id]
     define :play_stadium_command, args: [:game_id, :player_id, :card_instance_id]
     define :use_team_rockets_factory_command, args: [:game_id, :player_id]
+
+    define :use_munkidori_adrena_brain_command,
+      args: [
+        :game_id,
+        :player_id,
+        :source_card_instance_id,
+        :from_card_instance_id,
+        :target_card_instance_id,
+        :damage_counters
+      ]
+
     define :play_basic_to_bench_command, args: [:game_id, :player_id, :card_instance_id]
 
     define :attach_tool_command,

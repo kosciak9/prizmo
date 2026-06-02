@@ -79,6 +79,10 @@ defmodule Prizmo.Tcg.Cards.Behaviors.TWM do
   end
 
   card "TWM-095" do
+    ability(:adrena_brain,
+      effect: %{type: :move_damage_counters, max_counters: 3, requires_attached_type: :darkness}
+    )
+
     attack(:mind_bend, effect: %{type: :confuse_defender_active})
   end
 

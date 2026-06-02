@@ -4,6 +4,14 @@
 - Sources: Project codebase; local validation; wiki log
 - Raw: N/A — operational handoff
 
+## [2026-06-02] Iteration 244 handoff — Munkidori Adrena-Brain Ability command
+
+- Current state: Munkidori (`TWM-095`) from Dragapult (`27431`) moved off the visible `Pending card text`/pending Ability path. `Adrena-Brain` is now a real Ash Ability command and SPA command path, not registry-only coverage.
+- Completed: added the TWM behavior overlay and `EngineCardRegistry` CardDefinition for `TWM-095` with effect `:move_damage_counters`, `max_counters: 3`, and `requires_attached_type: :darkness`. `Prizmo.TcgEngine.AbilityEffects` centralizes the legality gates: source must be Munkidori in play, have an attached Darkness Energy provider (including `Team Rocket's Energy`), be unused this turn via the source card marker `"ability_used:adrena_brain"`, and the chosen own in-play source Pokémon must have enough damage counters.
+- Ash/React surface: `Mechanics.use_munkidori_adrena_brain/6` revalidates all IDs and legality, moves 1-3 counters from an own damaged in-play Pokémon to an opponent in-play Pokémon, marks the source Munkidori as used, writes a viewer-safe `ability_used` event, and resolves KO/prize/replacement flow if the target is Knocked Out. The Ash action `:use_munkidori_adrena_brain_command`, RPC mapping `:use_tcg_engine_munkidori_adrena_brain`, GameView `adrena_brain` affordances, generated TypeScript client, and React action buttons are wired so players can choose the counter count from the board.
+- Validation: `mix format && mix compile --warnings-as-errors`, `mix ash_typescript.codegen --check`, focused `mix test test/prizmo/tcg_engine/mechanics_test.exs` (12/0), `node_modules/.bin/tsc --noEmit`, direct catalog/registry check (`munkidori: {"Adrena-Brain", "TWM-095"}`), smoke check (`adrena_brain_smoke: {10, 20}` plus second-use rejection `{:ability_already_used_this_turn, _, :adrena_brain}`), and full `mix check` (all 12 gates) pass.
+- Recommended next atomic task: refresh the actual live six-deck/GameView pending-text inventory after Budew and Munkidori, then pick the next visible target-deck mechanic. Do not declare the six-deck north star complete while any target-deck card still appears as pending in real play, even if registry/coverage reports look green.
+
 ## [2026-06-02] Iteration 243 handoff — complete gameplay correction + Budew Item lock
 
 - Current direction: complete gameplay of all six target meta decks is the north star. Do **not** treat a card registry entry, behavior overlay, partial coverage inventory, or empty documented blocker list as completion. If a target-deck card still appears as `Pending card text` on the live board, or a real deck line cannot execute its printed gameplay through Ash/React, north-star work is not done.
