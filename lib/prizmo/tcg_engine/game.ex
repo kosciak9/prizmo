@@ -108,6 +108,9 @@ defmodule Prizmo.TcgEngine.Game do
         :damage_counters
       ]
 
+    define :use_teal_mask_ogerpon_teal_dance_command,
+      args: [:game_id, :player_id, :source_card_instance_id, :energy_card_instance_id]
+
     define :play_basic_to_bench_command, args: [:game_id, :player_id, :card_instance_id]
 
     define :attach_tool_command,

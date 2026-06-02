@@ -39,6 +39,7 @@ import {
   runStartTcgEngineSetup,
   runUndoTcgEngineGame,
   runUseTcgEngineMunkidoriAdrenaBrain,
+  runUseTcgEngineTealDance,
   runUseTcgEngineTeamRocketsFactory,
   type CreateOpenDeckTcgEngineGameFields,
   type CreateTcgEngineGameFields,
@@ -485,6 +486,14 @@ type AdrenaBrainCommandOption = {
   targetCard: CardSummary | undefined
 }
 
+type TealDanceCommandOption = {
+  key: string
+  sourceCardInstanceId: string
+  energyCardInstanceId: string
+  sourceCard: CardSummary | undefined
+  energyCard: CardSummary | undefined
+}
+
 type ActionRenderEntry = {
   key: string
   action: ActionAffordance
@@ -595,6 +604,19 @@ type MunkidoriAdrenaBrainCommand = {
   fromCardInstanceId: string
   targetCardInstanceId: string
   damageCounters: number
+}
+
+type TealDanceInput = {
+  gameId: string
+  playerId: PlayerId
+  sourceCardInstanceId: string
+  energyCardInstanceId: string
+}
+
+type TealDanceCommand = {
+  playerId: string
+  sourceCardInstanceId: string
+  energyCardInstanceId: string
 }
 
 type PlayBasicToBenchInput = {
@@ -1068,6 +1090,14 @@ export function HomeRoute() {
     }
   })
 
+  const tealDanceMutation = useMutation({
+    mutationFn: (input: TealDanceInput) => useTealDance(input),
+    onSuccess: async (_game, input) => {
+      clearUltraBallPostSearchHandoff(input.gameId, input.playerId)
+      await queryClient.invalidateQueries({ queryKey: ['tcg-engine', 'game-state'] })
+    }
+  })
+
   const playBasicToBenchMutation = useMutation({
     mutationFn: (input: PlayBasicToBenchInput) => playBasicToBench(input),
     onSuccess: async (_game, input) => {
@@ -1306,6 +1336,11 @@ export function HomeRoute() {
       munkidoriAdrenaBrainMutation.error,
       'Adrena-Brain failed',
       'No damage counters moved. Refresh state and confirm Munkidori still has Darkness Energy, the source is damaged, and the target is in play.'
+    ) ??
+    commandErrorNotice(
+      tealDanceMutation.error,
+      'Teal Dance failed',
+      'No Energy attached. Refresh state and confirm Teal Mask Ogerpon ex is in play, has not used Teal Dance this turn, and a Basic Grass Energy is still in hand.'
     ) ??
     commandErrorNotice(
       playBasicToBenchMutation.error,
@@ -1851,6 +1886,16 @@ export function HomeRoute() {
                     })
                   }
                 }}
+                onUseTealDance={({ playerId, sourceCardInstanceId, energyCardInstanceId }) => {
+                  if (isPlayerId(playerId)) {
+                    tealDanceMutation.mutate({
+                      gameId: normalisedGameId,
+                      playerId,
+                      sourceCardInstanceId,
+                      energyCardInstanceId
+                    })
+                  }
+                }}
                 onPlayBasicToBench={({ playerId, cardInstanceId }) => {
                   if (isPlayerId(playerId)) {
                     playBasicToBenchMutation.mutate({
@@ -1938,6 +1983,14 @@ export function HomeRoute() {
                         munkidoriAdrenaBrainMutation.variables.fromCardInstanceId,
                         munkidoriAdrenaBrainMutation.variables.targetCardInstanceId,
                         munkidoriAdrenaBrainMutation.variables.damageCounters
+                      )
+                    : null
+                }
+                tealDancePendingKey={
+                  tealDanceMutation.isPending && tealDanceMutation.variables
+                    ? tealDanceKey(
+                        tealDanceMutation.variables.sourceCardInstanceId,
+                        tealDanceMutation.variables.energyCardInstanceId
                       )
                     : null
                 }
@@ -2502,6 +2555,20 @@ async function useMunkidoriAdrenaBrain(input: MunkidoriAdrenaBrainInput): Promis
   return result.data as CreatedGame
 }
 
+async function useTealDance(input: TealDanceInput): Promise<CreatedGame> {
+  const result = await runUseTcgEngineTealDance({
+    input,
+    fields: GAME_RESOURCE_FIELDS,
+    headers: buildAshRpcHeaders()
+  })
+
+  if (!result.success) {
+    throw new Error(rpcErrorMessage(result.errors))
+  }
+
+  return result.data as CreatedGame
+}
+
 async function playBasicToBench(input: PlayBasicToBenchInput): Promise<CreatedGame> {
   const result = await runPlayTcgEngineBasicToBench({
     input,
@@ -2699,6 +2766,7 @@ function GameStateWorkbench({
   onPlayCard,
   onPlayStadium,
   onUseMunkidoriAdrenaBrain,
+  onUseTealDance,
   onUseTeamRocketsFactory,
   onRetreat,
   onResolveDeclaredAttack,
@@ -2723,6 +2791,7 @@ function GameStateWorkbench({
   playCardPendingCardId,
   playStadiumPendingCardId,
   munkidoriAdrenaBrainPendingKey,
+  tealDancePendingKey,
   teamRocketsFactoryPendingPlayerId,
   resolveDeclaredAttackPendingPlayerId,
   retreatPendingKey
@@ -2755,6 +2824,7 @@ function GameStateWorkbench({
   onPlayCard: (input: PlayCardCommand) => void
   onPlayStadium: (input: PlayStadiumCommand) => void
   onUseMunkidoriAdrenaBrain: (input: MunkidoriAdrenaBrainCommand) => void
+  onUseTealDance: (input: TealDanceCommand) => void
   onUseTeamRocketsFactory: (input: TeamRocketsFactoryCommand) => void
   onRetreat: (input: RetreatCommand) => void
   onResolveDeclaredAttack: (input: ResolveDeclaredAttackCommand) => void
@@ -2779,6 +2849,7 @@ function GameStateWorkbench({
   playCardPendingCardId: string | null
   playStadiumPendingCardId: string | null
   munkidoriAdrenaBrainPendingKey: string | null
+  tealDancePendingKey: string | null
   teamRocketsFactoryPendingPlayerId: string | null
   resolveDeclaredAttackPendingPlayerId: string | null
   retreatPendingKey: string | null
@@ -2789,6 +2860,7 @@ function GameStateWorkbench({
       playStadiumPendingCardId ||
       teamRocketsFactoryPendingPlayerId ||
       munkidoriAdrenaBrainPendingKey ||
+      tealDancePendingKey ||
       playBasicToBenchPendingCardId ||
       attachEnergyPendingKey ||
       attachToolPendingKey ||
@@ -2910,6 +2982,7 @@ function GameStateWorkbench({
             onPlayCard={onPlayCard}
             onPlayStadium={onPlayStadium}
             onUseMunkidoriAdrenaBrain={onUseMunkidoriAdrenaBrain}
+            onUseTealDance={onUseTealDance}
             onUseTeamRocketsFactory={onUseTeamRocketsFactory}
             onRetreat={onRetreat}
             attachEnergyPendingKey={attachEnergyPendingKey}
@@ -2921,6 +2994,7 @@ function GameStateWorkbench({
             playCardPendingCardId={playCardPendingCardId}
             playStadiumPendingCardId={playStadiumPendingCardId}
             munkidoriAdrenaBrainPendingKey={munkidoriAdrenaBrainPendingKey}
+            tealDancePendingKey={tealDancePendingKey}
             teamRocketsFactoryPendingPlayerId={teamRocketsFactoryPendingPlayerId}
             retreatPendingKey={retreatPendingKey}
             ultraBallPostSearchHandoff={ultraBallPostSearchHandoff}
@@ -5382,6 +5456,7 @@ function ActionAffordancesPanel({
   onPlayCard,
   onPlayStadium,
   onUseMunkidoriAdrenaBrain,
+  onUseTealDance,
   onUseTeamRocketsFactory,
   onRetreat,
   attachEnergyPendingKey,
@@ -5393,6 +5468,7 @@ function ActionAffordancesPanel({
   playCardPendingCardId,
   playStadiumPendingCardId,
   munkidoriAdrenaBrainPendingKey,
+  tealDancePendingKey,
   teamRocketsFactoryPendingPlayerId,
   retreatPendingKey,
   ultraBallPostSearchHandoff,
@@ -5413,6 +5489,7 @@ function ActionAffordancesPanel({
   onPlayCard: (input: PlayCardCommand) => void
   onPlayStadium: (input: PlayStadiumCommand) => void
   onUseMunkidoriAdrenaBrain: (input: MunkidoriAdrenaBrainCommand) => void
+  onUseTealDance: (input: TealDanceCommand) => void
   onUseTeamRocketsFactory: (input: TeamRocketsFactoryCommand) => void
   onRetreat: (input: RetreatCommand) => void
   attachEnergyPendingKey: string | null
@@ -5424,6 +5501,7 @@ function ActionAffordancesPanel({
   playCardPendingCardId: string | null
   playStadiumPendingCardId: string | null
   munkidoriAdrenaBrainPendingKey: string | null
+  tealDancePendingKey: string | null
   teamRocketsFactoryPendingPlayerId: string | null
   retreatPendingKey: string | null
   ultraBallPostSearchHandoff: UltraBallPostSearchHandoff | null
@@ -5434,6 +5512,7 @@ function ActionAffordancesPanel({
       playStadiumPendingCardId ||
       teamRocketsFactoryPendingPlayerId ||
       munkidoriAdrenaBrainPendingKey ||
+      tealDancePendingKey ||
       playBasicToBenchPendingCardId ||
       attachEnergyPendingKey ||
       attachToolPendingKey ||
@@ -5520,12 +5599,14 @@ function ActionAffordancesPanel({
                     onPlayCard={onPlayCard}
                     onPlayStadium={onPlayStadium}
                     onUseMunkidoriAdrenaBrain={onUseMunkidoriAdrenaBrain}
+                    onUseTealDance={onUseTealDance}
                     onUseTeamRocketsFactory={onUseTeamRocketsFactory}
                     onRetreat={onRetreat}
                     playBasicToBenchPendingCardId={playBasicToBenchPendingCardId}
                     playCardPendingCardId={playCardPendingCardId}
                     playStadiumPendingCardId={playStadiumPendingCardId}
                     munkidoriAdrenaBrainPendingKey={munkidoriAdrenaBrainPendingKey}
+                    tealDancePendingKey={tealDancePendingKey}
                     teamRocketsFactoryPendingPlayerId={teamRocketsFactoryPendingPlayerId}
                     postSearchBattleAttackIds={postSearchHandoff?.battleAttackIds ?? []}
                     postSearchBenchCardInstanceIds={postSearchHandoff?.benchableCardInstanceIds ?? []}
@@ -5987,6 +6068,8 @@ function handActionChoiceCount(handGroup: ActionGroup, cardsById: Map<string, Ca
         return count + action.sourceCardInstanceIds.length * action.targetCardInstanceIds.length
       case 'attach_tool':
         return count + action.sourceCardInstanceIds.length * action.targetCardInstanceIds.length
+      case 'teal_dance':
+        return count + tealDanceCommandOptions(action, cardsById).length
       case 'play_stadium':
         return count + action.sourceCardInstanceIds.length
       case 'play_card':
@@ -6105,12 +6188,14 @@ function ActionAffordanceCard({
   onPlayCard,
   onPlayStadium,
   onUseMunkidoriAdrenaBrain,
+  onUseTealDance,
   onUseTeamRocketsFactory,
   onRetreat,
   playBasicToBenchPendingCardId,
   playCardPendingCardId,
   playStadiumPendingCardId,
   munkidoriAdrenaBrainPendingKey,
+  tealDancePendingKey,
   teamRocketsFactoryPendingPlayerId,
   postSearchBattleAttackIds,
   postSearchBenchCardInstanceIds,
@@ -6138,12 +6223,14 @@ function ActionAffordanceCard({
   onPlayCard: (input: PlayCardCommand) => void
   onPlayStadium: (input: PlayStadiumCommand) => void
   onUseMunkidoriAdrenaBrain: (input: MunkidoriAdrenaBrainCommand) => void
+  onUseTealDance: (input: TealDanceCommand) => void
   onUseTeamRocketsFactory: (input: TeamRocketsFactoryCommand) => void
   onRetreat: (input: RetreatCommand) => void
   playBasicToBenchPendingCardId: string | null
   playCardPendingCardId: string | null
   playStadiumPendingCardId: string | null
   munkidoriAdrenaBrainPendingKey: string | null
+  tealDancePendingKey: string | null
   teamRocketsFactoryPendingPlayerId: string | null
   postSearchBattleAttackIds: string[]
   postSearchBenchCardInstanceIds: string[]
@@ -6161,6 +6248,7 @@ function ActionAffordanceCard({
   const evolutionOptions = providedEvolutionOptions ?? evolutionCommandOptions(action, cardsById)
   const repeatedEvolutionLabels = repeatedEvolutionBaseLabels(evolutionOptions)
   const adrenaBrainOptions = adrenaBrainCommandOptions(action, cardsById)
+  const tealDanceOptions = tealDanceCommandOptions(action, cardsById)
 
   return (
     <li className={`rounded-xl border px-3 py-2 text-sm ${actionSurfaceClassName(action)}`}>
@@ -6287,6 +6375,31 @@ function ActionAffordanceCard({
                 tone="primary"
               >
                 {isPending ? adrenaBrainPendingLabel(option) : adrenaBrainButtonLabel(option)}
+              </ActionCommandButton>
+            )
+          })}
+        </div>
+      ) : null}
+
+      {tealDanceOptions.length > 0 ? (
+        <div className="mt-2 space-y-1.5">
+          {tealDanceOptions.map(option => {
+            const isPending = tealDancePendingKey === option.key
+
+            return (
+              <ActionCommandButton
+                disabled={!canRunAction}
+                key={option.key}
+                onClick={() =>
+                  onUseTealDance({
+                    playerId: action.playerId,
+                    sourceCardInstanceId: option.sourceCardInstanceId,
+                    energyCardInstanceId: option.energyCardInstanceId
+                  })
+                }
+                tone="primary"
+              >
+                {isPending ? tealDancePendingLabel(option) : tealDanceButtonLabel(option)}
               </ActionCommandButton>
             )
           })}
@@ -6613,6 +6726,7 @@ function actionSurfaceClassName(action: ActionAffordance) {
     case 'choose_replacement_active':
       return 'border-attention/35 bg-attention/10'
     case 'adrena_brain':
+    case 'teal_dance':
     case 'declare_attack':
       return 'border-accent-mint/30 bg-accent-mint/10'
     case 'unsupported_attack':
@@ -6657,6 +6771,8 @@ function actionSummary(action: ActionAffordance) {
       )}.`
     case 'adrena_brain':
       return `Move up to ${action.requiredSourceCount} damage ${action.requiredSourceCount === 1 ? 'counter' : 'counters'} from your damaged Pokémon to an opponent Pokémon.`
+    case 'teal_dance':
+      return 'Attach a Basic Grass Energy from hand to Teal Mask Ogerpon ex, then draw 1 card.'
     case 'declare_attack':
       return `${action.attackName ?? (action.attackId ? formatAttackId(action.attackId) : 'Attack')}: ${attackCostSummary(
         action.attackCost
@@ -6765,6 +6881,35 @@ function adrenaBrainCommandOptions(
     fromCard: cardsById.get(fromCardInstanceId),
     targetCard: cardsById.get(targetCardInstanceId)
   }))
+}
+
+function tealDanceCommandOptions(action: ActionAffordance, cardsById: Map<string, CardSummary>): TealDanceCommandOption[] {
+  if (action.key !== 'teal_dance' || action.sourceCardInstanceIds.length < 2) {
+    return []
+  }
+
+  const sourceCardInstanceId = action.sourceCardInstanceIds[0]!
+  const energyCardInstanceId = action.sourceCardInstanceIds[1]!
+
+  return [
+    {
+      key: tealDanceKey(sourceCardInstanceId, energyCardInstanceId),
+      sourceCardInstanceId,
+      energyCardInstanceId,
+      sourceCard: cardsById.get(sourceCardInstanceId),
+      energyCard: cardsById.get(energyCardInstanceId)
+    }
+  ]
+}
+
+function tealDancePendingLabel(option: TealDanceCommandOption) {
+  return `Using Teal Dance with ${option.energyCard?.name ?? 'Grass Energy'}...`
+}
+
+function tealDanceButtonLabel(option: TealDanceCommandOption) {
+  return `Teal Dance: attach ${option.energyCard?.name ?? formatCardInstanceId(option.energyCardInstanceId)} to ${
+    option.sourceCard?.name ?? formatCardInstanceId(option.sourceCardInstanceId)
+  }`
 }
 
 function damageCounterOptions(maxCounters: number) {
@@ -7115,6 +7260,7 @@ function actionGroupId(action: ActionAffordance): ActionGroupId {
     case 'evolve_from_hand':
     case 'attach_energy':
     case 'attach_tool':
+    case 'teal_dance':
       return 'hand'
     case 'retreat':
     case 'adrena_brain':
@@ -8246,7 +8392,7 @@ function CardPill({
         <CardArt card={card} variant={variant} />
         <div className="mt-2 flex items-start justify-between gap-2">
           <p className="min-w-0 truncate text-xs font-medium text-foreground">{card.name}</p>
-          {card.damage > 0 ? <StatusBadge tone="warning">{card.damage}</StatusBadge> : null}
+          <DamageBadge damage={card.damage} label={String(card.damage)} sourceId={card.id} />
         </div>
         {attachedCards.length > 0 ? (
           <p className="mt-1 text-[0.68rem] font-medium text-muted-foreground">{attachedCards.length} attached</p>
@@ -8273,7 +8419,7 @@ function CardPill({
             <p className={`truncate font-medium text-foreground ${titleClassName}`}>{card.name}</p>
             <p className="mt-1 font-mono text-xs text-muted-foreground">{card.cardId}</p>
           </div>
-          {card.damage > 0 ? <StatusBadge tone="warning">{card.damage} dmg</StatusBadge> : null}
+          <DamageBadge damage={card.damage} label={`${card.damage} dmg`} sourceId={card.id} />
         </div>
 
         {showMeta ? (
@@ -8315,6 +8461,49 @@ function CardPill({
         </div>
       ) : null}
     </div>
+  )
+}
+
+function DamageBadge({ damage, label, sourceId }: { damage: number; label: string; sourceId: string }) {
+  const previousDamageRef = useRef({ damage, sourceId })
+  const [damageFlash, setDamageFlash] = useState(false)
+
+  useEffect(() => {
+    const previous = previousDamageRef.current.sourceId === sourceId ? previousDamageRef.current.damage : damage
+    previousDamageRef.current = { damage, sourceId }
+
+    if (damage <= previous) {
+      return
+    }
+
+    setDamageFlash(false)
+
+    const frame = window.requestAnimationFrame(() => setDamageFlash(true))
+    const timeout = window.setTimeout(() => setDamageFlash(false), 260)
+
+    return () => {
+      window.cancelAnimationFrame(frame)
+      window.clearTimeout(timeout)
+    }
+  }, [damage, sourceId])
+
+  if (damage <= 0) {
+    return null
+  }
+
+  const className = [
+    'inline-flex rounded-full transition-transform duration-200 ease-out motion-reduce:transition-none',
+    damageFlash
+      ? 'scale-110 motion-safe:animate-[pulse_220ms_cubic-bezier(0.22,1,0.36,1)_1] motion-reduce:scale-100'
+      : ''
+  ]
+    .filter(Boolean)
+    .join(' ')
+
+  return (
+    <span aria-label={`${damage} damage`} aria-live="polite" className={className}>
+      <StatusBadge tone="warning">{label}</StatusBadge>
+    </span>
   )
 }
 
@@ -9983,6 +10172,10 @@ function adrenaBrainKey(
   damageCounters: number
 ) {
   return `${sourceCardInstanceId}:${fromCardInstanceId}:${targetCardInstanceId}:${damageCounters}`
+}
+
+function tealDanceKey(sourceCardInstanceId: string, energyCardInstanceId: string) {
+  return `${sourceCardInstanceId}:${energyCardInstanceId}`
 }
 
 function attackKey(playerId: string, attackId: string) {

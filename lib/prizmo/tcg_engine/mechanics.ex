@@ -990,7 +990,7 @@ defmodule Prizmo.TcgEngine.Mechanics do
            :ok <-
              StadiumEffects.require_team_rockets_factory_available(game.id, turn.id, player_id),
            {:ok, %{effect: %{count: draw_count}}} <- CardCatalog.fetch(stadium_card.card_id),
-           {:ok, drawn_cards} <- draw_team_rockets_factory_cards(game.id, player, draw_count),
+           {:ok, drawn_cards} <- draw_cards_from_deck(game.id, player, draw_count),
            {:ok, _event} <-
              write_event_and_snapshot(game.id, :stadium_effect_used, player_id, %{
                turn_id: turn.id,
@@ -1070,6 +1070,46 @@ defmodule Prizmo.TcgEngine.Mechanics do
           target_card,
           ability_result
         )
+      end
+    end)
+  end
+
+  @spec use_teal_mask_ogerpon_teal_dance(
+          Game.t() | String.t(),
+          String.t(),
+          String.t(),
+          String.t()
+        ) :: {:ok, Game.t()} | {:error, term()}
+  def use_teal_mask_ogerpon_teal_dance(
+        game_or_id,
+        player_id,
+        source_card_instance_id,
+        energy_card_instance_id
+      )
+      when is_binary(player_id) and is_binary(source_card_instance_id) and
+             is_binary(energy_card_instance_id) do
+    transaction(fn ->
+      with {:ok, game} <- get_game(game_or_id),
+           {:ok, turn} <- require_action_window_for_player(game, player_id),
+           :ok <- CardPlay.require_no_awaiting_pending_effect(game.id),
+           {:ok, player} <- get_player(game.id, player_id),
+           {:ok, source_card} <- get_card(game.id, source_card_instance_id),
+           {:ok, energy_card} <- get_card(game.id, energy_card_instance_id),
+           :ok <- require_card_owned_by_player(source_card, player_id),
+           :ok <- AbilityEffects.require_teal_dance_available(game.id, source_card, turn),
+           :ok <- require_card_owned_by_player(energy_card, player_id),
+           :ok <- require_card_zone(energy_card, :hand),
+           :ok <- AbilityEffects.require_basic_grass_energy(energy_card),
+           {:ok, ability_result} <-
+             attach_teal_dance_energy_and_draw(game, player, source_card, energy_card, turn),
+           {:ok, _event} <-
+             write_event_and_snapshot(
+               game.id,
+               :ability_used,
+               player_id,
+               teal_dance_event_payload(turn, source_card, energy_card, ability_result)
+             ) do
+        get_game(game.id)
       end
     end)
   end
@@ -2273,7 +2313,39 @@ defmodule Prizmo.TcgEngine.Mechanics do
     end
   end
 
-  defp draw_team_rockets_factory_cards(game_id, player, draw_count) do
+  defp attach_teal_dance_energy_and_draw(
+         %Game{} = game,
+         player,
+         %CardInstance{} = source_card,
+         %CardInstance{} = energy_card,
+         %Turn{} = turn
+       ) do
+    with {:ok, position} <- next_attachment_position(game.id, source_card.id),
+         {:ok, attached_energy} <-
+           update(energy_card, :attach, %{
+             attached_to_card_instance_id: source_card.id,
+             position: position
+           }),
+         {:ok, recovered_special_condition} <-
+           StadiumEffects.recover_special_condition(game.id, source_card),
+         {:ok, drawn_cards} <-
+           draw_cards_from_deck(game.id, player, AbilityEffects.teal_dance_draw_count()),
+         {:ok, current_source_card} <- get_card(game.id, source_card.id),
+         {:ok, _source_card} <-
+           update(current_source_card, :set_markers, %{
+             markers: AbilityEffects.put_teal_dance_used_marker(current_source_card, turn)
+           }) do
+      {:ok,
+       %{
+         attached_energy: attached_energy,
+         attached_position: position,
+         drawn_cards: drawn_cards,
+         recovered_special_condition: recovered_special_condition
+       }}
+    end
+  end
+
+  defp draw_cards_from_deck(game_id, player, draw_count) do
     with {:ok, cards} <- Prizmo.TcgEngine.CardStore.deck_cards_for_player(player.id, draw_count) do
       cards
       |> Enum.map(&move_deck_card_to_hand(game_id, player.player_id, &1))
@@ -2293,6 +2365,53 @@ defmodule Prizmo.TcgEngine.Mechanics do
 
   defp adrena_brain_public_note(damage_counters) do
     "Adrena-Brain moved #{damage_counters} damage counters."
+  end
+
+  defp teal_dance_event_payload(
+         %Turn{} = turn,
+         %CardInstance{} = source_card,
+         %CardInstance{} = energy_card,
+         ability_result
+       ) do
+    drawn_cards = ability_result.drawn_cards
+
+    maybe_put(
+      %{
+        turn_id: turn.id,
+        source: EventPayloads.card_source(source_card),
+        source_card_id: source_card.card_id,
+        source_card_instance_id: source_card.id,
+        ability_id: Atom.to_string(AbilityEffects.teal_dance_ability_id()),
+        effect_type: :attach_basic_grass_energy_from_hand_to_self_then_draw,
+        energy_card_instance_id: energy_card.id,
+        attached_position: ability_result.attached_position,
+        drawn_card_count: length(drawn_cards),
+        cards:
+          teal_dance_moved_card_payloads(source_card, ability_result.attached_energy, drawn_cards),
+        public_note: teal_dance_public_note(length(drawn_cards))
+      },
+      :recovered_special_condition,
+      ability_result.recovered_special_condition
+    )
+  end
+
+  defp teal_dance_moved_card_payloads(source_card, attached_energy, drawn_cards) do
+    [
+      attached_energy
+      |> List.wrap()
+      |> EventPayloads.moved_cards(:hand, :attached)
+      |> List.first()
+      |> Map.put(
+        :to_attached_to_card_instance_id,
+        source_card.id
+      )
+    ] ++ EventPayloads.moved_cards(drawn_cards, :deck, :hand)
+  end
+
+  defp teal_dance_public_note(1), do: "Teal Dance attached Grass Energy and drew 1 card."
+
+  defp teal_dance_public_note(card_count) do
+    "Teal Dance attached Grass Energy and drew #{card_count} cards."
   end
 
   defp collect_results(results) do

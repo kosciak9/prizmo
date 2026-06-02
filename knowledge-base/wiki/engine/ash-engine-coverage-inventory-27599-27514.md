@@ -14,7 +14,7 @@
 | Card ID   | Name                              | Classification      | Notes (Ash engine path) |
 |-----------|-----------------------------------|---------------------|-------------------------|
 | MEG-104   | Mega Kangaskhan ex                | generic-supported   | Plain damage + rule-box ex; generic attack path |
-| TWM-025   | Teal Mask Ogerpon ex              | engine-defined      | Explicit CardDefinition + teal_dance Ability effect type (iteration 240) |
+| TWM-025   | Teal Mask Ogerpon ex              | engine-defined      | Explicit CardDefinition + real `teal_dance` Ability command for Basic Grass attach from hand then draw 1 (iteration 245; registry entry originally added in iteration 240) |
 | POR-062   | Meowth ex                         | generic-supported   | Plain damage ex attacker |
 | TEF-123   | Raging Bolt ex                    | engine-defined      | Core attacker; explicit CardDefinition + effect type (iteration 238) |
 | SSP-076   | Latias ex                         | generic-supported   | Plain damage ex attacker |
@@ -82,11 +82,11 @@ All documented blockers from the 2026-06-02 coverage inventory are now resolved 
 3. **SCR-131 Area Zero Underdepths, PFL-085 Battle Cage** — Stadiums with generic play but pending printed effects.
 4. **PFL-083 Buneary** — Basic Pokémon with printed evolution Ability pending.
 
-## Current status (post-iteration 242)
+## Current status (post-iteration 245)
 
-**2026-06-02 batch note (updated):** All documented blockers from the coverage inventory are now resolved. TEF-123/128/129 + PFL-084 core attackers closed in iteration 238. SCR-135 Glass Trumpet closed in iteration 239. TWM-025 Teal Mask Ogerpon ex closed in iteration 240. TWM-080 (duplicate) closed in iteration 241. SSP-170 Cyrano, TEF-145 Ciphermaniac's Codebreaking, and SCR-118 Fan Rotom closed in iteration 242 via explicit CardDefinition + search_deck effect type registration. The six-deck blocker list documented in this inventory is now empty.
+**2026-06-02 batch note (updated):** All documented blockers from the coverage inventory are now resolved. TEF-123/128/129 + PFL-084 core attackers closed in iteration 238. SCR-135 Glass Trumpet closed in iteration 239. TWM-025 Teal Mask Ogerpon ex received a registry entry in iteration 240 and now has a real `Teal Dance` Ash Ability command in iteration 245. TWM-080 (duplicate) closed in iteration 241. SSP-170 Cyrano, TEF-145 Ciphermaniac's Codebreaking, and SCR-118 Fan Rotom closed in iteration 242 via explicit CardDefinition + search_deck effect type registration. The six-deck blocker list documented in this inventory is now empty.
 
-Remaining partial gaps (not blockers): Coin-flip/Ability core attackers (TEF-123/128/129, PFL-084) and first-turn-only search gates (SCR-118 Fan Rotom) are the strongest candidates for the next engine-behavior batch. If the next batch returns to the product surface, damage counter animation remains the strongest remaining UI polish candidate.
+Remaining partial gaps (not blockers): Coin-flip/Ability core attackers (TEF-123/128/129, PFL-084) and first-turn-only search gates (SCR-118 Fan Rotom) are the strongest candidates for the next engine-behavior batch. If the next batch returns to the product surface, damage counter animation is closed in iteration 245; choose a new UI candidate only after live six-deck playability is refreshed.
 
 ## Validation notes
 

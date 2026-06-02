@@ -1,5 +1,12 @@
 # Wiki Log
 
+## [2026-06-02] iteration 245 | Teal Dance Ability command and damage counter motion
+
+- Task attempted: finished the remaining dirty chunks after the Munkidori commit. The `effect_runner.ex` chunk was corrected by removing Teal Dance from the generic Trainer choice path and implementing Teal Mask Ogerpon ex (`TWM-025`) `Teal Dance` as a real Ash Ability command. The SPA damage-animation chunk was finished as a restrained `DamageBadge` component.
+- Files changed: `lib/prizmo/tcg_engine/ability_effects.ex` (Teal Dance source, Basic Grass Energy, and once-per-turn marker helpers), `lib/prizmo/tcg_engine/mechanics.ex` (attach-from-hand, draw, event payload, marker write), `lib/prizmo/tcg_engine/game/action_commands.ex`, `lib/prizmo/tcg_engine/game.ex`, and `lib/prizmo/tcg_engine.ex` (Ash command/code interface/RPC), `lib/prizmo/tcg_engine/game_view/action_affordances.ex` and `lib/prizmo/tcg_engine/game_view.ex` (legal `teal_dance` affordances and public event note), `lib/prizmo_web/spa/lib/ash/client.ts` and generated Ash TypeScript RPC output, `lib/prizmo_web/spa/features/home/routes/index.tsx` (Teal Dance mutation/buttons/pending/error copy plus `DamageBadge`), and the handoff/inventory/log wiki files.
+- Validation: `mix format`, `mix ash_typescript.codegen`, `mix compile --warnings-as-errors`, `node_modules/.bin/tsc --noEmit`, focused `mix test test/prizmo/tcg_engine/mechanics_test.exs` (12/0), rollback smoke check (`teal_dance_smoke: {:attached, true, 1, true, true}`), and full `mix check` (all 12 gates) pass.
+- Remaining/blocking notes: TWM-025 `Teal Dance` is no longer registry-only coverage; it has an executable Ability command. Damage counter motion is no longer a rough hunk; it avoids initial flash and respects reduced motion. Next high-value work remains a fresh actual GameView/live-playability pending-text inventory across the six target decks.
+
 ## [2026-06-02] iteration 244 | Munkidori Adrena-Brain Ability command
 
 - Task attempted: closed the next visible Dragapult target-deck pending Ability from the screenshot. Munkidori (`TWM-095`) `Adrena-Brain` now has executable Ash mechanics and a React command path that moves 1-3 damage counters from an own damaged in-play Pokémon to an opponent in-play Pokémon while enforcing the Darkness Energy and once-per-turn requirements.

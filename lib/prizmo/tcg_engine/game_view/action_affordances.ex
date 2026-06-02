@@ -121,6 +121,7 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
       attach_tool_affordance(player, cards),
       retreat_affordance(player, current_turn, cards)
     ] ++
+      teal_dance_affordances(player, current_turn, cards) ++
       adrena_brain_affordances(player, current_turn, cards, all_cards) ++
       evolve_from_hand_affordances(player, current_turn, cards, all_cards) ++
       declare_attack_affordances(player, current_turn, cards, all_cards) ++
@@ -349,6 +350,33 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
   end
 
   defp adrena_brain_affordances(_player, _current_turn, _cards, _all_cards), do: []
+
+  defp teal_dance_affordances(%GamePlayer{} = player, %Turn{} = current_turn, cards) do
+    hand_grass_energy_cards =
+      cards
+      |> hand_cards()
+      |> Enum.filter(&AbilityEffects.basic_grass_energy?/1)
+      |> Enum.sort_by(&{&1.position, &1.instance_id})
+
+    own_in_play_cards = in_play_pokemon_cards(cards)
+
+    for source_card <- own_in_play_cards,
+        AbilityEffects.teal_dance_available?(source_card, hand_grass_energy_cards, current_turn),
+        energy_card <- hand_grass_energy_cards do
+      affordance(
+        :teal_dance,
+        teal_dance_label(source_card, energy_card),
+        :command,
+        player.player_id,
+        source_card_instance_ids: [source_card.id, energy_card.id],
+        choice_keys: ["basic_grass_energy"],
+        note:
+          "Attach this Basic Grass Energy from hand to Teal Mask Ogerpon ex, then draw 1 card."
+      )
+    end
+  end
+
+  defp teal_dance_affordances(_player, _current_turn, _cards), do: []
 
   defp declare_attack_affordances(
          %GamePlayer{} = player,
@@ -843,6 +871,10 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
 
   defp adrena_brain_label(from_card, target_card) do
     "Use Adrena-Brain: #{card_name(from_card)} → #{card_name(target_card)}"
+  end
+
+  defp teal_dance_label(source_card, energy_card) do
+    "Use Teal Dance: attach #{card_name(energy_card)} to #{card_name(source_card)}"
   end
 
   defp adrena_brain_note(1) do

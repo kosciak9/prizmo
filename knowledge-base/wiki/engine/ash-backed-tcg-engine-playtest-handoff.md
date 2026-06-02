@@ -4,6 +4,13 @@
 - Sources: Project codebase; local validation; wiki log
 - Raw: N/A — operational handoff
 
+## [2026-06-02] Iteration 245 handoff — Teal Dance Ability command + damage counter motion
+
+- Current state: Teal Mask Ogerpon ex (`TWM-025`) from Raging Bolt Ogerpon (`27599`) moved beyond its earlier registry-only `teal_dance` coverage. `Teal Dance` is now a real Ash Ability command and SPA command path: choose an in-play Teal Mask Ogerpon ex and a Basic Grass Energy from hand, attach that Energy to the source, draw 1 card, mark the source Ability used for the turn, and emit a viewer-safe public event. The old generic `EffectRunner` choice-list chunk for `:attach_basic_grass_energy_from_hand_to_self_then_draw` was removed because Pokémon Abilities should not resolve through the Trainer `play_card` effect path.
+- Completed engine/UI batch: `Prizmo.TcgEngine.AbilityEffects` now owns Teal Dance legality (`TWM-025`, in play, Basic Grass Energy in hand, source marker `"ability_used:teal_dance"` unused this turn). `Mechanics.use_teal_mask_ogerpon_teal_dance/4`, Ash action `:use_teal_mask_ogerpon_teal_dance_command`, RPC `:use_tcg_engine_teal_dance`, GameView `teal_dance` affordances, TypeScript client alias, and React action buttons are wired. The SPA board damage badge animation chunk was finished as a composed `DamageBadge` component: no initial flash, one-shot pulse only on damage increases, and `motion-reduce` support.
+- Validation: `mix format`, `mix ash_typescript.codegen`, `mix compile --warnings-as-errors`, `node_modules/.bin/tsc --noEmit`, focused `mix test test/prizmo/tcg_engine/mechanics_test.exs` (12/0), rollback smoke check (`teal_dance_smoke: {:attached, true, 1, true, true}`), and full `mix check` (all 12 gates) pass.
+- Recommended next atomic task: refresh actual GameView/live-playability pending text across all six target decks after Budew, Munkidori, and Teal Dance. Pick the next real target-deck mechanic from that inventory, not from registry coverage alone.
+
 ## [2026-06-02] Iteration 244 handoff — Munkidori Adrena-Brain Ability command
 
 - Current state: Munkidori (`TWM-095`) from Dragapult (`27431`) moved off the visible `Pending card text`/pending Ability path. `Adrena-Brain` is now a real Ash Ability command and SPA command path, not registry-only coverage.

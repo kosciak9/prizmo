@@ -445,6 +445,37 @@ defmodule Prizmo.TcgEngine.Game.ActionCommands do
       end
     end
 
+    action :use_teal_mask_ogerpon_teal_dance_command, :struct do
+      description "Use Teal Mask Ogerpon ex's Teal Dance Ability to attach Grass Energy and draw."
+
+      constraints instance_of: Game
+
+      argument :game_id, :uuid do
+        allow_nil? false
+      end
+
+      argument :player_id, :string do
+        allow_nil? false
+      end
+
+      argument :source_card_instance_id, :uuid do
+        allow_nil? false
+      end
+
+      argument :energy_card_instance_id, :uuid do
+        allow_nil? false
+      end
+
+      run fn input, _context ->
+        Mechanics.use_teal_mask_ogerpon_teal_dance(
+          input.arguments.game_id,
+          input.arguments.player_id,
+          input.arguments.source_card_instance_id,
+          input.arguments.energy_card_instance_id
+        )
+      end
+    end
+
     action :play_basic_to_bench_command, :struct do
       description "Play a Basic Pokémon from hand to the Bench through the mechanics layer."
 

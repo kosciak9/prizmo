@@ -37,6 +37,7 @@ export {
   startTcgEngineSetup as runStartTcgEngineSetup,
   undoTcgEngineGame as runUndoTcgEngineGame,
   useTcgEngineMunkidoriAdrenaBrain as runUseTcgEngineMunkidoriAdrenaBrain,
+  useTcgEngineTealDance as runUseTcgEngineTealDance,
   useTcgEngineTeamRocketsFactory as runUseTcgEngineTeamRocketsFactory,
 } from './generated/ash_rpc'
 
