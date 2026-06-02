@@ -25,8 +25,10 @@ defmodule Prizmo.TcgEngine.AttackDamage do
          {:ok, damage} <-
            apply_effect(damage, attacker_card, defender_card, Map.get(attack, :effect), opts),
          {:ok, damage} <-
-           apply_brave_bangle_bonus(damage, attacker_card, defender_card) do
-      apply_black_belts_training_bonus(damage, attacker_card, defender_card)
+           apply_brave_bangle_bonus(damage, attacker_card, defender_card),
+         {:ok, damage} <-
+           apply_black_belts_training_bonus(damage, attacker_card, defender_card) do
+      apply_kieran_damage_bonus(damage, attacker_card, defender_card)
     end
   end
 
@@ -359,6 +361,59 @@ defmodule Prizmo.TcgEngine.AttackDamage do
       end
     end
   end
+
+  defp apply_kieran_damage_bonus(
+         damage,
+         %CardInstance{} = attacker_card,
+         %CardInstance{} = defender_card
+       ) do
+    with {:ok, defender_metadata} <- CardCatalog.fetch(defender_card.card_id) do
+      if pokemon_ex_or_v?(defender_metadata) and
+           kieran_damage_played_this_turn?(attacker_card) do
+        {:ok, damage + 30}
+      else
+        {:ok, damage}
+      end
+    end
+  end
+
+  defp kieran_damage_played_this_turn?(%CardInstance{
+         game_id: game_id,
+         owner_player_id: player_id
+       }) do
+    with {:ok, turn} <- TurnStore.current_turn(game_id) do
+      events =
+        GameEvent
+        |> Ash.Query.filter(
+          game_id == ^game_id and player_id == ^player_id and type == "card_play_completed" and
+            turn_id == ^turn.id
+        )
+        |> Ash.Query.sort(index: :asc)
+        |> Ash.read()
+
+      case events do
+        {:ok, events} ->
+          {:ok,
+           Enum.any?(events, fn event ->
+             event.payload["card_id"] == "TWM-154" and
+               event.payload["kieran_effect"] == "damage"
+           end)}
+
+        {:error, reason} ->
+          {:error, reason}
+      end
+    end
+  end
+
+  defp pokemon_ex_or_v?(%{supertype: :pokemon, suffix: suffix})
+       when suffix in ["ex", "V", "VMAX", "VSTAR"], do: true
+
+  defp pokemon_ex_or_v?(%{supertype: :pokemon, name: name}) when is_binary(name) do
+    String.ends_with?(name, " ex") or String.ends_with?(name, " V") or
+      String.ends_with?(name, " VMAX") or String.ends_with?(name, " VSTAR")
+  end
+
+  defp pokemon_ex_or_v?(_metadata), do: false
 
   defp apply_brave_bangle_bonus(
          damage,

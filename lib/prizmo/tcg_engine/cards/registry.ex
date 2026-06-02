@@ -494,6 +494,20 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     ]
   }
 
+  @kieran %CardDefinition{
+    id: "TWM-154",
+    kind: :trainer,
+    trainer_type: :supporter,
+    play_window: :action_window,
+    effects: [
+      %Effect{
+        key: :kieran_switch_or_damage_bonus,
+        type: :kieran_switch_or_damage_bonus,
+        params: %{bonus_damage: 30, min_count: 0, max_count: 1}
+      }
+    ]
+  }
+
   @black_belts_training %CardDefinition{
     id: "JTG-143",
     kind: :trainer,
@@ -552,6 +566,7 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     @unfair_stamp.id => @unfair_stamp,
     @team_rockets_archer.id => @team_rockets_archer,
     @team_rockets_ariana.id => @team_rockets_ariana,
+    @kieran.id => @kieran,
     @black_belts_training.id => @black_belts_training,
     @team_rockets_giovanni.id => @team_rockets_giovanni,
     @team_rockets_proton.id => @team_rockets_proton,

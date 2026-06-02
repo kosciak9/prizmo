@@ -9088,7 +9088,8 @@ function trainerPromptFlowGuide(
     crushingHammerPromptFlowGuide(choiceKey, min, max, legalChoiceCount) ??
     wallysCompassionPromptFlowGuide(choiceKey, min, max, legalChoiceCount) ??
     teamRocketsGiovanniPromptFlowGuide(choiceKey, min, max, legalChoiceCount) ??
-    secretBoxPromptFlowGuide(choiceKey, min, max, legalChoiceCount)
+    secretBoxPromptFlowGuide(choiceKey, min, max, legalChoiceCount) ??
+    kieranPromptFlowGuide(choiceKey, min, max, legalChoiceCount)
   )
 }
 
@@ -9336,6 +9337,49 @@ function secretBoxPromptFlowGuide(
   return null
 }
 
+function kieranPromptFlowGuide(
+  choiceKey: string,
+  min: number,
+  max: number,
+  legalChoiceCount: number
+): PromptFlowGuide | null {
+  if (choiceKey !== 'kieran_switch_or_damage_bonus') {
+    return null
+  }
+
+  return {
+    eyebrow: "Kieran prompt",
+    title: 'Choose 1: Switch Active or +30 damage',
+    detail: legalChoiceCount > 0
+      ? 'Select a Benched Pokémon to switch (or submit no selection for the +30 damage bonus to your attacks this turn).'
+      : 'No Benched Pokémon available. Submitting no selection applies the +30 damage bonus to your attacks this turn.',
+    steps: [
+      {
+        label: 'play',
+        title: 'Supporter started',
+        detail: "Kieran is resolving. Choose between switching your Active or boosting damage for the turn.",
+        tone: 'complete'
+      },
+      {
+        label: 'choice',
+        title: legalChoiceCount > 0 ? 'Pick a Bench target or leave empty' : 'Auto-apply damage bonus',
+        detail: legalChoiceCount > 0
+          ? `${promptChoiceInstruction(min, max)} from ${legalChoiceCount} legal Bench Pokémon choices, or submit no selection for +30 damage against Active ex or V.`
+          : 'No Bench Pokémon available, so the damage bonus applies automatically.',
+        tone: 'focus'
+      },
+      {
+        label: 'resolve',
+        title: legalChoiceCount > 0 ? 'Switch or damage bonus applied' : 'Damage bonus active',
+        detail: legalChoiceCount > 0
+          ? 'The engine either switches your Active with the chosen Bench Pokémon or marks the damage bonus for the turn.'
+          : "This turn, your Pokémon's attacks do +30 damage to the opponent's Active Pokémon ex or V.",
+        tone: 'next'
+      }
+    ]
+  }
+}
+
 function promptSubmitLabel(choiceKey: string, selectedCount: number, max: number, isPending: boolean) {
   if (isPending) {
     return 'Resolving prompt...'
@@ -9386,6 +9430,9 @@ function promptSubmitLabel(choiceKey: string, selectedCount: number, max: number
       return `Recover selected cards ${selectedCount}/${max}`
     case 'shuffle_up_to_5_pokemon_from_discard_into_deck':
       return `Shuffle selected Pokémon ${selectedCount}/${max}`
+    case 'kieran_switch_or_damage_bonus':
+      if (selectedCount === 0) { return 'Apply +30 damage bonus (no switch)' }
+      return `Switch to selected Bench Pokémon ${selectedCount}/${max}`
     case 'knockout_prize_cards':
       return `Take selected Prizes ${selectedCount}/${max}`
     default:
@@ -9496,6 +9543,13 @@ function promptGuidanceMessages(
     return [
       "Team Rocket's Giovanni requires one of your Benched Team Rocket Pokémon and one opposing Benched Pokémon. Selection order does not matter; the engine resolves your switch first, then the gust.",
       `This prompt accepts ${promptChoiceInstruction(min, max)} from ${legalChoiceCount} legal Bench choices.`
+    ]
+  }
+
+  if (choiceKey === 'kieran_switch_or_damage_bonus') {
+    return [
+      'Kieran (Supporter) lets you choose 1: Switch your Active with a Benched Pokémon, or give your attacks +30 damage to the opponent\'s Active ex or V this turn.',
+      'Select a Benched Pokémon to switch (or submit no selection for the +30 damage bonus).'
     ]
   }
 

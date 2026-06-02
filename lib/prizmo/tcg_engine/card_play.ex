@@ -841,6 +841,84 @@ defmodule Prizmo.TcgEngine.CardPlay do
     complete_play_card_resolution(game, turn, player, card, effect)
   end
 
+  defp complete_play_card_effect(
+         game,
+         turn,
+         player,
+         card,
+         %{type: :kieran_switch_or_damage_bonus} = effect,
+         target_ids
+       ) do
+    case target_ids do
+      [] ->
+        # Damage bonus mode: complete immediately, +30 checked at attack time
+        with {:ok, _event} <-
+               write_event_and_snapshot(game.id, :effect_completed, player.player_id, %{
+                 turn_id: turn.id,
+                 source: EventPayloads.card_source(card),
+                 effect_key: effect.key,
+                 status: :completed
+               }),
+             {:ok, _event} <-
+               write_event_and_snapshot(game.id, :card_play_completed, player.player_id, %{
+                 turn_id: turn.id,
+                 card_instance_id: card.id,
+                 card_id: card.card_id,
+                 kieran_effect: "damage",
+                 result: :completed
+               }),
+             :ok <- PendingEffects.complete_resolving_for_game(game.id) do
+          GameStore.get_game(game.id)
+        end
+
+      [bench_card_id] ->
+        # Switch mode: switch own active with chosen bench Pokémon
+        with {:ok, bench_card} <- CardStore.get_card(game.id, bench_card_id),
+             :ok <- require_card_owned_by_player(bench_card, player.player_id),
+             :ok <- require_card_zone(bench_card, :bench),
+             {:ok, active_card} <- own_active_card(game.id, player.player_id),
+             bench_position = bench_card.position,
+             {:ok, _moved_active_card} <-
+               update(active_card, :move_active_to_bench, %{
+                 position: bench_position,
+                 status: nil
+               }),
+             {:ok, _moved_bench_card} <-
+               update(bench_card, :promote_to_active, %{position: 1, status: nil}),
+             {:ok, _event} <-
+               write_event_and_snapshot(game.id, :effect_completed, player.player_id, %{
+                 turn_id: turn.id,
+                 source: EventPayloads.card_source(card),
+                 effect_key: effect.key,
+                 status: :completed
+               }),
+             {:ok, _event} <-
+               write_event_and_snapshot(game.id, :cards_moved, player.player_id, %{
+                 reason: :effect_resolution,
+                 source: EventPayloads.card_source(card),
+                 effect_key: effect.key,
+                 cards: [
+                   switched_card_payload(active_card, :active, :bench),
+                   switched_card_payload(bench_card, :bench, :active)
+                 ]
+               }),
+             {:ok, _event} <-
+               write_event_and_snapshot(game.id, :card_play_completed, player.player_id, %{
+                 turn_id: turn.id,
+                 card_instance_id: card.id,
+                 card_id: card.card_id,
+                 kieran_effect: "switch",
+                 result: :completed
+               }),
+             :ok <- PendingEffects.complete_resolving_for_game(game.id) do
+          GameStore.get_game(game.id)
+        end
+
+      _invalid ->
+        {:error, :invalid_kieran_target_count}
+    end
+  end
+
   defp complete_play_card_effect(_game, _turn, _player, _card, effect, _target_ids) do
     {:error, {:unsupported_card_effect, effect.type}}
   end
@@ -1362,6 +1440,13 @@ defmodule Prizmo.TcgEngine.CardPlay do
     |> then(&{:ok, &1})
   end
 
+  defp effect_choice_ids(cards, player_id, %{type: :kieran_switch_or_damage_bonus}, _current_turn) do
+    cards
+    |> own_bench_choice_cards(player_id)
+    |> Enum.map(& &1.id)
+    |> then(&{:ok, &1})
+  end
+
   defp effect_choice_ids(_cards, _player_id, choice_step, _current_turn) do
     {:error, {:unsupported_choice_step, choice_step.key, choice_step.type}}
   end
@@ -1423,7 +1508,8 @@ defmodule Prizmo.TcgEngine.CardPlay do
              :move_basic_energy_between_own_pokemon,
              :recover_discard_to_hand,
              :recover_discard_to_deck,
-             :rare_candy_evolve
+             :rare_candy_evolve,
+             :kieran_switch_or_damage_bonus
            ] ->
         effect_choice_ids(cards, player_id, choice_step, current_turn)
 
@@ -1535,6 +1621,12 @@ defmodule Prizmo.TcgEngine.CardPlay do
     cards
     |> Enum.filter(&(&1.owner_player_id != player_id and &1.zone == :bench))
     |> Enum.sort_by(&{&1.owner_player_id, &1.position, &1.instance_id})
+  end
+
+  defp own_bench_choice_cards(cards, player_id) do
+    cards
+    |> Enum.filter(&(&1.owner_player_id == player_id and &1.zone == :bench))
+    |> Enum.sort_by(&{&1.position, &1.instance_id})
   end
 
   defp team_rockets_giovanni_choice_cards(cards, player_id) do
