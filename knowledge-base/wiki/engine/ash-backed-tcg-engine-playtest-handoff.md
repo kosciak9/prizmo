@@ -4,6 +4,13 @@
 - Sources: Project codebase; local validation; wiki log
 - Raw: N/A — operational handoff
 
+## [2026-06-02] Iteration 243 handoff — complete gameplay correction + Budew Item lock
+
+- Current direction: complete gameplay of all six target meta decks is the north star. Do **not** treat a card registry entry, behavior overlay, partial coverage inventory, or empty documented blocker list as completion. If a target-deck card still appears as `Pending card text` on the live board, or a real deck line cannot execute its printed gameplay through Ash/React, north-star work is not done.
+- Completed this batch: Budew (`ASC-016`) from Dragapult (`27431`) moved off pending attack text. Its `Itchy Pollen` attack now has an authored ASC behavior overlay with effect `:lock_opponent_items_next_turn`, a Pokémon CardDefinition in `EngineCardRegistry`, Ash attack support in `AttackEffects`/`AttackDamage`, and durable Item-lock legality in `Prizmo.TcgEngine.ItemLocks`. Resolving the attack records viewer-safe lock payload on `resolve_declared_attack`; during the blocked player's next turn, generic `play_card` Item use and older direct Item helpers reject via `:items_locked_by_itchy_pollen` and the affordance read model hides playable Items.
+- Still open from the screenshot: Munkidori (`TWM-095`) `Adrena-Brain` remains a six-deck target gameplay gap. It has legacy sim behavior but no Ash Ability action surface yet. The correct next slice is a real Ability command/prompt path: once-per-turn gate, Darkness Energy attachment requirement, choose own damaged Pokémon, choose opponent in-play Pokémon, choose up to 3 counters, move counters, write public event payloads, resolve KOs/prizes/replacement Active, expose the command in GameView/React, and keep hidden information safe.
+- Selection rule: prefer target-deck visible pending gameplay text and scenario-blocking mechanics over UI polish. Next high-value batches should continue Dragapult pending text (`TWM-095` Adrena-Brain and any other current-board pending target cards), then refresh a six-deck live-playability inventory that checks actual GameView/React pending text instead of only registry coverage.
+
 ## Iteration 237 handoff (superseded)
 
 - Superseded by the 2026-06-02 north-star reset and the Ash engine coverage inventory batch below. The previous UI-polish recommendation is deferred until six-deck playability is complete.

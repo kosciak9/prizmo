@@ -401,6 +401,20 @@ defmodule Prizmo.TcgEngine.GameView do
     }
   end
 
+  defp public_event_details(%GameEvent{type: "resolve_declared_attack", payload: payload}) do
+    if payload_value(payload, "effect_type") == "lock_opponent_items_next_turn" do
+      card_name = payload_card_name(payload, "item_lock_source_card_id", "Itchy Pollen")
+
+      %{
+        public_note: "#{card_name} prevents the opponent from playing Item cards next turn.",
+        public_card_count: 0,
+        public_revealed_cards: []
+      }
+    else
+      default_public_event_details()
+    end
+  end
+
   defp public_event_details(%GameEvent{type: "stadium_effect_used", payload: payload}) do
     card_name = payload_card_name(payload, "source_card_id", "Stadium")
     card_count = payload_integer(payload, "card_count") || 0
@@ -520,6 +534,8 @@ defmodule Prizmo.TcgEngine.GameView do
   defp payload_atom_key("card_count"), do: :card_count
   defp payload_atom_key("card_id"), do: :card_id
   defp payload_atom_key("energy_card_id"), do: :energy_card_id
+  defp payload_atom_key("effect_type"), do: :effect_type
+  defp payload_atom_key("item_lock_source_card_id"), do: :item_lock_source_card_id
   defp payload_atom_key("mulligan_number"), do: :mulligan_number
   defp payload_atom_key("public_note"), do: :public_note
   defp payload_atom_key("public_reveal"), do: :public_reveal

@@ -46,6 +46,7 @@ defmodule Prizmo.TcgEngine.CardPlay do
   alias Prizmo.TcgEngine.GameEvent
   alias Prizmo.TcgEngine.GamePlayer
   alias Prizmo.TcgEngine.GameStore
+  alias Prizmo.TcgEngine.ItemLocks
   alias Prizmo.TcgEngine.PendingEffects
   alias Prizmo.TcgEngine.PlayerStore
   alias Prizmo.TcgEngine.Prompt
@@ -75,6 +76,7 @@ defmodule Prizmo.TcgEngine.CardPlay do
              allow_first_turn_when_going_first?:
                definition.first_turn_supporter_allowed_when_going_first?
            ),
+         :ok <- ItemLocks.require_item_unlocked_if_item(metadata, game.id, player_id, turn),
          :ok <- require_ace_spec_available(player, metadata),
          :ok <- require_effect_available(game, turn, player, definition) do
       {:ok, metadata}
@@ -95,7 +97,8 @@ defmodule Prizmo.TcgEngine.CardPlay do
          :ok <- require_card_zone(card, :hand),
          :ok <- Prizmo.TcgEngine.Requirements.require_card_id(card, expected_card_id),
          {:ok, metadata} <- require_trainer_type(card.card_id, allowed_types),
-         :ok <- require_supporter_available(player, metadata, game, turn, opts) do
+         :ok <- require_supporter_available(player, metadata, game, turn, opts),
+         :ok <- ItemLocks.require_item_unlocked_if_item(metadata, game.id, player_id, turn) do
       require_ace_spec_available(player, metadata)
     end
   end

@@ -3,6 +3,10 @@ defmodule Prizmo.Tcg.Cards.Behaviors.ASC do
 
   use Prizmo.Tcg.Cards.DSL
 
+  card "ASC-016" do
+    attack(:itchy_pollen, effect: %{type: :lock_opponent_items_next_turn})
+  end
+
   card "ASC-039" do
     ability(:damp, effect: %{type: :pokemon_lose_self_knock_out_abilities})
     attack(:ram, effect: nil)

@@ -83,6 +83,7 @@ defmodule Prizmo.TcgEngine.AttackEffects do
     :damage_per_own_basic_pokemon_in_play,
     :damage_per_own_benched_pokemon,
     :damage_per_own_team_rocket_pokemon_in_play,
+    :lock_opponent_items_next_turn,
     :recover_trainer_from_discard_to_hand,
     :return_attached_energy_to_hand,
     :opponent_bench_damage_counters,
@@ -254,6 +255,9 @@ defmodule Prizmo.TcgEngine.AttackEffects do
 
       %{type: :defending_pokemon_cannot_retreat_next_turn} ->
         defender_cannot_retreat_next_turn(game_id, player_id, defender_card)
+
+      %{type: :lock_opponent_items_next_turn} ->
+        lock_opponent_items_next_turn(game_id, attacker_card, defender_card)
 
       %{type: :damage_per_own_benched_pokemon} ->
         {:ok, %{}}
@@ -455,6 +459,21 @@ defmodule Prizmo.TcgEngine.AttackEffects do
             legal_choice_ids
           )
       end
+    end
+  end
+
+  defp lock_opponent_items_next_turn(
+         game_id,
+         %CardInstance{} = attacker_card,
+         %CardInstance{} = defender_card
+       ) do
+    with {:ok, turn} <- TurnStore.current_turn(game_id) do
+      {:ok,
+       Prizmo.TcgEngine.ItemLocks.lock_opponent_items_next_turn_payload(
+         attacker_card,
+         defender_card.owner_player_id,
+         turn
+       )}
     end
   end
 

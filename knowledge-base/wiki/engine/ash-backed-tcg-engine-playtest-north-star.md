@@ -1,14 +1,25 @@
-# Open-Deck RNG TCG Engine and Card-First Playtest UI North Star
+# Six-Deck Fully Playable TCG Engine North Star
 
-- Updated: 2026-06-02 (batch 235)
+- Updated: 2026-06-02 (north-star reset)
 - Sources: Project codebase; local validation; wiki log; Electric documentation (2026-05-30)
 - Raw: [Electric Streams documentation notes](../../raw/engine/2026-05-30-electric-streams-docs.md)
 
 ## Scope
 
-This is the current north star for Prizmo's Pokémon TCG work: an Ash-backed, server-authoritative rules engine where two humans can start from arbitrary supported decklists, use persisted RNG for setup, shuffles, prizes, and draws, and play through a card-first browser UI built for experienced Pokémon TCG players.
+This is the current north star for Prizmo's Pokémon TCG work: an Ash-backed, server-authoritative rules engine where two humans can play **all six current fixture decks end-to-end, step by step, through any normal scenario those decks create** through a card-first browser UI built for experienced Pokémon TCG players.
 
-The goal is not yet complete Standard card-effect coverage, an AI opponent, an exact PTCGL clone, or post-game coaching. The near-term goal is a real playtest loop: players bring decklists, the engine performs normal random setup without preseeded draws, unsupported card effects are surfaced explicitly, and the UI feels like a dense competitive card table rather than a tutorial, test bench, or white-space-heavy debug surface.
+The first priority is not broad arbitrary-deck coverage, UI polish, Electric Streams, an AI opponent, an exact PTCGL clone, or post-game coaching. The near-term goal is narrower and stricter: every card needed by the six supported fixture decks must be playable through the canonical Ash engine or a deliberate generic behavior path with full mechanics for its printed gameplay text. Unsupported target-deck card behavior is a milestone blocker, not acceptable polish debt. Autonomous agents should choose six-deck playability work before any other product, UI, stream, or expansion task.
+
+Important correction for future agents: a coverage inventory, `EngineCardRegistry` entry, behavior overlay, or “blocker list empty” note is never sufficient to declare DONE. Complete gameplay means the live play surface has no visible `Pending card text` for target-deck gameplay, target-deck actions can be submitted through Ash/React where a real player needs them, and timing/lock/Ability/attack/Trainer/Tool/Stadium/Special Energy interactions work in the scenarios those six decks naturally produce.
+
+Target decks:
+
+- `27431` — Dragapult
+- `27147` — Alakazam
+- `27599` — Raging Bolt Ogerpon
+- `27445` — Festival Lead
+- `27514` — Lopunny Dudunsparce
+- `27459` — Rocket Mewtwo
 
 ## Current baseline
 
@@ -61,6 +72,7 @@ The goal is not yet complete Standard card-effect coverage, an AI opponent, an e
 - Iteration 235 moved Kieran (`TWM-154`) from pending Trainer text into executable Ash-engine behavior as a choice Supporter, closing the last non-Basic-Energy Trainer gap from the Festival Lead fixture deck. `EngineCardRegistry` now defines TWM-154 with effect `:kieran_switch_or_damage_bonus` and params `%{bonus_damage: 30, min_count: 0, max_count: 1}`. The choice system uses `min_count: 0` so the player can submit an empty selection (damage bonus mode) or one own bench card (switch mode). The damage branch writes `card_play_completed` with `kieran_effect: "damage"` and completes; the damage bonus is checked at attack time via `apply_kieran_damage_bonus/3` which adds +30 when the defender is ex or V (`pokemon_ex_or_v?` predicate checks suffix `["ex", "V", "VMAX", "VSTAR"]`). The switch branch performs `move_active_to_bench`/`promote_to_active` updates on the selected bench card with `cards_moved` switch payloads and writes `card_play_completed` with `kieran_effect: "switch"`. React SPA additions: `promptSubmitLabel`, `promptGuidanceMessages`, and `kieranPromptFlowGuide` for the choice prompt. No GameView changes were needed. `mix check` (all 12 gates) passes cleanly.
 - Iteration 236 audited the two remaining fixture decks (Raging Bolt Ogerpon `27599`, Lopunny Dudunsparce `27514`) for bounded gaps and moved JTG-120 (Dunsparce) onto the canonical Ash engine attack path. JTG-120 had a behavior overlay (`lib/prizmo/tcg/cards/behaviors/jtg.ex` with `trading_places` attack using `:switch_self_with_bench` effect) but no `EngineCardRegistry` entry. Added `@dunsparce` CardDefinition (`kind: :pokemon`, `play_window: :action_window`, effect `:switch_self_with_bench`) and registered it in `@cards`. The attack effect type was already supported in `AttackEffects` (`@supported_attack_effect_types`, `switch_self_with_bench/4` implementation) and the damage pipeline (`AttackDamage.apply_effect`). `EngineCardRegistry.fetch("JTG-120")` now returns a valid definition, `AttackEffects.supported?` returns true for the effect, and `mix check` (all 12 gates) passes cleanly. This expands arbitrary-deck attack coverage for the Lopunny Dudunsparce fixture without new prompt or UI surface changes.
 - Iteration 237 delivered the next UI polish batch after board-feel animation (232): card-slide-in animation for newly drawn cards and stronger turn-indicator presence. `HandCardTile` now accepts an optional `justDrawn` prop; `PrivateHandZone` tracks previous hand IDs via `useRef` + `useMemo` and passes `justDrawn` for cards that were not present on the prior render, triggering a lightweight 250 ms translate-x + opacity enter animation. The warning-tone `StatusBadge` (used for the active-player "turn" indicator) now combines `animate-[pulse_1.5s_ease-in-out_infinite]` with a subtle persistent `scale-[1.02]` for stronger visual weight without being intrusive. All changes are CSS + React state only in the same SPA board file; no engine or backend changes. `mix check` (all 12 gates) passes cleanly. This improves the experienced-player card-table feel for draw events and turn priority changes.
+- Iteration 243 corrected the previous over-narrow DONE interpretation after a Dragapult play surface showed target-deck pending text for Budew (`ASC-016`) and Munkidori (`TWM-095`). Budew's `Itchy Pollen` is now executable on the Ash attack path: the ASC behavior overlay declares `:lock_opponent_items_next_turn`, `AttackEffects` resolves it into a persisted `resolve_declared_attack` payload, `ItemLocks` derives the next-turn Item lock from durable event history, and generic/direct Item play legality rejects while the lock applies. Munkidori `Adrena-Brain` remains a target-deck gameplay gap requiring a real Ash Ability command/prompt surface, not merely a registry entry.
 - Iteration 213 closed the partial Crispin (`SCR-133`) gap left by the first generic search/attach slice. Crispin now supports the official one-Basic-Energy partial use by allowing the `search_basic_energy_split_hand_attach_to_pokemon` prompt to resolve with a single Basic Energy moved from deck to hand, while preserving the existing two-different-Basic-Energy plus target-Pokémon path that attaches the second Energy from deck without spending the manual attachment. The prompt caps to one choice when no complete attach selection is available, the moved-card event payload contains only the actually moved Energy cards, the remaining deck is still shuffled with engine-owned RNG metadata, and React guidance explains both valid selection shapes.
 - Iteration 214 moved Festival Grounds (`TWM-149`) from pending Stadium text into executable Ash-engine behavior. Playing Festival Grounds through the generic Stadium command now clears existing Special Conditions from all in-play Pokémon with attached Energy and records compact recovery payloads; Energy attached later from hand, from deck, or through Energy Switch-style reparenting also clears the target's Special Condition while the Stadium remains active. New Special Conditions are prevented for Energy-attached Pokémon through both direct status commands and attack effects such as Munkidori's `Mind Bend`; attack damage still applies. Festival Grounds card summaries now report `Engine-defined Stadium` and no longer emit pending Trainer-text affordances.
 - Iteration 215 moved Lana's Aid (`TWM-155`) onto the generic Ash engine `play_card` path by generalizing the existing discard-recovery effect from a single-card Night Stretcher shape to a multi-card recovery prompt. Lana's Aid is now an engine-defined Supporter that discards/marks through normal Trainer handling, prompts for `recover_non_rule_box_pokemon_or_basic_energy_from_discard` with min/max `1..3`, exposes only the active player's discard Pokémon without Rule Boxes and Basic Energy as legal choices, moves selected cards to hand, records one discard-to-hand moved-card payload containing all recovered cards, completes the pending effect/card-play sequence, and has React prompt copy for the multi-card discard recovery. Rollback validation confirmed invalid Trainer and rule-box Pokémon discard cards are excluded from prompt legality and that no scratch validation game persisted.
@@ -74,11 +86,11 @@ The goal is not yet complete Standard card-effect coverage, an AI opponent, an e
 
 ## Product north star
 
-The first playable product surface should be an experienced-player React SPA game client over the Ash-backed engine, not a debug-first test harness or rules tutorial.
+The first playable product surface should be an experienced-player React SPA game client over the Ash-backed engine where the six target decks can be played as real games, not a debug-first test harness, rules tutorial, or broad-but-shallow deck loader.
 
 It should let two humans:
 
-1. create or join a game from decklists rather than only hand-picked fixtures;
+1. create or join a game using any of the six target decklists without hand-picked opening hands or scripted prize maps;
 2. complete normal RNG-backed setup, including shuffling, opening hands, prizes, mulligan-relevant state, and initial Active or Bench choices where supported;
 3. see each player's public board, discard, prizes remaining, deck count, turn state, and legal action affordances;
 4. see the current player's private hand and prompts with compact card imagery;
@@ -87,10 +99,11 @@ It should let two humans:
 7. watch a chronological event log without raw payload noise in the normal play path;
 8. refresh or reconnect without losing game state or the random sequence history.
 
-### Open-deck and RNG expectations
+### Six-deck playability and RNG expectations
 
-- The normal product path should accept arbitrary decklists that can be resolved through the committed card catalog. Fixture-only game creation remains valid for tests, regression, demos, and narrow mechanic validation, but it is not sufficient as the final product path.
-- "Playable by any deck" means any valid decklist should load, validate, shuffle, set prizes, draw opening hands, and enter normal setup or play without crashes. Complete executable behavior for every card remains incremental. Unsupported effects must be visible as unsupported or unavailable actions, never silent no-ops.
+- The normal first-milestone path should accept the six target decklists and play them through the committed card catalog plus canonical Ash engine behavior. Arbitrary imported decklists remain a later milestone until the six-deck blocker list is closed.
+- "Fully playable" means every card in the six target decklists has executable behavior or a deliberate generic behavior path sufficient for normal play. Normal setup, turn flow, attacks, abilities, Trainers, Tools, Stadiums, Energy attachment/payment, prize taking, Knock Outs, switching, search/draw/discard flows, and relevant replacement-Active flows should work without fixture-only hand scripting. Full mechanics includes timing windows, once-per-turn markers, Item/attack/retreat locks, coin flips, prompted choices, conditional legality gates, replacement Active, KO/prize consequences, and all public/private information boundaries those cards require.
+- Unsupported behavior inside the six target decks is a blocker. Generic fallback is acceptable only for truly generic primitives such as Basic Energy, plain damage, or already-standardized attach/play mechanics. Unsupported behavior outside those six decks may still be surfaced as pending/unavailable.
 - Setup and draws must use engine-owned RNG. Preseeded hands, scripted prize maps, and manually ordered draws are only acceptable in explicit tests, demos, or replay fixtures.
 - RNG must be persisted enough for trust and replay. Store the game seed or equivalent random source metadata, record shuffle and random-choice domain facts, and make seeded test runs deterministic while production-like games default to fresh randomness.
 - The database remains the source of truth. Clients never pick hidden-zone order, prize placement, or random outcomes locally.
@@ -138,7 +151,7 @@ Validation target: the playable loop should be testable by two independent brows
 
 Source notes: [Electric Streams documentation notes](../../raw/engine/2026-05-30-electric-streams-docs.md).
 
-Electric Streams is a strong candidate for the game-data stream because it provides append-only durable streams, offset-based replay, browser-friendly SSE, JSON message mode, and idempotent producer support.
+Electric Streams remains a strong candidate for the later game-data stream because it provides append-only durable streams, offset-based replay, browser-friendly SSE, JSON message mode, and idempotent producer support. It is explicitly deferred until the six target decks are fully playable unless a tiny stream task is required to unblock six-deck validation.
 
 The preferred architecture to explore:
 
@@ -182,30 +195,35 @@ Important boundary: Electric should be a delivery and replay layer, not the rule
 
 ## Immediate implementation plan
 
-### 1. Keep the north star distinct from the next step
+### 1. Treat six-deck full playability as the next step and the north star
 
-- The north star describes the target product experience, not a ban on fixture-driven or scripted validation work.
-- Preseeded fixtures, deterministic seeds, current-game handoffs, and narrow scenario tests are allowed and often desirable when they prove engine correctness, prevent regressions, or validate a UI path.
-- When choosing between similarly feasible tasks, prefer coherent batches that advance arbitrary deck loading, RNG-backed setup, card-front/card-back rendering, hand density, benchmarked board layout, or generic mechanics that make arbitrary decks safer.
-- If the highest-value feasible step is another fixture-backed mechanic or current-game validation, do it, but record why it moves the north star or protects correctness.
+- Autonomous agents should choose work that moves one or more of the six target decks toward full playability before choosing UI polish, Electric Streams, broad open-deck work, non-target deck expansion, AI, coaching, or renderer experiments.
+- Preseeded fixtures, deterministic seeds, current-game handoffs, and narrow scenario tests are allowed when they prove engine correctness, prevent regressions, or validate a card behavior path for the six target decks.
+- Each batch should state which target deck/card blocker it closes or which six-deck validation gap it reduces.
+- If a task does not reduce six-deck blockers, defer it unless the user explicitly overrides this north-star reset.
 
-### 2. Build open-deck RNG game creation
+### 2. Inventory all unique cards across the six target decks
 
-- Add or harden decklist ingestion for normal game creation. Decks should resolve through `Prizmo.TcgEngine.CardCatalog` and report unresolved cards clearly.
-- Validate deck shape enough for supported play: deck size, recognizable card records, Basic Pokémon availability for setup, and copy-limit warnings or errors as appropriate.
-- Keep the optional explicit RNG seed path available for tests and reproducible dev runs, and expose it cleanly from the browser decklist-entry surface when useful.
-- Continue expanding persisted random/setup facts beyond the current per-player `deck_shuffled` facts, especially mulligans, prize placement, and any later random choices.
-- Replace any remaining product-path preseeded hands and scripted prize maps with the existing engine-owned shuffled deck order, opening hand draw, prize placement, and top-deck order.
-- Validate setup end-to-end from open decklists: different fresh seeds should produce different hands/prizes, while the same explicit seed is deterministic.
+- Generate or maintain a six-deck card coverage inventory from the committed deck modules.
+- Classify every unique card as `engine-defined`, `generic-supported`, `partial`, or `blocker` against the canonical Ash engine path, not only metadata/overlay coverage.
+- Verify card IDs against the committed catalog before naming blockers. Do not repeat stale handoff mistakes such as treating `POR-086` as Earthen Vessel or `JTG-120` as Togekiss.
+- Prioritize blockers by gameplay criticality: core attackers and Energy/payment paths first, then mandatory draw/search/switch/Trainer flows, then conditional Tools/Stadiums/Abilities, then lower-frequency edge text.
 
-### 3. Make any loaded deck safe to start
+### 3. Close target-deck card behavior blockers
 
-- Allow decklists with incomplete card behavior to enter setup when their metadata is known.
-- Keep generic mechanics available across decks: draw for turn, bench Basic Pokémon, attach Energy, evolve when metadata supports it, retreat, pass, damage, KO, prize-taking, and replacement Active.
-- Track unsupported actions explicitly in legal affordances, logs, and card detail views. Unsupported behavior should be a visible product state, not a crash or silent fallback.
-- Expand behavior manifests card-by-card after the generic arbitrary-deck path is trustworthy.
+- Implement missing target-deck cards through `Prizmo.TcgEngine.Cards.Registry`, generic mechanics, Stadium/Tool/Special Energy support modules, or explicit behavior hooks as appropriate.
+- Prefer reusable primitives when they naturally cover multiple target decks, but do not postpone a deck-critical blocker in pursuit of perfect arbitrary-deck generality.
+- Keep unsupported behavior explicit for non-target cards, but drive the unsupported blocker count for the six target decks to zero.
+- Validate card behavior through focused tests, rollback Tidewave/scenario checks, or browser play where appropriate.
 
-### 4. Benchmarked and partially rebuilt card table UI
+### 4. Validate each target deck as a playable game
+
+- For each of the six target decks, prove setup from a real decklist with engine-owned shuffle/opening hand/prize state.
+- Prove the deck's normal game plan can execute through legal UI/Ash actions: setup, attaching, evolving, searching/drawing, using key Abilities/Trainers, attacking, taking prizes, replacing Active, and continuing turns.
+- Use two independent browser sessions for milestone validation when practical.
+- Keep `mix check` green at the end of implementation batches.
+
+### 5. Preserve the card-table UI baseline without prioritizing polish
 
 - Completed (batch 219): TCG layout benchmark was recorded in the wiki/log, inspecting PTCGL, Hearthstone, and physical tournament table layouts. Adopted lessons: CSS-only card backs for face-down zones, overlapping card backs for hidden opponent hands, top-card face-up discard preview, stadium card art in center divider, and tighter hand card spacing. Rejected for now: Hearthstone-style board interactivity/fanning (too heavy without animation system) and PTCGL-style exact zone replication.
 - MiniCardBack component: CSS-only Pokémon-style back face using blue-to-purple gradient with decorative rings and corner accents. Used for Deck and Prizes zone count displays.
@@ -216,9 +234,9 @@ Important boundary: Electric should be a delivery and replay layer, not the rule
 - Completed (batch 225): event history visual polish — turn separators, per-type colored category indicators, compressed layout, removed verbose explanation text, compact player badges.
 - Completed (batch 227): large-hand density and overlap — adaptive hand layout with four density tiers (normal 2-column, compact 3-column, dense 4-column with compact tiles, overflow flex-wrap overlap). Hands up to 15 cards are visible simultaneously without scrolling; 16+ cards use overlapping flex layout.
 - Completed (batch 229): card-attached on-board action affordances — multi-intent rendering on board cards (Active, Bench) so all available actions display as compact inline `CardActionButton` components instead of a single first-wins badge. Multi-attack Pokémon show each attack as a distinct button with the attack name.
-- Remaining UI work: board-feel animation and further layout refinement as playtest loop matures.
+- Deferred UI work: further animation, layout refinement, and visual polish should wait until the six target decks are fully playable unless a UI defect blocks playability validation.
 
-### 5. Expand core engine mechanics
+### 6. Expand only the core engine mechanics needed for those decks
 
 Port or reimplement the old simulator's valuable rules into `Prizmo.TcgEngine` in small verified slices:
 
@@ -232,16 +250,17 @@ Port or reimplement the old simulator's valuable rules into `Prizmo.TcgEngine` i
 - mulligan handling and setup edge cases for arbitrary decklists;
 - undo/debug support through snapshots, not client-side state mutation.
 
-### 6. Migrate card behavior to engine definitions
+### 7. Migrate card behavior to engine definitions
 
 - Keep `Prizmo.TcgEngine.Cards.Registry` as the behavior registry for engine-playable cards.
 - Use the catalog only for static metadata and metadata-backed predicates.
 - Convert old simulator-specific card actions into generic costs, effects, operations, prompts, and hooks.
 - Track unsupported behavior explicitly instead of silently falling back.
 
-### 7. Spike Electric Streams
+### 8. Deferred: spike Electric Streams after six-deck playability
 
-- Run a local durable-streams server in development.
+- Do not pick this before six-deck playability unless the user explicitly overrides the current north star.
+- Later, run a local durable-streams server in development.
 - Publish committed `GameEvent` records for one game into a JSON stream.
 - Add a small React subscriber that catches up from `-1` and tails with SSE.
 - Verify reconnect/resume using saved offsets.
@@ -250,14 +269,18 @@ Port or reimplement the old simulator's valuable rules into `Prizmo.TcgEngine` i
 
 ## First milestone definition of done
 
-The first milestone is complete when two humans can create and play a supported slice from decklists through the browser UI without touching IEx or tests:
+The first milestone is complete when two humans can create and play all six current fixture decks through the browser UI without touching IEx or tests for normal game progress:
 
-- each player can provide or select a decklist that is not a hand-ordered draw fixture;
+- each player can provide or select any of the six target decklists without hand-ordered draw fixtures;
 - game creation persists player decklists and engine-owned RNG metadata;
 - setup uses RNG-backed shuffle, opening hands, prize placement, and setup choices where supported;
 - repeated fresh games can produce different hands/prizes, and explicit seeded games are reproducible for tests;
+- every unique card in the six target decks is classified in the maintained coverage inventory;
+- every target-deck card is either engine-defined or covered by a deliberate generic behavior path sufficient for normal play;
+- target-deck unsupported-card blockers are zero;
+- each deck's core attacker, draw/search, Energy/payment, switching, evolution, Tool/Stadium/Special Energy, Ability, prize-taking, KO, and replacement-Active flows work where that deck uses them;
 - both players can see correct public/private views with card fronts and card backs for the major physical card zones;
-- loaded decks with unsupported card behavior do not crash setup or generic play. Unsupported actions are clearly blocked or marked;
+- non-target loaded decks with unsupported card behavior do not crash setup or generic play. Unsupported actions outside the six target decks are clearly blocked or marked;
 - core generic actions work through the UI for supported cards and states;
 - legal actions are compact and visible without tutorial-style explanations dominating the board;
 - hand, prize, deck, discard, Active, and Bench layout is benchmarked and space-efficient enough for real play;
@@ -271,19 +294,24 @@ The first milestone is complete when two humans can create and play a supported 
 ## Non-goals for the first milestone
 
 - Full Standard support.
+- Full executable behavior for arbitrary imported decklists beyond the six target decks.
+- Additional fixture decks beyond the current six.
 - AI opponent.
 - Mobile-native renderer.
 - Production-grade card animation, foil, tilt, or 3D renderer effects.
 - PTCGL log import/replay.
 - Replacing Ash/Postgres persistence with streams.
-- Full executable behavior for every card in arbitrary imported decklists.
+- Electric Streams adoption or stream-backed UI transport.
+- Further UI polish unless it unblocks six-deck playability validation.
 - Teaching new players how Pokémon TCG works inside the main play surface.
 
 ## Key decisions captured
 
 - Canonical rules engine: `lib/prizmo/tcg_engine/`.
-- Near-term product target: arbitrary decklist game creation with engine-owned persisted RNG, plus a card-first experienced-player React SPA playtest UI.
-- Stream direction: explore Electric Streams for durable event delivery/replay, with Ash/Postgres remaining authoritative.
+- Near-term product target: all six current fixture decks fully playable through engine-owned persisted RNG and a card-first experienced-player React SPA playtest UI.
+- Autonomous-agent selection rule: pick six-deck card coverage, behavior implementation, or playability validation before UI polish, Electric Streams, broad open-deck expansion, AI, coaching, or non-target deck work.
+- Later open-deck target: arbitrary decklist game creation with explicit unsupported behavior remains valuable after the six target decks are fully playable.
+- Stream direction: explore Electric Streams for durable event delivery/replay later, with Ash/Postgres remaining authoritative.
 - Legacy simulator: reference only until useful scenarios are ported or deleted.
 - UI transport: do not revive the temporary Phoenix channel unless Electric or plain HTTP/SSE spikes fail.
 - UI layout work must benchmark Pokémon TCG and other TCG table layouts before substantial polish batches.

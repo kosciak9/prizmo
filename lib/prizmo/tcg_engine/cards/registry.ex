@@ -544,6 +544,19 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     ]
   }
 
+  @budew %CardDefinition{
+    id: "ASC-016",
+    kind: :pokemon,
+    play_window: :action_window,
+    effects: [
+      %Effect{
+        key: :itchy_pollen_lock_opponent_items_next_turn,
+        type: :lock_opponent_items_next_turn,
+        params: %{}
+      }
+    ]
+  }
+
   @dunsparce %CardDefinition{
     id: "JTG-120",
     kind: :pokemon,
@@ -703,6 +716,7 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
 
   @cards %{
     @boss_orders.id => @boss_orders,
+    @budew.id => @budew,
     @bug_catching_set.id => @bug_catching_set,
     @buddy_buddy_poffin.id => @buddy_buddy_poffin,
     @crushing_hammer.id => @crushing_hammer,

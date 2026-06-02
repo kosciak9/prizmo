@@ -1,5 +1,12 @@
 # Wiki Log
 
+## [2026-06-02] iteration 243 | Budew Itchy Pollen Item lock + complete gameplay correction
+
+- Task attempted: corrected the mistaken DONE interpretation by recording that complete gameplay of all six target meta decks is the north star; registry/coverage entries alone are not completion. Closed one visible Dragapult target-deck pending attack from the screenshot: Budew (`ASC-016`) `Itchy Pollen`.
+- Files changed: `lib/prizmo/tcg/cards/behaviors/asc.ex` (Budew behavior overlay), `lib/prizmo/tcg_engine/cards/registry.ex` (Budew CardDefinition), `lib/prizmo/tcg_engine/attack_effects.ex` and `lib/prizmo/tcg_engine/attack_damage.ex` (supported attack effect and damage pass-through), `lib/prizmo/tcg_engine/item_locks.ex` (durable event-history Item lock), `lib/prizmo/tcg_engine/card_play.ex` (generic/direct Item legality gate), `lib/prizmo/tcg_engine/game_view.ex` (viewer-safe event note), and the north-star/handoff/index/log wiki files.
+- Validation: `mix format`, `mix compile --warnings-as-errors`, `node_modules/.bin/tsc --noEmit`, focused `mix test test/prizmo/tcg_engine/mechanics_test.exs` (12/0), direct `mix run` verification that `CardCatalog.fetch_attack("ASC-016", :itchy_pollen)` and `EngineCardRegistry.fetch("ASC-016")` return executable definitions, and full `mix check` (all 12 gates) pass cleanly.
+- Remaining/blocking notes: Munkidori (`TWM-095`) `Adrena-Brain` remains a visible six-deck target gameplay gap and should be the next Ability-command slice. Future agents must not answer DONE while target-deck `Pending card text` remains visible in actual play.
+
 ## [2026-06-02] iteration 242 | SSP-170/TEF-145/SCR-118 Supporter search partial gap batch
 
 - Task attempted: closed the three remaining partial Supporter search gaps from decks 27599/27514 identified in the coverage inventory (SSP-170 Cyrano, TEF-145 Ciphermaniac's Codebreaking, SCR-118 Fan Rotom). Added explicit `EngineCardRegistry` CardDefinitions so these cards resolve through the canonical Ash path.
