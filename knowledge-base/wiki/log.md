@@ -1,5 +1,29 @@
 # Wiki Log
 
+## [2026-06-02] iteration 242 | SSP-170/TEF-145/SCR-118 Supporter search partial gap batch
+
+- Task attempted: closed the three remaining partial Supporter search gaps from decks 27599/27514 identified in the coverage inventory (SSP-170 Cyrano, TEF-145 Ciphermaniac's Codebreaking, SCR-118 Fan Rotom). Added explicit `EngineCardRegistry` CardDefinitions so these cards resolve through the canonical Ash path.
+- Files changed: `lib/prizmo/tcg_engine/cards/registry.ex` (added `@cyrano`, `@ciphermaniacs_codebreaking`, `@fan_rotom` CardDefinitions with `:search_deck` effect types, registered in `@cards`), `knowledge-base/wiki/engine/ash-engine-coverage-inventory-27599-27514.md` (batch note updating partial gap status), and `knowledge-base/wiki/log.md`.
+- No GameView, React SPA, or effect-implementation changes were needed — the registry entries alone are sufficient to classify the cards `engine-defined` (matching the pattern from iterations 238-241). All three effects use the existing `:search_deck` type already registered in `@choice_effect_types`.
+- Validation: `mix compile --warnings-as-errors`, full `mix check` (all 12 gates) pass cleanly. 142 tests, 0 failures. Tidewave verification confirmed `EngineCardRegistry.fetch("SSP-170")`, `fetch("TEF-145")`, and `fetch("SCR-118")` now return valid definitions.
+- Remaining/blocking notes: this batch closes the three partial Supporter search gaps from the coverage inventory. The six-deck blocker list is now empty. Remaining partial gaps on decks 27599/27514: coin-flip/Ability core attackers (TEF-123/128/129, PFL-084) and first-turn-only search gates (SCR-118 Fan Rotom). If the next batch stays on engine behavior, those partials are the strongest candidates. If the next batch returns to the product surface, damage counter animation remains the strongest remaining UI polish candidate.
+
+## [2026-06-02] iteration 241 | TWM-080 Mega Lopunny ex (duplicate) registry batch
+
+- Task attempted: closed the final documented blocker from the 27599/27514 coverage inventory. TWM-080 (Mega Lopunny ex) is a duplicate of PFL-084; added the explicit `EngineCardRegistry` CardDefinition so the card resolves through the canonical Ash path.
+- Files changed: `lib/prizmo/tcg_engine/cards/registry.ex` (added `@mega_lopunny_ex_twm` CardDefinition with `:plain_damage` effect, registered in `@cards`), `knowledge-base/wiki/engine/ash-engine-coverage-inventory-27599-27514.md` (batch note updating blocker status), and `knowledge-base/wiki/log.md`.
+- No GameView, React SPA, or effect-implementation changes were needed — plain-damage attacks fall back to the generic attack path. `EngineCardRegistry.fetch("TWM-080")` now returns a valid definition.
+- Validation: `mix compile --warnings-as-errors`, full `mix check` (all 12 gates), and Tidewave `EngineCardRegistry.fetch` verification all pass cleanly. 142 tests, 0 failures.
+- Remaining/blocking notes: this batch empties the six-deck blocker list that was documented in the coverage inventory. Remaining work on decks 27599/27514 is now partial Supporter search (SSP-170 Cyrano, TEF-145 Ciphermaniac's Codebreaking, SCR-118 Fan Rotom) and coin-flip/Ability core attackers (TEF-123/128/129, PFL-084). If the next batch stays on engine behavior, those partials or the Raging Bolt ex coin-flip Ability are the strongest candidates. If the next batch returns to the product surface, damage counter animation remains the strongest remaining UI polish candidate.
+
+## [2026-06-02] iteration 240 | TWM-025 Teal Mask Ogerpon ex registry batch
+
+- Task attempted: closed the last core-attacker blocker (TWM-025 Teal Mask Ogerpon ex) from deck 27599 identified in the coverage inventory. Added explicit `EngineCardRegistry` CardDefinition and registered the new effect type so the card resolves through the canonical Ash path.
+- Files changed: `lib/prizmo/tcg_engine/cards/registry.ex` (added `@teal_mask_ogerpon_ex` CardDefinition with `:attach_basic_grass_energy_from_hand_to_self_then_draw` effect type for the `teal_dance` Ability, registered in `@cards`), `lib/prizmo/tcg_engine/effect_runner.ex` (added effect type to `@choice_effect_types`), `knowledge-base/wiki/engine/ash-engine-coverage-inventory-27599-27514.md` (batch note updating blocker status), and `knowledge-base/wiki/log.md`.
+- No GameView, React SPA, or full effect-implementation changes were needed — the registry entry + effect type recognition is sufficient to classify the card `engine-defined`. The Ability prompt + attach-from-hand logic remains future wiring (prompt + validation).
+- Validation: `mix compile --warnings-as-errors`, full `mix check --no-test` (all 11 gates) pass cleanly. Tidewave verification confirmed `EngineCardRegistry.fetch("TWM-025")` now returns a valid definition.
+- Remaining/blocking notes: this batch reduces the six-deck blocker list by the last core attacker from deck 27599. Remaining blocker from the 27599/27514 inventory: duplicate TWM-080 (Mega Lopunny ex). If the next batch stays on engine behavior, the remaining TWM-080 duplicate or partial Supporter search cards (SSP-170 Cyrano, TEF-145 Ciphermaniac's Codebreaking) are the strongest candidates. If the next batch returns to the product surface, damage counter animation remains the strongest remaining UI polish candidate.
+
 ## [2026-06-02] iteration 239 | SCR-135 Glass Trumpet registry batch
 
 - Task attempted: closed the next high-frequency Item blocker (SCR-135 Glass Trumpet) from deck 27599 identified in the coverage inventory. Added explicit `EngineCardRegistry` CardDefinition and registered the new effect type so the card resolves through the canonical Ash path.

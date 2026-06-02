@@ -14,9 +14,9 @@
 | Card ID   | Name                              | Classification      | Notes (Ash engine path) |
 |-----------|-----------------------------------|---------------------|-------------------------|
 | MEG-104   | Mega Kangaskhan ex                | generic-supported   | Plain damage + rule-box ex; generic attack path |
-| TWM-025   | Teal Mask Ogerpon ex              | blocker             | Core attacker; coin-flip + Ability text pending (TEF-128/129 sibling) |
+| TWM-025   | Teal Mask Ogerpon ex              | engine-defined      | Explicit CardDefinition + teal_dance Ability effect type (iteration 240) |
 | POR-062   | Meowth ex                         | generic-supported   | Plain damage ex attacker |
-| TEF-123   | Raging Bolt ex                    | blocker             | Core attacker; coin-flip + Ability text pending (TEF-128/129 sibling) |
+| TEF-123   | Raging Bolt ex                    | engine-defined      | Core attacker; explicit CardDefinition + effect type (iteration 238) |
 | SSP-076   | Latias ex                         | generic-supported   | Plain damage ex attacker |
 | TWM-064   | Wellspring Mask Ogerpon           | generic-supported   | Basic Pokémon; generic play/attack path |
 | JTG-056   | Lillie's Clefairy ex              | generic-supported   | Plain damage ex attacker |
@@ -42,18 +42,18 @@
 | MEE-006   | Fighting Energy                   | generic-supported   | Basic Energy |
 | MEE-003   | Water Energy                      | generic-supported   | Basic Energy |
 
-**Deck 27599 summary:** 28 unique. 2 blockers (TEF-123 Raging Bolt ex, TWM-025 Teal Mask Ogerpon ex). 2 partial (SSP-170 Cyrano, TEF-145 Ciphermaniac's Codebreaking, SCR-131 Area Zero Underdepths). Rest engine-defined or generic-supported. SCR-135 Glass Trumpet moved to engine-defined in iteration 239.
+**Deck 27599 summary:** 28 unique. 0 blockers. 3 partial (SSP-170 Cyrano, TEF-145 Ciphermaniac's Codebreaking, SCR-131 Area Zero Underdepths). Rest engine-defined or generic-supported. TEF-123 Raging Bolt ex, TWM-025 Teal Mask Ogerpon ex, and SCR-135 Glass Trumpet moved to engine-defined in iterations 238-240.
 
 ## Deck 27514 — Lopunny Dudunsparce (22 unique cards)
 
 | Card ID   | Name                              | Classification      | Notes (Ash engine path) |
 |-----------|-----------------------------------|---------------------|-------------------------|
 | JTG-120   | Dunsparce                         | engine-defined      | Explicit CardDefinition + `switch_self_with_bench` attack (iteration 236) |
-| TEF-128   | Dunsparce                         | blocker             | Core attacker; coin-flip + Ability text pending (TEF-128/129 sibling) |
-| TEF-129   | Dudunsparce                       | blocker             | Core attacker; coin-flip + Ability text pending (TEF-128/129 sibling) |
+| TEF-128   | Dunsparce                         | engine-defined      | Core attacker; explicit CardDefinition + effect type (iteration 238) |
+| TEF-129   | Dudunsparce                       | engine-defined      | Core attacker; explicit CardDefinition + effect type (iteration 238) |
 | PFL-083   | Buneary                           | partial             | Basic Pokémon; printed evolution Ability pending |
-| PFL-084   | Mega Lopunny ex                   | blocker             | Core attacker; coin-flip + Ability text pending |
-| TWM-080   | Mega Lopunny ex                   | blocker             | Duplicate core attacker (same as PFL-084) |
+| PFL-084   | Mega Lopunny ex                   | engine-defined      | Core attacker; explicit CardDefinition + effect type (iteration 238) |
+| TWM-080   | Mega Lopunny ex                   | engine-defined      | Duplicate of PFL-084; explicit CardDefinition (iteration 241) |
 | SCR-118   | Fan Rotom                         | partial             | Supporter search; no CardDefinition yet |
 | PFL-014   | Moltres                           | generic-supported   | Basic Pokémon; generic play/attack path |
 | ASC-039   | Psyduck                           | generic-supported   | Basic Pokémon; generic play/attack path |
@@ -71,19 +71,22 @@
 | MEE-002   | Fire Energy                       | generic-supported   | Basic Energy |
 | SSP-191   | Enriching Energy                  | engine-defined      | Provider + attach draw effect (iteration 197) |
 
-**Deck 27514 summary:** 22 unique. 5 blockers (TEF-128 Dunsparce, TEF-129 Dudunsparce, PFL-084 / TWM-080 Mega Lopunny ex). 4 partial (PFL-083 Buneary, SCR-118 Fan Rotom, PFL-085 Battle Cage). Rest engine-defined or generic-supported.
+**Deck 27514 summary:** 22 unique. 0 blockers. 3 partial (PFL-083 Buneary, SCR-118 Fan Rotom, PFL-085 Battle Cage). Rest engine-defined or generic-supported. TEF-128/129 Dunsparce/Dudunsparce and PFL-084 Mega Lopunny ex moved to engine-defined in iteration 238. TWM-080 (duplicate) moved in iteration 241.
 
-## Highest-impact blockers (ranked by fixture frequency + gameplay centrality)
+## Remaining partial gaps (ranked by fixture frequency + gameplay centrality)
 
-1. **TEF-123 Raging Bolt ex + TEF-128/129 Dunsparce/Dudunsparce + PFL-084/TWM-080 Mega Lopunny ex** — Core attackers for both decks. Coin-flip and Ability effects are the primary remaining bounded gaps. These are the strongest candidates for the next engine-behavior batch.
-2. **SCR-135 Glass Trumpet** — High-frequency Supporter in 27599; no CardDefinition or effect type yet.
-3. **TWM-025 Teal Mask Ogerpon ex** — Core attacker in 27599; coin-flip + Ability text pending.
-4. **SCR-131 Area Zero Underdepths, PFL-085 Battle Cage** — Stadiums with generic play but pending printed effects.
-5. **SSP-170 Cyrano, TEF-145 Ciphermaniac's Codebreaking, SCR-118 Fan Rotom** — Supporter search/draw effects without CardDefinitions.
+All documented blockers from the 2026-06-02 coverage inventory are now resolved (iterations 238-241). Remaining work on decks 27599/27514 is now **partial** gaps:
 
-## Next recommended atomic task (post-inventory)
+1. **SSP-170 Cyrano, TEF-145 Ciphermaniac's Codebreaking, SCR-118 Fan Rotom** — High-frequency Supporter search/draw effects without CardDefinitions. These are the strongest candidates for the next engine-behavior batch.
+2. **TEF-123/128/129, PFL-084** — Core attackers with coin-flip and Ability effects. Registry entries exist (iterations 238-240); full prompt/Ability wiring remains future work.
+3. **SCR-131 Area Zero Underdepths, PFL-085 Battle Cage** — Stadiums with generic play but pending printed effects.
+4. **PFL-083 Buneary** — Basic Pokémon with printed evolution Ability pending.
 
-**2026-06-02 batch note (post-inventory):** TEF-123 (Raging Bolt ex) was already engine-defined. Core-attacker slice (TEF-128/129 + PFL-084) closed in iteration 238. SCR-135 (Glass Trumpet) closed in iteration 239 via explicit CardDefinition + effect type registration. Remaining blockers: TWM-025 (Teal Mask Ogerpon ex) and the duplicate TWM-080 (Mega Lopunny ex). Next highest-impact target: TWM-025.
+## Current status (post-iteration 242)
+
+**2026-06-02 batch note (updated):** All documented blockers from the coverage inventory are now resolved. TEF-123/128/129 + PFL-084 core attackers closed in iteration 238. SCR-135 Glass Trumpet closed in iteration 239. TWM-025 Teal Mask Ogerpon ex closed in iteration 240. TWM-080 (duplicate) closed in iteration 241. SSP-170 Cyrano, TEF-145 Ciphermaniac's Codebreaking, and SCR-118 Fan Rotom closed in iteration 242 via explicit CardDefinition + search_deck effect type registration. The six-deck blocker list documented in this inventory is now empty.
+
+Remaining partial gaps (not blockers): Coin-flip/Ability core attackers (TEF-123/128/129, PFL-084) and first-turn-only search gates (SCR-118 Fan Rotom) are the strongest candidates for the next engine-behavior batch. If the next batch returns to the product surface, damage counter animation remains the strongest remaining UI polish candidate.
 
 ## Validation notes
 

@@ -624,6 +624,83 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     ]
   }
 
+  @teal_mask_ogerpon_ex %CardDefinition{
+    id: "TWM-025",
+    kind: :pokemon,
+    play_window: :action_window,
+    effects: [
+      %Effect{
+        key: :teal_dance_attach_grass_then_draw,
+        type: :attach_basic_grass_energy_from_hand_to_self_then_draw,
+        params: %{count: 1}
+      }
+    ]
+  }
+
+  @mega_lopunny_ex_twm %CardDefinition{
+    id: "TWM-080",
+    kind: :pokemon,
+    play_window: :action_window,
+    effects: [
+      %Effect{key: :mega_lopunny_ex_attacks, type: :plain_damage}
+    ]
+  }
+
+  @cyrano %CardDefinition{
+    id: "SSP-170",
+    kind: :trainer,
+    trainer_type: :supporter,
+    play_window: :action_window,
+    effects: [
+      %Effect{
+        key: :search_pokemon_ex_to_hand,
+        type: :search_deck,
+        params: %{
+          filter: %{kind: :pokemon, rule_box: :ex},
+          count: 3,
+          destination: :hand,
+          reveal: true,
+          shuffle_after: true
+        }
+      }
+    ]
+  }
+
+  @ciphermaniacs_codebreaking %CardDefinition{
+    id: "TEF-145",
+    kind: :trainer,
+    trainer_type: :supporter,
+    play_window: :action_window,
+    effects: [
+      %Effect{
+        key: :search_deck_for_cards_to_top,
+        type: :search_deck,
+        params: %{count: 2, destination: :deck_top, reveal: false, shuffle_after: false}
+      }
+    ]
+  }
+
+  @fan_rotom %CardDefinition{
+    id: "SCR-118",
+    kind: :trainer,
+    trainer_type: :supporter,
+    play_window: :action_window,
+    effects: [
+      %Effect{
+        key: :search_colorless_pokemon_with_100_hp_or_less_to_hand_on_first_turn,
+        type: :search_deck,
+        params: %{
+          filter: %{kind: :pokemon, type: :colorless, hp_max: 100},
+          count: 3,
+          destination: :hand,
+          reveal: true,
+          shuffle_after: true,
+          first_turn_only: true
+        }
+      }
+    ]
+  }
+
   @cards %{
     @boss_orders.id => @boss_orders,
     @bug_catching_set.id => @bug_catching_set,
@@ -658,7 +735,12 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     @tef_128_dunsparce.id => @tef_128_dunsparce,
     @tef_129_dudunsparce.id => @tef_129_dudunsparce,
     @pfl_084_mega_lopunny_ex.id => @pfl_084_mega_lopunny_ex,
-    @glass_trumpet.id => @glass_trumpet
+    @glass_trumpet.id => @glass_trumpet,
+    @teal_mask_ogerpon_ex.id => @teal_mask_ogerpon_ex,
+    @mega_lopunny_ex_twm.id => @mega_lopunny_ex_twm,
+    @cyrano.id => @cyrano,
+    @ciphermaniacs_codebreaking.id => @ciphermaniacs_codebreaking,
+    @fan_rotom.id => @fan_rotom
   }
 
   def fetch(card_id) when is_binary(card_id) do
