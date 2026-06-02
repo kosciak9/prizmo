@@ -544,6 +544,19 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     ]
   }
 
+  @dunsparce %CardDefinition{
+    id: "JTG-120",
+    kind: :pokemon,
+    play_window: :action_window,
+    effects: [
+      %Effect{
+        key: :trading_places_switch_self_with_bench,
+        type: :switch_self_with_bench,
+        params: %{}
+      }
+    ]
+  }
+
   @cards %{
     @boss_orders.id => @boss_orders,
     @bug_catching_set.id => @bug_catching_set,
@@ -572,7 +585,8 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     @team_rockets_proton.id => @team_rockets_proton,
     @team_rockets_transceiver.id => @team_rockets_transceiver,
     @wallys_compassion.id => @wallys_compassion,
-    @ultra_ball.id => @ultra_ball
+    @ultra_ball.id => @ultra_ball,
+    @dunsparce.id => @dunsparce
   }
 
   def fetch(card_id) when is_binary(card_id) do
