@@ -1,5 +1,19 @@
 # Wiki Log
 
+## [2026-06-02] codebase update | Ash engine coverage inventory for 27599 + 27514
+
+- Task attempted: produced the required first canonical Ash-engine coverage inventory for the two decks that still carry known bounded gaps after iterations 234-236 (Raging Bolt Ogerpon 27599 and Lopunny Dudunsparce 27514). This fulfills the "required first implementation task" stated in the 2026-06-02 north-star reset and handoff. Classification uses `EngineCardRegistry`, supported effect types (`AttackEffects`, `ToolEffects`, `StadiumEffects`), generic paths, and recent iteration commits — not the legacy `mix prizmo.cards.coverage` report.
+- Files changed: new `knowledge-base/wiki/engine/ash-engine-coverage-inventory-27599-27514.md`, and `knowledge-base/wiki/log.md`.
+- Validation: wiki-only update; no code tests required. `mix format --check-formatted` passes.
+- Remaining/blocking notes: 27599 has 3 blockers (TEF-123 Raging Bolt ex, TWM-025 Teal Mask Ogerpon ex, SCR-135 Glass Trumpet) and 2 partial. 27514 has 5 blockers (TEF-128/129 Dunsparce/Dudunsparce, PFL-084/TWM-080 Mega Lopunny ex) and 4 partial. Highest-impact next atomic task is the core-attacker blocker slice (TEF-123/128/129 + PFL-084) or the high-frequency Supporter (SCR-135).
+
+## [2026-06-02] codebase update | Six-deck fully playable north-star reset
+
+- Task attempted: updated the current TCG engine north star so autonomous agents know the first milestone is all six current fixture decks fully playable before any other product direction.
+- Files changed: `knowledge-base/wiki/engine/ash-backed-tcg-engine-playtest-north-star.md`, `knowledge-base/wiki/engine/ash-backed-tcg-engine-playtest-handoff.md`, `knowledge-base/wiki/index.md`, and `knowledge-base/wiki/log.md`.
+- Validation: wiki-only update; no code tests required. Local validation inspected the final diff and checked stale next-task language; historical handoff entries still mention older UI/Electric work, but the current top handoff explicitly supersedes them.
+- Remaining/blocking notes: next implementation work should produce or refresh the canonical Ash-engine coverage inventory for `27431` Dragapult, `27147` Alakazam, `27599` Raging Bolt Ogerpon, `27445` Festival Lead, `27514` Lopunny Dudunsparce, and `27459` Rocket Mewtwo, then close the highest-impact target-deck blocker.
+
 ## [2026-06-02] iteration 237 | Card-slide-in animation and turn indicator polish
 
 - Task attempted: delivered the next UI polish batch after board-feel animation (iteration 232) — card-slide-in for newly drawn cards + stronger turn-indicator presence. This improves the experienced-player card-table feel for draw events (opening hand, draw-for-turn, search reveals) and turn priority changes without requiring a new benchmark (the TCG layout benchmark requirement was satisfied in batch 219).

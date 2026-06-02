@@ -1,22 +1,29 @@
 # Ash-backed TCG Engine Playtest Handoff
 
-- Updated: 2026-06-02 (batch 235)
+- Updated: 2026-06-02 (north-star reset)
 - Sources: Project codebase; local validation; wiki log
 - Raw: N/A — operational handoff
 
-## Iteration 237 handoff
+## Iteration 237 handoff (superseded)
 
-- Current state: delivered the next UI polish batch after board-feel animation (232) — card-slide-in for newly drawn cards + stronger turn-indicator presence. No durable game command was executed against any long-lived playtest or validation games. No engine or backend files were changed. Last commit at iteration end: (after this batch).
-- Completed: `HandCardTile` accepts optional `justDrawn` prop and applies a 250 ms translate-x + opacity enter animation via internal `useState` + `useEffect`. `PrivateHandZone` uses `useRef` + `useMemo` to compute newly added card IDs on each hand change and passes `justDrawn` accordingly. Warning-tone `StatusBadge` (turn indicator) now uses `animate-[pulse_1.5s_ease-in-out_infinite] scale-[1.02]` for stronger persistent visual weight. All changes are CSS + React state only. `mix check` (all 12 gates) passes cleanly.
-- Validation: `node_modules/.bin/tsc --noEmit`, `mix compile --warnings-as-errors`, and full `mix check` (all 12 gates) pass cleanly.
-- Recommended next atomic task: if the next batch stays on the product surface, further animation candidates include damage counter animation or a more pronounced turn-transition flash (board-level highlight). If the next batch returns to engine behavior, the strongest remaining bounded fixture-card gaps from the two decks are the core attackers TEF-128/129 (Raging Bolt ex / Ogerpon ex) with coin-flip and Ability effects.
+- Superseded by the 2026-06-02 north-star reset and the Ash engine coverage inventory batch below. The previous UI-polish recommendation is deferred until six-deck playability is complete.
+
+## [2026-06-02] Ash engine coverage inventory batch (required first task after north-star reset)
+
+- Current state: produced the required canonical Ash-engine coverage inventory for the two decks that still carry known bounded gaps after iterations 234-236. No durable game command was executed against any long-lived playtest or validation games. No engine or backend files were changed. Wiki-only batch.
+- Completed: new durable artifact `knowledge-base/wiki/engine/ash-engine-coverage-inventory-27599-27514.md` classifying all 50 unique cards from decks 27599 (Raging Bolt Ogerpon) and 27514 (Lopunny Dudunsparce) against `EngineCardRegistry`, supported effect types, and generic Ash paths. 27599: 3 blockers (TEF-123, TWM-025, SCR-135), 2 partial. 27514: 5 blockers (TEF-128/129, PFL-084/TWM-080), 4 partial. Highest-impact blockers identified and ranked by fixture frequency + gameplay centrality.
+- Validation: `mix format --check-formatted` passes. Wiki log entry added.
+- Recommended next atomic task: close the highest-impact core-attacker blocker slice (TEF-123 Raging Bolt ex + TEF-128/129 Dunsparce/Dudunsparce + PFL-084/TWM-080 Mega Lopunny ex) or the high-frequency Supporter (SCR-135 Glass Trumpet). Verify every card ID against the committed catalog before implementing. Do not move to UI polish, Electric Streams, or non-target deck work until the six-deck blocker list is empty.
 
 ## North-star reset handoff
 
-- Current direction: follow the canonical [Open-Deck RNG TCG Engine and Card-First Playtest UI North Star](ash-backed-tcg-engine-playtest-north-star.md). The north star is the product target, not a ban on fixture-backed engine validation.
-- Selection rule for loopers: game `f6df7025-7d0f-4d9b-9bc2-31c864de1d4e`, preseeded fixtures, deterministic seeds, and narrow scripted scenarios remain valid when they prove engine correctness, prevent regressions, or validate a UI path. They should not be mistaken for the finished product experience.
-- Highest-value feasible batches to prefer when available: open-deck game creation and catalog-backed deck validation; engine-owned persisted RNG for shuffle, opening hands, prizes, and draws; safe setup for arbitrary loaded decks with explicit unsupported-card behavior; TCG layout benchmark notes followed by card-front/card-back board improvements; compact experienced-player action and prompt surfaces; then broader generic mechanics and card behavior. If another fixture-backed mechanic slice is the highest-value feasible step, do it and record how it protects correctness or advances the north star.
-- UI batches must benchmark Pokémon TCG and at least one other TCG layout before substantial layout changes, then record what Prizmo adopts or rejects in the wiki/log for the batch. Batch 219 completed this benchmark; Prizmo adopted overlapping card backs for opponent hand, card back zone visuals for deck/prizes, top-card discard preview, and stadium card art. Prizmo deferred Hearthstone-style board interactivity/fanning and PTCGL-style exact zone replication.
+- Current direction: follow the canonical [Six-Deck Fully Playable TCG Engine North Star](ash-backed-tcg-engine-playtest-north-star.md). The first milestone is all six current fixture decks fully playable before anything else.
+- Selection rule for autonomous agents: choose six-deck card coverage inventory, target-deck behavior implementation, or target-deck playability validation before UI polish, Electric Streams, broad open-deck expansion, AI, coaching, renderer work, or non-target deck authoring. If a task does not reduce six-deck blockers, defer it unless the user explicitly overrides this reset.
+- Target decks: `27431` Dragapult, `27147` Alakazam, `27599` Raging Bolt Ogerpon, `27445` Festival Lead, `27514` Lopunny Dudunsparce, and `27459` Rocket Mewtwo.
+- Definition of fully playable: every card in those decks must have canonical Ash engine behavior or a deliberate generic behavior path sufficient for normal play. Unsupported target-deck behavior is a blocker. Generic fallback is acceptable for truly generic primitives such as Basic Energy/plain damage/already-standardized attachment and play mechanics; it is not acceptable for printed target-deck effects that affect gameplay.
+- Selection rule for validation: game `f6df7025-7d0f-4d9b-9bc2-31c864de1d4e`, preseeded fixtures, deterministic seeds, and narrow scripted scenarios remain valid when they prove engine correctness, prevent regressions, or validate a six-deck card behavior path. They should not be mistaken for complete deck playability by themselves.
+- Required first implementation task after this reset: produce or refresh a canonical Ash-engine coverage inventory for all unique cards in the six target deck modules. Classify cards as `engine-defined`, `generic-supported`, `partial`, or `blocker`, and use that inventory to pick the next blocker.
+- UI batches remain subject to the existing benchmark rule before substantial layout changes, but UI polish is now deferred unless it blocks six-deck validation. Batch 219 completed the current benchmark baseline.
 - Keep raw payloads, IDs, debug counters, and tutorial copy out of the normal play path. The product target is a serious, dense card table for players who already know Pokémon TCG.
 
 ## Iteration 235 handoff
