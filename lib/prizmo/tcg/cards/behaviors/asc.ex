@@ -12,6 +12,12 @@ defmodule Prizmo.Tcg.Cards.Behaviors.ASC do
     attack(:ram, effect: nil)
   end
 
+  card "ASC-142" do
+    ability(:flip_the_script,
+      effect: %{type: :draw_if_own_pokemon_knocked_out_last_turn, count: 3}
+    )
+  end
+
   card "ASC-181" do
     card_effect(
       effect: %{

@@ -38,6 +38,7 @@ defmodule Prizmo.TcgEngine do
       rpc_action :use_tcg_engine_team_rockets_factory, :use_team_rockets_factory_command
       rpc_action :use_tcg_engine_munkidori_adrena_brain, :use_munkidori_adrena_brain_command
       rpc_action :use_tcg_engine_teal_dance, :use_teal_mask_ogerpon_teal_dance_command
+      rpc_action :use_tcg_engine_flip_the_script, :use_fezandipiti_flip_the_script_command
       rpc_action :play_tcg_engine_basic_to_bench, :play_basic_to_bench_command
       rpc_action :evolve_tcg_engine_from_hand, :evolve_from_hand_command
       rpc_action :attach_tcg_engine_energy, :attach_energy_command
@@ -138,6 +139,10 @@ defmodule Prizmo.TcgEngine do
       define :use_teal_mask_ogerpon_teal_dance_for_game,
         action: :use_teal_mask_ogerpon_teal_dance_command,
         args: [:game_id, :player_id, :source_card_instance_id, :energy_card_instance_id]
+
+      define :use_fezandipiti_flip_the_script_for_game,
+        action: :use_fezandipiti_flip_the_script_command,
+        args: [:game_id, :player_id, :source_card_instance_id]
 
       define :play_basic_to_bench_for_game,
         action: :play_basic_to_bench_command,

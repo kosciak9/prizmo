@@ -122,6 +122,7 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
       retreat_affordance(player, current_turn, cards)
     ] ++
       teal_dance_affordances(player, current_turn, cards) ++
+      flip_the_script_affordances(game, player, current_turn, cards) ++
       adrena_brain_affordances(player, current_turn, cards, all_cards) ++
       evolve_from_hand_affordances(player, current_turn, cards, all_cards) ++
       declare_attack_affordances(player, current_turn, cards, all_cards) ++
@@ -377,6 +378,30 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
   end
 
   defp teal_dance_affordances(_player, _current_turn, _cards), do: []
+
+  defp flip_the_script_affordances(
+         %Game{} = game,
+         %GamePlayer{} = player,
+         %Turn{} = current_turn,
+         cards
+       ) do
+    cards
+    |> in_play_pokemon_cards()
+    |> Enum.filter(&AbilityEffects.flip_the_script_available?(game.id, &1, current_turn))
+    |> Enum.map(fn source_card ->
+      affordance(
+        :flip_the_script,
+        "Use Flip the Script",
+        :command,
+        player.player_id,
+        source_card_instance_ids: [source_card.id],
+        note:
+          "If one of your Pokémon was Knocked Out during your opponent's last turn, draw 3 cards. You can't use more than 1 Flip the Script Ability each turn."
+      )
+    end)
+  end
+
+  defp flip_the_script_affordances(_game, _player, _current_turn, _cards), do: []
 
   defp declare_attack_affordances(
          %GamePlayer{} = player,

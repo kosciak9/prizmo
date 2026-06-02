@@ -450,6 +450,17 @@ defmodule Prizmo.TcgEngine.GameView do
           public_revealed_cards: []
         }
 
+      "flip_the_script" ->
+        card_count = payload_integer(payload, "drawn_card_count") || 0
+
+        %{
+          public_note:
+            payload_value(payload, "public_note") ||
+              "#{payload_card_name(payload, "source_card_id", "Fezandipiti ex")} used Flip the Script.",
+          public_card_count: card_count,
+          public_revealed_cards: []
+        }
+
       _other ->
         default_public_event_details()
     end

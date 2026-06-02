@@ -36,6 +36,7 @@ export {
   startNextTcgEngineTurn as runStartNextTcgEngineTurn,
   startTcgEngineSetup as runStartTcgEngineSetup,
   undoTcgEngineGame as runUndoTcgEngineGame,
+  useTcgEngineFlipTheScript as runUseTcgEngineFlipTheScript,
   useTcgEngineMunkidoriAdrenaBrain as runUseTcgEngineMunkidoriAdrenaBrain,
   useTcgEngineTealDance as runUseTcgEngineTealDance,
   useTcgEngineTeamRocketsFactory as runUseTcgEngineTeamRocketsFactory,

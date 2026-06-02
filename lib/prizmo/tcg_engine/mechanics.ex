@@ -1114,6 +1114,31 @@ defmodule Prizmo.TcgEngine.Mechanics do
     end)
   end
 
+  @spec use_fezandipiti_flip_the_script(Game.t() | String.t(), String.t(), String.t()) ::
+          {:ok, Game.t()} | {:error, term()}
+  def use_fezandipiti_flip_the_script(game_or_id, player_id, source_card_instance_id)
+      when is_binary(player_id) and is_binary(source_card_instance_id) do
+    transaction(fn ->
+      with {:ok, game} <- get_game(game_or_id),
+           {:ok, turn} <- require_action_window_for_player(game, player_id),
+           :ok <- CardPlay.require_no_awaiting_pending_effect(game.id),
+           {:ok, player} <- get_player(game.id, player_id),
+           {:ok, source_card} <- get_card(game.id, source_card_instance_id),
+           :ok <- require_card_owned_by_player(source_card, player_id),
+           :ok <- AbilityEffects.require_flip_the_script_available(game.id, source_card, turn),
+           {:ok, ability_result} <- draw_flip_the_script_cards(game, player, source_card, turn),
+           {:ok, _event} <-
+             write_event_and_snapshot(
+               game.id,
+               :ability_used,
+               player_id,
+               flip_the_script_event_payload(turn, source_card, ability_result)
+             ) do
+        get_game(game.id)
+      end
+    end)
+  end
+
   @spec attach_tool(Game.t() | String.t(), String.t(), String.t(), String.t()) ::
           {:ok, Game.t()} | {:error, term()}
   def attach_tool(game_or_id, player_id, tool_card_instance_id, target_card_instance_id)
@@ -2345,6 +2370,23 @@ defmodule Prizmo.TcgEngine.Mechanics do
     end
   end
 
+  defp draw_flip_the_script_cards(
+         %Game{} = game,
+         player,
+         %CardInstance{} = source_card,
+         %Turn{} = turn
+       ) do
+    with {:ok, drawn_cards} <-
+           draw_cards_from_deck(game.id, player, AbilityEffects.flip_the_script_draw_count()),
+         {:ok, current_source_card} <- get_card(game.id, source_card.id),
+         {:ok, _source_card} <-
+           update(current_source_card, :set_markers, %{
+             markers: AbilityEffects.put_flip_the_script_used_marker(current_source_card, turn)
+           }) do
+      {:ok, %{drawn_cards: drawn_cards}}
+    end
+  end
+
   defp draw_cards_from_deck(game_id, player, draw_count) do
     with {:ok, cards} <- Prizmo.TcgEngine.CardStore.deck_cards_for_player(player.id, draw_count) do
       cards
@@ -2412,6 +2454,32 @@ defmodule Prizmo.TcgEngine.Mechanics do
 
   defp teal_dance_public_note(card_count) do
     "Teal Dance attached Grass Energy and drew #{card_count} cards."
+  end
+
+  defp flip_the_script_event_payload(
+         %Turn{} = turn,
+         %CardInstance{} = source_card,
+         ability_result
+       ) do
+    drawn_cards = ability_result.drawn_cards
+
+    %{
+      turn_id: turn.id,
+      source: EventPayloads.card_source(source_card),
+      source_card_id: source_card.card_id,
+      source_card_instance_id: source_card.id,
+      ability_id: Atom.to_string(AbilityEffects.flip_the_script_ability_id()),
+      effect_type: :draw_if_own_pokemon_knocked_out_last_turn,
+      drawn_card_count: length(drawn_cards),
+      cards: EventPayloads.moved_cards(drawn_cards, :deck, :hand),
+      public_note: flip_the_script_public_note(length(drawn_cards))
+    }
+  end
+
+  defp flip_the_script_public_note(1), do: "Flip the Script drew 1 card."
+
+  defp flip_the_script_public_note(card_count) do
+    "Flip the Script drew #{card_count} cards."
   end
 
   defp collect_results(results) do

@@ -476,6 +476,32 @@ defmodule Prizmo.TcgEngine.Game.ActionCommands do
       end
     end
 
+    action :use_fezandipiti_flip_the_script_command, :struct do
+      description "Use Fezandipiti ex's Flip the Script Ability to draw after an own KO last turn."
+
+      constraints instance_of: Game
+
+      argument :game_id, :uuid do
+        allow_nil? false
+      end
+
+      argument :player_id, :string do
+        allow_nil? false
+      end
+
+      argument :source_card_instance_id, :uuid do
+        allow_nil? false
+      end
+
+      run fn input, _context ->
+        Mechanics.use_fezandipiti_flip_the_script(
+          input.arguments.game_id,
+          input.arguments.player_id,
+          input.arguments.source_card_instance_id
+        )
+      end
+    end
+
     action :play_basic_to_bench_command, :struct do
       description "Play a Basic Pokémon from hand to the Bench through the mechanics layer."
 

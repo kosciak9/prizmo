@@ -38,6 +38,7 @@ import {
   runStartNextTcgEngineTurn,
   runStartTcgEngineSetup,
   runUndoTcgEngineGame,
+  runUseTcgEngineFlipTheScript,
   runUseTcgEngineMunkidoriAdrenaBrain,
   runUseTcgEngineTealDance,
   runUseTcgEngineTeamRocketsFactory,
@@ -494,6 +495,12 @@ type TealDanceCommandOption = {
   energyCard: CardSummary | undefined
 }
 
+type FlipTheScriptCommandOption = {
+  key: string
+  sourceCardInstanceId: string
+  sourceCard: CardSummary | undefined
+}
+
 type ActionRenderEntry = {
   key: string
   action: ActionAffordance
@@ -617,6 +624,17 @@ type TealDanceCommand = {
   playerId: string
   sourceCardInstanceId: string
   energyCardInstanceId: string
+}
+
+type FlipTheScriptInput = {
+  gameId: string
+  playerId: PlayerId
+  sourceCardInstanceId: string
+}
+
+type FlipTheScriptCommand = {
+  playerId: string
+  sourceCardInstanceId: string
 }
 
 type PlayBasicToBenchInput = {
@@ -1098,6 +1116,14 @@ export function HomeRoute() {
     }
   })
 
+  const flipTheScriptMutation = useMutation({
+    mutationFn: (input: FlipTheScriptInput) => useFlipTheScript(input),
+    onSuccess: async (_game, input) => {
+      clearUltraBallPostSearchHandoff(input.gameId, input.playerId)
+      await queryClient.invalidateQueries({ queryKey: ['tcg-engine', 'game-state'] })
+    }
+  })
+
   const playBasicToBenchMutation = useMutation({
     mutationFn: (input: PlayBasicToBenchInput) => playBasicToBench(input),
     onSuccess: async (_game, input) => {
@@ -1341,6 +1367,11 @@ export function HomeRoute() {
       tealDanceMutation.error,
       'Teal Dance failed',
       'No Energy attached. Refresh state and confirm Teal Mask Ogerpon ex is in play, has not used Teal Dance this turn, and a Basic Grass Energy is still in hand.'
+    ) ??
+    commandErrorNotice(
+      flipTheScriptMutation.error,
+      'Flip the Script failed',
+      'No cards were drawn. Refresh state and confirm Fezandipiti ex is in play, the Ability has not been used this turn, and one of your Pokémon was Knocked Out during the opponent’s last turn.'
     ) ??
     commandErrorNotice(
       playBasicToBenchMutation.error,
@@ -1896,6 +1927,15 @@ export function HomeRoute() {
                     })
                   }
                 }}
+                onUseFlipTheScript={({ playerId, sourceCardInstanceId }) => {
+                  if (isPlayerId(playerId)) {
+                    flipTheScriptMutation.mutate({
+                      gameId: normalisedGameId,
+                      playerId,
+                      sourceCardInstanceId
+                    })
+                  }
+                }}
                 onPlayBasicToBench={({ playerId, cardInstanceId }) => {
                   if (isPlayerId(playerId)) {
                     playBasicToBenchMutation.mutate({
@@ -1992,6 +2032,11 @@ export function HomeRoute() {
                         tealDanceMutation.variables.sourceCardInstanceId,
                         tealDanceMutation.variables.energyCardInstanceId
                       )
+                    : null
+                }
+                flipTheScriptPendingKey={
+                  flipTheScriptMutation.isPending && flipTheScriptMutation.variables
+                    ? flipTheScriptKey(flipTheScriptMutation.variables.sourceCardInstanceId)
                     : null
                 }
                 retreatPendingKey={
@@ -2569,6 +2614,20 @@ async function useTealDance(input: TealDanceInput): Promise<CreatedGame> {
   return result.data as CreatedGame
 }
 
+async function useFlipTheScript(input: FlipTheScriptInput): Promise<CreatedGame> {
+  const result = await runUseTcgEngineFlipTheScript({
+    input,
+    fields: GAME_RESOURCE_FIELDS,
+    headers: buildAshRpcHeaders()
+  })
+
+  if (!result.success) {
+    throw new Error(rpcErrorMessage(result.errors))
+  }
+
+  return result.data as CreatedGame
+}
+
 async function playBasicToBench(input: PlayBasicToBenchInput): Promise<CreatedGame> {
   const result = await runPlayTcgEngineBasicToBench({
     input,
@@ -2767,6 +2826,7 @@ function GameStateWorkbench({
   onPlayStadium,
   onUseMunkidoriAdrenaBrain,
   onUseTealDance,
+  onUseFlipTheScript,
   onUseTeamRocketsFactory,
   onRetreat,
   onResolveDeclaredAttack,
@@ -2792,6 +2852,7 @@ function GameStateWorkbench({
   playStadiumPendingCardId,
   munkidoriAdrenaBrainPendingKey,
   tealDancePendingKey,
+  flipTheScriptPendingKey,
   teamRocketsFactoryPendingPlayerId,
   resolveDeclaredAttackPendingPlayerId,
   retreatPendingKey
@@ -2825,6 +2886,7 @@ function GameStateWorkbench({
   onPlayStadium: (input: PlayStadiumCommand) => void
   onUseMunkidoriAdrenaBrain: (input: MunkidoriAdrenaBrainCommand) => void
   onUseTealDance: (input: TealDanceCommand) => void
+  onUseFlipTheScript: (input: FlipTheScriptCommand) => void
   onUseTeamRocketsFactory: (input: TeamRocketsFactoryCommand) => void
   onRetreat: (input: RetreatCommand) => void
   onResolveDeclaredAttack: (input: ResolveDeclaredAttackCommand) => void
@@ -2850,6 +2912,7 @@ function GameStateWorkbench({
   playStadiumPendingCardId: string | null
   munkidoriAdrenaBrainPendingKey: string | null
   tealDancePendingKey: string | null
+  flipTheScriptPendingKey: string | null
   teamRocketsFactoryPendingPlayerId: string | null
   resolveDeclaredAttackPendingPlayerId: string | null
   retreatPendingKey: string | null
@@ -2861,6 +2924,7 @@ function GameStateWorkbench({
       teamRocketsFactoryPendingPlayerId ||
       munkidoriAdrenaBrainPendingKey ||
       tealDancePendingKey ||
+      flipTheScriptPendingKey ||
       playBasicToBenchPendingCardId ||
       attachEnergyPendingKey ||
       attachToolPendingKey ||
@@ -2983,6 +3047,7 @@ function GameStateWorkbench({
             onPlayStadium={onPlayStadium}
             onUseMunkidoriAdrenaBrain={onUseMunkidoriAdrenaBrain}
             onUseTealDance={onUseTealDance}
+            onUseFlipTheScript={onUseFlipTheScript}
             onUseTeamRocketsFactory={onUseTeamRocketsFactory}
             onRetreat={onRetreat}
             attachEnergyPendingKey={attachEnergyPendingKey}
@@ -2995,6 +3060,7 @@ function GameStateWorkbench({
             playStadiumPendingCardId={playStadiumPendingCardId}
             munkidoriAdrenaBrainPendingKey={munkidoriAdrenaBrainPendingKey}
             tealDancePendingKey={tealDancePendingKey}
+            flipTheScriptPendingKey={flipTheScriptPendingKey}
             teamRocketsFactoryPendingPlayerId={teamRocketsFactoryPendingPlayerId}
             retreatPendingKey={retreatPendingKey}
             ultraBallPostSearchHandoff={ultraBallPostSearchHandoff}
@@ -5457,6 +5523,7 @@ function ActionAffordancesPanel({
   onPlayStadium,
   onUseMunkidoriAdrenaBrain,
   onUseTealDance,
+  onUseFlipTheScript,
   onUseTeamRocketsFactory,
   onRetreat,
   attachEnergyPendingKey,
@@ -5469,6 +5536,7 @@ function ActionAffordancesPanel({
   playStadiumPendingCardId,
   munkidoriAdrenaBrainPendingKey,
   tealDancePendingKey,
+  flipTheScriptPendingKey,
   teamRocketsFactoryPendingPlayerId,
   retreatPendingKey,
   ultraBallPostSearchHandoff,
@@ -5490,6 +5558,7 @@ function ActionAffordancesPanel({
   onPlayStadium: (input: PlayStadiumCommand) => void
   onUseMunkidoriAdrenaBrain: (input: MunkidoriAdrenaBrainCommand) => void
   onUseTealDance: (input: TealDanceCommand) => void
+  onUseFlipTheScript: (input: FlipTheScriptCommand) => void
   onUseTeamRocketsFactory: (input: TeamRocketsFactoryCommand) => void
   onRetreat: (input: RetreatCommand) => void
   attachEnergyPendingKey: string | null
@@ -5502,6 +5571,7 @@ function ActionAffordancesPanel({
   playStadiumPendingCardId: string | null
   munkidoriAdrenaBrainPendingKey: string | null
   tealDancePendingKey: string | null
+  flipTheScriptPendingKey: string | null
   teamRocketsFactoryPendingPlayerId: string | null
   retreatPendingKey: string | null
   ultraBallPostSearchHandoff: UltraBallPostSearchHandoff | null
@@ -5513,6 +5583,7 @@ function ActionAffordancesPanel({
       teamRocketsFactoryPendingPlayerId ||
       munkidoriAdrenaBrainPendingKey ||
       tealDancePendingKey ||
+      flipTheScriptPendingKey ||
       playBasicToBenchPendingCardId ||
       attachEnergyPendingKey ||
       attachToolPendingKey ||
@@ -5600,6 +5671,7 @@ function ActionAffordancesPanel({
                     onPlayStadium={onPlayStadium}
                     onUseMunkidoriAdrenaBrain={onUseMunkidoriAdrenaBrain}
                     onUseTealDance={onUseTealDance}
+                    onUseFlipTheScript={onUseFlipTheScript}
                     onUseTeamRocketsFactory={onUseTeamRocketsFactory}
                     onRetreat={onRetreat}
                     playBasicToBenchPendingCardId={playBasicToBenchPendingCardId}
@@ -5607,6 +5679,7 @@ function ActionAffordancesPanel({
                     playStadiumPendingCardId={playStadiumPendingCardId}
                     munkidoriAdrenaBrainPendingKey={munkidoriAdrenaBrainPendingKey}
                     tealDancePendingKey={tealDancePendingKey}
+                    flipTheScriptPendingKey={flipTheScriptPendingKey}
                     teamRocketsFactoryPendingPlayerId={teamRocketsFactoryPendingPlayerId}
                     postSearchBattleAttackIds={postSearchHandoff?.battleAttackIds ?? []}
                     postSearchBenchCardInstanceIds={postSearchHandoff?.benchableCardInstanceIds ?? []}
@@ -6189,6 +6262,7 @@ function ActionAffordanceCard({
   onPlayStadium,
   onUseMunkidoriAdrenaBrain,
   onUseTealDance,
+  onUseFlipTheScript,
   onUseTeamRocketsFactory,
   onRetreat,
   playBasicToBenchPendingCardId,
@@ -6196,6 +6270,7 @@ function ActionAffordanceCard({
   playStadiumPendingCardId,
   munkidoriAdrenaBrainPendingKey,
   tealDancePendingKey,
+  flipTheScriptPendingKey,
   teamRocketsFactoryPendingPlayerId,
   postSearchBattleAttackIds,
   postSearchBenchCardInstanceIds,
@@ -6224,6 +6299,7 @@ function ActionAffordanceCard({
   onPlayStadium: (input: PlayStadiumCommand) => void
   onUseMunkidoriAdrenaBrain: (input: MunkidoriAdrenaBrainCommand) => void
   onUseTealDance: (input: TealDanceCommand) => void
+  onUseFlipTheScript: (input: FlipTheScriptCommand) => void
   onUseTeamRocketsFactory: (input: TeamRocketsFactoryCommand) => void
   onRetreat: (input: RetreatCommand) => void
   playBasicToBenchPendingCardId: string | null
@@ -6231,6 +6307,7 @@ function ActionAffordanceCard({
   playStadiumPendingCardId: string | null
   munkidoriAdrenaBrainPendingKey: string | null
   tealDancePendingKey: string | null
+  flipTheScriptPendingKey: string | null
   teamRocketsFactoryPendingPlayerId: string | null
   postSearchBattleAttackIds: string[]
   postSearchBenchCardInstanceIds: string[]
@@ -6249,6 +6326,7 @@ function ActionAffordanceCard({
   const repeatedEvolutionLabels = repeatedEvolutionBaseLabels(evolutionOptions)
   const adrenaBrainOptions = adrenaBrainCommandOptions(action, cardsById)
   const tealDanceOptions = tealDanceCommandOptions(action, cardsById)
+  const flipTheScriptOptions = flipTheScriptCommandOptions(action, cardsById)
 
   return (
     <li className={`rounded-xl border px-3 py-2 text-sm ${actionSurfaceClassName(action)}`}>
@@ -6400,6 +6478,30 @@ function ActionAffordanceCard({
                 tone="primary"
               >
                 {isPending ? tealDancePendingLabel(option) : tealDanceButtonLabel(option)}
+              </ActionCommandButton>
+            )
+          })}
+        </div>
+      ) : null}
+
+      {flipTheScriptOptions.length > 0 ? (
+        <div className="mt-2 space-y-1.5">
+          {flipTheScriptOptions.map(option => {
+            const isPending = flipTheScriptPendingKey === option.key
+
+            return (
+              <ActionCommandButton
+                disabled={!canRunAction}
+                key={option.key}
+                onClick={() =>
+                  onUseFlipTheScript({
+                    playerId: action.playerId,
+                    sourceCardInstanceId: option.sourceCardInstanceId
+                  })
+                }
+                tone="primary"
+              >
+                {isPending ? flipTheScriptPendingLabel(option) : flipTheScriptButtonLabel(option)}
               </ActionCommandButton>
             )
           })}
@@ -6902,6 +7004,25 @@ function tealDanceCommandOptions(action: ActionAffordance, cardsById: Map<string
   ]
 }
 
+function flipTheScriptCommandOptions(
+  action: ActionAffordance,
+  cardsById: Map<string, CardSummary>
+): FlipTheScriptCommandOption[] {
+  if (action.key !== 'flip_the_script' || action.sourceCardInstanceIds.length < 1) {
+    return []
+  }
+
+  const sourceCardInstanceId = action.sourceCardInstanceIds[0]!
+
+  return [
+    {
+      key: flipTheScriptKey(sourceCardInstanceId),
+      sourceCardInstanceId,
+      sourceCard: cardsById.get(sourceCardInstanceId)
+    }
+  ]
+}
+
 function tealDancePendingLabel(option: TealDanceCommandOption) {
   return `Using Teal Dance with ${option.energyCard?.name ?? 'Grass Energy'}...`
 }
@@ -6910,6 +7031,14 @@ function tealDanceButtonLabel(option: TealDanceCommandOption) {
   return `Teal Dance: attach ${option.energyCard?.name ?? formatCardInstanceId(option.energyCardInstanceId)} to ${
     option.sourceCard?.name ?? formatCardInstanceId(option.sourceCardInstanceId)
   }`
+}
+
+function flipTheScriptPendingLabel(option: FlipTheScriptCommandOption) {
+  return `Using ${option.sourceCard?.name ?? 'Flip the Script'}...`
+}
+
+function flipTheScriptButtonLabel(option: FlipTheScriptCommandOption) {
+  return `Flip the Script: draw 3 with ${option.sourceCard?.name ?? formatCardInstanceId(option.sourceCardInstanceId)}`
 }
 
 function damageCounterOptions(maxCounters: number) {
@@ -7261,6 +7390,7 @@ function actionGroupId(action: ActionAffordance): ActionGroupId {
     case 'attach_energy':
     case 'attach_tool':
     case 'teal_dance':
+    case 'flip_the_script':
       return 'hand'
     case 'retreat':
     case 'adrena_brain':
@@ -10176,6 +10306,10 @@ function adrenaBrainKey(
 
 function tealDanceKey(sourceCardInstanceId: string, energyCardInstanceId: string) {
   return `${sourceCardInstanceId}:${energyCardInstanceId}`
+}
+
+function flipTheScriptKey(sourceCardInstanceId: string) {
+  return sourceCardInstanceId
 }
 
 function attackKey(playerId: string, attackId: string) {
