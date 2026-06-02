@@ -4,12 +4,12 @@
 - Sources: Project codebase; local validation; wiki log
 - Raw: N/A — operational handoff
 
-## Iteration 236 handoff
+## Iteration 237 handoff
 
-- Current state: audited Raging Bolt Ogerpon (`27599`) and Lopunny Dudunsparce (`27514`) fixture decks for bounded gaps after completing the Festival Lead deck in iteration 235. JTG-120 (Dunsparce) was the clearest remaining bounded fixture-card gap with a behavior overlay but no Ash engine CardDefinition. No durable game command was executed against any long-lived playtest or validation games. Last commit at iteration end: (after this batch).
-- Completed: `EngineCardRegistry` now defines JTG-120 (`@dunsparce`) as `kind: :pokemon` with `play_window: :action_window` and effect `:switch_self_with_bench` (key `trading_places_switch_self_with_bench`). The attack effect type `:switch_self_with_bench` was already supported in `AttackEffects` (registered in `@supported_attack_effect_types`, implemented in `switch_self_with_bench/4`, wired into `resolve_declared_attack` and `AttackDamage.apply_effect`). `EngineCardRegistry.fetch("JTG-120")` now succeeds, `AttackEffects.supported?` returns true, and the card is treated as engine-defined for its `trading_places` attack. The `ram` attack (nil effect) is covered by the generic damage path. No GameView or React SPA changes were needed. `mix check` (all 12 gates) passes cleanly.
-- Validation: `mix compile --warnings-as-errors`, `mix test` (142/0), and full `mix check` (all 12 gates) pass cleanly. Tidewave verification confirmed `EngineCardRegistry.fetch("JTG-120")` returns a valid `CardDefinition` with the `switch_self_with_bench` effect and `AttackEffects.supported?` returns true.
-- Recommended next atomic task: if the next batch stays on engine behavior, continue auditing the two fixture decks for remaining bounded gaps (TEF-128/129 Raging Bolt ex / Ogerpon ex core attackers, PFL-083/084, SCR-131/135, etc.). If the next batch returns to the product surface, turn transition animations, card-slide-in for drawn cards, or damage counter animation remain open UI polish candidates.
+- Current state: delivered the next UI polish batch after board-feel animation (232) — card-slide-in for newly drawn cards + stronger turn-indicator presence. No durable game command was executed against any long-lived playtest or validation games. No engine or backend files were changed. Last commit at iteration end: (after this batch).
+- Completed: `HandCardTile` accepts optional `justDrawn` prop and applies a 250 ms translate-x + opacity enter animation via internal `useState` + `useEffect`. `PrivateHandZone` uses `useRef` + `useMemo` to compute newly added card IDs on each hand change and passes `justDrawn` accordingly. Warning-tone `StatusBadge` (turn indicator) now uses `animate-[pulse_1.5s_ease-in-out_infinite] scale-[1.02]` for stronger persistent visual weight. All changes are CSS + React state only. `mix check` (all 12 gates) passes cleanly.
+- Validation: `node_modules/.bin/tsc --noEmit`, `mix compile --warnings-as-errors`, and full `mix check` (all 12 gates) pass cleanly.
+- Recommended next atomic task: if the next batch stays on the product surface, further animation candidates include damage counter animation or a more pronounced turn-transition flash (board-level highlight). If the next batch returns to engine behavior, the strongest remaining bounded fixture-card gaps from the two decks are the core attackers TEF-128/129 (Raging Bolt ex / Ogerpon ex) with coin-flip and Ability effects.
 
 ## North-star reset handoff
 

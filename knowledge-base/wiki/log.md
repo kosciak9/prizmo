@@ -1,5 +1,13 @@
 # Wiki Log
 
+## [2026-06-02] iteration 237 | Card-slide-in animation and turn indicator polish
+
+- Task attempted: delivered the next UI polish batch after board-feel animation (iteration 232) — card-slide-in for newly drawn cards + stronger turn-indicator presence. This improves the experienced-player card-table feel for draw events (opening hand, draw-for-turn, search reveals) and turn priority changes without requiring a new benchmark (the TCG layout benchmark requirement was satisfied in batch 219).
+- Files changed: `lib/prizmo_web/spa/features/home/routes/index.tsx` (added `useRef` import; `HandCardTile` now accepts optional `justDrawn` prop and uses internal `useState` + `useEffect` to apply a 250 ms translate-x + opacity enter animation; `PrivateHandZone` tracks previous hand IDs via `useRef` + `useMemo` and passes `justDrawn` for newly added cards; warning-tone `StatusBadge` now combines `animate-[pulse_1.5s_ease-in-out_infinite]` with `scale-[1.02]` for stronger persistent presence), and all three wiki files.
+- No engine or backend changes were needed.
+- Validation: `node_modules/.bin/tsc --noEmit`, `mix compile --warnings-as-errors`, and full `mix check` (all 12 gates: format, sobelow, compile, unused deps, xref, filenames, service images, ash ts gen, ash ts check, credo, dialyzer, tests) pass cleanly.
+- Remaining/blocking notes: this batch closes the card-slide-in and turn-indicator polish candidates. If the next batch stays on the product surface, damage counter animation remains the strongest remaining UI polish candidate. If the next batch returns to engine behavior, the strongest remaining bounded fixture-card gaps from the two decks are the core attackers TEF-128/129 (Raging Bolt ex / Ogerpon ex) with coin-flip and Ability effects.
+
 ## [2026-06-02] iteration 236 | Dunsparce JTG-120 trading places attack
 
 - Task attempted: audited the two remaining fixture decks (Raging Bolt Ogerpon `27599`, Lopunny Dudunsparce `27514`) after completing Festival Lead in iteration 235, and moved JTG-120 (Dunsparce) from pending attack text into executable Ash-engine behavior. JTG-120 had a behavior overlay (`lib/prizmo/tcg/cards/behaviors/jtg.ex` with `trading_places` attack using `:switch_self_with_bench` effect) but no `EngineCardRegistry` entry.

@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useSearch } from '@tanstack/react-router'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 import {
   runAttachTcgEngineEnergy,
@@ -7490,6 +7490,20 @@ function PrivateHandZone({
     }
   })()
 
+  // Track previous hand IDs to detect newly drawn cards for slide-in animation
+  const prevHandIdsRef = useRef<Set<string>>(new Set())
+  const currentHandIds = useMemo(() => new Set(player.hand.map((c) => c.id)), [player.hand])
+  const justDrawnIds = useMemo(() => {
+    const prev = prevHandIdsRef.current
+    const added = new Set<string>()
+    for (const id of currentHandIds) {
+      if (!prev.has(id)) added.add(id)
+    }
+    // update ref after computing
+    prevHandIdsRef.current = currentHandIds
+    return added
+  }, [currentHandIds])
+
   return (
     <div className="rounded-2xl bg-background/45 p-2.5">
       <div className="mb-2 flex items-center justify-between gap-2">
@@ -7506,11 +7520,12 @@ function PrivateHandZone({
           <HandRulesSupportNotice cards={player.hand} />
           {handSize > 0 ? (
             <div className={gridClassName}>
-              {player.hand.map((card, _i) => (
+              {player.hand.map((card) => (
                 <HandCardTile
                   card={card}
                   compact={densityTier === 'dense' || densityTier === 'overflow'}
                   intents={cardIntentsById.get(card.id) ?? []}
+                  justDrawn={justDrawnIds.has(card.id)}
                   key={card.id}
                 />
               ))}
@@ -7559,7 +7574,26 @@ function HandRulesSupportNotice({ cards }: { cards: CardSummary[] }) {
   )
 }
 
-function HandCardTile({ card, compact, intents }: { card: CardSummary; compact?: boolean; intents?: CardIntent[] }) {
+function HandCardTile({
+  card,
+  compact,
+  intents,
+  justDrawn
+}: {
+  card: CardSummary
+  compact?: boolean
+  intents?: CardIntent[]
+  justDrawn?: boolean
+}) {
+  const [isEntering, setIsEntering] = useState(!!justDrawn)
+
+  useEffect(() => {
+    if (justDrawn) {
+      const t = setTimeout(() => setIsEntering(false), 250)
+      return () => clearTimeout(t)
+    }
+  }, [justDrawn])
+
   const firstIntent = intents?.[0]
   const content = (
     <>
@@ -7570,7 +7604,9 @@ function HandCardTile({ card, compact, intents }: { card: CardSummary; compact?:
   )
   const paddingClass = compact ? 'p-0.5' : 'p-1'
   const ringClass = firstIntent ? cardIntentClassName(firstIntent) : ''
-  const className = `relative rounded-xl bg-secondary/70 ${paddingClass} text-left ring-1 ring-border/40 ${ringClass}`
+  const baseClass = `relative rounded-xl bg-secondary/70 ${paddingClass} text-left ring-1 ring-border/40 ${ringClass}`
+  const enterClass = isEntering ? 'translate-x-1 opacity-60' : 'translate-x-0 opacity-100 transition-all duration-200'
+  const className = `${baseClass} ${enterClass}`
   const title = firstIntent ? `${firstIntent.label} · ${card.name} · ${card.cardId}` : `${card.name} · ${card.cardId}`
 
   const hoverClass = firstIntent ? 'transition-all duration-150 hover:scale-[1.02] hover:shadow-md' : ''
@@ -8476,8 +8512,8 @@ function StatusBadge({
   const className =
     tone === 'active'
       ? 'bg-accent-mint/12 text-accent-mint'
-      : tone === 'warning'
-        ? 'bg-attention/12 text-attention animate-pulse'
+      :     tone === 'warning'
+        ? 'bg-attention/12 text-attention animate-[pulse_1.5s_ease-in-out_infinite] scale-[1.02]'
         : 'bg-muted/70 text-muted-foreground'
 
   return <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${className}`}>{children}</span>
