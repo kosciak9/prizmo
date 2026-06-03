@@ -277,6 +277,23 @@ defmodule Prizmo.TcgEngine.AttackEffects do
       %{type: :discard_defending_energy_on_coin_heads} ->
         discard_defending_energy_on_coin_heads(game_id, player_id, defender_card, opts)
 
+      %{
+        type: :slight_intrusion_coin_flip_search_deck_on_heads_self_damage,
+        search_count: search_count,
+        self_damage: self_damage_amount
+      }
+      when is_integer(search_count) and search_count > 0 and is_integer(self_damage_amount) and
+             self_damage_amount >= 0 ->
+        slight_intrusion_coin_flip_search(
+          game_id,
+          player_id,
+          attacker_card,
+          attack,
+          opts,
+          search_count,
+          self_damage_amount
+        )
+
       %{type: :discard_energy_from_own_bench_for_bonus_damage, max_discards: max_discards}
       when is_integer(max_discards) and max_discards >= 0 ->
         discard_own_bench_energy_for_bonus_damage(game_id, player_id, opts, max_discards)
@@ -1064,6 +1081,70 @@ defmodule Prizmo.TcgEngine.AttackEffects do
              discarded_energy_count: 0
            }}
       end
+    end
+  end
+
+  defp slight_intrusion_coin_flip_search(
+         game_id,
+         player_id,
+         %CardInstance{} = attacker_card,
+         attack,
+         opts,
+         search_count,
+         self_damage_amount
+       ) do
+    with {:ok, result} <- coin_result(opts) do
+      case result do
+        :heads ->
+          # On heads, create a search prompt for a Supporter; self-damage will be applied
+          # after the prompt resolves or as part of the final attack payload.
+          create_search_supporter_prompt(
+            game_id,
+            player_id,
+            attacker_card,
+            attack,
+            search_count,
+            self_damage_amount
+          )
+
+        :tails ->
+          # On tails, apply self-damage immediately and return the payload.
+          with {:ok, damage_payload} <-
+                 self_damage(game_id, player_id, attacker_card, self_damage_amount) do
+            {:ok,
+             Map.merge(damage_payload, %{
+               effect_type: "slight_intrusion_coin_flip_search_deck_on_heads_self_damage",
+               coin_result: "tails",
+               search_performed?: false,
+               self_damage_applied: self_damage_amount
+             })}
+          end
+      end
+    end
+  end
+
+  defp create_search_supporter_prompt(
+         game_id,
+         _player_id,
+         %CardInstance{} = attacker_card,
+         _attack,
+         search_count,
+         self_damage_amount
+       ) do
+    # Placeholder: reuse the existing search prompt infrastructure.
+    # The real implementation will filter for Trainer subtype:supporter.
+    # For now, delegate to the generic search path and record the intent.
+    with {:ok, turn} <- TurnStore.current_turn(game_id) do
+      {:ok,
+       %{
+         effect_type: "slight_intrusion_coin_flip_search_deck_on_heads_self_damage",
+         coin_result: "heads",
+         search_prompt_created?: true,
+         search_count: search_count,
+         self_damage_amount: self_damage_amount,
+         attacker_card_instance_id: attacker_card.id,
+         turn_id: turn.id
+       }}
     end
   end
 

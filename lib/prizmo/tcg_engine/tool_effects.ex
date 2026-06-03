@@ -10,7 +10,8 @@ defmodule Prizmo.TcgEngine.ToolEffects do
   @supported_tool_effect_types [
     :retreat_cost_reduction,
     :bonus_attack_damage_to_pokemon_ex_if_attacker_has_no_rule_box,
-    :move_energy_from_attacker_to_defender_bench_on_damage
+    :move_energy_from_attacker_to_defender_bench_on_damage,
+    :bench_limit_8_with_tera_in_play_else_discard_to_5
   ]
 
   def supported_tool?(%{supertype: :trainer, trainer_type: :tool, effect: %{type: type}})
