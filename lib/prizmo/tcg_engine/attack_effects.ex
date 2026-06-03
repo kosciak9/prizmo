@@ -23,6 +23,7 @@ defmodule Prizmo.TcgEngine.AttackEffects do
       get_cards: 2,
       move_attached_card_to_hand: 3,
       move_deck_card_to_hand: 3,
+      move_play_card_to_hand: 3,
       move_discard_card_to_hand: 3,
       next_hand_position_result: 2,
       shuffle_attached_cards_into_deck: 3
@@ -1295,22 +1296,38 @@ defmodule Prizmo.TcgEngine.AttackEffects do
   end
 
   defp return_attacker_and_attached_to_hand(
-         _game_id,
-         _player_id,
+         game_id,
+         player_id,
          %CardInstance{} = attacker_card,
          _opts
        ) do
-    # Placeholder resolution for Tuck Tail.
-    # Records the intent; full zone transition (bench/active -> hand for attacker + attached)
-    # follows the same pattern as other return-to-hand effects once the CardStore
-    # action for play -> hand is wired.
-    {:ok,
-     %{
-       effect_type: "return_attacker_and_attached_to_hand",
-       returned_attacker_instance_id: attacker_card.id,
-       returned_attached_count: 0,
-       note: "placeholder_resolution"
-     }}
+    with {:ok, attached} <- attached_cards(game_id, attacker_card.id),
+         {:ok, _attacker_returned} <-
+           move_play_card_to_hand(game_id, player_id, attacker_card),
+         {:ok, returned_attached} <-
+           attached
+           |> Enum.map(&move_attached_card_to_hand(game_id, player_id, &1))
+           |> collect_results() do
+      {:ok,
+       %{
+         effect_type: "return_attacker_and_attached_to_hand",
+         returned_attacker_instance_id: attacker_card.id,
+         returned_attached_count: length(returned_attached),
+         returned_attached_card_instance_ids: Enum.map(returned_attached, & &1.id)
+       }}
+    end
+  end
+
+  defp collect_results(results) do
+    results
+    |> Enum.reduce_while({:ok, []}, fn
+      {:ok, value}, {:ok, acc} -> {:cont, {:ok, [value | acc]}}
+      {:error, reason}, _acc -> {:halt, {:error, reason}}
+    end)
+    |> case do
+      {:ok, values} -> {:ok, Enum.reverse(values)}
+      {:error, reason} -> {:error, reason}
+    end
   end
 
   defp shuffle_attached_energy_then_damage_bench(
@@ -1952,16 +1969,4 @@ defmodule Prizmo.TcgEngine.AttackEffects do
 
   defp require_same_card(%CardInstance{}, %CardInstance{}),
     do: {:error, :attacker_is_no_longer_active}
-
-  defp collect_results(results) do
-    results
-    |> Enum.reduce_while({:ok, []}, fn
-      {:ok, value}, {:ok, acc} -> {:cont, {:ok, [value | acc]}}
-      {:error, reason}, _acc -> {:halt, {:error, reason}}
-    end)
-    |> case do
-      {:ok, values} -> {:ok, Enum.reverse(values)}
-      {:error, reason} -> {:error, reason}
-    end
-  end
 end

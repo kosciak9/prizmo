@@ -70,8 +70,7 @@ defmodule Prizmo.TcgEngine.StadiumEffects do
         supertype: :trainer,
         trainer_type: :stadium,
         effect: %{type: @battle_cage_effect}
-      }),
-      do: true
+      }), do: true
 
   def supported_stadium?(_card), do: false
 

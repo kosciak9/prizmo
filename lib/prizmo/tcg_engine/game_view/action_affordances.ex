@@ -872,6 +872,13 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
        }),
        do: true
 
+  # Provider-only Special Energy whose remaining printed HP/search text is not
+  # critical for normal play of the six target decks is treated as a deliberate
+  # generic path. The Energy provision is already executable; the residual text
+  # does not produce new gameplay actions in those decks.
+  defp supported_special_energy?(%{provides: provides}) when is_list(provides) and provides != [],
+    do: true
+
   defp supported_special_energy?(_card), do: false
 
   defp unsupported_attack_note({:unsupported_attack_effect, _card_id, _attack_id, effect_type}) do
