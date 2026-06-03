@@ -1,5 +1,14 @@
 # Wiki Log
 
+## [2026-06-03] codebase update | Six-deck GameView pending-text inventory (post-250)
+
+- Task attempted: produced the required authoritative live GameView / playability pending-text inventory across all six target decks after the iteration 250 Watchtower + Cruel Arrow + Genesect batch. This fulfills the explicit "refresh actual GameView pending-text inventory" recommendation from the iteration 246/247/248/250 handoffs and the 2026-06-02 north-star reset.
+- Files changed: new `knowledge-base/wiki/engine/six-deck-gameview-pending-text-inventory-2026-06-03-post-250.md`, and `knowledge-base/wiki/log.md`.
+- Method: Cross-referenced the pre-250 inventory against commit `366be29` and current `ActionAffordances` pending-emission paths. Only cards that still produce visible `Pending card text` / `unsupported_*` affordances on the React board are listed.
+- Result: Top 3 repeated blockers (Fezandipiti Cruel Arrow, Team Rocket's Watchtower, Genesect ACE Nullifier) are now closed. Remaining visible six-deck pending text: Rellor Slight Intrusion (TEF-023, 2 decks), Meowth ex effects (POR-062, 2 decks), and 6 single-deck gaps. Highest-impact next target: Rellor Slight Intrusion (coin-flip search attack).
+- Validation: `mix check --no-test` (all 11 gates) passes cleanly. Wiki-only batch; no engine or SPA changes.
+- Recommended next engine slice: Rellor Slight Intrusion (TEF-023) — repeated visible pending attack across Alakazam and Festival Lead. Alternative: Meowth ex effect wiring.
+
 ## [2026-06-03] iteration 250 | Fezandipiti ex Cruel Arrow any-opponent target attack surface
 
 - Task attempted: closed the highest-frequency repeated visible target-deck pending attack (Fezandipiti ex `Cruel Arrow`, ASC-142) from the post-247/post-248 inventory by implementing the missing any-opponent-Pokémon target selection attack surface. The card now fully resolves through the canonical Ash `play_card` / attack path with legal prompt choices over opponent Active + Bench, damage application, and viewer-safe event writing.
