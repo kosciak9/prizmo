@@ -23,6 +23,7 @@ defmodule Prizmo.TcgEngine.StadiumEffects do
   @forest_of_vitality_card_id "MEG-117"
   @team_rockets_watchtower_effect :colorless_pokemon_have_no_abilities
   @area_zero_underdepths_effect :bench_limit_8_with_tera_in_play_else_discard_to_5
+  @battle_cage_effect :prevent_damage_counters_to_bench_from_opponent_pokemon_effects
 
   def supported_stadium?(%{
         supertype: :trainer,
@@ -62,6 +63,13 @@ defmodule Prizmo.TcgEngine.StadiumEffects do
         supertype: :trainer,
         trainer_type: :stadium,
         effect: %{type: @area_zero_underdepths_effect}
+      }),
+      do: true
+
+  def supported_stadium?(%{
+        supertype: :trainer,
+        trainer_type: :stadium,
+        effect: %{type: @battle_cage_effect}
       }),
       do: true
 

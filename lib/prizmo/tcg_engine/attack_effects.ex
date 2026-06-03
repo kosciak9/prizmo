@@ -319,6 +319,9 @@ defmodule Prizmo.TcgEngine.AttackEffects do
       %{type: :return_attached_energy_to_hand} ->
         return_attached_energy_to_hand(game_id, player_id, attacker_card, opts)
 
+      %{type: :return_attacker_and_attached_to_hand} ->
+        return_attacker_and_attached_to_hand(game_id, player_id, attacker_card, opts)
+
       %{type: :opponent_bench_damage_counters, total_counters: total_counters}
       when is_integer(total_counters) and total_counters >= 0 ->
         damage_opponent_bench_counters(game_id, player_id, opts, total_counters)
@@ -1289,6 +1292,25 @@ defmodule Prizmo.TcgEngine.AttackEffects do
          returned_energy_card_instance_id: returned_energy_card.id
        }}
     end
+  end
+
+  defp return_attacker_and_attached_to_hand(
+         _game_id,
+         _player_id,
+         %CardInstance{} = attacker_card,
+         _opts
+       ) do
+    # Placeholder resolution for Tuck Tail.
+    # Records the intent; full zone transition (bench/active -> hand for attacker + attached)
+    # follows the same pattern as other return-to-hand effects once the CardStore
+    # action for play -> hand is wired.
+    {:ok,
+     %{
+       effect_type: "return_attacker_and_attached_to_hand",
+       returned_attacker_instance_id: attacker_card.id,
+       returned_attached_count: 0,
+       note: "placeholder_resolution"
+     }}
   end
 
   defp shuffle_attached_energy_then_damage_bench(
