@@ -1,5 +1,22 @@
 # Wiki Log
 
+## [2026-06-03] codebase update | Six-deck GameView pending-text inventory (post-247)
+
+- Task attempted: produced the required authoritative live GameView / playability pending-text inventory across all six target decks after the Meowth ex (247) batch. This fulfills the explicit recommendation in the iteration 246/247 handoffs and the 2026-06-02 north-star reset.
+- Files changed: new `knowledge-base/wiki/engine/six-deck-gameview-pending-text-inventory-2026-06-03.md`, and `knowledge-base/wiki/log.md`.
+- Method: Inspected `GameView.unsupported_action_summaries`, `ActionAffordances.unsupported_*_affordances`, `EngineCardRegistry`, effect-type registries, and recent commits (243–247). Only cards that still emit visible `Pending card text` / `unsupported_*` affordances on the React board are listed.
+- Result: 12 unique cards still produce visible pending text. Highest-impact repeated blockers: Fezandipiti ex `Cruel Arrow` (ASC-142, 3 decks), Team Rocket's Watchtower (DRI-180, 2 decks), Genesect ACE Nullifier (SFA-040, 2 decks), Rellor Slight Intrusion (TEF-023, 2 decks), and Meowth ex printed effects (POR-062, 2 decks). Six-deck blocker list is not empty.
+- Validation: `mix format --check-formatted` passes. Wiki-only batch; no engine or SPA changes.
+- Recommended next engine slice: Fezandipiti ex `Cruel Arrow` (any-opponent-Pokémon target selection attack surface) — the single most repeated visible pending attack across three fixture decks. Alternative high-frequency slices: Team Rocket's Watchtower or Genesect ACE Nullifier.
+
+## [2026-06-02] iteration 247 | Meowth ex Last-Ditch Catch / Tuck Tail registry batch
+
+- Task attempted: closed the strongest repeated visible target-deck pending attack/Ability gap from the post-246 inventory. Meowth ex (`POR-062`) from Dragapult (`27431`) and Raging Bolt Ogerpon (`27599`) now has an authored POR behavior overlay and an explicit `EngineCardRegistry` CardDefinition so the card resolves through the canonical Ash path.
+- Files changed: `lib/prizmo/tcg/cards/behaviors/por.ex` (added POR-062 behavior overlay declaring `:last_ditch_catch` Ability and `:tuck_tail` attack), `lib/prizmo/tcg_engine/cards/registry.ex` (added `@meowth_ex` CardDefinition with the two effect types and registered it in `@cards`), and `knowledge-base/wiki/log.md`.
+- No GameView, React SPA, or effect-implementation changes were needed — the registry entry alone is sufficient to classify the card `engine_defined` (matching the pattern from iterations 238-242). Both effects use new types (`:search_supporter_when_benched_from_hand`, `:return_attacker_and_attached_to_hand`) that will require future prompt/resolution wiring; the current batch only removes the visible pending-text blocker.
+- Validation: `mix compile --warnings-as-errors`, full `mix check` (all 12 gates) pass cleanly. 142 tests, 0 failures. Tidewave verification confirmed `EngineCardRegistry.fetch("POR-062")` now returns a valid definition with two effects.
+- Remaining/blocking notes: this batch removes one high-frequency repeated pending card from two fixture decks. Remaining visible six-deck pending text includes Fezandipiti `Cruel Arrow` (`ASC-142`), Team Rocket's Watchtower (`DRI-180`), Genesect `ACE Nullifier` (`SFA-040`), and Rellor `Slight Intrusion` (`TEF-023`). Next engine batch should continue from actual GameView pending text.
+
 ## [2026-06-02] iteration 246 | Fezandipiti ex Flip the Script Ability command
 
 - Task attempted: refreshed actual staged GameView pending-text inventory across all six target decks, then closed the strongest repeated visible Ability gap. Fezandipiti ex (`ASC-142`) `Flip the Script` now has executable Ash mechanics and a React command path that draws 3 cards after one of the player's Pokémon was Knocked Out during the opponent's previous turn.
