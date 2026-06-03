@@ -89,10 +89,9 @@ defmodule Prizmo.TcgEngine.AttackEffects do
     :return_attached_energy_to_hand,
     :opponent_bench_damage_counters,
     :prevent_damage_and_effects_from_attacks_next_turn_on_coin_heads,
-    :search_pokemon_to_hand,
-    :self_damage,
-    :shuffle_attached_energy_into_deck_then_damage_opponent_bench,
-    :switch_self_with_bench
+    :return_attacker_and_attached_to_hand,
+    :switch_self_with_bench,
+    :slight_intrusion_coin_flip_search_deck_on_heads_self_damage
   ]
 
   @trainer_types [:item, :supporter, :stadium, :tool]

@@ -707,6 +707,19 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     ]
   }
 
+  @rellor %CardDefinition{
+    id: "TEF-023",
+    kind: :pokemon,
+    play_window: :action_window,
+    effects: [
+      %Effect{
+        key: :slight_intrusion_coin_flip_search_deck_on_heads_self_damage,
+        type: :slight_intrusion_coin_flip_search_deck_on_heads_self_damage,
+        params: %{self_damage: 10}
+      }
+    ]
+  }
+
   @mega_lopunny_ex_twm %CardDefinition{
     id: "TWM-080",
     kind: :pokemon,
@@ -811,6 +824,7 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     @fezandipiti_ex.id => @fezandipiti_ex,
     @genesect.id => @genesect,
     @teal_mask_ogerpon_ex.id => @teal_mask_ogerpon_ex,
+    @rellor.id => @rellor,
     @mega_lopunny_ex_twm.id => @mega_lopunny_ex_twm,
     @munkidori.id => @munkidori,
     @cyrano.id => @cyrano,

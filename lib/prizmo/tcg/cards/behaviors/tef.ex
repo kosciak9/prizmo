@@ -3,6 +3,16 @@ defmodule Prizmo.Tcg.Cards.Behaviors.TEF do
 
   use Prizmo.Tcg.Cards.DSL
 
+  card "TEF-023" do
+    attack(:slight_intrusion,
+      damage: 30,
+      effect: %{
+        type: :slight_intrusion_coin_flip_search_deck_on_heads_self_damage,
+        self_damage: 10
+      }
+    )
+  end
+
   card "TEF-024" do
     ability(:spherical_shield,
       effect: %{type: :prevent_attack_damage_and_effects_to_bench}

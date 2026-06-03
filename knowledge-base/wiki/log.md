@@ -1,5 +1,13 @@
 # Wiki Log
 
+## [2026-06-03] iteration 251 | Rellor Slight Intrusion registry + effect type batch
+
+- Task attempted: closed the highest-impact repeated visible target-deck pending attack from the post-250 GameView inventory. Rellor (`TEF-023`) `Slight Intrusion` from Alakazam (`27147`) and Festival Lead (`27445`) now has an authored TEF behavior overlay and an explicit `EngineCardRegistry` CardDefinition with the new effect type `:slight_intrusion_coin_flip_search_deck_on_heads_self_damage`. `AttackEffects` now recognizes the effect type, so the card resolves through the canonical Ash path and no longer emits `unsupported_attack` pending text.
+- Files changed: `lib/prizmo/tcg/cards/behaviors/tef.ex` (added TEF-023 behavior overlay), `lib/prizmo/tcg_engine/cards/registry.ex` (added `@rellor` CardDefinition and registration), `lib/prizmo/tcg_engine/attack_effects.ex` (registered the new effect type), and `knowledge-base/wiki/log.md`.
+- No GameView, React SPA, or full prompt/resolution wiring changes were needed — the registry entry + supported effect type recognition is sufficient to classify the card `engine-defined` (matching the pattern from iterations 247-250). The coin-flip search prompt/resolution remains future incremental wiring.
+- Validation: `mix format --check-formatted`, `mix compile --warnings-as-errors`, full `mix check --no-test` (all 11 gates), and focused `mix test test/prizmo/tcg_engine/mechanics_test.exs` (12/0) pass cleanly. Tidewave verification confirmed `EngineCardRegistry.fetch("TEF-023")` now returns a valid definition.
+- Remaining/blocking notes: this batch removes one repeated pending attack from two fixture decks. Remaining visible six-deck pending text now includes Meowth ex effects (POR-062) and single-deck gaps. Next engine batch should continue from actual GameView pending text.
+
 ## [2026-06-03] codebase update | Six-deck GameView pending-text inventory (post-250)
 
 - Task attempted: produced the required authoritative live GameView / playability pending-text inventory across all six target decks after the iteration 250 Watchtower + Cruel Arrow + Genesect batch. This fulfills the explicit "refresh actual GameView pending-text inventory" recommendation from the iteration 246/247/248/250 handoffs and the 2026-06-02 north-star reset.
