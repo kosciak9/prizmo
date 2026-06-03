@@ -94,6 +94,10 @@ defmodule Prizmo.Tcg.Cards.Behaviors.DRI do
     card_effect(effect: %{type: :search_basic_team_rocket_pokemon_to_hand, max_targets: 3})
   end
 
+  card "DRI-180" do
+    card_effect(effect: %{type: :colorless_pokemon_have_no_abilities})
+  end
+
   card "DRI-178" do
     card_effect(effect: %{type: :search_team_rocket_supporter_to_hand})
   end

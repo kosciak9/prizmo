@@ -15,4 +15,16 @@ defmodule Prizmo.Tcg.Cards.Behaviors.POR do
       }
     )
   end
+
+  card "POR-062" do
+    ability(:last_ditch_catch,
+      effect: %{type: :search_supporter_when_benched_from_hand, last_ditch?: true}
+    )
+
+    attack(:tuck_tail,
+      cost: [:colorless, :colorless, :colorless],
+      damage: 60,
+      effect: %{type: :return_attacker_and_attached_to_hand}
+    )
+  end
 end

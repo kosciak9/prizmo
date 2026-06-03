@@ -681,6 +681,19 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     ]
   }
 
+  @genesect %CardDefinition{
+    id: "SFA-040",
+    kind: :pokemon,
+    play_window: :action_window,
+    effects: [
+      %Effect{
+        key: :ace_nullifier_opponent_cannot_play_ace_spec_if_tool_attached,
+        type: :opponent_cannot_play_ace_spec_if_tool_attached,
+        params: %{}
+      }
+    ]
+  }
+
   @teal_mask_ogerpon_ex %CardDefinition{
     id: "TWM-025",
     kind: :pokemon,
@@ -796,6 +809,7 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     @glass_trumpet.id => @glass_trumpet,
     @meowth_ex.id => @meowth_ex,
     @fezandipiti_ex.id => @fezandipiti_ex,
+    @genesect.id => @genesect,
     @teal_mask_ogerpon_ex.id => @teal_mask_ogerpon_ex,
     @mega_lopunny_ex_twm.id => @mega_lopunny_ex_twm,
     @munkidori.id => @munkidori,
