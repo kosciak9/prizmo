@@ -1612,6 +1612,14 @@ defmodule Prizmo.TcgEngine.Mechanics do
                damage_result,
                opts
              ),
+           {:ok, _luxray_payload} <-
+             ToolEffects.apply_luxray_draw_if_needed(
+               game.id,
+               player_id,
+               attacker_card,
+               defender_card,
+               damage_result
+             ),
            {:ok, event} <-
              write_event(
                game,

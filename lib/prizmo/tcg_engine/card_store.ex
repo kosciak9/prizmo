@@ -4,6 +4,7 @@ defmodule Prizmo.TcgEngine.CardStore do
   import Prizmo.TcgEngine.Operation, only: [update: 3]
 
   alias Prizmo.TcgEngine.CardInstance
+  alias Prizmo.TcgEngine.GamePlayer
 
   require Ash.Query
 
@@ -66,6 +67,28 @@ defmodule Prizmo.TcgEngine.CardStore do
   def deck_count(game_id, player_id) do
     with {:ok, deck_cards} <- cards_in_zone(game_id, player_id, :deck) do
       {:ok, length(deck_cards)}
+    end
+  end
+
+  def get_player(game_id, player_id) do
+    case GamePlayer
+         |> Ash.Query.filter(game_id == ^game_id and id == ^player_id)
+         |> Ash.Query.select(:all)
+         |> Ash.read_one() do
+      {:ok, %GamePlayer{} = player} -> {:ok, player}
+      {:ok, nil} -> {:error, :player_not_found}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  def get_opponent(game_id, player_id) do
+    case GamePlayer
+         |> Ash.Query.filter(game_id == ^game_id and id != ^player_id)
+         |> Ash.Query.select(:all)
+         |> Ash.read_one() do
+      {:ok, %GamePlayer{} = opponent} -> {:ok, opponent}
+      {:ok, nil} -> {:error, :opponent_not_found}
+      {:error, reason} -> {:error, reason}
     end
   end
 

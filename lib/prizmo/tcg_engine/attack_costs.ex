@@ -7,13 +7,12 @@ defmodule Prizmo.TcgEngine.AttackCosts do
 
   def require_attack_cost_paid(game_id, %CardInstance{} = attacker_card, attack)
       when is_binary(game_id) and is_map(attack) do
-    with {:ok, attached_cards} <- CardStore.attached_cards(game_id, attacker_card.id) do
-      cost = attack_cost(attack)
-
-      if paid?(cost, attached_cards) do
+    with {:ok, attached_cards} <- CardStore.attached_cards(game_id, attacker_card.id),
+         {:ok, effective_cost} <- effective_attack_cost(game_id, attacker_card, attack) do
+      if paid?(effective_cost, attached_cards) do
         :ok
       else
-        {:error, {:insufficient_attack_energy, stringify_cost(cost)}}
+        {:error, {:insufficient_attack_energy, stringify_cost(effective_cost)}}
       end
     end
   end
@@ -26,6 +25,47 @@ defmodule Prizmo.TcgEngine.AttackCosts do
 
   def attack_cost(%{cost: cost}) when is_list(cost), do: normalize_cost(cost)
   def attack_cost(_attack), do: []
+
+  @doc """
+  Returns the effective attack cost after applying Tool reductions such as
+  Radiant Tsareena (SSP-169): reduce Colorless cost by 1 when the player has
+  more Prizes remaining than the opponent.
+  """
+  def effective_attack_cost(
+        game_id,
+        %CardInstance{owner_player_id: player_id} = attacker_card,
+        attack
+      )
+      when is_binary(game_id) and is_map(attack) do
+    base_cost = attack_cost(attack)
+
+    with {:ok, attached_cards} <- CardStore.attached_cards(game_id, attacker_card.id),
+         {:ok, player} <- CardStore.get_player(game_id, player_id),
+         {:ok, opponent} <- CardStore.get_opponent(game_id, player_id) do
+      reduced_cost =
+        if has_radiant_tsareena?(attached_cards) and
+             player.prizes_remaining > opponent.prizes_remaining do
+          remove_one_colorless(base_cost)
+        else
+          base_cost
+        end
+
+      {:ok, reduced_cost}
+    else
+      _ -> {:ok, base_cost}
+    end
+  end
+
+  defp has_radiant_tsareena?(attached_cards) do
+    Enum.any?(attached_cards, &(&1.card_id == "SSP-169"))
+  end
+
+  defp remove_one_colorless(cost) do
+    case Enum.split_while(cost, &(&1 != :colorless)) do
+      {before, []} -> before
+      {before, [:colorless | after_colorless]} -> before ++ after_colorless
+    end
+  end
 
   def stringify_cost(cost) when is_list(cost) do
     cost

@@ -5,13 +5,18 @@ defmodule Prizmo.TcgEngine.ToolEffects do
   alias Prizmo.TcgEngine.CardInstance
   alias Prizmo.TcgEngine.CardStore
 
+  require Ash.Query
+
   @handheld_fan_card_id "TWM-150"
+  @luxray_card_id "TWM-158"
 
   @supported_tool_effect_types [
     :retreat_cost_reduction,
     :bonus_attack_damage_to_pokemon_ex_if_attacker_has_no_rule_box,
     :move_energy_from_attacker_to_defender_bench_on_damage,
-    :bench_limit_8_with_tera_in_play_else_discard_to_5
+    :bench_limit_8_with_tera_in_play_else_discard_to_5,
+    :reduce_attack_cost_by_colorless_if_more_prizes_remaining,
+    :draw_cards_if_damaged_as_active_by_attack
   ]
 
   def supported_tool?(%{supertype: :trainer, trainer_type: :tool, effect: %{type: type}})
@@ -47,6 +52,58 @@ defmodule Prizmo.TcgEngine.ToolEffects do
     else
       false -> {:ok, nil}
       {:error, _reason} = error -> error
+    end
+  end
+
+  @doc """
+  Applies Luxray's effect after attack damage: draws 2 cards for the defender's
+  player if the defender's Active had TWM-158 attached and damage was dealt.
+  """
+  def apply_luxray_draw_if_needed(
+        game_id,
+        _attacking_player_id,
+        _attacker_card,
+        defender_card,
+        damage_result
+      ) do
+    with true <- Map.get(damage_result, :damage, 0) > 0,
+         true <- luxray_attached?(game_id, defender_card),
+         {:ok, player} <- CardStore.get_player(game_id, defender_card.owner_player_id),
+         {:ok, _drawn} <- draw_cards_for_player(game_id, player, 2) do
+      {:ok, %{type: :luxray_draw_triggered, count: 2, player_id: player.id}}
+    else
+      false -> {:ok, nil}
+      {:error, _reason} = error -> error
+    end
+  end
+
+  defp luxray_attached?(game_id, %CardInstance{id: defender_id}) do
+    case CardStore.attached_cards(game_id, defender_id) do
+      {:ok, attachments} ->
+        Enum.any?(attachments, &(&1.card_id == @luxray_card_id))
+
+      _other ->
+        false
+    end
+  end
+
+  defp draw_cards_for_player(game_id, player, count) do
+    with {:ok, cards} <- CardStore.deck_cards_for_player(player.id, count) do
+      cards
+      |> Enum.map(&CardStore.move_deck_card_to_hand(game_id, player.player_id, &1))
+      |> collect_results()
+    end
+  end
+
+  defp collect_results(results) do
+    results
+    |> Enum.reduce_while({:ok, []}, fn
+      {:ok, value}, {:ok, acc} -> {:cont, {:ok, [value | acc]}}
+      {:error, reason}, _ -> {:halt, {:error, reason}}
+    end)
+    |> case do
+      {:ok, acc} -> {:ok, Enum.reverse(acc)}
+      error -> error
     end
   end
 
