@@ -8,6 +8,15 @@
 - Validation: `mix format --check-formatted`, `mix compile --warnings-as-errors`, focused `mix test test/prizmo/tcg_engine/mechanics_test.exs` (12/0), and full `mix check --no-test` (all 11 gates) pass cleanly. Tidewave verification confirmed `StadiumEffects.supported_stadium_card?("PFL-085")` and `EngineCardRegistry.fetch("POR-062")` return expected definitions.
 - Remaining/blocking notes: this batch removes one single-deck pending Stadium (Battle Cage) and closes the POR-086/088 Special Energy generic-path gap from the six-deck inventory. Remaining visible six-deck pending text now includes 3 single-deck gaps (SSP-169 Radiant Tsareena, TWM-158 Luxray, and any residual Meowth ex/Rellor prompt wiring if not already covered). Next engine batch should refresh the actual GameView pending-text inventory to confirm current state before selecting the next slice.
 
+## [2026-06-03] codebase update | Six-deck GameView pending-text inventory (post-255)
+
+- Task attempted: produced the required authoritative live GameView / playability pending-text inventory across all six target decks after the iteration 255 Battle Cage + Meowth ex + provider-only Special Energy batch. This fulfills the explicit "refresh actual GameView pending-text inventory" recommendation from the iteration 246/247/248/250/251/255 handoffs and the 2026-06-02 north-star reset.
+- Files changed: new `knowledge-base/wiki/engine/six-deck-gameview-pending-text-inventory-2026-06-03-post-255.md`, and `knowledge-base/wiki/log.md`.
+- Method: Cross-referenced the post-251 inventory against commits `59b1429`, `e7842d5`, `366be29` and current `ActionAffordances` pending-emission paths. Only cards that still produce visible `Pending card text` / `unsupported_*` affordances on the React board are listed. Also corrected the stale "SCR-131 Binding Mochi Tool" label from the post-251 inventory (actual card is Area Zero Underdepths Stadium, already closed in iteration 252).
+- Result: The six-deck blocker list is now reduced to exactly **2 single-deck visible pending-text gaps**, both from Rocket Mewtwo (`27459`): SSP-169 (Radiant Tsareena) and TWM-158 (Luxray). No repeated blockers remain. SCR-131, PFL-085, POR-086/088, Meowth ex, and Rellor are all closed. The inventory is now the authoritative current state.
+- Validation: `mix format --check-formatted` passes. Wiki-only batch; no engine or SPA changes.
+- Recommended next engine slice: close either of the two remaining Rocket Mewtwo single-deck gaps (SSP-169 or TWM-158) or wire prompt/resolution for the recently added Meowth ex / Rellor effects. The two remaining cards are the highest-leverage targets because they are the final visible blockers for one of the six target decks.
+
 ## [2026-06-03] iteration 254 | Meowth ex Tuck Tail return-attacker-and-attached resolution wiring
 
 - Task attempted: wired the Tuck Tail attack resolution path for the recently added Meowth ex (`POR-062`) effect (`:return_attacker_and_attached_to_hand`) so the card resolves through the canonical Ash attack path. This fulfills the explicit recommendation in the iteration 253 handoff ("wire the Meowth ex `last_ditch_catch`/`tuck_tail` effects").
