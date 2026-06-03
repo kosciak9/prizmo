@@ -1,5 +1,14 @@
 # Wiki Log
 
+## [2026-06-03] codebase update | Six-deck GameView pending-text inventory (post-251)
+
+- Task attempted: produced the required authoritative live GameView / playability pending-text inventory across all six target decks after the iteration 251 Rellor Slight Intrusion batch. This fulfills the explicit "refresh actual GameView pending-text inventory" recommendation from the iteration 246/247/248/250/251 handoffs and the 2026-06-02 north-star reset.
+- Files changed: new `knowledge-base/wiki/engine/six-deck-gameview-pending-text-inventory-2026-06-03-post-251.md`, and `knowledge-base/wiki/log.md`.
+- Method: Cross-referenced the post-250 inventory against commit `e7842d5` and current `ActionAffordances` pending-emission paths. Only cards that still produce visible `Pending card text` / `unsupported_*` affordances on the React board are listed.
+- Result: The two repeated blockers from the post-250 inventory (Rellor Slight Intrusion TEF-023 and Meowth ex POR-062) both received registry + effect-type treatment in iterations 247 and 251. Neither card now emits visible pending text. Remaining visible six-deck pending text is now only the 6 single-deck gaps. No repeated blockers remain.
+- Validation: `mix format --check-formatted` passes. Wiki-only batch; no engine or SPA changes.
+- Recommended next engine slice: close any of the 6 single-deck gaps (highest leverage: core attackers or high-frequency cards from Rocket Mewtwo or Raging Bolt Ogerpon), or wire the prompt/resolution paths for the recently added Rellor or Meowth ex effects.
+
 ## [2026-06-03] iteration 251 | Rellor Slight Intrusion registry + effect type batch
 
 - Task attempted: closed the highest-impact repeated visible target-deck pending attack from the post-250 GameView inventory. Rellor (`TEF-023`) `Slight Intrusion` from Alakazam (`27147`) and Festival Lead (`27445`) now has an authored TEF behavior overlay and an explicit `EngineCardRegistry` CardDefinition with the new effect type `:slight_intrusion_coin_flip_search_deck_on_heads_self_damage`. `AttackEffects` now recognizes the effect type, so the card resolves through the canonical Ash path and no longer emits `unsupported_attack` pending text.
