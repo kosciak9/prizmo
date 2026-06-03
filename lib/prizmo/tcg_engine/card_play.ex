@@ -771,6 +771,22 @@ defmodule Prizmo.TcgEngine.CardPlay do
          turn,
          player,
          card,
+         %{type: :damage_any_opponent_pokemon, amount: amount} = effect,
+         target_ids
+       ) do
+    with {:ok, [target_pokemon]} <-
+           validate_opponent_in_play_damage_target(game.id, player.player_id, target_ids),
+         {:ok, _damage_result} <-
+           resolve_attack_damage_to_target(game.id, target_pokemon, amount, card, effect) do
+      complete_play_card_resolution(game, turn, player, card, effect)
+    end
+  end
+
+  defp complete_play_card_effect(
+         game,
+         turn,
+         player,
+         card,
          %{type: :discard_opponent_special_energy} = effect,
          target_ids
        ) do
@@ -1221,6 +1237,16 @@ defmodule Prizmo.TcgEngine.CardPlay do
     end
   end
 
+  defp validate_opponent_in_play_damage_target(game_id, player_id, target_ids) do
+    with {:ok, target_ids} <-
+           EffectRunner.validate_choice_selection(%{min_count: 1, max_count: 1}, target_ids),
+         {:ok, target_cards} <- CardStore.get_cards(game_id, target_ids),
+         :ok <- require_all_opponent_cards(target_cards, player_id),
+         :ok <- require_all_in_zone(target_cards, [:active, :bench]) do
+      {:ok, target_cards}
+    end
+  end
+
   defp validate_team_rockets_giovanni_effect(game_id, player_id, effect, target_ids) do
     with {:ok, active_card} <- own_active_card(game_id, player_id),
          :ok <- require_team_rocket_pokemon_card(active_card.card_id),
@@ -1388,6 +1414,13 @@ defmodule Prizmo.TcgEngine.CardPlay do
     |> then(&{:ok, &1})
   end
 
+  defp effect_choice_ids(cards, player_id, %{type: :damage_any_opponent_pokemon}, _current_turn) do
+    cards
+    |> opponent_in_play_choice_cards(player_id)
+    |> Enum.map(& &1.id)
+    |> then(&{:ok, &1})
+  end
+
   defp effect_choice_ids(
          cards,
          player_id,
@@ -1507,6 +1540,7 @@ defmodule Prizmo.TcgEngine.CardPlay do
              :heal_mega_evolution_pokemon_ex_then_return_attached_energy_to_hand,
              :switch_team_rocket_bench_and_opponent_bench_to_active,
              :switch_opponent_bench_to_active,
+             :damage_any_opponent_pokemon,
              :discard_opponent_special_energy,
              :move_basic_energy_between_own_pokemon,
              :recover_discard_to_hand,
@@ -1710,6 +1744,16 @@ defmodule Prizmo.TcgEngine.CardPlay do
       &{&1.owner_player_id, &1.attached_to_card_instance_id, &1.position, &1.instance_id}
     )
   end
+
+  defp opponent_in_play_choice_cards(cards, player_id) do
+    cards
+    |> Enum.filter(&(&1.owner_player_id != player_id and &1.zone in [:active, :bench]))
+    |> Enum.sort_by(&{zone_to_int(&1.zone), &1.position, &1.instance_id})
+  end
+
+  defp zone_to_int(:active), do: 0
+  defp zone_to_int(:bench), do: 1
+  defp zone_to_int(_), do: 99
 
   defp energy_switch_choice_cards(cards, player_id) do
     source_cards = energy_switch_source_cards(cards, player_id)
@@ -3078,6 +3122,31 @@ defmodule Prizmo.TcgEngine.CardPlay do
         [] -> {:error, :missing_opponent_active_pokemon}
         _multiple -> {:error, :ambiguous_opponent_active_pokemon}
       end
+    end
+  end
+
+  defp resolve_attack_damage_to_target(game_id, target_pokemon, amount, source_card, effect) do
+    current_damage = target_pokemon.damage || 0
+    new_damage = current_damage + amount
+
+    with {:ok, updated_target} <-
+           update(target_pokemon, :set_damage, %{damage: new_damage}),
+         {:ok, _event} <-
+           write_event_and_snapshot(
+             game_id,
+             :resolve_declared_attack,
+             target_pokemon.owner_player_id,
+             %{
+               source_card_id: source_card.card_id,
+               source_card_instance_id: source_card.id,
+               effect_key: effect.key,
+               target_card_id: target_pokemon.card_id,
+               target_card_instance_id: target_pokemon.id,
+               damage_dealt: amount,
+               resulting_damage: new_damage
+             }
+           ) do
+      {:ok, updated_target}
     end
   end
 

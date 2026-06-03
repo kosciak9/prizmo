@@ -12,6 +12,7 @@ defmodule Prizmo.TcgEngine.EffectRunner do
     :kieran_switch_or_damage_bonus,
     :switch_team_rocket_bench_and_opponent_bench_to_active,
     :switch_opponent_bench_to_active,
+    :damage_any_opponent_pokemon,
     :discard_opponent_special_energy,
     :move_basic_energy_between_own_pokemon,
     :recover_discard_to_hand,

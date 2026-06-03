@@ -1,5 +1,21 @@
 # Wiki Log
 
+## [2026-06-03] iteration 250 | Fezandipiti ex Cruel Arrow any-opponent target attack surface
+
+- Task attempted: closed the highest-frequency repeated visible target-deck pending attack (Fezandipiti ex `Cruel Arrow`, ASC-142) from the post-247/post-248 inventory by implementing the missing any-opponent-Pokémon target selection attack surface. The card now fully resolves through the canonical Ash `play_card` / attack path with legal prompt choices over opponent Active + Bench, damage application, and viewer-safe event writing.
+- Files changed: `lib/prizmo/tcg_engine/card_play.ex` (added `opponent_in_play_choice_cards`, `validate_opponent_in_play_damage_target`, `resolve_attack_damage_to_target`, `complete_play_card_effect` clause for `:damage_any_opponent_pokemon`, `effect_choice_ids` clause, and registration in the legal choice guard list), `lib/prizmo/tcg_engine/effect_runner.ex` (registered the effect type in `@choice_effect_types`), `lib/prizmo/tcg_engine/stadium_effects.ex` (cleaned unused `@team_rockets_watchtower_card_id` attribute), and `knowledge-base/wiki/log.md`.
+- No GameView, React SPA, or new prompt key changes were needed — the existing generic opponent-target prompt flow (matching Boss's Orders) and `resolve_declared_attack` event surface are reused.
+- Validation: `mix format`, `mix compile --warnings-as-errors`, `mix ash_typescript.codegen --check`, `mix credo --strict`, focused `mix test test/prizmo/tcg_engine/mechanics_test.exs` (12/0), and full `mix check --no-test` (all 11 gates) pass cleanly.
+- Remaining/blocking notes: this batch removes the single most-repeated pending attack from three fixture decks (Dragapult, Alakazam, Raging Bolt Ogerpon). Remaining visible six-deck pending text now includes Genesect `ACE Nullifier` (`SFA-040`), Rellor `Slight Intrusion` (`TEF-023`), and single-deck gaps. Next engine batch should continue from actual GameView pending text.
+
+## [2026-06-03] iteration 249 | Team Rocket's Watchtower DRI-180 Stadium effect
+
+- Task attempted: closed the next repeated visible target-deck pending Stadium from the post-247/post-248 GameView inventory. Team Rocket's Watchtower (`DRI-180`) from Dragapult (`27431`) and Rocket's Mewtwo (`27459`) is now engine-defined: Colorless Pokémon (both players) have no Abilities while the Stadium is active.
+- Files changed: `lib/prizmo/tcg/cards/behaviors/dri.ex` (added `card_effect` overlay declaring `%{type: :colorless_pokemon_have_no_abilities}`), `lib/prizmo/tcg_engine/stadium_effects.ex` (added `@team_rockets_watchtower_effect` constant + `supported_stadium?` clause), and `knowledge-base/wiki/log.md`.
+- No `EngineCardRegistry` entry, GameView, or React SPA changes were needed — Stadium cards resolve through the generic `play_stadium` command, and `supported_stadium_card?/1` now returns true for DRI-180 (matching the pattern from Risky Ruins MEG-127 and Forest of Vitality MEG-117). `GameView` automatically treats the card as `Engine-defined Stadium` instead of `Generic Stadium` with pending text.
+- Validation: `mix format --check-formatted`, `mix compile --warnings-as-errors`, and full `mix check --no-test` (all 11 gates) pass cleanly. Tidewave verification confirmed `StadiumEffects.supported_stadium_card?("DRI-180")` returns true.
+- Remaining/blocking notes: this batch removes one repeated pending Stadium from two fixture decks. Remaining visible six-deck pending text includes Genesect `ACE Nullifier` (`SFA-040`), Rellor `Slight Intrusion` (`TEF-023`), Meowth ex effects (`POR-062`), and single-deck Stadium/Tool/Special Energy gaps. Next engine batch should continue from actual GameView pending text.
+
 ## [2026-06-03] iteration 248 | Fezandipiti ex Cruel Arrow registry batch
 
 - Task attempted: closed the single most repeated visible target-deck pending attack from the post-247 GameView inventory. Fezandipiti ex (`ASC-142`) `Cruel Arrow` from Dragapult (`27431`), Alakazam (`27147`), and Raging Bolt Ogerpon (`27599`) now has an authored ASC behavior overlay and an explicit `EngineCardRegistry` CardDefinition so the card resolves through the canonical Ash path.

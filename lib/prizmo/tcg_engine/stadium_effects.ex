@@ -21,6 +21,7 @@ defmodule Prizmo.TcgEngine.StadiumEffects do
   @risky_ruins_damage 20
   @forest_of_vitality_effect :same_turn_grass_evolution_exception
   @forest_of_vitality_card_id "MEG-117"
+  @team_rockets_watchtower_effect :colorless_pokemon_have_no_abilities
 
   def supported_stadium?(%{
         supertype: :trainer,
@@ -46,6 +47,13 @@ defmodule Prizmo.TcgEngine.StadiumEffects do
         supertype: :trainer,
         trainer_type: :stadium,
         effect: %{type: @forest_of_vitality_effect}
+      }),
+      do: true
+
+  def supported_stadium?(%{
+        supertype: :trainer,
+        trainer_type: :stadium,
+        effect: %{type: @team_rockets_watchtower_effect}
       }),
       do: true
 
