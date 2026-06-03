@@ -80,6 +80,7 @@ defmodule Prizmo.TcgEngine.AttackEffects do
     :defending_pokemon_cannot_retreat_next_turn,
     :discard_hand_then_draw,
     :draw_after_attack,
+    :damage_any_opponent_pokemon,
     :damage_per_own_basic_pokemon_in_play,
     :damage_per_own_benched_pokemon,
     :damage_per_own_team_rocket_pokemon_in_play,

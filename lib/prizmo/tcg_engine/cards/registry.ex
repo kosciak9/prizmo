@@ -650,6 +650,37 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     ]
   }
 
+  @meowth_ex %CardDefinition{
+    id: "POR-062",
+    kind: :pokemon,
+    play_window: :action_window,
+    effects: [
+      %Effect{
+        key: :last_ditch_catch_search_supporter_when_benched_from_hand,
+        type: :search_supporter_when_benched_from_hand,
+        params: %{last_ditch?: true}
+      },
+      %Effect{
+        key: :tuck_tail_return_attacker_and_attached_to_hand,
+        type: :return_attacker_and_attached_to_hand,
+        params: %{}
+      }
+    ]
+  }
+
+  @fezandipiti_ex %CardDefinition{
+    id: "ASC-142",
+    kind: :pokemon,
+    play_window: :action_window,
+    effects: [
+      %Effect{
+        key: :cruel_arrow_damage_any_opponent_pokemon,
+        type: :damage_any_opponent_pokemon,
+        params: %{amount: 20}
+      }
+    ]
+  }
+
   @teal_mask_ogerpon_ex %CardDefinition{
     id: "TWM-025",
     kind: :pokemon,
@@ -763,6 +794,8 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     @tef_129_dudunsparce.id => @tef_129_dudunsparce,
     @pfl_084_mega_lopunny_ex.id => @pfl_084_mega_lopunny_ex,
     @glass_trumpet.id => @glass_trumpet,
+    @meowth_ex.id => @meowth_ex,
+    @fezandipiti_ex.id => @fezandipiti_ex,
     @teal_mask_ogerpon_ex.id => @teal_mask_ogerpon_ex,
     @mega_lopunny_ex_twm.id => @mega_lopunny_ex_twm,
     @munkidori.id => @munkidori,

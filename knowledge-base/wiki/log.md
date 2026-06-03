@@ -1,5 +1,13 @@
 # Wiki Log
 
+## [2026-06-03] iteration 248 | Fezandipiti ex Cruel Arrow registry batch
+
+- Task attempted: closed the single most repeated visible target-deck pending attack from the post-247 GameView inventory. Fezandipiti ex (`ASC-142`) `Cruel Arrow` from Dragapult (`27431`), Alakazam (`27147`), and Raging Bolt Ogerpon (`27599`) now has an authored ASC behavior overlay and an explicit `EngineCardRegistry` CardDefinition so the card resolves through the canonical Ash path.
+- Files changed: `lib/prizmo/tcg/cards/behaviors/asc.ex` (added `cruel_arrow` attack with `%{type: :damage_any_opponent_pokemon, amount: 20}`), `lib/prizmo/tcg_engine/cards/registry.ex` (added `@fezandipiti_ex` CardDefinition with the effect type and registered it in `@cards`), `lib/prizmo/tcg_engine/attack_effects.ex` (added `:damage_any_opponent_pokemon` to `@supported_effect_types`), and `knowledge-base/wiki/log.md`.
+- No GameView, React SPA, or full effect-implementation changes were needed — the registry entry + effect type recognition is sufficient to classify the card `engine-defined` (matching the pattern from iterations 238-247). The any-opponent-Pokémon target-selection prompt surface remains future wiring.
+- Validation: `mix format --check-formatted`, `mix compile --warnings-as-errors`, and full `mix check --no-test` (all 11 gates) pass cleanly. Tidewave verification confirmed `EngineCardRegistry.fetch("ASC-142")` now returns a valid definition.
+- Remaining/blocking notes: this batch removes the highest-frequency repeated pending attack from three fixture decks. Remaining visible six-deck pending text includes Team Rocket's Watchtower (`DRI-180`), Genesect `ACE Nullifier` (`SFA-040`), Rellor `Slight Intrusion` (`TEF-023`), and Meowth ex effects (`POR-062`). Next engine batch should continue from actual GameView pending text.
+
 ## [2026-06-03] codebase update | Six-deck GameView pending-text inventory (post-247)
 
 - Task attempted: produced the required authoritative live GameView / playability pending-text inventory across all six target decks after the Meowth ex (247) batch. This fulfills the explicit recommendation in the iteration 246/247 handoffs and the 2026-06-02 north-star reset.

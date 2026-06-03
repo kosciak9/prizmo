@@ -16,6 +16,8 @@ defmodule Prizmo.Tcg.Cards.Behaviors.ASC do
     ability(:flip_the_script,
       effect: %{type: :draw_if_own_pokemon_knocked_out_last_turn, count: 3}
     )
+
+    attack(:cruel_arrow, effect: %{type: :damage_any_opponent_pokemon, amount: 20})
   end
 
   card "ASC-181" do
