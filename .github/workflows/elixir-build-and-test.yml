@@ -62,7 +62,7 @@ jobs:
       - run: mix assets.setup
       - run: mix ash.setup
       - run: mix coveralls.lcov
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: lcov
           path: cover/lcov.info
