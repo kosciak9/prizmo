@@ -27,4 +27,13 @@ defmodule Prizmo.Tcg.Cards.Behaviors.POR do
       effect: %{type: :return_attacker_and_attached_to_hand}
     )
   end
+
+  card "POR-084" do
+    card_effect(
+      effect: %{
+        type: :attach_basic_energy_from_discard_to_stage2_if_more_prizes,
+        max_targets: 2
+      }
+    )
+  end
 end

@@ -10,4 +10,8 @@ defmodule Prizmo.Tcg.Cards.Behaviors.SFA do
 
     attack(:magnetic_blast, effect: nil)
   end
+
+  card "SFA-064" do
+    card_effect(effect: %{type: :opponent_discards_to_hand_size, target_hand_size: 3})
+  end
 end

@@ -1,5 +1,12 @@
 # Wiki Log
 
+## [2026-06-16] codebase update | Plain Dragapult tech Supporter behavior overlays (SFA-064, POR-084)
+
+- Task attempted: added behavior overlays for the three remaining plain Dragapult tech cards from deck 28256. TWM-080 (Mega Lopunny ex) already had an EngineCardRegistry entry (`@mega_lopunny_ex_twm`). SFA-064 (Xerosic's Machinations) and POR-084 (Rosa's Encouragement) received behavior overlays in `sfa.ex` and `por.ex` declaring their respective effect types (`:opponent_discards_to_hand_size` and `:attach_basic_energy_from_discard_to_stage2_if_more_prizes`). Both cards now resolve through the generic Supporter `play_card` path; full resolution wiring remains future work.
+- Files changed: `lib/prizmo/tcg/cards/behaviors/sfa.ex`, `lib/prizmo/tcg/cards/behaviors/por.ex`, `knowledge-base/wiki/log.md`.
+- Validation: `mix format --check-formatted`, `mix compile --warnings-as-errors`, focused `mix test test/prizmo/tcg_engine/mechanics_test.exs` (12/0) all pass cleanly. No new effect types or prompt surface changes were required — the generic unsupported-Supporter path is the deliberate generic fallback.
+- Remaining/blocking notes: full resolution for the two new Supporter effects and dedicated fixture tests remain open. The three plain Dragapult tech cards are now past the visible pending-text blocker stage.
+
 ## [2026-06-16] codebase update | Godot game subtree repository boundary
 - Task attempted: recorded that repo-root `game/*` is reserved for Godot TCG player experiments and must not be edited, deleted, formatted, moved, cleaned, or otherwise managed unless the user explicitly requests Godot/`game/*` work.
 - Files changed: `AGENTS.md`, `knowledge-base/wiki/engine/tcg-client-renderer-options.md`, `knowledge-base/wiki/index.md`, `knowledge-base/wiki/log.md`
