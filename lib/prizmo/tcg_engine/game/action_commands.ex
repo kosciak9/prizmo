@@ -512,6 +512,37 @@ defmodule Prizmo.TcgEngine.Game.ActionCommands do
       end
     end
 
+    action :use_cursed_blast_command, :struct do
+      description "Use Dusclops or Dusknoir's Cursed Blast Ability to place damage counters, then Knock itself Out."
+
+      constraints instance_of: Game
+
+      argument :game_id, :uuid do
+        allow_nil? false
+      end
+
+      argument :player_id, :string do
+        allow_nil? false
+      end
+
+      argument :source_card_instance_id, :uuid do
+        allow_nil? false
+      end
+
+      argument :target_card_instance_id, :uuid do
+        allow_nil? false
+      end
+
+      run fn input, _context ->
+        Mechanics.use_cursed_blast(
+          input.arguments.game_id,
+          input.arguments.player_id,
+          input.arguments.source_card_instance_id,
+          input.arguments.target_card_instance_id
+        )
+      end
+    end
+
     action :use_fezandipiti_flip_the_script_command, :struct do
       description "Use Fezandipiti ex's Flip the Script Ability to draw after an own KO last turn."
 

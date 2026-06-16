@@ -40,6 +40,8 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
   @recon_directive_effect_type :top_two_choose_one_to_hand_other_to_bottom
   @run_away_draw_ability_id :run_away_draw
   @run_away_draw_effect_type :draw_then_shuffle_self_into_deck
+  @cursed_blast_ability_id :cursed_blast
+  @cursed_blast_effect_type :damage_counters_to_opponent_pokemon_then_self_knock_out
   @damp_card_id "ASC-039"
   @damp_ability_id :damp
 
@@ -57,6 +59,7 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
   def psychic_draw_ability_id, do: @psychic_draw_ability_id
   def recon_directive_ability_id, do: @recon_directive_ability_id
   def run_away_draw_ability_id, do: @run_away_draw_ability_id
+  def cursed_blast_ability_id, do: @cursed_blast_ability_id
   def damp_ability_id, do: @damp_ability_id
 
   def adrena_brain_source?(%CardInstance{card_id: @adrena_brain_card_id}), do: true
@@ -82,6 +85,10 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
 
   def run_away_draw_source?(%CardInstance{} = source) do
     match?({:ok, _effect}, run_away_draw_effect(source))
+  end
+
+  def cursed_blast_source?(%CardInstance{} = source) do
+    match?({:ok, _effect}, cursed_blast_effect(source))
   end
 
   def damp_active?(game_id) when is_binary(game_id) do
@@ -207,6 +214,20 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
     end
   end
 
+  def cursed_blast_available?(game_id, %CardInstance{} = source, %Turn{} = turn)
+      when is_binary(game_id) do
+    require_cursed_blast_available(game_id, source, turn) == :ok
+  end
+
+  def require_cursed_blast_available(game_id, %CardInstance{} = source, %Turn{} = turn)
+      when is_binary(game_id) do
+    with {:ok, _effect} <- cursed_blast_effect(source),
+         :ok <- require_in_play(source),
+         :ok <- require_self_knock_out_ability_not_blocked(game_id) do
+      require_ability_unused(source, turn, @cursed_blast_ability_id)
+    end
+  end
+
   def psychic_draw_count(%CardInstance{} = source) do
     with {:ok, %{draw_count: draw_count}} <- psychic_draw_effect(source) do
       {:ok, draw_count}
@@ -216,6 +237,12 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
   def run_away_draw_count(%CardInstance{} = source) do
     with {:ok, %{draw_count: draw_count}} <- run_away_draw_effect(source) do
       {:ok, draw_count}
+    end
+  end
+
+  def cursed_blast_counters(%CardInstance{} = source) do
+    with {:ok, %{counters: counters}} <- cursed_blast_effect(source) do
+      {:ok, counters}
     end
   end
 
@@ -325,6 +352,10 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
 
   def put_run_away_draw_used_marker(%CardInstance{} = source, %Turn{} = turn) do
     put_ability_used_marker(source, turn, @run_away_draw_ability_id)
+  end
+
+  def put_cursed_blast_used_marker(%CardInstance{} = source, %Turn{} = turn) do
+    put_ability_used_marker(source, turn, @cursed_blast_ability_id)
   end
 
   def adrena_brain_used_this_turn?(%CardInstance{markers: markers}, %Turn{} = turn) do
@@ -633,6 +664,22 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
         {:error,
          {:unsupported_ability_effect, card_id, @run_away_draw_ability_id,
           @run_away_draw_effect_type}}
+    end
+  end
+
+  defp cursed_blast_effect(%CardInstance{card_id: card_id}) do
+    with {:ok, %{abilities: abilities}} <- CardCatalog.fetch(card_id),
+         %{effect: effect} <- Map.get(abilities, @cursed_blast_ability_id),
+         %{
+           type: @cursed_blast_effect_type,
+           counters: counters
+         } <- effect do
+      {:ok, %{counters: counters}}
+    else
+      _other ->
+        {:error,
+         {:unsupported_ability_effect, card_id, @cursed_blast_ability_id,
+          @cursed_blast_effect_type}}
     end
   end
 

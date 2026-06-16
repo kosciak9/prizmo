@@ -27,8 +27,9 @@ defmodule Prizmo.TcgEngine.AttackDamage do
          {:ok, damage} <-
            apply_brave_bangle_bonus(damage, attacker_card, defender_card),
          {:ok, damage} <-
-           apply_black_belts_training_bonus(damage, attacker_card, defender_card) do
-      apply_kieran_damage_bonus(damage, attacker_card, defender_card)
+           apply_black_belts_training_bonus(damage, attacker_card, defender_card),
+         {:ok, damage} <- apply_kieran_damage_bonus(damage, attacker_card, defender_card) do
+      apply_weakness_and_resistance(damage, attacker_card, defender_card)
     end
   end
 
@@ -198,6 +199,16 @@ defmodule Prizmo.TcgEngine.AttackDamage do
     end
   end
 
+  defp apply_effect(damage, %CardInstance{game_id: game_id}, _defender_card, %{
+         type: :bonus_damage_if_stadium_in_play_then_discard_stadium,
+         bonus_damage: bonus_damage
+       })
+       when is_integer(bonus_damage) and bonus_damage >= 0 do
+    with {:ok, stadiums} <- CardStore.cards_in_zone(game_id, :stadium) do
+      if Enum.empty?(stadiums), do: {:ok, damage}, else: {:ok, damage + bonus_damage}
+    end
+  end
+
   defp apply_effect(damage, %CardInstance{} = attacker_card, _defender_card, %{
          type: :damage_per_own_benched_pokemon,
          damage_per_pokemon: damage_per_pokemon
@@ -305,6 +316,11 @@ defmodule Prizmo.TcgEngine.AttackDamage do
        }), do: {:ok, damage}
 
   defp apply_effect(damage, _attacker_card, _defender_card, %{
+         type: :put_up_to_3_duskull_from_discard_to_bench
+       }),
+       do: {:ok, damage}
+
+  defp apply_effect(damage, _attacker_card, _defender_card, %{
          type: :shuffle_attached_energy_into_deck_then_damage_opponent_bench
        }),
        do: {:ok, damage}
@@ -341,6 +357,88 @@ defmodule Prizmo.TcgEngine.AttackDamage do
   defp apply_effect(_damage, _attacker_card, _defender_card, effect) do
     {:error, {:unsupported_attack_effect, AttackEffects.type(effect)}}
   end
+
+  defp apply_weakness_and_resistance(0, %CardInstance{}, %CardInstance{}), do: {:ok, 0}
+
+  defp apply_weakness_and_resistance(
+         damage,
+         %CardInstance{} = attacker_card,
+         %CardInstance{} = defender_card
+       ) do
+    with {:ok, attacker_metadata} <- CardCatalog.fetch(attacker_card.card_id),
+         {:ok, defender_metadata} <- CardCatalog.fetch(defender_card.card_id),
+         {:ok, weakness} <- effective_weakness(attacker_card, defender_card, defender_metadata) do
+      damage =
+        damage
+        |> apply_weakness(attacker_metadata, weakness)
+        |> apply_resistance(attacker_metadata, defender_metadata)
+        |> max(0)
+
+      {:ok, damage}
+    end
+  end
+
+  defp effective_weakness(
+         %CardInstance{game_id: game_id, owner_player_id: attacker_player_id},
+         %CardInstance{},
+         defender_metadata
+       ) do
+    with true <- darkness_pokemon?(defender_metadata),
+         {:ok, cards} <- CardStore.list_cards(game_id),
+         true <- Enum.any?(cards, &opponent_fairy_zone_active?(&1, attacker_player_id)) do
+      {:ok, %{type: :psychic, multiplier: 2}}
+    else
+      false -> {:ok, Map.get(defender_metadata, :weakness)}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp apply_weakness(damage, %{type: attack_type}, %{type: attack_type, multiplier: multiplier})
+       when is_integer(multiplier) and multiplier > 0 do
+    damage * multiplier
+  end
+
+  defp apply_weakness(damage, _attacker_metadata, _weakness), do: damage
+
+  defp apply_resistance(damage, %{type: attack_type}, %{
+         resistance: %{type: attack_type, value: value}
+       })
+       when is_integer(value) do
+    damage + value
+  end
+
+  defp apply_resistance(damage, _attacker_metadata, _defender_metadata), do: damage
+
+  defp opponent_fairy_zone_active?(
+         %CardInstance{owner_player_id: owner_player_id, zone: zone, card_id: card_id},
+         attacker_player_id
+       )
+       when owner_player_id != attacker_player_id and zone in [:active, :bench] do
+    case CardCatalog.fetch(card_id) do
+      {:ok,
+       %{
+         abilities: %{
+           fairy_zone: %{effect: %{type: :opponent_darkness_pokemon_weakness_becomes_psychic}}
+         }
+       }} ->
+        true
+
+      {:ok, _metadata} ->
+        false
+
+      {:error, _reason} ->
+        false
+    end
+  end
+
+  defp opponent_fairy_zone_active?(%CardInstance{}, _attacker_player_id), do: false
+
+  defp darkness_pokemon?(%{supertype: :pokemon, types: types}) when is_list(types) do
+    :darkness in types
+  end
+
+  defp darkness_pokemon?(%{supertype: :pokemon, type: :darkness}), do: true
+  defp darkness_pokemon?(_metadata), do: false
 
   defp apply_black_belts_training_bonus(
          damage,

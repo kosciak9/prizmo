@@ -12,4 +12,29 @@ defmodule Prizmo.Tcg.Cards.Behaviors.PRE do
       effect: %{type: :draw_after_attack, count: 2}
     )
   end
+
+  card "PRE-035" do
+    attack(:come_and_get_you,
+      damage: 0,
+      effect: %{type: :put_up_to_3_duskull_from_discard_to_bench}
+    )
+
+    attack(:mumble, effect: nil)
+  end
+
+  card "PRE-036" do
+    ability(:cursed_blast,
+      effect: %{type: :damage_counters_to_opponent_pokemon_then_self_knock_out, counters: 5}
+    )
+
+    attack(:will_o_wisp, effect: nil)
+  end
+
+  card "PRE-037" do
+    ability(:cursed_blast,
+      effect: %{type: :damage_counters_to_opponent_pokemon_then_self_knock_out, counters: 13}
+    )
+
+    attack(:shadow_bind, effect: %{type: :defending_pokemon_cannot_retreat_next_turn})
+  end
 end

@@ -113,6 +113,9 @@ defmodule Prizmo.TcgEngine.Game do
         :target_card_instance_id
       ]
 
+    define :use_cursed_blast_command,
+      args: [:game_id, :player_id, :source_card_instance_id, :target_card_instance_id]
+
     define :use_fezandipiti_flip_the_script_command,
       args: [:game_id, :player_id, :source_card_instance_id]
 

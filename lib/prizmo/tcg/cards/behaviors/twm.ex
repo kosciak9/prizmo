@@ -47,6 +47,15 @@ defmodule Prizmo.Tcg.Cards.Behaviors.TWM do
     )
   end
 
+  card "TWM-039" do
+    attack(:allure, damage: 0, effect: %{type: :draw_after_attack, count: 2})
+
+    attack(:ground_melter,
+      damage: 60,
+      effect: %{type: :bonus_damage_if_stadium_in_play_then_discard_stadium, bonus_damage: 60}
+    )
+  end
+
   card "TWM-044" do
     ability(:festival_lead,
       effect: %{type: :may_attack_twice_if_festival_grounds_in_play}
@@ -134,6 +143,10 @@ defmodule Prizmo.Tcg.Cards.Behaviors.TWM do
 
   card "TWM-150" do
     card_effect(effect: %{type: :move_energy_from_attacker_to_defender_bench_on_damage})
+  end
+
+  card "TWM-153" do
+    card_effect(effect: %{type: :pokemon_tools_have_no_effect})
   end
 
   card "TWM-154" do

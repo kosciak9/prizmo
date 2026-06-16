@@ -24,6 +24,7 @@ defmodule Prizmo.TcgEngine.StadiumEffects do
   @team_rockets_watchtower_effect :colorless_pokemon_have_no_abilities
   @area_zero_underdepths_effect :bench_limit_8_with_tera_in_play_else_discard_to_5
   @battle_cage_effect :prevent_damage_counters_to_bench_from_opponent_pokemon_effects
+  @jamming_tower_effect :pokemon_tools_have_no_effect
 
   def supported_stadium?(%{
         supertype: :trainer,
@@ -70,6 +71,12 @@ defmodule Prizmo.TcgEngine.StadiumEffects do
         supertype: :trainer,
         trainer_type: :stadium,
         effect: %{type: @battle_cage_effect}
+      }), do: true
+
+  def supported_stadium?(%{
+        supertype: :trainer,
+        trainer_type: :stadium,
+        effect: %{type: @jamming_tower_effect}
       }), do: true
 
   def supported_stadium?(_card), do: false
@@ -252,10 +259,58 @@ defmodule Prizmo.TcgEngine.StadiumEffects do
     end
   end
 
+  def damage_counter_prevention_payload(
+        game_id,
+        %CardInstance{zone: :bench, owner_player_id: owner_player_id} = card,
+        source_player_id,
+        :opponent_pokemon_effect
+      )
+      when is_binary(game_id) and is_binary(source_player_id) and
+             owner_player_id != source_player_id do
+    case active_battle_cage_stadium(game_id) do
+      {:ok, %CardInstance{} = stadium} ->
+        {:prevented,
+         %{
+           protected_card_instance_id: card.id,
+           damage_counter_prevention_source_card_id: stadium.card_id,
+           damage_counter_prevention_source_card_instance_id: stadium.id,
+           damage_counter_prevention_source_effect_id: @battle_cage_effect,
+           damage_counter_prevention_source_player_id: stadium.owner_player_id
+         }}
+
+      _other ->
+        :not_prevented
+    end
+  end
+
+  def damage_counter_prevention_payload(_game_id, %CardInstance{}, _source_player_id, _kind) do
+    :not_prevented
+  end
+
+  def tools_have_no_effect?(game_id) when is_binary(game_id) do
+    case active_jamming_tower_stadium(game_id) do
+      {:ok, %CardInstance{}} -> true
+      {:ok, nil} -> false
+      {:error, _reason} -> false
+    end
+  end
+
   defp active_special_condition_immunity_stadium(game_id) do
     with {:ok, stadiums} <- CardStore.cards_in_zone(game_id, :stadium) do
       stadium = Enum.find(stadiums, &special_condition_immunity_stadium?/1)
       {:ok, stadium}
+    end
+  end
+
+  defp active_battle_cage_stadium(game_id) do
+    with {:ok, stadiums} <- CardStore.cards_in_zone(game_id, :stadium) do
+      {:ok, Enum.find(stadiums, &battle_cage_stadium?/1)}
+    end
+  end
+
+  defp active_jamming_tower_stadium(game_id) do
+    with {:ok, stadiums} <- CardStore.cards_in_zone(game_id, :stadium) do
+      {:ok, Enum.find(stadiums, &jamming_tower_stadium?/1)}
     end
   end
 
@@ -337,6 +392,42 @@ defmodule Prizmo.TcgEngine.StadiumEffects do
     |> case do
       {:ok, card} -> supported_stadium?(card)
       {:error, _reason} -> false
+    end
+  end
+
+  defp battle_cage_stadium?(%CardInstance{card_id: card_id}) do
+    case CardCatalog.fetch(card_id) do
+      {:ok,
+       %{
+         supertype: :trainer,
+         trainer_type: :stadium,
+         effect: %{type: @battle_cage_effect}
+       }} ->
+        true
+
+      {:ok, _card} ->
+        false
+
+      {:error, _reason} ->
+        false
+    end
+  end
+
+  defp jamming_tower_stadium?(%CardInstance{card_id: card_id}) do
+    case CardCatalog.fetch(card_id) do
+      {:ok,
+       %{
+         supertype: :trainer,
+         trainer_type: :stadium,
+         effect: %{type: @jamming_tower_effect}
+       }} ->
+        true
+
+      {:ok, _card} ->
+        false
+
+      {:error, _reason} ->
+        false
     end
   end
 

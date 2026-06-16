@@ -319,6 +319,20 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     ]
   }
 
+  @special_red_card %CardDefinition{
+    id: "CRI-082",
+    kind: :trainer,
+    trainer_type: :item,
+    play_window: :action_window,
+    effects: [
+      %Effect{
+        key: :opponent_hand_to_bottom_then_draw_if_any,
+        type: :opponent_hand_to_bottom_then_draw_if_any,
+        params: %{draw_count: 3, requires_opponent_prize_count_at_most: 3}
+      }
+    ]
+  }
+
   @lanas_aid %CardDefinition{
     id: "TWM-155",
     kind: :trainer,
@@ -804,6 +818,7 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     @rare_candy.id => @rare_candy,
     @sacred_ash.id => @sacred_ash,
     @secret_box.id => @secret_box,
+    @special_red_card.id => @special_red_card,
     @unfair_stamp.id => @unfair_stamp,
     @team_rockets_archer.id => @team_rockets_archer,
     @team_rockets_ariana.id => @team_rockets_ariana,

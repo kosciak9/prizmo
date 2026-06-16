@@ -136,6 +136,46 @@ defmodule Prizmo.Tcg.Sim.CardRegistry do
         }
       }
     },
+    "TWM-039" => %{
+      attacks: %{
+        allure: %{damage: 0, effect: %{type: :draw_after_attack, count: 2}},
+        ground_melter: %{
+          damage: 60,
+          effect: %{type: :bonus_damage_if_stadium_in_play_then_discard_stadium, bonus_damage: 60}
+        }
+      }
+    },
+    "PRE-035" => %{
+      attacks: %{
+        come_and_get_you: %{
+          damage: 0,
+          effect: %{type: :put_up_to_3_duskull_from_discard_to_bench}
+        },
+        mumble: %{effect: nil}
+      }
+    },
+    "PRE-036" => %{
+      evolves_from: "PRE-035",
+      abilities: %{
+        cursed_blast: %{
+          effect: %{type: :damage_counters_to_opponent_pokemon_then_self_knock_out, counters: 5}
+        }
+      },
+      attacks: %{
+        will_o_wisp: %{effect: nil}
+      }
+    },
+    "PRE-037" => %{
+      evolves_from: "PRE-036",
+      abilities: %{
+        cursed_blast: %{
+          effect: %{type: :damage_counters_to_opponent_pokemon_then_self_knock_out, counters: 13}
+        }
+      },
+      attacks: %{
+        shadow_bind: %{effect: %{type: :defending_pokemon_cannot_retreat_next_turn}}
+      }
+    },
     "TWM-044" => %{
       abilities: %{
         festival_lead: %{effect: %{type: :may_attack_twice_if_festival_grounds_in_play}}
@@ -788,6 +828,9 @@ defmodule Prizmo.Tcg.Sim.CardRegistry do
       }
     },
     "TWM-150" => %{name: "Handheld Fan", supertype: :trainer, trainer_type: :tool},
+    "TWM-153" => %{
+      effect: %{type: :pokemon_tools_have_no_effect}
+    },
     "TWM-158" => %{
       effect: %{type: :draw_cards_if_damaged_as_active_by_attack, count: 2}
     },
@@ -838,6 +881,13 @@ defmodule Prizmo.Tcg.Sim.CardRegistry do
     "DRI-182" => %{
       provides: [:psychic, :darkness],
       effect: %{type: :team_rocket_energy_attachment_and_dual_provides}
+    },
+    "CRI-082" => %{
+      effect: %{
+        type: :opponent_hand_to_bottom_then_draw_if_any,
+        draw_count: 3,
+        requires_opponent_prize_count_at_most: 3
+      }
     }
   }
 

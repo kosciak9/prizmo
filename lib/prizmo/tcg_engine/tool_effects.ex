@@ -4,6 +4,7 @@ defmodule Prizmo.TcgEngine.ToolEffects do
   alias Prizmo.TcgEngine.CardCatalog
   alias Prizmo.TcgEngine.CardInstance
   alias Prizmo.TcgEngine.CardStore
+  alias Prizmo.TcgEngine.StadiumEffects
 
   require Ash.Query
 
@@ -44,12 +45,14 @@ defmodule Prizmo.TcgEngine.ToolEffects do
         damage_result,
         opts
       ) do
-    with true <- Map.get(damage_result, :damage, 0) > 0,
+    with false <- StadiumEffects.tools_have_no_effect?(game_id),
+         true <- Map.get(damage_result, :damage, 0) > 0,
          true <- handheld_fan_attached?(game_id, defender_card),
          {:ok, energy_card} <- get_handheld_fan_energy_card(game_id, attacker_card, opts),
          {:ok, bench_target} <- get_handheld_fan_bench_target(game_id, defender_card, opts) do
       move_energy_to_bench(game_id, energy_card, bench_target)
     else
+      true -> {:ok, nil}
       false -> {:ok, nil}
       {:error, _reason} = error -> error
     end
@@ -66,12 +69,14 @@ defmodule Prizmo.TcgEngine.ToolEffects do
         defender_card,
         damage_result
       ) do
-    with true <- Map.get(damage_result, :damage, 0) > 0,
+    with false <- StadiumEffects.tools_have_no_effect?(game_id),
+         true <- Map.get(damage_result, :damage, 0) > 0,
          true <- luxray_attached?(game_id, defender_card),
          {:ok, player} <- CardStore.get_player(game_id, defender_card.owner_player_id),
          {:ok, _drawn} <- draw_cards_for_player(game_id, player, 2) do
       {:ok, %{type: :luxray_draw_triggered, count: 2, player_id: player.id}}
     else
+      true -> {:ok, nil}
       false -> {:ok, nil}
       {:error, _reason} = error -> error
     end
@@ -197,6 +202,15 @@ defmodule Prizmo.TcgEngine.ToolEffects do
       _card ->
         []
     end)
+  end
+
+  def retreat_cost_reductions(game_id, attached_cards)
+      when is_binary(game_id) and is_list(attached_cards) do
+    if StadiumEffects.tools_have_no_effect?(game_id) do
+      []
+    else
+      retreat_cost_reductions(attached_cards)
+    end
   end
 
   def retreat_cost_reduction(card_id) when is_binary(card_id) do

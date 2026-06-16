@@ -400,6 +400,41 @@ defmodule Prizmo.TcgEngine.CardPlay do
          turn,
          player,
          card,
+         %{type: :opponent_hand_to_bottom_then_draw_if_any} = effect,
+         _target_ids
+       ) do
+    with {:ok, opponent_player} <- CardStore.get_opponent(game.id, player.player_id),
+         :ok <- require_opponent_prize_count_at_most(game.id, player.player_id, effect),
+         {:ok, bottomed_cards} <-
+           shuffle_hand_to_bottom_of_deck(game, turn, opponent_player, card, effect),
+         {:ok, _event} <-
+           write_event_and_snapshot(game.id, :cards_moved, player.player_id, %{
+             reason: :effect_resolution,
+             source: EventPayloads.card_source(card),
+             effect_key: effect.key,
+             affected_player_id: opponent_player.player_id,
+             cards: EventPayloads.moved_cards(bottomed_cards, :hand, :deck),
+             destination: :deck_bottom
+           }),
+         {:ok, drawn_cards} <-
+           maybe_draw_after_opponent_hand_bottomed(game, opponent_player, bottomed_cards, effect),
+         {:ok, _event} <-
+           write_event_and_snapshot(game.id, :cards_moved, player.player_id, %{
+             reason: :effect_resolution,
+             source: EventPayloads.card_source(card),
+             effect_key: effect.key,
+             affected_player_id: opponent_player.player_id,
+             cards: EventPayloads.moved_cards(drawn_cards, :deck, :hand)
+           }) do
+      complete_play_card_resolution(game, turn, player, card, effect)
+    end
+  end
+
+  defp complete_play_card_effect(
+         game,
+         turn,
+         player,
+         card,
          %{type: :draw_until_hand_size} = effect,
          _target_ids
        ) do
@@ -1057,6 +1092,9 @@ defmodule Prizmo.TcgEngine.CardPlay do
             :ok
         end
 
+      {:ok, %{type: :opponent_hand_to_bottom_then_draw_if_any} = effect} ->
+        require_opponent_prize_count_at_most(game.id, player.player_id, effect)
+
       {:ok, _effect} ->
         :ok
 
@@ -1122,6 +1160,22 @@ defmodule Prizmo.TcgEngine.CardPlay do
   end
 
   defp require_previous_turn_own_knockout(_game_id, _turn, _player_id, _effect), do: :ok
+
+  defp require_opponent_prize_count_at_most(game_id, player_id, %{
+         params: %{requires_opponent_prize_count_at_most: max_prize_count}
+       })
+       when is_binary(game_id) and is_binary(player_id) and is_integer(max_prize_count) do
+    with {:ok, opponent_player} <- CardStore.get_opponent(game_id, player_id),
+         {:ok, prizes} <- CardStore.cards_in_zone(game_id, opponent_player.player_id, :prize) do
+      if length(prizes) <= max_prize_count do
+        :ok
+      else
+        {:error, :special_red_card_requires_opponent_3_or_fewer_prizes_remaining}
+      end
+    end
+  end
+
+  defp require_opponent_prize_count_at_most(_game_id, _player_id, _effect), do: :ok
 
   defp any_knockout_for_player?(%GameEvent{payload: payload}, player_id) do
     payload
@@ -2868,6 +2922,38 @@ defmodule Prizmo.TcgEngine.CardPlay do
       end)
       |> collect_results()
     end
+  end
+
+  defp shuffle_hand_to_bottom_of_deck(%Game{} = game, turn, %GamePlayer{} = player, card, effect) do
+    context =
+      {:trainer_effect_hand_shuffle_to_bottom, player.player_id, turn.turn_number, card.card_id,
+       effect.key}
+
+    with {:ok, hand_cards} <- CardStore.cards_in_zone(game.id, player.player_id, :hand),
+         {:ok, deck_count} <- CardStore.deck_count(game.id, player.player_id) do
+      hand_cards
+      |> shuffle_cards(game.rng_seed, context)
+      |> Enum.with_index(deck_count + 1)
+      |> Enum.map(fn {card, position} ->
+        update(card, :shuffle_into_deck, %{attached_to_card_instance_id: nil, position: position})
+      end)
+      |> collect_results()
+    end
+  end
+
+  defp maybe_draw_after_opponent_hand_bottomed(
+         %Game{} = game,
+         %GamePlayer{} = player,
+         [_first | _rest],
+         %{
+           params: %{draw_count: draw_count}
+         }
+       ) do
+    draw_cards_for_effect(game, player, draw_count)
+  end
+
+  defp maybe_draw_after_opponent_hand_bottomed(%Game{}, %GamePlayer{}, [], _effect) do
+    {:ok, []}
   end
 
   defp shuffle_deck_for_effect(%Game{} = game, turn, %GamePlayer{} = player, card, effect) do

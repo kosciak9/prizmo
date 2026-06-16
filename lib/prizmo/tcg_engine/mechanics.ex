@@ -1075,6 +1075,48 @@ defmodule Prizmo.TcgEngine.Mechanics do
     end)
   end
 
+  @spec use_cursed_blast(
+          Game.t() | String.t(),
+          String.t(),
+          String.t(),
+          String.t()
+        ) :: {:ok, Game.t()} | {:error, term()}
+  def use_cursed_blast(game_or_id, player_id, source_card_instance_id, target_card_instance_id)
+      when is_binary(player_id) and is_binary(source_card_instance_id) and
+             is_binary(target_card_instance_id) do
+    transaction(fn ->
+      with {:ok, game} <- get_game(game_or_id),
+           {:ok, turn} <- require_action_window_for_player(game, player_id),
+           :ok <- CardPlay.require_no_awaiting_pending_effect(game.id),
+           {:ok, source_card} <- get_card(game.id, source_card_instance_id),
+           {:ok, target_card} <- get_card(game.id, target_card_instance_id),
+           {:ok, opponent_player_id} <- opponent_player_id(game.id, player_id),
+           :ok <- require_card_owned_by_player(source_card, player_id),
+           :ok <- AbilityEffects.require_cursed_blast_available(game.id, source_card, turn),
+           :ok <- require_card_owned_by_player(target_card, opponent_player_id),
+           :ok <- require_in_play_pokemon_zone(target_card),
+           {:ok, ability_result} <-
+             resolve_cursed_blast(game.id, player_id, source_card, target_card, turn),
+           {:ok, event} <-
+             write_event(
+               game,
+               :ability_used,
+               player_id,
+               cursed_blast_event_payload(turn, source_card, target_card, ability_result)
+             ),
+           {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do
+        resolve_cursed_blast_knockouts(
+          game.id,
+          player_id,
+          opponent_player_id,
+          source_card,
+          target_card,
+          ability_result
+        )
+      end
+    end)
+  end
+
   @spec use_teal_mask_ogerpon_teal_dance(
           Game.t() | String.t(),
           String.t(),
@@ -2489,6 +2531,232 @@ defmodule Prizmo.TcgEngine.Mechanics do
           {:ok, game}
       end
     end
+  end
+
+  defp resolve_cursed_blast(
+         game_id,
+         player_id,
+         %CardInstance{} = source_card,
+         %CardInstance{} = target_card,
+         %Turn{} = turn
+       ) do
+    with {:ok, damage_counters} <- AbilityEffects.cursed_blast_counters(source_card),
+         damage = AbilityEffects.damage_for_counters(damage_counters),
+         {:ok, target_result} <-
+           place_cursed_blast_damage_counters(game_id, player_id, target_card, damage_counters),
+         {:ok, current_source_card} <- get_card(game_id, source_card.id),
+         {:ok, marked_source_card} <-
+           update(current_source_card, :set_markers, %{
+             markers: AbilityEffects.put_cursed_blast_used_marker(current_source_card, turn)
+           }),
+         {:ok, self_knocked_out_cards} <- discard_knocked_out_stack(game_id, marked_source_card) do
+      {:ok,
+       Map.merge(target_result, %{
+         damage_counters: damage_counters,
+         placed_damage: damage,
+         self_knocked_out?: true,
+         self_knocked_out_card_instance_ids: Enum.map(self_knocked_out_cards, & &1.id)
+       })}
+    end
+  end
+
+  defp place_cursed_blast_damage_counters(
+         game_id,
+         player_id,
+         %CardInstance{} = target_card,
+         damage_counters
+       ) do
+    damage = AbilityEffects.damage_for_counters(damage_counters)
+
+    case StadiumEffects.damage_counter_prevention_payload(
+           game_id,
+           target_card,
+           player_id,
+           :opponent_pokemon_effect
+         ) do
+      {:prevented, prevention_payload} ->
+        {:ok,
+         Map.merge(
+           %{
+             target_starting_damage: target_card.damage,
+             target_resulting_damage: target_card.damage,
+             target_knocked_out?: false,
+             damage_counter_prevented?: true,
+             prevented_damage_counters: damage_counters,
+             prevented_damage: damage
+           },
+           prevention_payload
+         )}
+
+      :not_prevented ->
+        target_resulting_damage = target_card.damage + damage
+
+        with {:ok, _target_card} <-
+               update(target_card, :set_damage, %{damage: target_resulting_damage}),
+             {:ok, target_knocked_out?} <-
+               maybe_knock_out_after_cursed_blast(game_id, target_card, target_resulting_damage) do
+          {:ok,
+           %{
+             target_starting_damage: target_card.damage,
+             target_resulting_damage: target_resulting_damage,
+             target_knocked_out?: target_knocked_out?,
+             damage_counter_prevented?: false,
+             prevented_damage_counters: 0,
+             prevented_damage: 0
+           }}
+        end
+    end
+  end
+
+  defp maybe_knock_out_after_cursed_blast(game_id, %CardInstance{} = target_card, new_damage) do
+    with {:ok, target_hp} <- pokemon_hp(target_card.card_id) do
+      if new_damage < target_hp do
+        {:ok, false}
+      else
+        with {:ok, _discarded_cards} <- discard_knocked_out_stack(game_id, target_card) do
+          {:ok, true}
+        end
+      end
+    end
+  end
+
+  defp cursed_blast_event_payload(
+         %Turn{} = turn,
+         %CardInstance{} = source_card,
+         %CardInstance{} = target_card,
+         ability_result
+       ) do
+    %{
+      turn_id: turn.id,
+      source: EventPayloads.card_source(source_card),
+      source_card_id: source_card.card_id,
+      source_card_instance_id: source_card.id,
+      ability_id: Atom.to_string(AbilityEffects.cursed_blast_ability_id()),
+      effect_type: :damage_counters_to_opponent_pokemon_then_self_knock_out,
+      target_card_instance_id: target_card.id,
+      damage_counters: ability_result.damage_counters,
+      placed_damage: ability_result.placed_damage,
+      target_starting_damage: ability_result.target_starting_damage,
+      target_resulting_damage: ability_result.target_resulting_damage,
+      target_knocked_out?: ability_result.target_knocked_out?,
+      damage_counter_prevented?: ability_result.damage_counter_prevented?,
+      prevented_damage_counters: ability_result.prevented_damage_counters,
+      prevented_damage: ability_result.prevented_damage,
+      protected_card_instance_id: Map.get(ability_result, :protected_card_instance_id),
+      damage_counter_prevention_source_card_id:
+        Map.get(ability_result, :damage_counter_prevention_source_card_id),
+      damage_counter_prevention_source_card_instance_id:
+        Map.get(ability_result, :damage_counter_prevention_source_card_instance_id),
+      damage_counter_prevention_source_effect_id:
+        Map.get(ability_result, :damage_counter_prevention_source_effect_id),
+      self_knocked_out?: ability_result.self_knocked_out?,
+      self_knocked_out_card_instance_ids: ability_result.self_knocked_out_card_instance_ids,
+      public_note: cursed_blast_public_note(source_card, ability_result.damage_counters)
+    }
+  end
+
+  defp resolve_cursed_blast_knockouts(
+         game_id,
+         player_id,
+         opponent_player_id,
+         %CardInstance{} = source_card,
+         %CardInstance{} = target_card,
+         ability_result
+       ) do
+    with {:ok, target_records} <-
+           cursed_blast_target_prize_records(
+             game_id,
+             target_card.owner_player_id,
+             target_card,
+             ability_result
+           ),
+         {:ok, self_records} <-
+           self_knockout_prize_records(game_id, source_card.owner_player_id, source_card, %{
+             self_knocked_out?: true
+           }),
+         prize_selections =
+           []
+           |> append_knockout_prize_selection(player_id, target_records)
+           |> append_knockout_prize_selection(opponent_player_id, self_records),
+         {:ok, game} <- create_knockout_prize_selections(game_id, prize_selections),
+         {:ok, game} <-
+           maybe_resolve_cursed_blast_target_replacement(
+             game,
+             player_id,
+             target_card.owner_player_id,
+             target_card,
+             ability_result
+           ) do
+      maybe_resolve_cursed_blast_self_replacement(
+        game,
+        opponent_player_id,
+        source_card.owner_player_id,
+        source_card,
+        ability_result
+      )
+    end
+  end
+
+  defp cursed_blast_target_prize_records(game_id, knocked_out_player_id, target_card, %{
+         target_knocked_out?: true
+       }) do
+    with {:ok, current_target_card} <- get_card(game_id, target_card.id),
+         :ok <- require_card_zone(current_target_card, :discard),
+         {:ok, prize_record} <- knockout_prize_record(knocked_out_player_id, current_target_card) do
+      {:ok, [prize_record]}
+    end
+  end
+
+  defp cursed_blast_target_prize_records(_game_id, _knocked_out_player_id, _target_card, _result) do
+    {:ok, []}
+  end
+
+  defp maybe_resolve_cursed_blast_target_replacement(
+         %Game{} = game,
+         attacking_player_id,
+         knocked_out_player_id,
+         %CardInstance{zone: :active},
+         %{target_knocked_out?: true}
+       ) do
+    resolve_replacement_after_knockout(game, attacking_player_id, knocked_out_player_id)
+  end
+
+  defp maybe_resolve_cursed_blast_target_replacement(
+         %Game{} = game,
+         _attacking_player_id,
+         _knocked_out_player_id,
+         %CardInstance{},
+         _ability_result
+       ) do
+    {:ok, game}
+  end
+
+  defp maybe_resolve_cursed_blast_self_replacement(
+         %Game{} = game,
+         attacking_player_id,
+         knocked_out_player_id,
+         %CardInstance{zone: :active},
+         %{self_knocked_out?: true}
+       ) do
+    resolve_replacement_after_knockout(game, attacking_player_id, knocked_out_player_id)
+  end
+
+  defp maybe_resolve_cursed_blast_self_replacement(
+         %Game{} = game,
+         _attacking_player_id,
+         _knocked_out_player_id,
+         %CardInstance{},
+         _ability_result
+       ) do
+    {:ok, game}
+  end
+
+  defp cursed_blast_public_note(%CardInstance{card_id: "PRE-037"}, damage_counters) do
+    "Dusknoir's Cursed Blast placed #{damage_counters} damage counters, then Dusknoir was Knocked Out."
+  end
+
+  defp cursed_blast_public_note(%CardInstance{}, damage_counters) do
+    "Dusclops's Cursed Blast placed #{damage_counters} damage counters, then Dusclops was Knocked Out."
   end
 
   defp attach_teal_dance_energy_and_draw(

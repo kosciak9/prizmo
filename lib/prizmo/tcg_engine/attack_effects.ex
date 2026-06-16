@@ -26,6 +26,7 @@ defmodule Prizmo.TcgEngine.AttackEffects do
       move_deck_card_to_hand: 3,
       move_play_card_to_hand: 3,
       move_discard_card_to_hand: 3,
+      next_bench_position: 2,
       next_hand_position_result: 2,
       shuffle_attached_cards_into_deck: 3
     ]
@@ -49,6 +50,7 @@ defmodule Prizmo.TcgEngine.AttackEffects do
   alias Prizmo.TcgEngine.BattleActions
   alias Prizmo.TcgEngine.CardCatalog
   alias Prizmo.TcgEngine.CardInstance
+  alias Prizmo.TcgEngine.CardStore
   alias Prizmo.TcgEngine.EventPayloads
   alias Prizmo.TcgEngine.Game
   alias Prizmo.TcgEngine.GameStore
@@ -66,6 +68,7 @@ defmodule Prizmo.TcgEngine.AttackEffects do
 
   @supported_effect_types [
     :bonus_damage_per_benched_pokemon,
+    :bonus_damage_if_stadium_in_play_then_discard_stadium,
     :bonus_damage_on_coin_heads,
     :bonus_damage_per_coin_heads_count,
     :bonus_damage_if_defender_pokemon_ex,
@@ -94,6 +97,7 @@ defmodule Prizmo.TcgEngine.AttackEffects do
     :return_attached_energy_to_hand,
     :opponent_bench_damage_counters,
     :prevent_damage_and_effects_from_attacks_next_turn_on_coin_heads,
+    :put_up_to_3_duskull_from_discard_to_bench,
     :return_attacker_and_attached_to_hand,
     :switch_self_with_bench,
     :slight_intrusion_coin_flip_search_deck_on_heads_self_damage
@@ -246,6 +250,9 @@ defmodule Prizmo.TcgEngine.AttackEffects do
       %{type: :bonus_damage_per_benched_pokemon} ->
         {:ok, %{}}
 
+      %{type: :bonus_damage_if_stadium_in_play_then_discard_stadium} ->
+        discard_stadium_if_in_play(game_id, player_id)
+
       %{type: :bonus_damage_per_energy_attached_to_both_active} ->
         {:ok, %{}}
 
@@ -320,6 +327,9 @@ defmodule Prizmo.TcgEngine.AttackEffects do
 
       %{type: :recover_trainer_from_discard_to_hand} ->
         create_recover_trainer_prompt(game_id, player_id, attacker_card, attack)
+
+      %{type: :put_up_to_3_duskull_from_discard_to_bench} ->
+        create_put_duskull_from_discard_prompt(game_id, player_id, attacker_card, attack)
 
       %{type: :return_attached_energy_to_hand} ->
         return_attached_energy_to_hand(game_id, player_id, attacker_card, opts)
@@ -448,6 +458,55 @@ defmodule Prizmo.TcgEngine.AttackEffects do
              pending_effect_id: pending_effect.id,
              effect_key: pending_effect.effect_key,
              selected_card_instance_id: recovered_card.id
+           }) do
+      GameStore.get_game(game.id)
+    end
+  end
+
+  def resume_pending_effect(
+        %Game{} = game,
+        %Prompt{} = prompt,
+        %PendingEffect{
+          source_type: :attack_effect,
+          effect_key: :put_up_to_3_duskull_from_discard_to_bench
+        } =
+          pending_effect,
+        player_id,
+        "put_duskull_from_discard_to_bench",
+        selected_card_instance_ids
+      )
+      when is_binary(player_id) and is_list(selected_card_instance_ids) do
+    with :ok <- require_max_count(selected_card_instance_ids, 3, :too_many_duskull_targets),
+         :ok <- require_unique_ids(selected_card_instance_ids),
+         :ok <- require_prompt_legal_choices(prompt, selected_card_instance_ids),
+         :ok <- require_prompt_selection_count(prompt, selected_card_instance_ids),
+         {:ok, duskull_cards} <- get_cards(game.id, selected_card_instance_ids),
+         :ok <- require_all_owned_in_zone(duskull_cards, player_id, :discard),
+         :ok <- require_duskull_cards(duskull_cards),
+         {:ok, moved_cards} <- put_discard_duskull_on_bench(game.id, player_id, duskull_cards),
+         {:ok, _event} <-
+           write_event_and_snapshot(game.id, :cards_moved, player_id, %{
+             reason: :attack_effect_resolution,
+             source: source_payload(pending_effect),
+             effect_key: pending_effect.effect_key,
+             cards: EventPayloads.moved_cards(moved_cards, :discard, :bench)
+           }),
+         {:ok, _pending_effect} <-
+           update(pending_effect, :complete, %{
+             current_player_id: nil,
+             state:
+               Map.merge(pending_effect.state || %{}, %{
+                 "benched_card_instance_ids" => Enum.map(moved_cards, & &1.id),
+                 "benched_count" => length(moved_cards)
+               })
+           }),
+         {:ok, _event} <-
+           write_event_and_snapshot(game.id, :attack_effect_completed, player_id, %{
+             prompt_id: prompt.id,
+             pending_effect_id: pending_effect.id,
+             effect_key: pending_effect.effect_key,
+             selected_card_instance_ids: Enum.map(moved_cards, & &1.id),
+             selected_count: length(moved_cards)
            }) do
       GameStore.get_game(game.id)
     end
@@ -671,6 +730,144 @@ defmodule Prizmo.TcgEngine.AttackEffects do
     end
   end
 
+  defp create_put_duskull_from_discard_prompt(
+         game_id,
+         player_id,
+         %CardInstance{} = attacker_card,
+         attack
+       ) do
+    with {:ok, legal_choice_ids} <- legal_duskull_from_discard_choice_ids(game_id, player_id),
+         {:ok, bench_space} <- bench_space(game_id, player_id) do
+      max_choices = min(3, min(bench_space, length(legal_choice_ids)))
+
+      if max_choices == 0 do
+        {:ok,
+         %{
+           effect_type: "put_up_to_3_duskull_from_discard_to_bench",
+           duskull_prompt_created?: false,
+           duskull_legal_choice_count: length(legal_choice_ids),
+           available_bench_space: bench_space
+         }}
+      else
+        create_put_duskull_from_discard_prompt(
+          game_id,
+          player_id,
+          attacker_card,
+          attack,
+          legal_choice_ids,
+          max_choices
+        )
+      end
+    end
+  end
+
+  defp create_put_duskull_from_discard_prompt(
+         game_id,
+         player_id,
+         %CardInstance{} = attacker_card,
+         attack,
+         legal_choice_ids,
+         max_choices
+       ) do
+    with {:ok, turn} <- TurnStore.current_turn(game_id),
+         {:ok, pending_effect} <-
+           create(PendingEffect, :create, %{
+             game_id: game_id,
+             source_type: :attack_effect,
+             source_card_instance_id: attacker_card.id,
+             source_card_id: attacker_card.card_id,
+             controller_player_id: player_id,
+             current_player_id: player_id,
+             effect_key: :put_up_to_3_duskull_from_discard_to_bench,
+             step: "awaiting_choice",
+             state: %{
+               "version" => 1,
+               "kind" => "attack_effect",
+               "effect_type" => "put_up_to_3_duskull_from_discard_to_bench",
+               "player_id" => player_id,
+               "source_card_instance_id" => attacker_card.id,
+               "source_card_id" => attacker_card.card_id,
+               "attack_id" => Atom.to_string(attack.id)
+             }
+           }),
+         {:ok, pending_effect} <-
+           update(pending_effect, :await_prompt, %{
+             current_player_id: player_id,
+             effect_key: :put_up_to_3_duskull_from_discard_to_bench,
+             step: "awaiting_choice",
+             state: pending_effect.state || %{}
+           }),
+         {:ok, prompt} <-
+           create(Prompt, :create, %{
+             game_id: game_id,
+             turn_id: turn.id,
+             pending_effect_id: pending_effect.id,
+             prompt_type: "select_cards",
+             player_id: player_id,
+             payload: %{
+               "choice_key" => "put_duskull_from_discard_to_bench",
+               "legal_choices" => legal_choice_ids,
+               "min" => 0,
+               "max" => max_choices,
+               "source_card_instance_id" => attacker_card.id,
+               "source_card_id" => attacker_card.card_id,
+               "attack_id" => Atom.to_string(attack.id)
+             }
+           }) do
+      {:ok,
+       %{
+         effect_type: "put_up_to_3_duskull_from_discard_to_bench",
+         pending_effect_id: pending_effect.id,
+         prompt_id: prompt.id,
+         duskull_prompt_created?: true,
+         duskull_legal_choice_count: length(legal_choice_ids),
+         max_duskull_choices: max_choices
+       }}
+    end
+  end
+
+  defp legal_duskull_from_discard_choice_ids(game_id, player_id) do
+    with {:ok, discard_cards} <- cards_in_zone(game_id, player_id, :discard) do
+      discard_cards
+      |> Enum.filter(&duskull_card?/1)
+      |> Enum.map(& &1.id)
+      |> then(&{:ok, &1})
+    end
+  end
+
+  defp bench_space(game_id, player_id) do
+    with {:ok, bench_cards} <- cards_in_zone(game_id, player_id, :bench) do
+      {:ok, max(5 - length(bench_cards), 0)}
+    end
+  end
+
+  defp require_duskull_cards(cards) when is_list(cards) do
+    if Enum.all?(cards, &duskull_card?/1) do
+      :ok
+    else
+      {:error, :come_and_get_you_requires_duskull}
+    end
+  end
+
+  defp duskull_card?(%CardInstance{card_id: "PRE-035"}), do: true
+  defp duskull_card?(%CardInstance{}), do: false
+
+  defp put_discard_duskull_on_bench(_game_id, _player_id, []), do: {:ok, []}
+
+  defp put_discard_duskull_on_bench(game_id, player_id, duskull_cards) do
+    duskull_cards
+    |> Enum.map(fn card ->
+      with {:ok, position} <- next_bench_position(game_id, player_id),
+           {:ok, turn} <- TurnStore.current_turn(game_id) do
+        update(card, :put_basic_from_discard_to_bench, %{
+          position: position,
+          turn_entered_play: turn.turn_number
+        })
+      end
+    end)
+    |> collect_results()
+  end
+
   defp require_prompt_legal_choices(%Prompt{payload: payload}, selected_card_instance_ids) do
     legal_choice_ids =
       case Map.get(payload, "legal_choices", []) do
@@ -682,6 +879,25 @@ defmodule Prizmo.TcgEngine.AttackEffects do
       :ok
     else
       {:error, :illegal_prompt_choice}
+    end
+  end
+
+  defp require_prompt_selection_count(%Prompt{payload: payload}, selected_card_instance_ids) do
+    count = length(selected_card_instance_ids)
+    min = prompt_bound(payload, "min", 0)
+    max = prompt_bound(payload, "max", count)
+
+    cond do
+      count < min -> {:error, {:too_few_prompt_choices, count, min}}
+      count > max -> {:error, {:too_many_prompt_choices, count, max}}
+      true -> :ok
+    end
+  end
+
+  defp prompt_bound(payload, key, default) do
+    case Map.get(payload, key, default) do
+      value when is_integer(value) -> value
+      _invalid -> default
     end
   end
 
@@ -1218,6 +1434,33 @@ defmodule Prizmo.TcgEngine.AttackEffects do
        discarded_energy_card_instance_ids: [],
        discarded_energy_count: 0
      }}
+  end
+
+  defp discard_stadium_if_in_play(game_id, _player_id) do
+    with {:ok, stadiums} <- CardStore.cards_in_zone(game_id, :stadium) do
+      case stadiums do
+        [] ->
+          {:ok,
+           %{
+             effect_type: "bonus_damage_if_stadium_in_play_then_discard_stadium",
+             stadium_discarded?: false,
+             discarded_stadium_card_instance_ids: []
+           }}
+
+        [_first | _rest] ->
+          with {:ok, discarded_stadiums} <- CardStore.discard_existing_stadiums(game_id) do
+            {:ok,
+             %{
+               effect_type: "bonus_damage_if_stadium_in_play_then_discard_stadium",
+               stadium_discarded?: true,
+               discarded_stadium_card_instance_ids: Enum.map(discarded_stadiums, & &1.id),
+               discarded_stadium_card_ids: Enum.map(discarded_stadiums, & &1.card_id),
+               discarded_stadium_count: length(discarded_stadiums),
+               affected_player_ids: Enum.map(discarded_stadiums, & &1.owner_player_id)
+             }}
+          end
+      end
+    end
   end
 
   defp defending_energy_card(game_id, %CardInstance{} = defender_card, opts) do

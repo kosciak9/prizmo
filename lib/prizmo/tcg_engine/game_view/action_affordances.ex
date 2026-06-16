@@ -119,7 +119,7 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
       play_basic_to_bench_affordance(player, cards),
       attach_energy_affordance(player, cards),
       attach_tool_affordance(game, player, cards),
-      retreat_affordance(player, current_turn, cards)
+      retreat_affordance(game, player, current_turn, cards)
     ] ++
       teal_dance_affordances(player, current_turn, cards) ++
       seething_spirit_affordances(player, current_turn, cards) ++
@@ -127,6 +127,7 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
       psychic_draw_affordances(player, current_turn, cards) ++
       recon_directive_affordances(player, current_turn, cards) ++
       run_away_draw_affordances(player, current_turn, cards) ++
+      cursed_blast_affordances(game, player, current_turn, cards, all_cards) ++
       adrena_brain_affordances(player, current_turn, cards, all_cards) ++
       evolve_from_hand_affordances(player, current_turn, cards, all_cards) ++
       declare_attack_affordances(player, current_turn, cards, all_cards) ++
@@ -296,18 +297,21 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
 
   defp evolve_from_hand_affordances(_player, _current_turn, _cards, _all_cards), do: []
 
-  defp retreat_affordance(%GamePlayer{retreated_this_turn?: true}, _current_turn, _cards), do: nil
+  defp retreat_affordance(_game, %GamePlayer{retreated_this_turn?: true}, _current_turn, _cards),
+    do: nil
 
-  defp retreat_affordance(%GamePlayer{} = player, %Turn{} = current_turn, cards) do
+  defp retreat_affordance(%Game{} = game, %GamePlayer{} = player, %Turn{} = current_turn, cards) do
     with %CardInstance{} = active_card <- active_pokemon_card(cards),
          false <- blocked_retreat_status?(active_card),
          false <- RetreatLocks.blocked_this_turn?(active_card, current_turn),
          target_ids when target_ids != [] <- cards |> bench_pokemon_cards() |> card_ids(),
          {:ok, retreat_cost} <-
-           RetreatCosts.effective_retreat_cost(
+           RetreatCosts.effective_retreat_cost_details(
+             game.id,
              active_card,
              attached_cards_for(cards, active_card.id)
            ),
+         retreat_cost = retreat_cost.effective,
          source_ids = cards |> active_attached_energy_cards(active_card.id) |> card_ids(),
          true <- length(source_ids) >= retreat_cost do
       affordance(:retreat, "Retreat Active Pokémon", :command, player.player_id,
@@ -497,6 +501,36 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
   end
 
   defp run_away_draw_affordances(_player, _current_turn, _cards), do: []
+
+  defp cursed_blast_affordances(
+         %Game{} = game,
+         %GamePlayer{} = player,
+         %Turn{} = current_turn,
+         cards,
+         all_cards
+       ) do
+    opponent_target_cards = opponent_in_play_pokemon_cards(all_cards, player.player_id)
+
+    for source_card <- in_play_pokemon_cards(cards),
+        AbilityEffects.cursed_blast_available?(game.id, source_card, current_turn),
+        target_card <- opponent_target_cards do
+      {:ok, damage_counters} = AbilityEffects.cursed_blast_counters(source_card)
+
+      affordance(
+        :cursed_blast,
+        cursed_blast_label(source_card, target_card, damage_counters),
+        :command,
+        player.player_id,
+        source_card_instance_ids: [source_card.id],
+        target_card_instance_ids: [target_card.id],
+        choice_keys: ["target_pokemon"],
+        note:
+          "Put #{damage_counters} damage counters on 1 of your opponent's Pokémon. Then this Pokémon is Knocked Out."
+      )
+    end
+  end
+
+  defp cursed_blast_affordances(_game, _player, _current_turn, _cards, _all_cards), do: []
 
   defp declare_attack_affordances(
          %GamePlayer{} = player,
@@ -1022,6 +1056,10 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
 
   defp seething_spirit_label(energy_card, target_card) do
     "Use Seething Spirit: attach #{card_name(energy_card)} to #{card_name(target_card)}"
+  end
+
+  defp cursed_blast_label(source_card, target_card, damage_counters) do
+    "Use Cursed Blast: #{card_name(source_card)} → #{card_name(target_card)} (#{damage_counters} counters)"
   end
 
   defp adrena_brain_note(1) do

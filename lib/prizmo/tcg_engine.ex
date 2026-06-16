@@ -40,6 +40,7 @@ defmodule Prizmo.TcgEngine do
       rpc_action :use_tcg_engine_munkidori_adrena_brain, :use_munkidori_adrena_brain_command
       rpc_action :use_tcg_engine_teal_dance, :use_teal_mask_ogerpon_teal_dance_command
       rpc_action :use_tcg_engine_seething_spirit, :use_blaziken_ex_seething_spirit_command
+      rpc_action :use_tcg_engine_cursed_blast, :use_cursed_blast_command
       rpc_action :use_tcg_engine_flip_the_script, :use_fezandipiti_flip_the_script_command
       rpc_action :use_tcg_engine_psychic_draw, :use_psychic_draw_command
       rpc_action :use_tcg_engine_recon_directive, :use_drakloak_recon_directive_command
@@ -159,6 +160,10 @@ defmodule Prizmo.TcgEngine do
           :energy_card_instance_id,
           :target_card_instance_id
         ]
+
+      define :use_cursed_blast_for_game,
+        action: :use_cursed_blast_command,
+        args: [:game_id, :player_id, :source_card_instance_id, :target_card_instance_id]
 
       define :use_fezandipiti_flip_the_script_for_game,
         action: :use_fezandipiti_flip_the_script_command,
