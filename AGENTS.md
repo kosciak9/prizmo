@@ -86,6 +86,9 @@ Use `mix check --no-test` only when tests are being run separately. Use
 ## Repository boundaries
 
 - Keep generated runtime data, local uploads, credentials, and dependency caches out of git.
+- `game/*` is reserved for Godot TCG player experiments. Do not edit, delete,
+  format, move, or clean files under `game/*` unless the user explicitly asks
+  for Godot/`game/*` work.
 - Use `/tmp/opencode` for scratch work outside the repository.
 - Verify APIs against the installed dependency versions before relying on examples from the internet.
 

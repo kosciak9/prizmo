@@ -1,7 +1,7 @@
 # TCG Client Renderer Options
 
-- Updated: 2026-05-28
-- Sources: ChatGPT shared conversation/export (2026-05-28); cited GitHub repositories and Godot documentation
+- Updated: 2026-06-16
+- Sources: ChatGPT shared conversation/export (2026-05-28); cited GitHub repositories and Godot documentation; Project codebase; user instruction
 - Raw: [TCG client renderer AI thread](../../raw/engine/2026-05-28-tcg-client-renderer-ai-thread.md)
 
 ## Summary
@@ -147,6 +147,10 @@ drag card onto valid target
 ## Validation status
 
 The first direct source validation is captured in [Cross-Platform TCG Client Architecture](cross-platform-tcg-client-architecture.md) and [Godot card repository validation](../../raw/engine/2026-05-28-godot-card-repo-validation.md).
+
+## Current repo experiment boundary
+
+Repo-root `game/*` is reserved for Godot TCG player experiments, including local Godot project/editor artifacts such as `game/ptcg_game/*`. Treat this subtree as intentionally out of scope for Phoenix/Ash/React work: do not edit, delete, format, move, clean, or otherwise manage files under `game/*` unless the user explicitly requests Godot or `game/*` work.
 
 Remaining validation tasks:
 

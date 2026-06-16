@@ -11,16 +11,18 @@ This article defines the complete scope needed to play **exact printed-text-fide
 ## Current State
 
 - The legacy pure simulator (`lib/prizmo/tcg/sim/`) already supports the Dragapult-vs-Alakazam matchup end-to-end with scripted engine actions, but this is not the canonical product path.
-- The Ash-backed persisted engine (`lib/prizmo/tcg_engine/`) + React SPA has all six fixture decks declared as **0 visible pending-text blockers** per the post-256 inventory, but this criterion is too weak: it checks GameView pending text, not whether effects/actions actually resolve.
-- **Verified blocker cards in the fixture decks** (have behavior metadata but missing executable Ash path or action surface):
-  - `MEG-054` Abra — Teleportation Attack missing executive attack behavior
-  - `MEG-055` Kadabra — Psychic Draw has no persisted action surface (effect overlay exists)
-  - `MEG-056` Alakazam — Powerful Hand unsupported, Psychic Draw effect overlay missing
-  - `TWM-129` Drakloak — Recon Directive has no persisted action surface
-  - `TEF-129` Dudunsparce — Run Away Draw has no persisted action surface
-  - `TEF-024` Rabsca — Spherical Shield not enforced as bench damage prevention
-  - `SFA-040` Genesect — ACE Nullifier not enforced
-  - `ASC-039` Psyduck — Damp not enforced
+- The canonical target remains the Ash-backed persisted engine (`lib/prizmo/tcg_engine/`) + React SPA under `lib/prizmo_web/spa/`.
+- The original 8 fixture-deck blockers are now closed in the canonical path: Teleportation Attack, Psychic Draw, Powerful Hand, Recon Directive, Run Away Draw, Spherical Shield, ACE Nullifier, and Damp all have persisted engine behavior and/or action surfaces.
+- Dragapult Blaziken variant support now includes Seething Spirit, Smolder-sault, Fairy Zone Weakness override, Chi-Yu Allure + Ground Melter with Stadium discard, and Special Red Card backend play support.
+- Dragapult Dusknoir variant support now includes Come and Get You, Dusclops/Dusknoir Cursed Blast backend resolution, Dusknoir Shadow Bind, Jamming Tower Tool suppression, Battle Cage-style bench damage-counter prevention, and the React SPA button/RPC wiring for `cursed_blast` actions.
+- Latest local validation for the Cursed Blast SPA wiring and surrounding engine slice: `mix format`, `mix compile --warnings-as-errors`, focused engine/card registry tests (24 tests, 0 failures), `mix assets.build`, and `mix ash_typescript.codegen --check` passed. `mix check --no-test` passed through Credo and halted at Dialyzer because the local Erlang/Dialyzer install exits the VM.
+
+## Remaining Scope After Current Slice
+
+- Plain Dragapult tech cards still need executable support and tests: `TWM-080`, `SFA-064`, and `POR-084`.
+- Alakazam tech fixture/support work remains for common swaps such as `ASC-197`, `TEF-146`, `PFL-094`, `TEF-159`, and `SCR-137`. `CRI-082` Special Red Card has backend play support, but still needs fixture/test coverage if it is part of the final Alakazam tech matrix.
+- Dedicated tests are still needed for Fairy Zone/Weakness, Ground Melter Stadium discard, Special Red Card, Come and Get You, Cursed Blast prize/replacement/Damp interactions, and Jamming Tower.
+- Full two-seat browser validation is still pending for each Dragapult variant against Alakazam.
 
 ## Variant Pool
 

@@ -1,5 +1,17 @@
 # Wiki Log
 
+## [2026-06-16] codebase update | Godot game subtree repository boundary
+- Task attempted: recorded that repo-root `game/*` is reserved for Godot TCG player experiments and must not be edited, deleted, formatted, moved, cleaned, or otherwise managed unless the user explicitly requests Godot/`game/*` work.
+- Files changed: `AGENTS.md`, `knowledge-base/wiki/engine/tcg-client-renderer-options.md`, `knowledge-base/wiki/index.md`, `knowledge-base/wiki/log.md`
+- Validation: docs-only update; no tests run.
+- Remaining/blocking notes: untracked `game/ptcg_game/*` remains intentionally untouched unless explicitly requested.
+
+## [2026-06-16] codebase update | Cursed Blast SPA wiring and Dragapult variant status
+- Task attempted: wired the generated Ash RPC for `use_tcg_engine_cursed_blast` into the React SPA action rail and refreshed the Dragapult/Alakazam scope article with current canonical-engine progress and remaining blockers.
+- Files changed: `lib/prizmo_web/spa/lib/ash/client.ts`, `lib/prizmo_web/spa/features/home/routes/index.tsx`, `knowledge-base/wiki/engine/dragapult-alakazam-full-game-implementation-scope.md`, `knowledge-base/wiki/index.md`, `knowledge-base/wiki/log.md`
+- Validation: `mix format`, `mix compile --warnings-as-errors`, focused `mix test test/prizmo/tcg_engine/mechanics_test.exs test/prizmo/tcg/cards/metadata_test.exs test/prizmo/tcg/cards/dsl_test.exs test/prizmo/tcg/sim/card_registry_test.exs test/prizmo/tcg/sim/registry_coverage_test.exs` (24/0), `mix assets.build`, and `mix ash_typescript.codegen --check` passed. `mix check --no-test` passed Format, Sobelow, Compiling, Unused Deps, Xref, Filenames, Service Images, Ash TS Gen/Check, and Credo, then halted at Dialyzer due to the local Erlang/Dialyzer VM issue.
+- Remaining/blocking notes: plain Dragapult techs (`TWM-080`, `SFA-064`, `POR-084`), Alakazam tech fixture/support, dedicated mechanics tests, and full two-seat browser validation remain.
+
 ## [2026-06-16] codebase update | Dragapult and Alakazam full-game implementation scope
 - Task attempted: researched NAIC 2026 Dragapult and Alakazam variant pool from Limitless TCG aggregate + specific topping lists, cross-referenced against current Ash-backed persisted engine support.
 - Files changed: new `knowledge-base/raw/meta/2026-06-16-naic-2026-dragapult-and-alakazam-deck-cards.md` (raw Limitless card data), new `knowledge-base/wiki/engine/dragapult-alakazam-full-game-implementation-scope.md` (implementation plan), `knowledge-base/wiki/index.md`, `knowledge-base/wiki/log.md`
