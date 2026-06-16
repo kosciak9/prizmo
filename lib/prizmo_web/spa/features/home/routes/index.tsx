@@ -22,6 +22,7 @@ import {
   runEvolveTcgEngineFromHand,
   runFinishTcgEngineAttack,
   runFinishTcgEngineSetupChoices,
+  runGetSupportedTcgDeckBlueprint,
   runGetTcgEngineGameState,
   runListTcgEngineGames,
   runListSupportedTcgDecks,
@@ -44,6 +45,7 @@ import {
   runUseTcgEngineTeamRocketsFactory,
   type CreateOpenDeckTcgEngineGameFields,
   type CreateTcgEngineGameFields,
+  type GetSupportedTcgDeckBlueprintFields,
   type GetTcgEngineGameStateFields,
   type ListTcgEngineGamesFields,
   type ListSupportedTcgDecksFields
@@ -79,6 +81,15 @@ const SUPPORTED_DECK_FIELDS: ListSupportedTcgDecksFields = [
   'cardCount',
   'uniqueCardCount'
 ]
+
+const GET_SUPPORTED_DECK_BLUEPRINT_FIELDS: GetSupportedTcgDeckBlueprintFields = [
+  'deckKey',
+  'name',
+  'sourceUrl',
+  'cardCount',
+  'uniqueCardCount',
+  { counts: ['cardId', 'count'] }
+] as unknown as GetSupportedTcgDeckBlueprintFields
 
 const GAME_RESOURCE_FIELDS: CreateTcgEngineGameFields = [
   'id',
@@ -241,7 +252,8 @@ type PlayerId = (typeof PLAYER_IDS)[number]
 type CoinResult = 'heads' | 'tails'
 type ResolutionChecklistTone = 'blocked' | 'ready' | 'waiting'
 type SetupGuideState = 'done' | 'needed' | 'next' | 'ready'
-type GameCreationMode = 'open-deck' | 'fixture'
+type LauncherMode = 'regular' | 'fixture'
+type RegularSourceMode = 'premade' | 'paste'
 
 type ResolutionChecklistItem = {
   label: string
@@ -883,7 +895,8 @@ export function HomeRoute() {
   const navigate = useNavigate({ from: '/' })
   const search = useSearch({ from: '/' })
   const queryClient = useQueryClient()
-  const [gameCreationMode, setGameCreationMode] = useState<GameCreationMode>('open-deck')
+  const [launcherMode, setLauncherMode] = useState<LauncherMode>('regular')
+  const [regularSourceMode, setRegularSourceMode] = useState<RegularSourceMode>('premade')
   const [playerOneDeckKey, setPlayerOneDeckKey] = useState('')
   const [playerTwoDeckKey, setPlayerTwoDeckKey] = useState('')
   const [playerOneOpenDeckText, setPlayerOneOpenDeckText] = useState('')
@@ -935,6 +948,32 @@ export function HomeRoute() {
     })
   }, [normalisedGameId, session.viewerPlayerId])
 
+  // Premade deck preload for regular games
+  useEffect(() => {
+    if (launcherMode !== 'regular' || regularSourceMode !== 'premade') {
+      return
+    }
+
+    const loadPremade = async (deckKey: string, setText: (text: string) => void) => {
+      if (!deckKey) return
+      try {
+        const blueprint = await getDeckBlueprint(deckKey)
+        const text = formatDeckCountsToText(blueprint.counts)
+        setText(text)
+      } catch (err) {
+        // Silently ignore — user can still paste manually
+        console.warn('Failed to load premade deck blueprint', err)
+      }
+    }
+
+    if (selectedPlayerOneDeckKey) {
+      void loadPremade(selectedPlayerOneDeckKey, setPlayerOneOpenDeckText)
+    }
+    if (selectedPlayerTwoDeckKey) {
+      void loadPremade(selectedPlayerTwoDeckKey, setPlayerTwoOpenDeckText)
+    }
+  }, [launcherMode, regularSourceMode, selectedPlayerOneDeckKey, selectedPlayerTwoDeckKey])
+
   const gameStateQuery = useQuery({
     queryKey: ['tcg-engine', 'game-state', normalisedGameId, session.viewerPlayerId] as const,
     queryFn: ({ queryKey }) => {
@@ -947,17 +986,23 @@ export function HomeRoute() {
   })
 
   const createGameMutation = useMutation({
-    mutationFn: () =>
-      gameCreationMode === 'open-deck'
-        ? createOpenDeckGame({
-            playerOneCards: parsedPlayerOneOpenDeck.cards,
-            playerTwoCards: parsedPlayerTwoOpenDeck.cards,
-            rngSeed: openDeckRngSeedValue.length > 0 ? openDeckRngSeedValue : null
-          })
-        : createFixtureGame({
-            playerOneDeckKey: selectedPlayerOneDeckKey,
-            playerTwoDeckKey: selectedPlayerTwoDeckKey
-          }),
+    mutationFn: () => {
+      const isRegularPremade = launcherMode === 'regular' && regularSourceMode === 'premade'
+      const isRegularPaste = launcherMode === 'regular' && regularSourceMode === 'paste'
+
+      if (isRegularPremade || isRegularPaste) {
+        return createOpenDeckGame({
+          playerOneCards: parsedPlayerOneOpenDeck.cards,
+          playerTwoCards: parsedPlayerTwoOpenDeck.cards,
+          rngSeed: openDeckRngSeedValue.length > 0 ? openDeckRngSeedValue : null
+        })
+      }
+
+      return createFixtureGame({
+        playerOneDeckKey: selectedPlayerOneDeckKey,
+        playerTwoDeckKey: selectedPlayerTwoDeckKey
+      })
+    },
     onSuccess: async game => {
       updateSession(currentSession => ({
         ...currentSession,
@@ -1245,9 +1290,9 @@ export function HomeRoute() {
   )
   const fixtureLoadoutsReady = Boolean(selectedPlayerOneDeckKey && selectedPlayerTwoDeckKey)
   const openDeckLoadoutsReady = isOpenDeckReady(parsedPlayerOneOpenDeck) && isOpenDeckReady(parsedPlayerTwoOpenDeck)
-  const loadoutsReady = gameCreationMode === 'open-deck' ? openDeckLoadoutsReady : fixtureLoadoutsReady
+  const loadoutsReady = launcherMode === 'regular' ? openDeckLoadoutsReady : fixtureLoadoutsReady
   const loadoutDetail =
-    gameCreationMode === 'open-deck'
+    launcherMode === 'regular'
       ? openDeckLoadoutDetail(parsedPlayerOneOpenDeck, parsedPlayerTwoOpenDeck, openDeckRngSeedValue)
       : selectedPlayerOneDeck && selectedPlayerTwoDeck
         ? `${selectedPlayerOneDeck.name} vs ${selectedPlayerTwoDeck.name}`
@@ -1463,12 +1508,56 @@ export function HomeRoute() {
           </div>
         </header>
 
+        {normalisedGameId ? (
+          <div className="prizmo-soft-surface flex flex-col gap-3 rounded-2xl px-4 py-3 text-sm text-muted-foreground lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="font-medium text-foreground">Session</span>
+              <StatusBadge tone={gameStateHasViewerMismatch ? 'warning' : 'active'}>
+                {gameStateHasViewerMismatch ? 'viewer mismatch' : 'connected'}
+              </StatusBadge>
+              <span className="font-mono text-xs">{formatGameId(normalisedGameId)}</span>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              {PLAYER_IDS.map(playerId => (
+                <button
+                  className={`rounded-xl px-3 py-2 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-ring/50 ${
+                    session.viewerPlayerId === playerId
+                      ? 'bg-primary/12 text-primary'
+                      : 'bg-secondary/70 text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                  }`}
+                  key={playerId}
+                  onClick={() => updateSession(currentSession => ({ ...currentSession, viewerPlayerId: playerId }))}
+                  type="button"
+                >
+                  {formatPlayerId(playerId)}
+                </button>
+              ))}
+              <button
+                className="rounded-xl bg-secondary/70 px-3 py-2 text-sm font-medium text-muted-foreground transition hover:bg-accent hover:text-accent-foreground focus:outline-none focus:ring-2 focus:ring-ring/50 disabled:cursor-not-allowed disabled:text-text-dim"
+                disabled={gameStateQuery.isFetching}
+                onClick={() => void gameStateQuery.refetch()}
+                type="button"
+              >
+                {gameStateQuery.isFetching ? 'Refreshing...' : 'Refresh'}
+              </button>
+              <button
+                className="rounded-xl bg-secondary/70 px-3 py-2 text-sm font-medium text-muted-foreground transition hover:bg-accent hover:text-accent-foreground focus:outline-none focus:ring-2 focus:ring-ring/50"
+                onClick={clearGame}
+                type="button"
+              >
+                Clear
+              </button>
+            </div>
+          </div>
+        ) : null}
+
         <section
           className={`grid gap-6 ${
-            normalisedGameId ? 'lg:grid-cols-[minmax(11rem,13rem)_1fr]' : 'lg:grid-cols-[minmax(18rem,22rem)_1fr]'
+            normalisedGameId ? 'lg:grid-cols-1' : 'lg:grid-cols-[minmax(18rem,22rem)_1fr]'
           }`}
         >
-          <aside className="flex flex-col gap-5">
+          <aside className={normalisedGameId ? 'hidden' : 'flex flex-col gap-5'}>
             <Panel title={normalisedGameId ? 'Session' : 'Create or reconnect'}>
               <div className="space-y-4">
                 <SessionConnectionSummary
@@ -1480,10 +1569,54 @@ export function HomeRoute() {
 
                 {!normalisedGameId ? (
                   <>
-                    <GameCreationModeSelect value={gameCreationMode} onChange={setGameCreationMode} />
+                    <LauncherModeSelect
+                      launcherMode={launcherMode}
+                      regularSourceMode={regularSourceMode}
+                      onLauncherModeChange={setLauncherMode}
+                      onRegularSourceModeChange={setRegularSourceMode}
+                    />
 
-                    {gameCreationMode === 'open-deck' ? (
+                    {(launcherMode === 'regular' && regularSourceMode === 'premade') || launcherMode === 'fixture' ? (
                       <>
+                        {decksQuery.isPending ? <SkeletonLines count={3} /> : null}
+
+                        {decksQuery.error ? (
+                          <InlineNotice tone="error" title="Deck catalog did not load">
+                            {errorMessage(decksQuery.error)} Refresh before creating a table.
+                          </InlineNotice>
+                        ) : null}
+
+                        {!decksQuery.isPending && decks.length === 0 ? (
+                          <InlineNotice tone="info" title="No supported decks exposed yet">
+                            The engine RPC returned an empty fixture list.
+                          </InlineNotice>
+                        ) : null}
+
+                        <DeckSelect
+                          label={launcherMode === 'fixture' ? 'Player 1 fixture' : 'Player 1 premade'}
+                          playerId={PLAYER_ONE_ID}
+                          value={selectedPlayerOneDeckKey}
+                          decks={decks}
+                          onChange={setPlayerOneDeckKey}
+                        />
+                        <DeckSelect
+                          label={launcherMode === 'fixture' ? 'Player 2 fixture' : 'Player 2 premade'}
+                          playerId={PLAYER_TWO_ID}
+                          value={selectedPlayerTwoDeckKey}
+                          decks={decks}
+                          onChange={setPlayerTwoDeckKey}
+                        />
+                      </>
+                    ) : null}
+
+                    {launcherMode === 'regular' ? (
+                      <>
+                        {regularSourceMode === 'premade' ? (
+                          <InlineNotice tone="info" title="Editable premade lists">
+                            Premade choices load into these deck editors. Adjust either list before creating the regular shuffled board.
+                          </InlineNotice>
+                        ) : null}
+
                         <OpenDeckTextArea
                           label="Player 1 decklist"
                           parsedDeck={parsedPlayerOneOpenDeck}
@@ -1514,38 +1647,7 @@ export function HomeRoute() {
                           />
                         </label>
                       </>
-                    ) : (
-                      <>
-                        {decksQuery.isPending ? <SkeletonLines count={3} /> : null}
-
-                        {decksQuery.error ? (
-                          <InlineNotice tone="error" title="Deck fixtures did not load">
-                            {errorMessage(decksQuery.error)} Refresh before creating a table.
-                          </InlineNotice>
-                        ) : null}
-
-                        {!decksQuery.isPending && decks.length === 0 ? (
-                          <InlineNotice tone="info" title="No supported decks exposed yet">
-                            The engine RPC returned an empty fixture list.
-                          </InlineNotice>
-                        ) : null}
-
-                        <DeckSelect
-                          label="Player 1 loadout"
-                          playerId={PLAYER_ONE_ID}
-                          value={selectedPlayerOneDeckKey}
-                          decks={decks}
-                          onChange={setPlayerOneDeckKey}
-                        />
-                        <DeckSelect
-                          label="Player 2 loadout"
-                          playerId={PLAYER_TWO_ID}
-                          value={selectedPlayerTwoDeckKey}
-                          decks={decks}
-                          onChange={setPlayerTwoDeckKey}
-                        />
-                      </>
-                    )}
+                    ) : null}
                   </>
                 ) : null}
 
@@ -1584,9 +1686,9 @@ export function HomeRoute() {
                   >
                     {createGameMutation.isPending
                       ? 'Creating table...'
-                      : gameCreationMode === 'open-deck'
-                        ? 'Create RNG open-deck board'
-                        : 'Create fixture board'}
+                      : launcherMode === 'regular'
+                        ? 'Create regular board'
+                        : 'Create board'}
                   </button>
                 ) : null}
 
@@ -1595,7 +1697,13 @@ export function HomeRoute() {
                     hasGame={Boolean(normalisedGameId)}
                     loadoutDetail={loadoutDetail}
                     loadoutsReady={loadoutsReady}
-                    sourceTitle={gameCreationMode === 'open-deck' ? 'Paste open decklists' : 'Pick fixture loadouts'}
+                    sourceTitle={
+                      launcherMode === 'regular'
+                        ? regularSourceMode === 'premade'
+                          ? 'Pick premades, then edit decklists'
+                          : 'Paste open decklists'
+                        : 'Pick fixture loadouts'
+                    }
                     viewerPlayerId={session.viewerPlayerId}
                   />
                 ) : null}
@@ -1603,9 +1711,9 @@ export function HomeRoute() {
                 {createGameMutation.error ? (
                   <InlineNotice tone="error" title="Game creation failed">
                     {errorMessage(createGameMutation.error)}{' '}
-                    {gameCreationMode === 'open-deck'
+                    {launcherMode === 'regular'
                       ? 'No table was created. Confirm both lists use catalog card IDs, include 60 cards, and contain at least one Basic Pokémon.'
-                      : 'No table was created. Confirm both fixture decks are still available, then try again.'}
+                      : 'No table was created. Confirm both fixture loadouts are still available, then try again.'}
                   </InlineNotice>
                 ) : null}
 
@@ -1663,7 +1771,7 @@ export function HomeRoute() {
               </div>
             </Panel>
 
-            {!normalisedGameId && gameCreationMode === 'fixture' ? (
+            {!normalisedGameId && launcherMode === 'fixture' ? (
               <Panel
                 title="Fixture catalog"
                 trailing={<StatusBadge tone={decks.length > 0 ? 'active' : 'neutral'}>{decks.length} decks</StatusBadge>}
@@ -2084,6 +2192,31 @@ async function listSupportedDecks(): Promise<SupportedDeck[]> {
   return result.data as SupportedDeck[]
 }
 
+type DeckBlueprint = {
+  deckKey: string
+  name: string
+  sourceUrl: string
+  cardCount: number
+  uniqueCardCount: number
+  counts: DeckBlueprintCardCount[]
+}
+
+type DeckBlueprintCardCount = { cardId?: string; card_id?: string; count: number }
+
+async function getDeckBlueprint(deckKey: string): Promise<DeckBlueprint> {
+  const result = await runGetSupportedTcgDeckBlueprint({
+    fields: GET_SUPPORTED_DECK_BLUEPRINT_FIELDS,
+    headers: buildAshRpcHeaders(),
+    input: { deckKey }
+  })
+
+  if (!result.success) {
+    throw new Error(rpcErrorMessage(result.errors))
+  }
+
+  return result.data as unknown as DeckBlueprint
+}
+
 async function listAvailableGames(): Promise<AvailableGame[]> {
   const result = await runListTcgEngineGames({
     fields: GAME_LIST_FIELDS,
@@ -2238,6 +2371,12 @@ function normalizeExternalOpenDeckCardId(cardText: string) {
 
 function isOpenDeckReady(parsedDeck: ParsedOpenDeck) {
   return parsedDeck.errors.length === 0 && parsedDeck.totalCount === EXPECTED_OPEN_DECK_CARD_COUNT
+}
+
+function formatDeckCountsToText(counts: DeckBlueprintCardCount[]): string {
+  return counts
+    .map(({ cardId, card_id, count }) => `${count} ${cardId ?? card_id ?? ''}`)
+    .join('\n')
 }
 
 function openDeckLoadoutDetail(
@@ -8141,49 +8280,79 @@ function Panel({
   )
 }
 
-function GameCreationModeSelect({
-  value,
-  onChange
+function LauncherModeSelect({
+  launcherMode,
+  regularSourceMode,
+  onLauncherModeChange,
+  onRegularSourceModeChange
 }: {
-  value: GameCreationMode
-  onChange: (value: GameCreationMode) => void
+  launcherMode: LauncherMode
+  regularSourceMode: RegularSourceMode
+  onLauncherModeChange: (mode: LauncherMode) => void
+  onRegularSourceModeChange: (mode: RegularSourceMode) => void
 }) {
-  const options: Array<{ value: GameCreationMode; title: string; detail: string }> = [
-    {
-      value: 'open-deck',
-      title: 'Open decklists',
-      detail: 'Paste catalog card IDs. The engine validates, seeds, and shuffles the table.'
-    },
-    {
-      value: 'fixture',
-      title: 'Fixture shortcut',
-      detail: 'Use committed regression fixtures for known playtest scenarios.'
-    }
-  ]
-
   return (
-    <fieldset className="space-y-2">
+    <fieldset className="space-y-3">
       <legend className="text-sm font-medium text-foreground">Game source</legend>
-      <div className="grid gap-2">
-        {options.map(option => (
-          <label
-            className="flex cursor-pointer items-start justify-between gap-3 rounded-2xl bg-secondary/70 px-3 py-2.5 text-sm text-muted-foreground transition hover:bg-accent hover:text-accent-foreground has-[:checked]:bg-primary/12 has-[:checked]:text-primary"
-            key={option.value}
-          >
-            <span>
-              <span className="block font-medium text-foreground">{option.title}</span>
-              <span className="mt-1 block text-xs leading-5 text-muted-foreground">{option.detail}</span>
+
+      <div className="space-y-2">
+        <label className="flex cursor-pointer items-start justify-between gap-3 rounded-2xl bg-secondary/70 px-3 py-2.5 text-sm text-muted-foreground transition hover:bg-accent hover:text-accent-foreground has-[:checked]:bg-primary/12 has-[:checked]:text-primary">
+          <span>
+            <span className="block font-medium text-foreground">Regular game</span>
+            <span className="mt-1 block text-xs leading-5 text-muted-foreground">
+              Start a normal shuffled game. Choose premade decks or paste your own lists.
             </span>
-            <input
-              checked={value === option.value}
-              className="mt-1 h-4 w-4 shrink-0 accent-primary"
-              name="game-creation-mode"
-              onChange={() => onChange(option.value)}
-              type="radio"
-            />
-          </label>
-        ))}
+          </span>
+          <input
+            checked={launcherMode === 'regular'}
+            className="mt-1 h-4 w-4 shrink-0 accent-primary"
+            name="launcher-mode"
+            onChange={() => onLauncherModeChange('regular')}
+            type="radio"
+          />
+        </label>
+
+        {launcherMode === 'regular' && (
+          <div className="ml-4 space-y-2 border-l border-line-subtle pl-4">
+            <label className="flex cursor-pointer items-center justify-between gap-3 rounded-xl bg-secondary/55 px-3 py-2 text-sm text-muted-foreground transition hover:bg-accent hover:text-accent-foreground has-[:checked]:bg-primary/12 has-[:checked]:text-primary">
+              <span className="font-medium text-foreground">Premade deck</span>
+              <input
+                checked={regularSourceMode === 'premade'}
+                className="h-4 w-4 accent-primary"
+                name="regular-source"
+                onChange={() => onRegularSourceModeChange('premade')}
+                type="radio"
+              />
+            </label>
+            <label className="flex cursor-pointer items-center justify-between gap-3 rounded-xl bg-secondary/55 px-3 py-2 text-sm text-muted-foreground transition hover:bg-accent hover:text-accent-foreground has-[:checked]:bg-primary/12 has-[:checked]:text-primary">
+              <span className="font-medium text-foreground">Paste decklist</span>
+              <input
+                checked={regularSourceMode === 'paste'}
+                className="h-4 w-4 accent-primary"
+                name="regular-source"
+                onChange={() => onRegularSourceModeChange('paste')}
+                type="radio"
+              />
+            </label>
+          </div>
+        )}
       </div>
+
+      <label className="flex cursor-pointer items-start justify-between gap-3 rounded-2xl bg-secondary/70 px-3 py-2.5 text-sm text-muted-foreground transition hover:bg-accent hover:text-accent-foreground has-[:checked]:bg-primary/12 has-[:checked]:text-primary">
+        <span>
+          <span className="block font-medium text-foreground">Regression fixtures</span>
+          <span className="mt-1 block text-xs leading-5 text-muted-foreground">
+            Use committed engine fixtures for known playtest scenarios.
+          </span>
+        </span>
+        <input
+          checked={launcherMode === 'fixture'}
+          className="mt-1 h-4 w-4 shrink-0 accent-primary"
+          name="launcher-mode"
+          onChange={() => onLauncherModeChange('fixture')}
+          type="radio"
+        />
+      </label>
     </fieldset>
   )
 }

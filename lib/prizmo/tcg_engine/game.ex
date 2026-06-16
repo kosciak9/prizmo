@@ -4,7 +4,7 @@ defmodule Prizmo.TcgEngine.Game do
   use Ash.Resource,
     otp_app: :prizmo,
     domain: Prizmo.TcgEngine,
-    fragments: [Prizmo.TcgEngine.Game.ActionCommands],
+    fragments: [Prizmo.TcgEngine.Game.ActionCommands, Prizmo.TcgEngine.Game.SupportedDeckActions],
     data_layer: AshPostgres.DataLayer,
     authorizers: [Ash.Policy.Authorizer],
     extensions: [AshStateMachine, AshTypescript.Resource]
@@ -14,14 +14,6 @@ defmodule Prizmo.TcgEngine.Game do
   alias Prizmo.TcgEngine.GameView
   alias Prizmo.TcgEngine.GameView.Fields, as: GameViewFields
   alias Prizmo.TcgEngine.SupportedDecks
-
-  @supported_deck_fields [
-    deck_key: [type: :string, allow_nil?: false],
-    name: [type: :string, allow_nil?: false],
-    source_url: [type: :string, allow_nil?: false],
-    card_count: [type: :integer, allow_nil?: false],
-    unique_card_count: [type: :integer, allow_nil?: false]
-  ]
 
   @player_deck_selection_fields [
     player_id: [type: :string, allow_nil?: false],
@@ -69,6 +61,7 @@ defmodule Prizmo.TcgEngine.Game do
     define :create
     define :read
     define :list_supported_decks
+    define :get_supported_deck_blueprint, args: [:deck_key]
     define :create_from_supported_decks, args: [:players]
     define :create_from_decklists, args: [:players]
 
@@ -136,16 +129,6 @@ defmodule Prizmo.TcgEngine.Game do
 
   actions do
     defaults [:read]
-
-    action :list_supported_decks, {:array, :map} do
-      description "List supported deck fixtures that can create TCG engine games."
-
-      constraints items: [fields: @supported_deck_fields]
-
-      run fn _input, _context ->
-        {:ok, SupportedDecks.list()}
-      end
-    end
 
     action :create_from_supported_decks, :struct do
       description "Create a TCG engine game from supported deck fixture keys."

@@ -30,6 +30,40 @@ defmodule Prizmo.TcgEngine.SupportedDecks do
     end
   end
 
+  @type blueprint :: %{
+          deck_key: deck_key(),
+          name: String.t(),
+          source_url: String.t(),
+          card_count: non_neg_integer(),
+          unique_card_count: non_neg_integer(),
+          counts: [%{card_id: String.t(), count: pos_integer()}]
+        }
+
+  @doc "Returns the full blueprint (including raw card counts) for a supported deck key."
+  @spec fetch_blueprint(deck_key()) :: {:ok, blueprint()} | {:error, {:unsupported_deck, term()}}
+  def fetch_blueprint(deck_key) do
+    case Decks.fetch(deck_key) do
+      {:ok, deck_module} ->
+        summary = Decks.summary(deck_module)
+
+        {:ok,
+         %{
+           deck_key: summary.deck_key,
+           name: summary.name,
+           source_url: summary.source_url,
+           card_count: summary.card_count,
+           unique_card_count: summary.unique_card_count,
+           counts:
+             Enum.map(deck_module.counts(), fn {card_id, count} ->
+               %{card_id: card_id, count: count}
+             end)
+         }}
+
+      :error ->
+        {:error, {:unsupported_deck, deck_key}}
+    end
+  end
+
   @doc "Resolves UI deck selections into the module tuples expected by mechanics."
   @spec resolve_player_decks([player_deck_selection()]) ::
           {:ok, [Mechanics.player_deck()]} | {:error, term()}
