@@ -39,6 +39,10 @@ export {
   undoTcgEngineGame as runUndoTcgEngineGame,
   useTcgEngineFlipTheScript as runUseTcgEngineFlipTheScript,
   useTcgEngineMunkidoriAdrenaBrain as runUseTcgEngineMunkidoriAdrenaBrain,
+  useTcgEnginePsychicDraw as runUseTcgEnginePsychicDraw,
+  useTcgEngineReconDirective as runUseTcgEngineReconDirective,
+  useTcgEngineRunAwayDraw as runUseTcgEngineRunAwayDraw,
+  useTcgEngineSeethingSpirit as runUseTcgEngineSeethingSpirit,
   useTcgEngineTealDance as runUseTcgEngineTealDance,
   useTcgEngineTeamRocketsFactory as runUseTcgEngineTeamRocketsFactory,
 } from './generated/ash_rpc'
@@ -122,6 +126,8 @@ export type {
   UndoTcgEngineGameResult,
   UseTcgEngineMunkidoriAdrenaBrainInput,
   UseTcgEngineMunkidoriAdrenaBrainResult,
+  UseTcgEngineSeethingSpiritInput,
+  UseTcgEngineSeethingSpiritResult,
   UseTcgEngineTeamRocketsFactoryInput,
   UseTcgEngineTeamRocketsFactoryResult,
 } from './generated/ash_rpc'

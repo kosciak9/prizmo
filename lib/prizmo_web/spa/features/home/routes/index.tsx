@@ -41,6 +41,10 @@ import {
   runUndoTcgEngineGame,
   runUseTcgEngineFlipTheScript,
   runUseTcgEngineMunkidoriAdrenaBrain,
+  runUseTcgEnginePsychicDraw,
+  runUseTcgEngineReconDirective,
+  runUseTcgEngineRunAwayDraw,
+  runUseTcgEngineSeethingSpirit,
   runUseTcgEngineTealDance,
   runUseTcgEngineTeamRocketsFactory,
   type CreateOpenDeckTcgEngineGameFields,
@@ -507,7 +511,37 @@ type TealDanceCommandOption = {
   energyCard: CardSummary | undefined
 }
 
+type SeethingSpiritCommandOption = {
+  key: string
+  sourceCardInstanceId: string
+  energyCardInstanceId: string
+  targetCardInstanceId: string
+  sourceCard: CardSummary | undefined
+  energyCard: CardSummary | undefined
+  targetCard: CardSummary | undefined
+}
+
 type FlipTheScriptCommandOption = {
+  key: string
+  sourceCardInstanceId: string
+  sourceCard: CardSummary | undefined
+}
+
+type PsychicDrawCommandOption = {
+  key: string
+  sourceCardInstanceId: string
+  sourceCard: CardSummary | undefined
+}
+
+type ReconDirectiveCommandOption = {
+  key: string
+  sourceCardInstanceId: string
+  chosenCardInstanceId: string
+  sourceCard: CardSummary | undefined
+  chosenCard: CardSummary | undefined
+}
+
+type RunAwayDrawCommandOption = {
   key: string
   sourceCardInstanceId: string
   sourceCard: CardSummary | undefined
@@ -638,6 +672,21 @@ type TealDanceCommand = {
   energyCardInstanceId: string
 }
 
+type SeethingSpiritInput = {
+  gameId: string
+  playerId: PlayerId
+  sourceCardInstanceId: string
+  energyCardInstanceId: string
+  targetCardInstanceId: string
+}
+
+type SeethingSpiritCommand = {
+  playerId: string
+  sourceCardInstanceId: string
+  energyCardInstanceId: string
+  targetCardInstanceId: string
+}
+
 type FlipTheScriptInput = {
   gameId: string
   playerId: PlayerId
@@ -645,6 +694,41 @@ type FlipTheScriptInput = {
 }
 
 type FlipTheScriptCommand = {
+  playerId: string
+  sourceCardInstanceId: string
+}
+
+type PsychicDrawInput = {
+  gameId: string
+  playerId: PlayerId
+  sourceCardInstanceId: string
+}
+
+type PsychicDrawCommand = {
+  playerId: string
+  sourceCardInstanceId: string
+}
+
+type ReconDirectiveInput = {
+  gameId: string
+  playerId: PlayerId
+  sourceCardInstanceId: string
+  chosenCardInstanceId: string
+}
+
+type ReconDirectiveCommand = {
+  playerId: string
+  sourceCardInstanceId: string
+  chosenCardInstanceId: string
+}
+
+type RunAwayDrawInput = {
+  gameId: string
+  playerId: PlayerId
+  sourceCardInstanceId: string
+}
+
+type RunAwayDrawCommand = {
   playerId: string
   sourceCardInstanceId: string
 }
@@ -1161,8 +1245,40 @@ export function HomeRoute() {
     }
   })
 
+  const seethingSpiritMutation = useMutation({
+    mutationFn: (input: SeethingSpiritInput) => useSeethingSpirit(input),
+    onSuccess: async (_game, input) => {
+      clearUltraBallPostSearchHandoff(input.gameId, input.playerId)
+      await queryClient.invalidateQueries({ queryKey: ['tcg-engine', 'game-state'] })
+    }
+  })
+
   const flipTheScriptMutation = useMutation({
     mutationFn: (input: FlipTheScriptInput) => useFlipTheScript(input),
+    onSuccess: async (_game, input) => {
+      clearUltraBallPostSearchHandoff(input.gameId, input.playerId)
+      await queryClient.invalidateQueries({ queryKey: ['tcg-engine', 'game-state'] })
+    }
+  })
+
+  const psychicDrawMutation = useMutation({
+    mutationFn: (input: PsychicDrawInput) => usePsychicDraw(input),
+    onSuccess: async (_game, input) => {
+      clearUltraBallPostSearchHandoff(input.gameId, input.playerId)
+      await queryClient.invalidateQueries({ queryKey: ['tcg-engine', 'game-state'] })
+    }
+  })
+
+  const reconDirectiveMutation = useMutation({
+    mutationFn: (input: ReconDirectiveInput) => useReconDirective(input),
+    onSuccess: async (_game, input) => {
+      clearUltraBallPostSearchHandoff(input.gameId, input.playerId)
+      await queryClient.invalidateQueries({ queryKey: ['tcg-engine', 'game-state'] })
+    }
+  })
+
+  const runAwayDrawMutation = useMutation({
+    mutationFn: (input: RunAwayDrawInput) => useRunAwayDraw(input),
     onSuccess: async (_game, input) => {
       clearUltraBallPostSearchHandoff(input.gameId, input.playerId)
       await queryClient.invalidateQueries({ queryKey: ['tcg-engine', 'game-state'] })
@@ -1412,6 +1528,11 @@ export function HomeRoute() {
       tealDanceMutation.error,
       'Teal Dance failed',
       'No Energy attached. Refresh state and confirm Teal Mask Ogerpon ex is in play, has not used Teal Dance this turn, and a Basic Grass Energy is still in hand.'
+    ) ??
+    commandErrorNotice(
+      seethingSpiritMutation.error,
+      'Seething Spirit failed',
+      'No Energy attached. Refresh state and confirm Blaziken ex is in play, has not used Seething Spirit this turn, and a Basic Energy is still in discard.'
     ) ??
     commandErrorNotice(
       flipTheScriptMutation.error,
@@ -2035,9 +2156,48 @@ export function HomeRoute() {
                     })
                   }
                 }}
+                onUseSeethingSpirit={({ playerId, sourceCardInstanceId, energyCardInstanceId, targetCardInstanceId }) => {
+                  if (isPlayerId(playerId)) {
+                    seethingSpiritMutation.mutate({
+                      gameId: normalisedGameId,
+                      playerId,
+                      sourceCardInstanceId,
+                      energyCardInstanceId,
+                      targetCardInstanceId
+                    })
+                  }
+                }}
                 onUseFlipTheScript={({ playerId, sourceCardInstanceId }) => {
                   if (isPlayerId(playerId)) {
                     flipTheScriptMutation.mutate({
+                      gameId: normalisedGameId,
+                      playerId,
+                      sourceCardInstanceId
+                    })
+                  }
+                }}
+                onUsePsychicDraw={({ playerId, sourceCardInstanceId }) => {
+                  if (isPlayerId(playerId)) {
+                    psychicDrawMutation.mutate({
+                      gameId: normalisedGameId,
+                      playerId,
+                      sourceCardInstanceId
+                    })
+                  }
+                }}
+                onUseReconDirective={({ playerId, sourceCardInstanceId, chosenCardInstanceId }) => {
+                  if (isPlayerId(playerId)) {
+                    reconDirectiveMutation.mutate({
+                      gameId: normalisedGameId,
+                      playerId,
+                      sourceCardInstanceId,
+                      chosenCardInstanceId
+                    })
+                  }
+                }}
+                onUseRunAwayDraw={({ playerId, sourceCardInstanceId }) => {
+                  if (isPlayerId(playerId)) {
+                    runAwayDrawMutation.mutate({
                       gameId: normalisedGameId,
                       playerId,
                       sourceCardInstanceId
@@ -2142,9 +2302,36 @@ export function HomeRoute() {
                       )
                     : null
                 }
+                seethingSpiritPendingKey={
+                  seethingSpiritMutation.isPending && seethingSpiritMutation.variables
+                    ? seethingSpiritKey(
+                        seethingSpiritMutation.variables.sourceCardInstanceId,
+                        seethingSpiritMutation.variables.energyCardInstanceId,
+                        seethingSpiritMutation.variables.targetCardInstanceId
+                      )
+                    : null
+                }
                 flipTheScriptPendingKey={
                   flipTheScriptMutation.isPending && flipTheScriptMutation.variables
                     ? flipTheScriptKey(flipTheScriptMutation.variables.sourceCardInstanceId)
+                    : null
+                }
+                psychicDrawPendingKey={
+                  psychicDrawMutation.isPending && psychicDrawMutation.variables
+                    ? psychicDrawKey(psychicDrawMutation.variables.sourceCardInstanceId)
+                    : null
+                }
+                reconDirectivePendingKey={
+                  reconDirectiveMutation.isPending && reconDirectiveMutation.variables
+                    ? reconDirectiveKey(
+                        reconDirectiveMutation.variables.sourceCardInstanceId,
+                        reconDirectiveMutation.variables.chosenCardInstanceId
+                      )
+                    : null
+                }
+                runAwayDrawPendingKey={
+                  runAwayDrawMutation.isPending && runAwayDrawMutation.variables
+                    ? runAwayDrawKey(runAwayDrawMutation.variables.sourceCardInstanceId)
                     : null
                 }
                 retreatPendingKey={
@@ -2753,8 +2940,64 @@ async function useTealDance(input: TealDanceInput): Promise<CreatedGame> {
   return result.data as CreatedGame
 }
 
+async function useSeethingSpirit(input: SeethingSpiritInput): Promise<CreatedGame> {
+  const result = await runUseTcgEngineSeethingSpirit({
+    input,
+    fields: GAME_RESOURCE_FIELDS,
+    headers: buildAshRpcHeaders()
+  })
+
+  if (!result.success) {
+    throw new Error(rpcErrorMessage(result.errors))
+  }
+
+  return result.data as CreatedGame
+}
+
 async function useFlipTheScript(input: FlipTheScriptInput): Promise<CreatedGame> {
   const result = await runUseTcgEngineFlipTheScript({
+    input,
+    fields: GAME_RESOURCE_FIELDS,
+    headers: buildAshRpcHeaders()
+  })
+
+  if (!result.success) {
+    throw new Error(rpcErrorMessage(result.errors))
+  }
+
+  return result.data as CreatedGame
+}
+
+async function usePsychicDraw(input: PsychicDrawInput): Promise<CreatedGame> {
+  const result = await runUseTcgEnginePsychicDraw({
+    input,
+    fields: GAME_RESOURCE_FIELDS,
+    headers: buildAshRpcHeaders()
+  })
+
+  if (!result.success) {
+    throw new Error(rpcErrorMessage(result.errors))
+  }
+
+  return result.data as CreatedGame
+}
+
+async function useReconDirective(input: ReconDirectiveInput): Promise<CreatedGame> {
+  const result = await runUseTcgEngineReconDirective({
+    input,
+    fields: GAME_RESOURCE_FIELDS,
+    headers: buildAshRpcHeaders()
+  })
+
+  if (!result.success) {
+    throw new Error(rpcErrorMessage(result.errors))
+  }
+
+  return result.data as CreatedGame
+}
+
+async function useRunAwayDraw(input: RunAwayDrawInput): Promise<CreatedGame> {
+  const result = await runUseTcgEngineRunAwayDraw({
     input,
     fields: GAME_RESOURCE_FIELDS,
     headers: buildAshRpcHeaders()
@@ -2965,7 +3208,11 @@ function GameStateWorkbench({
   onPlayStadium,
   onUseMunkidoriAdrenaBrain,
   onUseTealDance,
+  onUseSeethingSpirit,
   onUseFlipTheScript,
+  onUsePsychicDraw,
+  onUseReconDirective,
+  onUseRunAwayDraw,
   onUseTeamRocketsFactory,
   onRetreat,
   onResolveDeclaredAttack,
@@ -2991,7 +3238,11 @@ function GameStateWorkbench({
   playStadiumPendingCardId,
   munkidoriAdrenaBrainPendingKey,
   tealDancePendingKey,
+  seethingSpiritPendingKey,
   flipTheScriptPendingKey,
+  psychicDrawPendingKey,
+  reconDirectivePendingKey,
+  runAwayDrawPendingKey,
   teamRocketsFactoryPendingPlayerId,
   resolveDeclaredAttackPendingPlayerId,
   retreatPendingKey
@@ -3025,7 +3276,11 @@ function GameStateWorkbench({
   onPlayStadium: (input: PlayStadiumCommand) => void
   onUseMunkidoriAdrenaBrain: (input: MunkidoriAdrenaBrainCommand) => void
   onUseTealDance: (input: TealDanceCommand) => void
+  onUseSeethingSpirit: (input: SeethingSpiritCommand) => void
   onUseFlipTheScript: (input: FlipTheScriptCommand) => void
+  onUsePsychicDraw: (input: PsychicDrawCommand) => void
+  onUseReconDirective: (input: ReconDirectiveCommand) => void
+  onUseRunAwayDraw: (input: RunAwayDrawCommand) => void
   onUseTeamRocketsFactory: (input: TeamRocketsFactoryCommand) => void
   onRetreat: (input: RetreatCommand) => void
   onResolveDeclaredAttack: (input: ResolveDeclaredAttackCommand) => void
@@ -3051,7 +3306,11 @@ function GameStateWorkbench({
   playStadiumPendingCardId: string | null
   munkidoriAdrenaBrainPendingKey: string | null
   tealDancePendingKey: string | null
+  seethingSpiritPendingKey: string | null
   flipTheScriptPendingKey: string | null
+  psychicDrawPendingKey: string | null
+  reconDirectivePendingKey: string | null
+  runAwayDrawPendingKey: string | null
   teamRocketsFactoryPendingPlayerId: string | null
   resolveDeclaredAttackPendingPlayerId: string | null
   retreatPendingKey: string | null
@@ -3063,7 +3322,11 @@ function GameStateWorkbench({
       teamRocketsFactoryPendingPlayerId ||
       munkidoriAdrenaBrainPendingKey ||
       tealDancePendingKey ||
+      seethingSpiritPendingKey ||
       flipTheScriptPendingKey ||
+      psychicDrawPendingKey ||
+      reconDirectivePendingKey ||
+      runAwayDrawPendingKey ||
       playBasicToBenchPendingCardId ||
       attachEnergyPendingKey ||
       attachToolPendingKey ||
@@ -3186,7 +3449,11 @@ function GameStateWorkbench({
             onPlayStadium={onPlayStadium}
             onUseMunkidoriAdrenaBrain={onUseMunkidoriAdrenaBrain}
             onUseTealDance={onUseTealDance}
+            onUseSeethingSpirit={onUseSeethingSpirit}
             onUseFlipTheScript={onUseFlipTheScript}
+            onUsePsychicDraw={onUsePsychicDraw}
+            onUseReconDirective={onUseReconDirective}
+            onUseRunAwayDraw={onUseRunAwayDraw}
             onUseTeamRocketsFactory={onUseTeamRocketsFactory}
             onRetreat={onRetreat}
             attachEnergyPendingKey={attachEnergyPendingKey}
@@ -3199,7 +3466,11 @@ function GameStateWorkbench({
             playStadiumPendingCardId={playStadiumPendingCardId}
             munkidoriAdrenaBrainPendingKey={munkidoriAdrenaBrainPendingKey}
             tealDancePendingKey={tealDancePendingKey}
+            seethingSpiritPendingKey={seethingSpiritPendingKey}
             flipTheScriptPendingKey={flipTheScriptPendingKey}
+            psychicDrawPendingKey={psychicDrawPendingKey}
+            reconDirectivePendingKey={reconDirectivePendingKey}
+            runAwayDrawPendingKey={runAwayDrawPendingKey}
             teamRocketsFactoryPendingPlayerId={teamRocketsFactoryPendingPlayerId}
             retreatPendingKey={retreatPendingKey}
             ultraBallPostSearchHandoff={ultraBallPostSearchHandoff}
@@ -5662,7 +5933,11 @@ function ActionAffordancesPanel({
   onPlayStadium,
   onUseMunkidoriAdrenaBrain,
   onUseTealDance,
+  onUseSeethingSpirit,
   onUseFlipTheScript,
+  onUsePsychicDraw,
+  onUseReconDirective,
+  onUseRunAwayDraw,
   onUseTeamRocketsFactory,
   onRetreat,
   attachEnergyPendingKey,
@@ -5675,7 +5950,11 @@ function ActionAffordancesPanel({
   playStadiumPendingCardId,
   munkidoriAdrenaBrainPendingKey,
   tealDancePendingKey,
+  seethingSpiritPendingKey,
   flipTheScriptPendingKey,
+  psychicDrawPendingKey,
+  reconDirectivePendingKey,
+  runAwayDrawPendingKey,
   teamRocketsFactoryPendingPlayerId,
   retreatPendingKey,
   ultraBallPostSearchHandoff,
@@ -5697,7 +5976,11 @@ function ActionAffordancesPanel({
   onPlayStadium: (input: PlayStadiumCommand) => void
   onUseMunkidoriAdrenaBrain: (input: MunkidoriAdrenaBrainCommand) => void
   onUseTealDance: (input: TealDanceCommand) => void
+  onUseSeethingSpirit: (input: SeethingSpiritCommand) => void
   onUseFlipTheScript: (input: FlipTheScriptCommand) => void
+  onUsePsychicDraw: (input: PsychicDrawCommand) => void
+  onUseReconDirective: (input: ReconDirectiveCommand) => void
+  onUseRunAwayDraw: (input: RunAwayDrawCommand) => void
   onUseTeamRocketsFactory: (input: TeamRocketsFactoryCommand) => void
   onRetreat: (input: RetreatCommand) => void
   attachEnergyPendingKey: string | null
@@ -5710,7 +5993,11 @@ function ActionAffordancesPanel({
   playStadiumPendingCardId: string | null
   munkidoriAdrenaBrainPendingKey: string | null
   tealDancePendingKey: string | null
+  seethingSpiritPendingKey: string | null
   flipTheScriptPendingKey: string | null
+  psychicDrawPendingKey: string | null
+  reconDirectivePendingKey: string | null
+  runAwayDrawPendingKey: string | null
   teamRocketsFactoryPendingPlayerId: string | null
   retreatPendingKey: string | null
   ultraBallPostSearchHandoff: UltraBallPostSearchHandoff | null
@@ -5722,7 +6009,11 @@ function ActionAffordancesPanel({
       teamRocketsFactoryPendingPlayerId ||
       munkidoriAdrenaBrainPendingKey ||
       tealDancePendingKey ||
+      seethingSpiritPendingKey ||
       flipTheScriptPendingKey ||
+      psychicDrawPendingKey ||
+      reconDirectivePendingKey ||
+      runAwayDrawPendingKey ||
       playBasicToBenchPendingCardId ||
       attachEnergyPendingKey ||
       attachToolPendingKey ||
@@ -5810,7 +6101,11 @@ function ActionAffordancesPanel({
                     onPlayStadium={onPlayStadium}
                     onUseMunkidoriAdrenaBrain={onUseMunkidoriAdrenaBrain}
                     onUseTealDance={onUseTealDance}
+                    onUseSeethingSpirit={onUseSeethingSpirit}
                     onUseFlipTheScript={onUseFlipTheScript}
+                    onUsePsychicDraw={onUsePsychicDraw}
+                    onUseReconDirective={onUseReconDirective}
+                    onUseRunAwayDraw={onUseRunAwayDraw}
                     onUseTeamRocketsFactory={onUseTeamRocketsFactory}
                     onRetreat={onRetreat}
                     playBasicToBenchPendingCardId={playBasicToBenchPendingCardId}
@@ -5818,7 +6113,11 @@ function ActionAffordancesPanel({
                     playStadiumPendingCardId={playStadiumPendingCardId}
                     munkidoriAdrenaBrainPendingKey={munkidoriAdrenaBrainPendingKey}
                     tealDancePendingKey={tealDancePendingKey}
+                    seethingSpiritPendingKey={seethingSpiritPendingKey}
                     flipTheScriptPendingKey={flipTheScriptPendingKey}
+                    psychicDrawPendingKey={psychicDrawPendingKey}
+                    reconDirectivePendingKey={reconDirectivePendingKey}
+                    runAwayDrawPendingKey={runAwayDrawPendingKey}
                     teamRocketsFactoryPendingPlayerId={teamRocketsFactoryPendingPlayerId}
                     postSearchBattleAttackIds={postSearchHandoff?.battleAttackIds ?? []}
                     postSearchBenchCardInstanceIds={postSearchHandoff?.benchableCardInstanceIds ?? []}
@@ -6282,6 +6581,8 @@ function handActionChoiceCount(handGroup: ActionGroup, cardsById: Map<string, Ca
         return count + action.sourceCardInstanceIds.length * action.targetCardInstanceIds.length
       case 'teal_dance':
         return count + tealDanceCommandOptions(action, cardsById).length
+      case 'seething_spirit':
+        return count + seethingSpiritCommandOptions(action, cardsById).length
       case 'play_stadium':
         return count + action.sourceCardInstanceIds.length
       case 'play_card':
@@ -6401,7 +6702,11 @@ function ActionAffordanceCard({
   onPlayStadium,
   onUseMunkidoriAdrenaBrain,
   onUseTealDance,
+  onUseSeethingSpirit,
   onUseFlipTheScript,
+  onUsePsychicDraw,
+  onUseReconDirective,
+  onUseRunAwayDraw,
   onUseTeamRocketsFactory,
   onRetreat,
   playBasicToBenchPendingCardId,
@@ -6409,7 +6714,11 @@ function ActionAffordanceCard({
   playStadiumPendingCardId,
   munkidoriAdrenaBrainPendingKey,
   tealDancePendingKey,
+  seethingSpiritPendingKey,
   flipTheScriptPendingKey,
+  psychicDrawPendingKey,
+  reconDirectivePendingKey,
+  runAwayDrawPendingKey,
   teamRocketsFactoryPendingPlayerId,
   postSearchBattleAttackIds,
   postSearchBenchCardInstanceIds,
@@ -6438,7 +6747,11 @@ function ActionAffordanceCard({
   onPlayStadium: (input: PlayStadiumCommand) => void
   onUseMunkidoriAdrenaBrain: (input: MunkidoriAdrenaBrainCommand) => void
   onUseTealDance: (input: TealDanceCommand) => void
+  onUseSeethingSpirit: (input: SeethingSpiritCommand) => void
   onUseFlipTheScript: (input: FlipTheScriptCommand) => void
+  onUsePsychicDraw: (input: PsychicDrawCommand) => void
+  onUseReconDirective: (input: ReconDirectiveCommand) => void
+  onUseRunAwayDraw: (input: RunAwayDrawCommand) => void
   onUseTeamRocketsFactory: (input: TeamRocketsFactoryCommand) => void
   onRetreat: (input: RetreatCommand) => void
   playBasicToBenchPendingCardId: string | null
@@ -6446,7 +6759,11 @@ function ActionAffordanceCard({
   playStadiumPendingCardId: string | null
   munkidoriAdrenaBrainPendingKey: string | null
   tealDancePendingKey: string | null
+  seethingSpiritPendingKey: string | null
   flipTheScriptPendingKey: string | null
+  psychicDrawPendingKey: string | null
+  reconDirectivePendingKey: string | null
+  runAwayDrawPendingKey: string | null
   teamRocketsFactoryPendingPlayerId: string | null
   postSearchBattleAttackIds: string[]
   postSearchBenchCardInstanceIds: string[]
@@ -6465,7 +6782,11 @@ function ActionAffordanceCard({
   const repeatedEvolutionLabels = repeatedEvolutionBaseLabels(evolutionOptions)
   const adrenaBrainOptions = adrenaBrainCommandOptions(action, cardsById)
   const tealDanceOptions = tealDanceCommandOptions(action, cardsById)
+  const seethingSpiritOptions = seethingSpiritCommandOptions(action, cardsById)
   const flipTheScriptOptions = flipTheScriptCommandOptions(action, cardsById)
+  const psychicDrawOptions = psychicDrawCommandOptions(action, cardsById)
+  const reconDirectiveOptions = reconDirectiveCommandOptions(action, cardsById)
+  const runAwayDrawOptions = runAwayDrawCommandOptions(action, cardsById)
 
   return (
     <li className={`rounded-xl border px-3 py-2 text-sm ${actionSurfaceClassName(action)}`}>
@@ -6623,6 +6944,32 @@ function ActionAffordanceCard({
         </div>
       ) : null}
 
+      {seethingSpiritOptions.length > 0 ? (
+        <div className="mt-2 space-y-1.5">
+          {seethingSpiritOptions.map(option => {
+            const isPending = seethingSpiritPendingKey === option.key
+
+            return (
+              <ActionCommandButton
+                disabled={!canRunAction}
+                key={option.key}
+                onClick={() =>
+                  onUseSeethingSpirit({
+                    playerId: action.playerId,
+                    sourceCardInstanceId: option.sourceCardInstanceId,
+                    energyCardInstanceId: option.energyCardInstanceId,
+                    targetCardInstanceId: option.targetCardInstanceId
+                  })
+                }
+                tone="primary"
+              >
+                {isPending ? seethingSpiritPendingLabel(option) : seethingSpiritButtonLabel(option)}
+              </ActionCommandButton>
+            )
+          })}
+        </div>
+      ) : null}
+
       {flipTheScriptOptions.length > 0 ? (
         <div className="mt-2 space-y-1.5">
           {flipTheScriptOptions.map(option => {
@@ -6641,6 +6988,79 @@ function ActionAffordanceCard({
                 tone="primary"
               >
                 {isPending ? flipTheScriptPendingLabel(option) : flipTheScriptButtonLabel(option)}
+              </ActionCommandButton>
+            )
+          })}
+        </div>
+      ) : null}
+
+      {psychicDrawOptions.length > 0 ? (
+        <div className="mt-2 space-y-1.5">
+          {psychicDrawOptions.map(option => {
+            const isPending = psychicDrawPendingKey === option.key
+
+            return (
+              <ActionCommandButton
+                disabled={!canRunAction}
+                key={option.key}
+                onClick={() =>
+                  onUsePsychicDraw({
+                    playerId: action.playerId,
+                    sourceCardInstanceId: option.sourceCardInstanceId
+                  })
+                }
+                tone="primary"
+              >
+                {isPending ? psychicDrawPendingLabel(option) : psychicDrawButtonLabel(option)}
+              </ActionCommandButton>
+            )
+          })}
+        </div>
+      ) : null}
+
+      {reconDirectiveOptions.length > 0 ? (
+        <div className="mt-2 space-y-1.5">
+          {reconDirectiveOptions.map(option => {
+            const isPending = reconDirectivePendingKey === option.key
+
+            return (
+              <ActionCommandButton
+                disabled={!canRunAction}
+                key={option.key}
+                onClick={() =>
+                  onUseReconDirective({
+                    playerId: action.playerId,
+                    sourceCardInstanceId: option.sourceCardInstanceId,
+                    chosenCardInstanceId: option.chosenCardInstanceId
+                  })
+                }
+                tone="primary"
+              >
+                {isPending ? reconDirectivePendingLabel(option) : reconDirectiveButtonLabel(option)}
+              </ActionCommandButton>
+            )
+          })}
+        </div>
+      ) : null}
+
+      {runAwayDrawOptions.length > 0 ? (
+        <div className="mt-2 space-y-1.5">
+          {runAwayDrawOptions.map(option => {
+            const isPending = runAwayDrawPendingKey === option.key
+
+            return (
+              <ActionCommandButton
+                disabled={!canRunAction}
+                key={option.key}
+                onClick={() =>
+                  onUseRunAwayDraw({
+                    playerId: action.playerId,
+                    sourceCardInstanceId: option.sourceCardInstanceId
+                  })
+                }
+                tone="primary"
+              >
+                {isPending ? runAwayDrawPendingLabel(option) : runAwayDrawButtonLabel(option)}
               </ActionCommandButton>
             )
           })}
@@ -6968,6 +7388,10 @@ function actionSurfaceClassName(action: ActionAffordance) {
       return 'border-attention/35 bg-attention/10'
     case 'adrena_brain':
     case 'teal_dance':
+    case 'seething_spirit':
+    case 'psychic_draw':
+    case 'recon_directive':
+    case 'run_away_draw':
     case 'declare_attack':
       return 'border-accent-mint/30 bg-accent-mint/10'
     case 'unsupported_attack':
@@ -7014,6 +7438,14 @@ function actionSummary(action: ActionAffordance) {
       return `Move up to ${action.requiredSourceCount} damage ${action.requiredSourceCount === 1 ? 'counter' : 'counters'} from your damaged Pokémon to an opponent Pokémon.`
     case 'teal_dance':
       return 'Attach a Basic Grass Energy from hand to Teal Mask Ogerpon ex, then draw 1 card.'
+    case 'seething_spirit':
+      return 'Attach a Basic Energy from discard to 1 of your Pokémon.'
+    case 'psychic_draw':
+      return 'Draw cards with a Kadabra or Alakazam that evolved from hand this turn.'
+    case 'recon_directive':
+      return 'Choose 1 of the top 2 cards of your deck for hand; put the other on the bottom.'
+    case 'run_away_draw':
+      return 'Draw 3 cards, then shuffle Dudunsparce and attached cards into your deck.'
     case 'declare_attack':
       return `${action.attackName ?? (action.attackId ? formatAttackId(action.attackId) : 'Attack')}: ${attackCostSummary(
         action.attackCost
@@ -7143,6 +7575,28 @@ function tealDanceCommandOptions(action: ActionAffordance, cardsById: Map<string
   ]
 }
 
+function seethingSpiritCommandOptions(
+  action: ActionAffordance,
+  cardsById: Map<string, CardSummary>
+): SeethingSpiritCommandOption[] {
+  if (action.key !== 'seething_spirit' || action.sourceCardInstanceIds.length < 2) {
+    return []
+  }
+
+  const sourceCardInstanceId = action.sourceCardInstanceIds[0]!
+  const energyCardInstanceId = action.sourceCardInstanceIds[1]!
+
+  return action.targetCardInstanceIds.map(targetCardInstanceId => ({
+    key: seethingSpiritKey(sourceCardInstanceId, energyCardInstanceId, targetCardInstanceId),
+    sourceCardInstanceId,
+    energyCardInstanceId,
+    targetCardInstanceId,
+    sourceCard: cardsById.get(sourceCardInstanceId),
+    energyCard: cardsById.get(energyCardInstanceId),
+    targetCard: cardsById.get(targetCardInstanceId)
+  }))
+}
+
 function flipTheScriptCommandOptions(
   action: ActionAffordance,
   cardsById: Map<string, CardSummary>
@@ -7162,6 +7616,57 @@ function flipTheScriptCommandOptions(
   ]
 }
 
+function psychicDrawCommandOptions(action: ActionAffordance, cardsById: Map<string, CardSummary>): PsychicDrawCommandOption[] {
+  if (action.key !== 'psychic_draw' || action.sourceCardInstanceIds.length < 1) {
+    return []
+  }
+
+  const sourceCardInstanceId = action.sourceCardInstanceIds[0]!
+
+  return [
+    {
+      key: psychicDrawKey(sourceCardInstanceId),
+      sourceCardInstanceId,
+      sourceCard: cardsById.get(sourceCardInstanceId)
+    }
+  ]
+}
+
+function reconDirectiveCommandOptions(
+  action: ActionAffordance,
+  cardsById: Map<string, CardSummary>
+): ReconDirectiveCommandOption[] {
+  if (action.key !== 'recon_directive' || action.sourceCardInstanceIds.length < 1) {
+    return []
+  }
+
+  const sourceCardInstanceId = action.sourceCardInstanceIds[0]!
+
+  return action.targetCardInstanceIds.map(chosenCardInstanceId => ({
+    key: reconDirectiveKey(sourceCardInstanceId, chosenCardInstanceId),
+    sourceCardInstanceId,
+    chosenCardInstanceId,
+    sourceCard: cardsById.get(sourceCardInstanceId),
+    chosenCard: cardsById.get(chosenCardInstanceId)
+  }))
+}
+
+function runAwayDrawCommandOptions(action: ActionAffordance, cardsById: Map<string, CardSummary>): RunAwayDrawCommandOption[] {
+  if (action.key !== 'run_away_draw' || action.sourceCardInstanceIds.length < 1) {
+    return []
+  }
+
+  const sourceCardInstanceId = action.sourceCardInstanceIds[0]!
+
+  return [
+    {
+      key: runAwayDrawKey(sourceCardInstanceId),
+      sourceCardInstanceId,
+      sourceCard: cardsById.get(sourceCardInstanceId)
+    }
+  ]
+}
+
 function tealDancePendingLabel(option: TealDanceCommandOption) {
   return `Using Teal Dance with ${option.energyCard?.name ?? 'Grass Energy'}...`
 }
@@ -7172,12 +7677,46 @@ function tealDanceButtonLabel(option: TealDanceCommandOption) {
   }`
 }
 
+function seethingSpiritPendingLabel(option: SeethingSpiritCommandOption) {
+  return `Using Seething Spirit with ${option.energyCard?.name ?? 'Basic Energy'}...`
+}
+
+function seethingSpiritButtonLabel(option: SeethingSpiritCommandOption) {
+  return `Seething Spirit: attach ${option.energyCard?.name ?? formatCardInstanceId(option.energyCardInstanceId)} to ${
+    option.targetCard?.name ?? formatCardInstanceId(option.targetCardInstanceId)
+  }`
+}
+
 function flipTheScriptPendingLabel(option: FlipTheScriptCommandOption) {
   return `Using ${option.sourceCard?.name ?? 'Flip the Script'}...`
 }
 
 function flipTheScriptButtonLabel(option: FlipTheScriptCommandOption) {
   return `Flip the Script: draw 3 with ${option.sourceCard?.name ?? formatCardInstanceId(option.sourceCardInstanceId)}`
+}
+
+function psychicDrawPendingLabel(option: PsychicDrawCommandOption) {
+  return `Using ${option.sourceCard?.name ?? 'Psychic Draw'}...`
+}
+
+function psychicDrawButtonLabel(option: PsychicDrawCommandOption) {
+  return `Psychic Draw with ${option.sourceCard?.name ?? formatCardInstanceId(option.sourceCardInstanceId)}`
+}
+
+function reconDirectivePendingLabel(option: ReconDirectiveCommandOption) {
+  return `Using Recon Directive for ${option.chosenCard?.name ?? 'chosen card'}...`
+}
+
+function reconDirectiveButtonLabel(option: ReconDirectiveCommandOption) {
+  return `Recon Directive: put ${option.chosenCard?.name ?? formatCardInstanceId(option.chosenCardInstanceId)} into hand`
+}
+
+function runAwayDrawPendingLabel(option: RunAwayDrawCommandOption) {
+  return `Using ${option.sourceCard?.name ?? 'Run Away Draw'}...`
+}
+
+function runAwayDrawButtonLabel(option: RunAwayDrawCommandOption) {
+  return `Run Away Draw with ${option.sourceCard?.name ?? formatCardInstanceId(option.sourceCardInstanceId)}`
 }
 
 function damageCounterOptions(maxCounters: number) {
@@ -7529,7 +8068,11 @@ function actionGroupId(action: ActionAffordance): ActionGroupId {
     case 'attach_energy':
     case 'attach_tool':
     case 'teal_dance':
+    case 'seething_spirit':
     case 'flip_the_script':
+    case 'psychic_draw':
+    case 'recon_directive':
+    case 'run_away_draw':
       return 'hand'
     case 'retreat':
     case 'adrena_brain':
@@ -10477,7 +11020,23 @@ function tealDanceKey(sourceCardInstanceId: string, energyCardInstanceId: string
   return `${sourceCardInstanceId}:${energyCardInstanceId}`
 }
 
+function seethingSpiritKey(sourceCardInstanceId: string, energyCardInstanceId: string, targetCardInstanceId: string) {
+  return `${sourceCardInstanceId}:${energyCardInstanceId}:${targetCardInstanceId}`
+}
+
 function flipTheScriptKey(sourceCardInstanceId: string) {
+  return sourceCardInstanceId
+}
+
+function psychicDrawKey(sourceCardInstanceId: string) {
+  return sourceCardInstanceId
+}
+
+function reconDirectiveKey(sourceCardInstanceId: string, chosenCardInstanceId: string) {
+  return `${sourceCardInstanceId}:${chosenCardInstanceId}`
+}
+
+function runAwayDrawKey(sourceCardInstanceId: string) {
   return sourceCardInstanceId
 }
 
