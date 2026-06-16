@@ -39,6 +39,7 @@ import {
   runStartNextTcgEngineTurn,
   runStartTcgEngineSetup,
   runUndoTcgEngineGame,
+  runUseTcgEngineCursedBlast,
   runUseTcgEngineFlipTheScript,
   runUseTcgEngineMunkidoriAdrenaBrain,
   runUseTcgEnginePsychicDraw,
@@ -503,6 +504,14 @@ type AdrenaBrainCommandOption = {
   targetCard: CardSummary | undefined
 }
 
+type CursedBlastCommandOption = {
+  key: string
+  sourceCardInstanceId: string
+  targetCardInstanceId: string
+  sourceCard: CardSummary | undefined
+  targetCard: CardSummary | undefined
+}
+
 type TealDanceCommandOption = {
   key: string
   sourceCardInstanceId: string
@@ -640,6 +649,19 @@ type TeamRocketsFactoryInput = {
 
 type TeamRocketsFactoryCommand = {
   playerId: string
+}
+
+type CursedBlastInput = {
+  gameId: string
+  playerId: PlayerId
+  sourceCardInstanceId: string
+  targetCardInstanceId: string
+}
+
+type CursedBlastCommand = {
+  playerId: string
+  sourceCardInstanceId: string
+  targetCardInstanceId: string
 }
 
 type MunkidoriAdrenaBrainInput = {
@@ -1229,6 +1251,14 @@ export function HomeRoute() {
     }
   })
 
+  const cursedBlastMutation = useMutation({
+    mutationFn: (input: CursedBlastInput) => useCursedBlast(input),
+    onSuccess: async (_game, input) => {
+      clearUltraBallPostSearchHandoff(input.gameId, input.playerId)
+      await queryClient.invalidateQueries({ queryKey: ['tcg-engine', 'game-state'] })
+    }
+  })
+
   const munkidoriAdrenaBrainMutation = useMutation({
     mutationFn: (input: MunkidoriAdrenaBrainInput) => useMunkidoriAdrenaBrain(input),
     onSuccess: async (_game, input) => {
@@ -1518,6 +1548,11 @@ export function HomeRoute() {
       playStadiumMutation.error,
       'Play Stadium failed',
       'The Stadium stayed in hand. Refresh state and confirm this viewer still has priority from the action window.'
+    ) ??
+    commandErrorNotice(
+      cursedBlastMutation.error,
+      'Cursed Blast failed',
+      'No damage counters were placed. Refresh state and confirm Dusclops or Dusknoir is still in play, the Ability is unblocked, and the target is still an opponent Pokémon.'
     ) ??
     commandErrorNotice(
       munkidoriAdrenaBrainMutation.error,
@@ -2128,6 +2163,16 @@ export function HomeRoute() {
                     })
                   }
                 }}
+                onUseCursedBlast={({ playerId, sourceCardInstanceId, targetCardInstanceId }) => {
+                  if (isPlayerId(playerId)) {
+                    cursedBlastMutation.mutate({
+                      gameId: normalisedGameId,
+                      playerId,
+                      sourceCardInstanceId,
+                      targetCardInstanceId
+                    })
+                  }
+                }}
                 onUseMunkidoriAdrenaBrain={({
                   playerId,
                   sourceCardInstanceId,
@@ -2282,6 +2327,14 @@ export function HomeRoute() {
                 teamRocketsFactoryPendingPlayerId={
                   teamRocketsFactoryMutation.isPending
                     ? teamRocketsFactoryMutation.variables?.playerId ?? null
+                    : null
+                }
+                cursedBlastPendingKey={
+                  cursedBlastMutation.isPending && cursedBlastMutation.variables
+                    ? cursedBlastKey(
+                        cursedBlastMutation.variables.sourceCardInstanceId,
+                        cursedBlastMutation.variables.targetCardInstanceId
+                      )
                     : null
                 }
                 munkidoriAdrenaBrainPendingKey={
@@ -2912,6 +2965,20 @@ async function useTeamRocketsFactory(input: TeamRocketsFactoryInput): Promise<Cr
   return result.data as CreatedGame
 }
 
+async function useCursedBlast(input: CursedBlastInput): Promise<CreatedGame> {
+  const result = await runUseTcgEngineCursedBlast({
+    input,
+    fields: GAME_RESOURCE_FIELDS,
+    headers: buildAshRpcHeaders()
+  })
+
+  if (!result.success) {
+    throw new Error(rpcErrorMessage(result.errors))
+  }
+
+  return result.data as CreatedGame
+}
+
 async function useMunkidoriAdrenaBrain(input: MunkidoriAdrenaBrainInput): Promise<CreatedGame> {
   const result = await runUseTcgEngineMunkidoriAdrenaBrain({
     input,
@@ -3206,6 +3273,7 @@ function GameStateWorkbench({
   onPlayBasicToBench,
   onPlayCard,
   onPlayStadium,
+  onUseCursedBlast,
   onUseMunkidoriAdrenaBrain,
   onUseTealDance,
   onUseSeethingSpirit,
@@ -3236,6 +3304,7 @@ function GameStateWorkbench({
   promptPendingId,
   playCardPendingCardId,
   playStadiumPendingCardId,
+  cursedBlastPendingKey,
   munkidoriAdrenaBrainPendingKey,
   tealDancePendingKey,
   seethingSpiritPendingKey,
@@ -3274,6 +3343,7 @@ function GameStateWorkbench({
   onPlayBasicToBench: (input: PlayBasicToBenchCommand) => void
   onPlayCard: (input: PlayCardCommand) => void
   onPlayStadium: (input: PlayStadiumCommand) => void
+  onUseCursedBlast: (input: CursedBlastCommand) => void
   onUseMunkidoriAdrenaBrain: (input: MunkidoriAdrenaBrainCommand) => void
   onUseTealDance: (input: TealDanceCommand) => void
   onUseSeethingSpirit: (input: SeethingSpiritCommand) => void
@@ -3304,6 +3374,7 @@ function GameStateWorkbench({
   promptPendingId: string | null
   playCardPendingCardId: string | null
   playStadiumPendingCardId: string | null
+  cursedBlastPendingKey: string | null
   munkidoriAdrenaBrainPendingKey: string | null
   tealDancePendingKey: string | null
   seethingSpiritPendingKey: string | null
@@ -3320,6 +3391,7 @@ function GameStateWorkbench({
     playCardPendingCardId ||
       playStadiumPendingCardId ||
       teamRocketsFactoryPendingPlayerId ||
+      cursedBlastPendingKey ||
       munkidoriAdrenaBrainPendingKey ||
       tealDancePendingKey ||
       seethingSpiritPendingKey ||
@@ -3447,6 +3519,7 @@ function GameStateWorkbench({
             onPlayBasicToBench={onPlayBasicToBench}
             onPlayCard={onPlayCard}
             onPlayStadium={onPlayStadium}
+            onUseCursedBlast={onUseCursedBlast}
             onUseMunkidoriAdrenaBrain={onUseMunkidoriAdrenaBrain}
             onUseTealDance={onUseTealDance}
             onUseSeethingSpirit={onUseSeethingSpirit}
@@ -3464,6 +3537,7 @@ function GameStateWorkbench({
             playBasicToBenchPendingCardId={playBasicToBenchPendingCardId}
             playCardPendingCardId={playCardPendingCardId}
             playStadiumPendingCardId={playStadiumPendingCardId}
+            cursedBlastPendingKey={cursedBlastPendingKey}
             munkidoriAdrenaBrainPendingKey={munkidoriAdrenaBrainPendingKey}
             tealDancePendingKey={tealDancePendingKey}
             seethingSpiritPendingKey={seethingSpiritPendingKey}
@@ -5931,6 +6005,7 @@ function ActionAffordancesPanel({
   onPlayBasicToBench,
   onPlayCard,
   onPlayStadium,
+  onUseCursedBlast,
   onUseMunkidoriAdrenaBrain,
   onUseTealDance,
   onUseSeethingSpirit,
@@ -5948,6 +6023,7 @@ function ActionAffordancesPanel({
   playBasicToBenchPendingCardId,
   playCardPendingCardId,
   playStadiumPendingCardId,
+  cursedBlastPendingKey,
   munkidoriAdrenaBrainPendingKey,
   tealDancePendingKey,
   seethingSpiritPendingKey,
@@ -5974,6 +6050,7 @@ function ActionAffordancesPanel({
   onPlayBasicToBench: (input: PlayBasicToBenchCommand) => void
   onPlayCard: (input: PlayCardCommand) => void
   onPlayStadium: (input: PlayStadiumCommand) => void
+  onUseCursedBlast: (input: CursedBlastCommand) => void
   onUseMunkidoriAdrenaBrain: (input: MunkidoriAdrenaBrainCommand) => void
   onUseTealDance: (input: TealDanceCommand) => void
   onUseSeethingSpirit: (input: SeethingSpiritCommand) => void
@@ -5991,6 +6068,7 @@ function ActionAffordancesPanel({
   playBasicToBenchPendingCardId: string | null
   playCardPendingCardId: string | null
   playStadiumPendingCardId: string | null
+  cursedBlastPendingKey: string | null
   munkidoriAdrenaBrainPendingKey: string | null
   tealDancePendingKey: string | null
   seethingSpiritPendingKey: string | null
@@ -6007,6 +6085,7 @@ function ActionAffordancesPanel({
     playCardPendingCardId ||
       playStadiumPendingCardId ||
       teamRocketsFactoryPendingPlayerId ||
+      cursedBlastPendingKey ||
       munkidoriAdrenaBrainPendingKey ||
       tealDancePendingKey ||
       seethingSpiritPendingKey ||
@@ -6099,6 +6178,7 @@ function ActionAffordancesPanel({
                     onPlayBasicToBench={onPlayBasicToBench}
                     onPlayCard={onPlayCard}
                     onPlayStadium={onPlayStadium}
+                    onUseCursedBlast={onUseCursedBlast}
                     onUseMunkidoriAdrenaBrain={onUseMunkidoriAdrenaBrain}
                     onUseTealDance={onUseTealDance}
                     onUseSeethingSpirit={onUseSeethingSpirit}
@@ -6111,6 +6191,7 @@ function ActionAffordancesPanel({
                     playBasicToBenchPendingCardId={playBasicToBenchPendingCardId}
                     playCardPendingCardId={playCardPendingCardId}
                     playStadiumPendingCardId={playStadiumPendingCardId}
+                    cursedBlastPendingKey={cursedBlastPendingKey}
                     munkidoriAdrenaBrainPendingKey={munkidoriAdrenaBrainPendingKey}
                     tealDancePendingKey={tealDancePendingKey}
                     seethingSpiritPendingKey={seethingSpiritPendingKey}
@@ -6700,6 +6781,7 @@ function ActionAffordanceCard({
   onPlayBasicToBench,
   onPlayCard,
   onPlayStadium,
+  onUseCursedBlast,
   onUseMunkidoriAdrenaBrain,
   onUseTealDance,
   onUseSeethingSpirit,
@@ -6712,6 +6794,7 @@ function ActionAffordanceCard({
   playBasicToBenchPendingCardId,
   playCardPendingCardId,
   playStadiumPendingCardId,
+  cursedBlastPendingKey,
   munkidoriAdrenaBrainPendingKey,
   tealDancePendingKey,
   seethingSpiritPendingKey,
@@ -6745,6 +6828,7 @@ function ActionAffordanceCard({
   onPlayBasicToBench: (input: PlayBasicToBenchCommand) => void
   onPlayCard: (input: PlayCardCommand) => void
   onPlayStadium: (input: PlayStadiumCommand) => void
+  onUseCursedBlast: (input: CursedBlastCommand) => void
   onUseMunkidoriAdrenaBrain: (input: MunkidoriAdrenaBrainCommand) => void
   onUseTealDance: (input: TealDanceCommand) => void
   onUseSeethingSpirit: (input: SeethingSpiritCommand) => void
@@ -6757,6 +6841,7 @@ function ActionAffordanceCard({
   playBasicToBenchPendingCardId: string | null
   playCardPendingCardId: string | null
   playStadiumPendingCardId: string | null
+  cursedBlastPendingKey: string | null
   munkidoriAdrenaBrainPendingKey: string | null
   tealDancePendingKey: string | null
   seethingSpiritPendingKey: string | null
@@ -6780,6 +6865,7 @@ function ActionAffordanceCard({
   const repeatedBenchLabels = repeatedBasicBenchBaseLabels(benchOptions)
   const evolutionOptions = providedEvolutionOptions ?? evolutionCommandOptions(action, cardsById)
   const repeatedEvolutionLabels = repeatedEvolutionBaseLabels(evolutionOptions)
+  const cursedBlastOptions = cursedBlastCommandOptions(action, cardsById)
   const adrenaBrainOptions = adrenaBrainCommandOptions(action, cardsById)
   const tealDanceOptions = tealDanceCommandOptions(action, cardsById)
   const seethingSpiritOptions = seethingSpiritCommandOptions(action, cardsById)
@@ -6886,6 +6972,31 @@ function ActionAffordanceCard({
                 {isPending
                   ? `Using ${stadiumCard?.name ?? "Team Rocket's Factory"}...`
                   : `Use ${stadiumCard?.name ?? formatCardInstanceId(cardInstanceId)}`}
+              </ActionCommandButton>
+            )
+          })}
+        </div>
+      ) : null}
+
+      {cursedBlastOptions.length > 0 ? (
+        <div className="mt-2 space-y-1.5">
+          {cursedBlastOptions.map(option => {
+            const isPending = cursedBlastPendingKey === option.key
+
+            return (
+              <ActionCommandButton
+                disabled={!canRunAction}
+                key={option.key}
+                onClick={() =>
+                  onUseCursedBlast({
+                    playerId: action.playerId,
+                    sourceCardInstanceId: option.sourceCardInstanceId,
+                    targetCardInstanceId: option.targetCardInstanceId
+                  })
+                }
+                tone="primary"
+              >
+                {isPending ? cursedBlastPendingLabel(option) : cursedBlastButtonLabel(option)}
               </ActionCommandButton>
             )
           })}
@@ -7387,6 +7498,7 @@ function actionSurfaceClassName(action: ActionAffordance) {
     case 'choose_replacement_active':
       return 'border-attention/35 bg-attention/10'
     case 'adrena_brain':
+    case 'cursed_blast':
     case 'teal_dance':
     case 'seething_spirit':
     case 'psychic_draw':
@@ -7436,6 +7548,8 @@ function actionSummary(action: ActionAffordance) {
       )}.`
     case 'adrena_brain':
       return `Move up to ${action.requiredSourceCount} damage ${action.requiredSourceCount === 1 ? 'counter' : 'counters'} from your damaged Pokémon to an opponent Pokémon.`
+    case 'cursed_blast':
+      return 'Put damage counters on 1 opponent Pokémon, then Knock Out the Dusclops or Dusknoir using this Ability.'
     case 'teal_dance':
       return 'Attach a Basic Grass Energy from hand to Teal Mask Ogerpon ex, then draw 1 card.'
     case 'seething_spirit':
@@ -7530,6 +7644,22 @@ function playCardCommandOptions(
       baseLabel: card?.name ?? formatCardInstanceId(cardInstanceId)
     }
   })
+}
+
+function cursedBlastCommandOptions(action: ActionAffordance, cardsById: Map<string, CardSummary>): CursedBlastCommandOption[] {
+  if (action.key !== 'cursed_blast' || action.sourceCardInstanceIds.length < 1) {
+    return []
+  }
+
+  const sourceCardInstanceId = action.sourceCardInstanceIds[0]!
+
+  return action.targetCardInstanceIds.map(targetCardInstanceId => ({
+    key: cursedBlastKey(sourceCardInstanceId, targetCardInstanceId),
+    sourceCardInstanceId,
+    targetCardInstanceId,
+    sourceCard: cardsById.get(sourceCardInstanceId),
+    targetCard: cardsById.get(targetCardInstanceId)
+  }))
 }
 
 function adrenaBrainCommandOptions(
@@ -7717,6 +7847,16 @@ function runAwayDrawPendingLabel(option: RunAwayDrawCommandOption) {
 
 function runAwayDrawButtonLabel(option: RunAwayDrawCommandOption) {
   return `Run Away Draw with ${option.sourceCard?.name ?? formatCardInstanceId(option.sourceCardInstanceId)}`
+}
+
+function cursedBlastPendingLabel(option: CursedBlastCommandOption) {
+  return `Using Cursed Blast with ${option.sourceCard?.name ?? formatCardInstanceId(option.sourceCardInstanceId)}...`
+}
+
+function cursedBlastButtonLabel(option: CursedBlastCommandOption) {
+  return `Cursed Blast: ${option.sourceCard?.name ?? formatCardInstanceId(option.sourceCardInstanceId)} → ${
+    option.targetCard?.name ?? formatCardInstanceId(option.targetCardInstanceId)
+  }`
 }
 
 function damageCounterOptions(maxCounters: number) {
@@ -8075,6 +8215,7 @@ function actionGroupId(action: ActionAffordance): ActionGroupId {
     case 'run_away_draw':
       return 'hand'
     case 'retreat':
+    case 'cursed_blast':
     case 'adrena_brain':
     case 'declare_attack':
       return 'battle'
@@ -11005,6 +11146,10 @@ function evolveKey(evolutionCardInstanceId: string, targetCardInstanceId: string
 
 function retreatKey(benchCardInstanceId: string, energyCardInstanceIds: string[]) {
   return `${benchCardInstanceId}:${energyCardInstanceIds.join(',')}`
+}
+
+function cursedBlastKey(sourceCardInstanceId: string, targetCardInstanceId: string) {
+  return `${sourceCardInstanceId}:${targetCardInstanceId}`
 }
 
 function adrenaBrainKey(
