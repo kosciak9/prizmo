@@ -1,0 +1,84 @@
+{
+  "prizmo_id": "TEF-069",
+  "source": {
+    "base_url": "https://api.tcgdex.net/v2/en",
+    "dynamic_fields_removed": [
+      "pricing"
+    ],
+    "language": "en",
+    "provider": "TCGdex"
+  },
+  "tcgdex": {
+    "attacks": [
+      {
+        "cost": [
+          "Psychic"
+        ],
+        "damage": 30,
+        "effect": "During your opponent's next turn, they can't play any Pokémon from their hand to evolve their Pokémon.",
+        "name": "Evolution Jammer"
+      },
+      {
+        "cost": [
+          "Psychic",
+          "Colorless",
+          "Colorless"
+        ],
+        "damage": 100,
+        "name": "Super Psy Bolt"
+      }
+    ],
+    "category": "Pokemon",
+    "dexId": [
+      437
+    ],
+    "evolveFrom": "Bronzor",
+    "hp": 110,
+    "id": "sv05-069",
+    "illustrator": "Katsunori Sato",
+    "image": "https://assets.tcgdex.net/en/sv/sv05/069",
+    "legal": {
+      "expanded": true,
+      "standard": true
+    },
+    "localId": "069",
+    "name": "Bronzong",
+    "rarity": "Uncommon",
+    "regulationMark": "H",
+    "retreat": 3,
+    "set": {
+      "cardCount": {
+        "official": 162,
+        "total": 218
+      },
+      "id": "sv05",
+      "name": "Temporal Forces",
+      "symbol": "https://assets.tcgdex.net/univ/sv/sv05/symbol"
+    },
+    "stage": "Stage1",
+    "types": [
+      "Psychic"
+    ],
+    "updated": "2026-05-06T18:45:51Z",
+    "variants": {
+      "firstEdition": false,
+      "holo": false,
+      "normal": true,
+      "reverse": true,
+      "wPromo": false
+    },
+    "variants_detailed": [
+      {
+        "size": "standard",
+        "type": "normal",
+        "variantId": "endfynwn4n10gzq"
+      },
+      {
+        "size": "standard",
+        "type": "reverse",
+        "variantId": "cm4kqul3x1bwlz1f"
+      }
+    ]
+  },
+  "tcgdex_id": "sv05-069"
+}

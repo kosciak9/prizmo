@@ -1,0 +1,81 @@
+{
+  "prizmo_id": "DRI-040",
+  "source": {
+    "base_url": "https://api.tcgdex.net/v2/en",
+    "dynamic_fields_removed": [
+      "pricing"
+    ],
+    "language": "en",
+    "provider": "TCGdex"
+  },
+  "tcgdex": {
+    "attacks": [
+      {
+        "cost": [
+          "Colorless"
+        ],
+        "effect": "Draw a card.",
+        "name": "Collect"
+      },
+      {
+        "cost": [
+          "Fire"
+        ],
+        "damage": 10,
+        "name": "Combustion"
+      }
+    ],
+    "category": "Pokemon",
+    "dexId": [
+      255
+    ],
+    "hp": 70,
+    "id": "sv10-040",
+    "illustrator": "Tika Matsuno",
+    "image": "https://assets.tcgdex.net/en/sv/sv10/040",
+    "legal": {
+      "expanded": true,
+      "standard": true
+    },
+    "localId": "040",
+    "name": "Torchic",
+    "rarity": "Common",
+    "regulationMark": "I",
+    "retreat": 1,
+    "set": {
+      "cardCount": {
+        "official": 182,
+        "total": 244
+      },
+      "id": "sv10",
+      "logo": "https://assets.tcgdex.net/en/sv/sv10/logo",
+      "name": "Destined Rivals",
+      "symbol": "https://assets.tcgdex.net/univ/sv/sv10/symbol"
+    },
+    "stage": "Basic",
+    "types": [
+      "Fire"
+    ],
+    "updated": "2026-04-14T22:44:49+01:00",
+    "variants": {
+      "firstEdition": false,
+      "holo": false,
+      "normal": true,
+      "reverse": true,
+      "wPromo": false
+    },
+    "variants_detailed": [
+      {
+        "size": "standard",
+        "type": "normal",
+        "variantId": "endfynwn4n10gzq"
+      },
+      {
+        "size": "standard",
+        "type": "reverse",
+        "variantId": "cm4kqul3x1bwlz1f"
+      }
+    ]
+  },
+  "tcgdex_id": "sv10-040"
+}

@@ -1,0 +1,89 @@
+{
+  "prizmo_id": "SSP-072",
+  "source": {
+    "base_url": "https://api.tcgdex.net/v2/en",
+    "dynamic_fields_removed": [
+      "pricing"
+    ],
+    "language": "en",
+    "provider": "TCGdex"
+  },
+  "tcgdex": {
+    "abilities": [
+      {
+        "effect": "When your opponent's Active Pokémon is Knocked Out, flip a coin. If heads, take 1 more Prize card. The effect of Wonder Kiss doesn't stack.",
+        "name": "Wonder Kiss",
+        "type": "Ability"
+      }
+    ],
+    "attacks": [
+      {
+        "cost": [
+          "Colorless",
+          "Colorless",
+          "Colorless"
+        ],
+        "damage": 140,
+        "name": "Speed Wing"
+      }
+    ],
+    "category": "Pokemon",
+    "dexId": [
+      468
+    ],
+    "evolveFrom": "Togetic",
+    "hp": 140,
+    "id": "sv08-072",
+    "illustrator": "Narano",
+    "image": "https://assets.tcgdex.net/en/sv/sv08/072",
+    "legal": {
+      "expanded": true,
+      "standard": true
+    },
+    "localId": "072",
+    "name": "Togekiss",
+    "rarity": "Rare",
+    "regulationMark": "H",
+    "retreat": 1,
+    "set": {
+      "cardCount": {
+        "official": 191,
+        "total": 252
+      },
+      "id": "sv08",
+      "logo": "https://assets.tcgdex.net/en/sv/sv08/logo",
+      "name": "Surging Sparks"
+    },
+    "stage": "Stage2",
+    "types": [
+      "Psychic"
+    ],
+    "updated": "2026-04-28T20:18:34+01:00",
+    "variants": {
+      "firstEdition": false,
+      "holo": true,
+      "normal": false,
+      "reverse": true,
+      "wPromo": false
+    },
+    "variants_detailed": [
+      {
+        "size": "standard",
+        "type": "holo",
+        "variantId": "jr7oetx1mqug9"
+      },
+      {
+        "size": "standard",
+        "type": "reverse",
+        "variantId": "cm4kqul3x1bwlz1f"
+      },
+      {
+        "foil": "cosmos",
+        "size": "standard",
+        "type": "holo",
+        "variantId": "5zs5af49g93yryvw1ftj"
+      }
+    ]
+  },
+  "tcgdex_id": "sv08-072"
+}

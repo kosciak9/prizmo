@@ -18,6 +18,8 @@ defmodule Prizmo.Tcg.Data.TCGdex do
 
   @tcgdex_set_id_by_prizmo_abbreviation %{
     "ASC" => "me02.5",
+    "BLK" => "sv10.5b",
+    "CRI" => "me04",
     "DRI" => "sv10",
     "JTG" => "sv09",
     "MEE" => "mee",

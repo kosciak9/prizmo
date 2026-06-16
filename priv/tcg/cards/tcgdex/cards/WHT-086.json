@@ -1,0 +1,63 @@
+{
+  "prizmo_id": "WHT-086",
+  "source": {
+    "base_url": "https://api.tcgdex.net/v2/en",
+    "dynamic_fields_removed": [
+      "pricing"
+    ],
+    "language": "en",
+    "provider": "TCGdex"
+  },
+  "tcgdex": {
+    "category": "Energy",
+    "effect": "If this card is attached to 1 of your Pokémon, discard it at the end of your turn.\n\nAs long as this card is attached to a Pokémon, it provides {C} Energy.\n\nIf this card is attached to an Evolution Pokémon, it provides {C}{C}{C} Energy instead.",
+    "energyType": "Normal",
+    "id": "sv10.5w-086",
+    "image": "https://assets.tcgdex.net/en/sv/sv10.5w/086",
+    "legal": {
+      "expanded": true,
+      "standard": true
+    },
+    "localId": "086",
+    "name": "Ignition Energy",
+    "rarity": "Uncommon",
+    "regulationMark": "I",
+    "set": {
+      "cardCount": {
+        "official": 86,
+        "total": 173
+      },
+      "id": "sv10.5w",
+      "logo": "https://assets.tcgdex.net/en/sv/sv10.5w/logo",
+      "name": "White Flare",
+      "symbol": "https://assets.tcgdex.net/univ/sv/sv10.5w/symbol"
+    },
+    "updated": "2026-04-21T19:45:38+01:00",
+    "variants": {
+      "firstEdition": false,
+      "holo": false,
+      "normal": true,
+      "reverse": true,
+      "wPromo": false
+    },
+    "variants_detailed": [
+      {
+        "size": "standard",
+        "type": "normal",
+        "variantId": "endfynwn4n10gzq"
+      },
+      {
+        "size": "standard",
+        "type": "reverse",
+        "variantId": "cm4kqul3x1bwlz1f"
+      },
+      {
+        "foil": "pokeball",
+        "size": "standard",
+        "type": "reverse",
+        "variantId": "3739bbtj3i910y5ynn9xc6ryf"
+      }
+    ]
+  },
+  "tcgdex_id": "sv10.5w-086"
+}

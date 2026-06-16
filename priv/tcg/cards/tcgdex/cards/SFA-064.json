@@ -1,0 +1,53 @@
+{
+  "prizmo_id": "SFA-064",
+  "source": {
+    "base_url": "https://api.tcgdex.net/v2/en",
+    "dynamic_fields_removed": [
+      "pricing"
+    ],
+    "language": "en",
+    "provider": "TCGdex"
+  },
+  "tcgdex": {
+    "category": "Trainer",
+    "effect": "Your opponent discards cards from their hand until they have 3 cards in their hand.",
+    "id": "sv06.5-064",
+    "illustrator": "GOSSAN",
+    "image": "https://assets.tcgdex.net/en/sv/sv06.5/064",
+    "legal": {
+      "expanded": true,
+      "standard": true
+    },
+    "localId": "064",
+    "name": "Xerosic's Machinations",
+    "rarity": "Uncommon",
+    "regulationMark": "H",
+    "set": {
+      "cardCount": {
+        "official": 64,
+        "total": 99
+      },
+      "id": "sv06.5",
+      "logo": "https://assets.tcgdex.net/en/sv/sv06.5/logo",
+      "name": "Shrouded Fable",
+      "symbol": "https://assets.tcgdex.net/univ/sv/sv06.5/symbol"
+    },
+    "trainerType": "Supporter",
+    "updated": "2025-11-14T00:04:19+01:00",
+    "variants": {
+      "firstEdition": false,
+      "holo": false,
+      "normal": true,
+      "reverse": false,
+      "wPromo": false
+    },
+    "variants_detailed": [
+      {
+        "size": "standard",
+        "type": "normal",
+        "variantId": "generated"
+      }
+    ]
+  },
+  "tcgdex_id": "sv06.5-064"
+}

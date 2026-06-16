@@ -1,0 +1,82 @@
+{
+  "prizmo_id": "JTG-121",
+  "source": {
+    "base_url": "https://api.tcgdex.net/v2/en",
+    "dynamic_fields_removed": [
+      "pricing"
+    ],
+    "language": "en",
+    "provider": "TCGdex"
+  },
+  "tcgdex": {
+    "attacks": [
+      {
+        "cost": [
+          "Colorless"
+        ],
+        "damage": "60×",
+        "effect": "This attack does 60 damage for each of your opponent's Pokémon ex in play.",
+        "name": "Tenacious Tail"
+      },
+      {
+        "cost": [
+          "Colorless",
+          "Colorless",
+          "Colorless"
+        ],
+        "damage": 150,
+        "effect": "This attack's damage isn't affected by any effects on your opponent's Active Pokémon.",
+        "name": "Destructive Drill"
+      }
+    ],
+    "category": "Pokemon",
+    "dexId": [
+      982
+    ],
+    "evolveFrom": "Dunsparce",
+    "hp": 270,
+    "id": "sv09-121",
+    "illustrator": "5ban Graphics",
+    "image": "https://assets.tcgdex.net/en/sv/sv09/121",
+    "legal": {
+      "expanded": true,
+      "standard": true
+    },
+    "localId": "121",
+    "name": "Dudunsparce ex",
+    "rarity": "Double rare",
+    "regulationMark": "I",
+    "retreat": 3,
+    "set": {
+      "cardCount": {
+        "official": 159,
+        "total": 190
+      },
+      "id": "sv09",
+      "logo": "https://assets.tcgdex.net/en/sv/sv09/logo",
+      "name": "Journey Together",
+      "symbol": "https://assets.tcgdex.net/univ/sv/sv09/symbol"
+    },
+    "stage": "Stage1",
+    "suffix": "ex",
+    "types": [
+      "Colorless"
+    ],
+    "updated": "2026-04-25T21:46:36+01:00",
+    "variants": {
+      "firstEdition": false,
+      "holo": true,
+      "normal": false,
+      "reverse": false,
+      "wPromo": false
+    },
+    "variants_detailed": [
+      {
+        "size": "standard",
+        "type": "holo",
+        "variantId": "jr7oetx1mqug9"
+      }
+    ]
+  },
+  "tcgdex_id": "sv09-121"
+}

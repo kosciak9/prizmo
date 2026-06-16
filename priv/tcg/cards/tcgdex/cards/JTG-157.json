@@ -1,0 +1,58 @@
+{
+  "prizmo_id": "JTG-157",
+  "source": {
+    "base_url": "https://api.tcgdex.net/v2/en",
+    "dynamic_fields_removed": [
+      "pricing"
+    ],
+    "language": "en",
+    "provider": "TCGdex"
+  },
+  "tcgdex": {
+    "category": "Trainer",
+    "effect": "Discard a Pokémon Tool and a Special Energy from 1 of your opponent's Pokémon.",
+    "id": "sv09-157",
+    "illustrator": "Hideki Ishikawa",
+    "image": "https://assets.tcgdex.net/en/sv/sv09/157",
+    "legal": {
+      "expanded": true,
+      "standard": true
+    },
+    "localId": "157",
+    "name": "Ruffian",
+    "rarity": "Uncommon",
+    "regulationMark": "I",
+    "set": {
+      "cardCount": {
+        "official": 159,
+        "total": 190
+      },
+      "id": "sv09",
+      "logo": "https://assets.tcgdex.net/en/sv/sv09/logo",
+      "name": "Journey Together",
+      "symbol": "https://assets.tcgdex.net/univ/sv/sv09/symbol"
+    },
+    "trainerType": "Supporter",
+    "updated": "2026-04-15T20:30:14+01:00",
+    "variants": {
+      "firstEdition": false,
+      "holo": false,
+      "normal": true,
+      "reverse": true,
+      "wPromo": false
+    },
+    "variants_detailed": [
+      {
+        "size": "standard",
+        "type": "normal",
+        "variantId": "endfynwn4n10gzq"
+      },
+      {
+        "size": "standard",
+        "type": "reverse",
+        "variantId": "cm4kqul3x1bwlz1f"
+      }
+    ]
+  },
+  "tcgdex_id": "sv09-157"
+}

@@ -1,0 +1,60 @@
+{
+  "prizmo_id": "TEF-157",
+  "source": {
+    "base_url": "https://api.tcgdex.net/v2/en",
+    "dynamic_fields_removed": [
+      "pricing"
+    ],
+    "language": "en",
+    "provider": "TCGdex"
+  },
+  "tcgdex": {
+    "category": "Trainer",
+    "effect": "Switch in 1 of your opponent's Benched Pokémon to the Active Spot. If you do, switch your Active Pokémon with 1 of your Benched Pokémon.",
+    "id": "sv05-157",
+    "illustrator": "Toyste Beach",
+    "image": "https://assets.tcgdex.net/en/sv/sv05/157",
+    "legal": {
+      "expanded": true,
+      "standard": true
+    },
+    "localId": "157",
+    "name": "Prime Catcher",
+    "rarity": "ACE SPEC Rare",
+    "regulationMark": "H",
+    "set": {
+      "cardCount": {
+        "official": 162,
+        "total": 218
+      },
+      "id": "sv05",
+      "name": "Temporal Forces",
+      "symbol": "https://assets.tcgdex.net/univ/sv/sv05/symbol"
+    },
+    "trainerType": "Item",
+    "updated": "2026-05-06T18:45:51Z",
+    "variants": {
+      "firstEdition": false,
+      "holo": true,
+      "normal": false,
+      "reverse": false,
+      "wPromo": false
+    },
+    "variants_detailed": [
+      {
+        "size": "standard",
+        "type": "holo",
+        "variantId": "jr7oetx1mqug9"
+      },
+      {
+        "size": "standard",
+        "stamp": [
+          "player-rewards-program"
+        ],
+        "type": "holo",
+        "variantId": "mtltux8quqoc7vwp24c9zzhgmzduu8xcik8"
+      }
+    ]
+  },
+  "tcgdex_id": "sv05-157"
+}

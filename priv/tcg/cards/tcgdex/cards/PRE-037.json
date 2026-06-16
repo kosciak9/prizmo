@@ -1,0 +1,96 @@
+{
+  "prizmo_id": "PRE-037",
+  "source": {
+    "base_url": "https://api.tcgdex.net/v2/en",
+    "dynamic_fields_removed": [
+      "pricing"
+    ],
+    "language": "en",
+    "provider": "TCGdex"
+  },
+  "tcgdex": {
+    "abilities": [
+      {
+        "effect": "Once during your turn, you may put 13 damage counters on 1 of your opponent's Pokémon. If you use this Ability, this Pokémon is Knocked Out.",
+        "name": "Cursed Blast",
+        "type": "Ability"
+      }
+    ],
+    "attacks": [
+      {
+        "cost": [
+          "Psychic",
+          "Psychic",
+          "Colorless"
+        ],
+        "damage": 150,
+        "effect": "During your opponent's next turn, the Defending Pokémon can't retreat.",
+        "name": "Shadow Bind"
+      }
+    ],
+    "category": "Pokemon",
+    "dexId": [
+      477
+    ],
+    "evolveFrom": "Dusclops",
+    "hp": 160,
+    "id": "sv08.5-037",
+    "illustrator": "danciao",
+    "image": "https://assets.tcgdex.net/en/sv/sv08.5/037",
+    "legal": {
+      "expanded": true,
+      "standard": true
+    },
+    "localId": "037",
+    "name": "Dusknoir",
+    "rarity": "Rare",
+    "regulationMark": "H",
+    "retreat": 3,
+    "set": {
+      "cardCount": {
+        "official": 131,
+        "total": 180
+      },
+      "id": "sv08.5",
+      "logo": "https://assets.tcgdex.net/en/sv/sv08.5/logo",
+      "name": "Prismatic Evolutions"
+    },
+    "stage": "Stage2",
+    "types": [
+      "Psychic"
+    ],
+    "updated": "2026-04-23T19:37:54+01:00",
+    "variants": {
+      "firstEdition": false,
+      "holo": true,
+      "normal": false,
+      "reverse": true,
+      "wPromo": false
+    },
+    "variants_detailed": [
+      {
+        "size": "standard",
+        "type": "reverse",
+        "variantId": "cm4kqul3x1bwlz1f"
+      },
+      {
+        "size": "standard",
+        "type": "holo",
+        "variantId": "jr7oetx1mqug9"
+      },
+      {
+        "foil": "pokeball",
+        "size": "standard",
+        "type": "reverse",
+        "variantId": "3739bbtj3i910y5ynn9xc6ryf"
+      },
+      {
+        "foil": "masterball",
+        "size": "standard",
+        "type": "reverse",
+        "variantId": "2asus05yghmpd1ud1sdmlq3as4e"
+      }
+    ]
+  },
+  "tcgdex_id": "sv08.5-037"
+}

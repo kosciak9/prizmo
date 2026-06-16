@@ -1,0 +1,94 @@
+{
+  "prizmo_id": "PRE-036",
+  "source": {
+    "base_url": "https://api.tcgdex.net/v2/en",
+    "dynamic_fields_removed": [
+      "pricing"
+    ],
+    "language": "en",
+    "provider": "TCGdex"
+  },
+  "tcgdex": {
+    "abilities": [
+      {
+        "effect": "Once during your turn, you may put 5 damage counters on 1 of your opponent's Pokémon. If you use this Ability, this Pokémon is Knocked Out.",
+        "name": "Cursed Blast",
+        "type": "Ability"
+      }
+    ],
+    "attacks": [
+      {
+        "cost": [
+          "Psychic",
+          "Psychic"
+        ],
+        "damage": 50,
+        "name": "Will-O-Wisp"
+      }
+    ],
+    "category": "Pokemon",
+    "dexId": [
+      356
+    ],
+    "evolveFrom": "Duskull",
+    "hp": 90,
+    "id": "sv08.5-036",
+    "illustrator": "Aya Kusube",
+    "image": "https://assets.tcgdex.net/en/sv/sv08.5/036",
+    "legal": {
+      "expanded": true,
+      "standard": true
+    },
+    "localId": "036",
+    "name": "Dusclops",
+    "rarity": "Common",
+    "regulationMark": "H",
+    "retreat": 2,
+    "set": {
+      "cardCount": {
+        "official": 131,
+        "total": 180
+      },
+      "id": "sv08.5",
+      "logo": "https://assets.tcgdex.net/en/sv/sv08.5/logo",
+      "name": "Prismatic Evolutions"
+    },
+    "stage": "Stage1",
+    "types": [
+      "Psychic"
+    ],
+    "updated": "2026-04-23T19:37:54+01:00",
+    "variants": {
+      "firstEdition": false,
+      "holo": false,
+      "normal": true,
+      "reverse": true,
+      "wPromo": false
+    },
+    "variants_detailed": [
+      {
+        "size": "standard",
+        "type": "normal",
+        "variantId": "endfynwn4n10gzq"
+      },
+      {
+        "size": "standard",
+        "type": "reverse",
+        "variantId": "cm4kqul3x1bwlz1f"
+      },
+      {
+        "foil": "pokeball",
+        "size": "standard",
+        "type": "reverse",
+        "variantId": "3739bbtj3i910y5ynn9xc6ryf"
+      },
+      {
+        "foil": "masterball",
+        "size": "standard",
+        "type": "reverse",
+        "variantId": "2asus05yghmpd1ud1sdmlq3as4e"
+      }
+    ]
+  },
+  "tcgdex_id": "sv08.5-036"
+}

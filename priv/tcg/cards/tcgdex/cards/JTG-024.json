@@ -1,0 +1,101 @@
+{
+  "prizmo_id": "JTG-024",
+  "source": {
+    "base_url": "https://api.tcgdex.net/v2/en",
+    "dynamic_fields_removed": [
+      "pricing"
+    ],
+    "language": "en",
+    "provider": "TCGdex"
+  },
+  "tcgdex": {
+    "abilities": [
+      {
+        "effect": "Once during your turn, you may attach a Basic Energy card from your discard pile to 1 of your Pokémon.",
+        "name": "Seething Spirit",
+        "type": "Ability"
+      }
+    ],
+    "attacks": [
+      {
+        "cost": [
+          "Fire",
+          "Colorless"
+        ],
+        "damage": 200,
+        "effect": "During your next turn, this Pokémon can't attack.",
+        "name": "Smolder-sault"
+      }
+    ],
+    "category": "Pokemon",
+    "dexId": [
+      257
+    ],
+    "evolveFrom": "Combusken",
+    "hp": 320,
+    "id": "sv09-024",
+    "illustrator": "takuyoa",
+    "image": "https://assets.tcgdex.net/en/sv/sv09/024",
+    "legal": {
+      "expanded": true,
+      "standard": true
+    },
+    "localId": "024",
+    "name": "Blaziken ex",
+    "rarity": "Double rare",
+    "regulationMark": "H",
+    "retreat": 2,
+    "set": {
+      "cardCount": {
+        "official": 159,
+        "total": 190
+      },
+      "id": "sv09",
+      "logo": "https://assets.tcgdex.net/en/sv/sv09/logo",
+      "name": "Journey Together",
+      "symbol": "https://assets.tcgdex.net/univ/sv/sv09/symbol"
+    },
+    "stage": "Stage2",
+    "suffix": "ex",
+    "types": [
+      "Fire"
+    ],
+    "updated": "2026-04-25T21:46:36+01:00",
+    "variants": {
+      "firstEdition": false,
+      "holo": true,
+      "normal": false,
+      "reverse": false,
+      "wPromo": false
+    },
+    "variants_detailed": [
+      {
+        "size": "standard",
+        "type": "holo",
+        "variantId": "jr7oetx1mqug9"
+      },
+      {
+        "size": "standard",
+        "stamp": [
+          "set-logo"
+        ],
+        "type": "holo",
+        "variantId": "555jb0efopmyclvkikic41"
+      },
+      {
+        "size": "jumbo",
+        "stamp": [
+          "set-logo"
+        ],
+        "type": "holo",
+        "variantId": "7g4cbxtmtngwhnkbcgz"
+      },
+      {
+        "size": "jumbo",
+        "type": "holo",
+        "variantId": "slwlv6rn87"
+      }
+    ]
+  },
+  "tcgdex_id": "sv09-024"
+}

@@ -1,0 +1,95 @@
+{
+  "prizmo_id": "BLK-040",
+  "source": {
+    "base_url": "https://api.tcgdex.net/v2/en",
+    "dynamic_fields_removed": [
+      "pricing"
+    ],
+    "language": "en",
+    "provider": "TCGdex"
+  },
+  "tcgdex": {
+    "attacks": [
+      {
+        "cost": [
+          "Psychic"
+        ],
+        "effect": "Move an Energy from 1 of your opponent's Pokémon to another of their Pokémon.",
+        "name": "Slight Shift"
+      },
+      {
+        "cost": [
+          "Colorless",
+          "Colorless",
+          "Colorless"
+        ],
+        "damage": 40,
+        "name": "Beam"
+      }
+    ],
+    "category": "Pokemon",
+    "dexId": [
+      605
+    ],
+    "hp": 60,
+    "id": "sv10.5b-040",
+    "illustrator": "Apios",
+    "image": "https://assets.tcgdex.net/en/sv/sv10.5b/040",
+    "legal": {
+      "expanded": true,
+      "standard": true
+    },
+    "localId": "040",
+    "name": "Elgyem",
+    "rarity": "Common",
+    "regulationMark": "I",
+    "retreat": 1,
+    "set": {
+      "cardCount": {
+        "official": 86,
+        "total": 172
+      },
+      "id": "sv10.5b",
+      "logo": "https://assets.tcgdex.net/en/sv/sv10.5b/logo",
+      "name": "Black Bolt",
+      "symbol": "https://assets.tcgdex.net/univ/sv/sv10.5b/symbol"
+    },
+    "stage": "Basic",
+    "types": [
+      "Psychic"
+    ],
+    "updated": "2026-04-14T17:41:47Z",
+    "variants": {
+      "firstEdition": false,
+      "holo": false,
+      "normal": true,
+      "reverse": true,
+      "wPromo": false
+    },
+    "variants_detailed": [
+      {
+        "size": "standard",
+        "type": "normal",
+        "variantId": "endfynwn4n10gzq"
+      },
+      {
+        "size": "standard",
+        "type": "reverse",
+        "variantId": "cm4kqul3x1bwlz1f"
+      },
+      {
+        "foil": "pokeball",
+        "size": "standard",
+        "type": "reverse",
+        "variantId": "3739bbtj3i910y5ynn9xc6ryf"
+      },
+      {
+        "foil": "masterball",
+        "size": "standard",
+        "type": "reverse",
+        "variantId": "2asus05yghmpd1ud1sdmlq3as4e"
+      }
+    ]
+  },
+  "tcgdex_id": "sv10.5b-040"
+}

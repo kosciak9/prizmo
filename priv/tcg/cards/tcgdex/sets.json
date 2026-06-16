@@ -28,6 +28,58 @@
     },
     {
       "abbreviation": {
+        "official": "BLK"
+      },
+      "cardCount": {
+        "firstEd": 0,
+        "holo": 102,
+        "normal": 72,
+        "official": 86,
+        "reverse": 232,
+        "total": 172
+      },
+      "id": "sv10.5b",
+      "legal": {
+        "expanded": true,
+        "standard": false
+      },
+      "logo": "https://assets.tcgdex.net/en/sv/sv10.5b/logo",
+      "name": "Black Bolt",
+      "releaseDate": "2025-07-17",
+      "serie": {
+        "id": "sv",
+        "name": "Scarlet & Violet"
+      },
+      "symbol": "https://assets.tcgdex.net/univ/sv/sv10.5b/symbol"
+    },
+    {
+      "abbreviation": {
+        "official": "CRI"
+      },
+      "cardCount": {
+        "firstEd": 0,
+        "holo": 0,
+        "normal": 122,
+        "official": 86,
+        "reverse": 0,
+        "total": 122
+      },
+      "id": "me04",
+      "legal": {
+        "expanded": true,
+        "standard": false
+      },
+      "logo": "https://assets.tcgdex.net/en/me/me04/logo",
+      "name": "Chaos Rising",
+      "releaseDate": "2026-05-22",
+      "serie": {
+        "id": "me",
+        "name": "Mega Evolution"
+      },
+      "symbol": "https://assets.tcgdex.net/univ/me/me04/symbol"
+    },
+    {
+      "abbreviation": {
         "official": "DRI"
       },
       "cardCount": {

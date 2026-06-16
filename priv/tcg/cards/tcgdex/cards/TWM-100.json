@@ -1,0 +1,94 @@
+{
+  "prizmo_id": "TWM-100",
+  "source": {
+    "base_url": "https://api.tcgdex.net/v2/en",
+    "dynamic_fields_removed": [
+      "pricing"
+    ],
+    "language": "en",
+    "provider": "TCGdex"
+  },
+  "tcgdex": {
+    "attacks": [
+      {
+        "damage": "30+",
+        "effect": "If your Benched Pokémon have any damage counters on them, this attack does 90 more damage.",
+        "name": "Proud Fangs"
+      },
+      {
+        "cost": [
+          "Fighting",
+          "Fighting",
+          "Colorless"
+        ],
+        "damage": 90,
+        "effect": "Your opponent's Active Pokémon is now Burned.",
+        "name": "Searing Flame"
+      }
+    ],
+    "category": "Pokemon",
+    "dexId": [
+      59
+    ],
+    "evolveFrom": "Hisuian Growlithe",
+    "hp": 130,
+    "id": "sv06-100",
+    "illustrator": "SIE NANAHARA",
+    "image": "https://assets.tcgdex.net/en/sv/sv06/100",
+    "legal": {
+      "expanded": true,
+      "standard": true
+    },
+    "localId": "100",
+    "name": "Hisuian Arcanine",
+    "rarity": "Rare",
+    "regulationMark": "H",
+    "retreat": 2,
+    "set": {
+      "cardCount": {
+        "official": 167,
+        "total": 226
+      },
+      "id": "sv06",
+      "logo": "https://assets.tcgdex.net/en/sv/sv06/logo",
+      "name": "Twilight Masquerade",
+      "symbol": "https://assets.tcgdex.net/univ/sv/sv06/symbol"
+    },
+    "stage": "Stage1",
+    "types": [
+      "Fighting"
+    ],
+    "updated": "2026-05-04T00:16:35+01:00",
+    "variants": {
+      "firstEdition": false,
+      "holo": true,
+      "normal": true,
+      "reverse": true,
+      "wPromo": false
+    },
+    "variants_detailed": [
+      {
+        "size": "standard",
+        "type": "holo",
+        "variantId": "jr7oetx1mqug9"
+      },
+      {
+        "size": "standard",
+        "type": "reverse",
+        "variantId": "cm4kqul3x1bwlz1f"
+      },
+      {
+        "foil": "cosmos",
+        "size": "standard",
+        "type": "holo",
+        "variantId": "5zs5af49g93yryvw1ftj"
+      },
+      {
+        "size": "standard",
+        "type": "normal",
+        "variantId": "endfynwn4n10gzq"
+      }
+    ]
+  },
+  "tcgdex_id": "sv06-100"
+}

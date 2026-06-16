@@ -1,0 +1,80 @@
+{
+  "prizmo_id": "TWM-099",
+  "source": {
+    "base_url": "https://api.tcgdex.net/v2/en",
+    "dynamic_fields_removed": [
+      "pricing"
+    ],
+    "language": "en",
+    "provider": "TCGdex"
+  },
+  "tcgdex": {
+    "attacks": [
+      {
+        "effect": "Discard a Stadium in play.",
+        "name": "Blazing Destruction"
+      },
+      {
+        "cost": [
+          "Fighting",
+          "Colorless"
+        ],
+        "damage": 40,
+        "effect": "This Pokémon also does 10 damage to itself.",
+        "name": "Take Down"
+      }
+    ],
+    "category": "Pokemon",
+    "dexId": [
+      58
+    ],
+    "hp": 80,
+    "id": "sv06-099",
+    "illustrator": "Whisker",
+    "image": "https://assets.tcgdex.net/en/sv/sv06/099",
+    "legal": {
+      "expanded": true,
+      "standard": true
+    },
+    "localId": "099",
+    "name": "Hisuian Growlithe",
+    "rarity": "Common",
+    "regulationMark": "H",
+    "retreat": 2,
+    "set": {
+      "cardCount": {
+        "official": 167,
+        "total": 226
+      },
+      "id": "sv06",
+      "logo": "https://assets.tcgdex.net/en/sv/sv06/logo",
+      "name": "Twilight Masquerade",
+      "symbol": "https://assets.tcgdex.net/univ/sv/sv06/symbol"
+    },
+    "stage": "Basic",
+    "types": [
+      "Fighting"
+    ],
+    "updated": "2026-05-04T00:16:35+01:00",
+    "variants": {
+      "firstEdition": false,
+      "holo": false,
+      "normal": true,
+      "reverse": true,
+      "wPromo": false
+    },
+    "variants_detailed": [
+      {
+        "size": "standard",
+        "type": "normal",
+        "variantId": "endfynwn4n10gzq"
+      },
+      {
+        "size": "standard",
+        "type": "reverse",
+        "variantId": "cm4kqul3x1bwlz1f"
+      }
+    ]
+  },
+  "tcgdex_id": "sv06-099"
+}

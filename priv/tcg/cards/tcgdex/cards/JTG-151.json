@@ -1,0 +1,73 @@
+{
+  "prizmo_id": "JTG-151",
+  "source": {
+    "base_url": "https://api.tcgdex.net/v2/en",
+    "dynamic_fields_removed": [
+      "pricing"
+    ],
+    "language": "en",
+    "provider": "TCGdex"
+  },
+  "tcgdex": {
+    "category": "Trainer",
+    "effect": "If the Lillie's Pokémon this card is attached to is Knocked Out by damage from an attack from your opponent's Pokémon, that player takes 1 fewer Prize card.",
+    "id": "sv09-151",
+    "illustrator": "AYUMI ODASHIMA",
+    "image": "https://assets.tcgdex.net/en/sv/sv09/151",
+    "legal": {
+      "expanded": true,
+      "standard": true
+    },
+    "localId": "151",
+    "name": "Lillie's Pearl",
+    "rarity": "Uncommon",
+    "regulationMark": "I",
+    "set": {
+      "cardCount": {
+        "official": 159,
+        "total": 190
+      },
+      "id": "sv09",
+      "logo": "https://assets.tcgdex.net/en/sv/sv09/logo",
+      "name": "Journey Together",
+      "symbol": "https://assets.tcgdex.net/univ/sv/sv09/symbol"
+    },
+    "trainerType": "Tool",
+    "updated": "2026-04-15T20:30:14+01:00",
+    "variants": {
+      "firstEdition": false,
+      "holo": true,
+      "normal": true,
+      "reverse": true,
+      "wPromo": false
+    },
+    "variants_detailed": [
+      {
+        "size": "standard",
+        "type": "normal",
+        "variantId": "endfynwn4n10gzq"
+      },
+      {
+        "size": "standard",
+        "type": "reverse",
+        "variantId": "cm4kqul3x1bwlz1f"
+      },
+      {
+        "foil": "cosmos",
+        "size": "standard",
+        "type": "holo",
+        "variantId": "5zs5af49g93yryvw1ftj"
+      },
+      {
+        "foil": "cosmos",
+        "size": "standard",
+        "stamp": [
+          "player-rewards-program"
+        ],
+        "type": "holo",
+        "variantId": "6x9wic2vzb5bfzn0gz10e76xy60nqt2vwbzzupgwp6"
+      }
+    ]
+  },
+  "tcgdex_id": "sv09-151"
+}

@@ -1,0 +1,89 @@
+{
+  "prizmo_id": "TWM-082",
+  "source": {
+    "base_url": "https://api.tcgdex.net/v2/en",
+    "dynamic_fields_removed": [
+      "pricing"
+    ],
+    "language": "en",
+    "provider": "TCGdex"
+  },
+  "tcgdex": {
+    "attacks": [
+      {
+        "cost": [
+          "Psychic"
+        ],
+        "effect": "Your opponent's Active Pokémon is now Confused. You may move any number of damage counters from your opponent's Pokémon to their other Pokémon in any way you like.",
+        "name": "Strange Hacking"
+      },
+      {
+        "cost": [
+          "Psychic"
+        ],
+        "damage": "10+",
+        "effect": "This attack does 50 more damage for each Energy attached to your opponent's Active Pokémon.",
+        "name": "Psychic"
+      }
+    ],
+    "category": "Pokemon",
+    "dexId": [
+      65
+    ],
+    "evolveFrom": "Kadabra",
+    "hp": 140,
+    "id": "sv06-082",
+    "illustrator": "Masako Tomii",
+    "image": "https://assets.tcgdex.net/en/sv/sv06/082",
+    "legal": {
+      "expanded": true,
+      "standard": true
+    },
+    "localId": "082",
+    "name": "Alakazam",
+    "rarity": "Rare",
+    "regulationMark": "H",
+    "retreat": 1,
+    "set": {
+      "cardCount": {
+        "official": 167,
+        "total": 226
+      },
+      "id": "sv06",
+      "logo": "https://assets.tcgdex.net/en/sv/sv06/logo",
+      "name": "Twilight Masquerade",
+      "symbol": "https://assets.tcgdex.net/univ/sv/sv06/symbol"
+    },
+    "stage": "Stage2",
+    "types": [
+      "Psychic"
+    ],
+    "updated": "2026-05-04T00:16:35+01:00",
+    "variants": {
+      "firstEdition": false,
+      "holo": true,
+      "normal": false,
+      "reverse": true,
+      "wPromo": false
+    },
+    "variants_detailed": [
+      {
+        "size": "standard",
+        "type": "holo",
+        "variantId": "jr7oetx1mqug9"
+      },
+      {
+        "size": "standard",
+        "type": "reverse",
+        "variantId": "cm4kqul3x1bwlz1f"
+      },
+      {
+        "foil": "cosmos",
+        "size": "standard",
+        "type": "holo",
+        "variantId": "5zs5af49g93yryvw1ftj"
+      }
+    ]
+  },
+  "tcgdex_id": "sv06-082"
+}

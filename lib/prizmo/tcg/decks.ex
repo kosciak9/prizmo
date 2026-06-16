@@ -9,6 +9,9 @@ defmodule Prizmo.Tcg.Decks do
 
   @modules [
     Prizmo.Tcg.Decks.Dragapult27431,
+    Prizmo.Tcg.Decks.DragapultBlaziken28253,
+    Prizmo.Tcg.Decks.DragapultDusknoir28236,
+    Prizmo.Tcg.Decks.DragapultPlain28256,
     Prizmo.Tcg.Decks.Alakazam27147,
     Prizmo.Tcg.Decks.RagingBoltOgerpon27599,
     Prizmo.Tcg.Decks.FestivalLead27445,

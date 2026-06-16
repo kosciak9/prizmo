@@ -1,0 +1,72 @@
+{
+  "prizmo_id": "SFA-039",
+  "source": {
+    "base_url": "https://api.tcgdex.net/v2/en",
+    "dynamic_fields_removed": [
+      "pricing"
+    ],
+    "language": "en",
+    "provider": "TCGdex"
+  },
+  "tcgdex": {
+    "abilities": [
+      {
+        "effect": "Once during your turn, you may switch 1 of your Benched {D} Pokémon, except any Pecharunt ex, with your Active Pokémon. If you do, the new Active Pokémon is now Poisoned. You can't use more than 1 Subjugating Chains Ability each turn.",
+        "name": "Subjugating Chains",
+        "type": "Ability"
+      }
+    ],
+    "attacks": [
+      {
+        "cost": [
+          "Darkness",
+          "Darkness"
+        ],
+        "damage": "60×",
+        "effect": "This attack does 60 damage for each Prize card your opponent has taken.",
+        "name": "Irritated Outburst"
+      }
+    ],
+    "category": "Pokemon",
+    "dexId": [
+      1025
+    ],
+    "hp": 190,
+    "id": "sv06.5-039",
+    "illustrator": "aky CG Works",
+    "image": "https://assets.tcgdex.net/en/sv/sv06.5/039",
+    "legal": {
+      "expanded": true,
+      "standard": true
+    },
+    "localId": "039",
+    "name": "Pecharunt ex",
+    "rarity": "Double rare",
+    "regulationMark": "H",
+    "retreat": 1,
+    "set": {
+      "cardCount": {
+        "official": 64,
+        "total": 99
+      },
+      "id": "sv06.5",
+      "logo": "https://assets.tcgdex.net/en/sv/sv06.5/logo",
+      "name": "Shrouded Fable",
+      "symbol": "https://assets.tcgdex.net/univ/sv/sv06.5/symbol"
+    },
+    "stage": "Basic",
+    "suffix": "ex",
+    "types": [
+      "Darkness"
+    ],
+    "updated": "2026-04-25T21:46:36+01:00",
+    "variants": {
+      "firstEdition": false,
+      "holo": false,
+      "normal": false,
+      "reverse": false,
+      "wPromo": false
+    }
+  },
+  "tcgdex_id": "sv06.5-039"
+}

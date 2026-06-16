@@ -1,0 +1,108 @@
+{
+  "prizmo_id": "MEG-088",
+  "source": {
+    "base_url": "https://api.tcgdex.net/v2/en",
+    "dynamic_fields_removed": [
+      "pricing"
+    ],
+    "language": "en",
+    "provider": "TCGdex"
+  },
+  "tcgdex": {
+    "attacks": [
+      {
+        "cost": [
+          "Darkness"
+        ],
+        "damage": 20,
+        "effect": "During your opponent's next turn, the Defending Pokémon can't retreat.",
+        "name": "Clutch"
+      },
+      {
+        "cost": [
+          "Darkness",
+          "Darkness",
+          "Colorless"
+        ],
+        "damage": 110,
+        "name": "Dark Feather"
+      }
+    ],
+    "category": "Pokemon",
+    "dexId": [
+      717
+    ],
+    "hp": 110,
+    "id": "me01-088",
+    "illustrator": "akagi",
+    "image": "https://assets.tcgdex.net/en/me/me01/088",
+    "legal": {
+      "expanded": true,
+      "standard": true
+    },
+    "localId": "088",
+    "name": "Yveltal",
+    "rarity": "Rare",
+    "regulationMark": "I",
+    "retreat": 0,
+    "set": {
+      "cardCount": {
+        "official": 132,
+        "total": 188
+      },
+      "id": "me01",
+      "logo": "https://assets.tcgdex.net/en/me/me01/logo",
+      "name": "Mega Evolution",
+      "symbol": "https://assets.tcgdex.net/univ/me/me01/symbol"
+    },
+    "stage": "Basic",
+    "types": [
+      "Darkness"
+    ],
+    "updated": "2026-04-21T19:02:59Z",
+    "variants": {
+      "firstEdition": false,
+      "holo": true,
+      "normal": false,
+      "reverse": true,
+      "wPromo": false
+    },
+    "variants_detailed": [
+      {
+        "size": "standard",
+        "type": "holo",
+        "variantId": "jr7oetx1mqug9"
+      },
+      {
+        "size": "standard",
+        "type": "reverse",
+        "variantId": "cm4kqul3x1bwlz1f"
+      },
+      {
+        "size": "standard",
+        "stamp": [
+          "gamestop"
+        ],
+        "type": "holo",
+        "variantId": "555jb0efonmc6b2xkvdv4j"
+      },
+      {
+        "size": "standard",
+        "stamp": [
+          "eb-games"
+        ],
+        "type": "holo",
+        "variantId": "555jb0efona5x2dskyq0ye"
+      },
+      {
+        "size": "standard",
+        "stamp": [
+          "set-logo"
+        ],
+        "type": "holo",
+        "variantId": "555jb0efopmyclvkikic41"
+      }
+    ]
+  },
+  "tcgdex_id": "me01-088"
+}

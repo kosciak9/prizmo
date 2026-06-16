@@ -1,0 +1,82 @@
+{
+  "prizmo_id": "SCR-115",
+  "source": {
+    "base_url": "https://api.tcgdex.net/v2/en",
+    "dynamic_fields_removed": [
+      "pricing"
+    ],
+    "language": "en",
+    "provider": "TCGdex"
+  },
+  "tcgdex": {
+    "abilities": [
+      {
+        "effect": "Once during your turn, when you play this Pokémon from your hand to evolve 1 of your Pokémon, if you have any Tera Pokémon in play, you may search your deck for up to 2 Trainer cards, reveal them, and put them into your hand. Then, shuffle your deck.",
+        "name": "Jewel Seeker",
+        "type": "Ability"
+      }
+    ],
+    "attacks": [
+      {
+        "cost": [
+          "Colorless",
+          "Colorless"
+        ],
+        "damage": 60,
+        "name": "Speed Wing"
+      }
+    ],
+    "category": "Pokemon",
+    "dexId": [
+      164
+    ],
+    "evolveFrom": "Hoothoot",
+    "hp": 100,
+    "id": "sv07-115",
+    "illustrator": "matazo",
+    "image": "https://assets.tcgdex.net/en/sv/sv07/115",
+    "legal": {
+      "expanded": true,
+      "standard": true
+    },
+    "localId": "115",
+    "name": "Noctowl",
+    "rarity": "Rare",
+    "regulationMark": "H",
+    "retreat": 1,
+    "set": {
+      "cardCount": {
+        "official": 142,
+        "total": 175
+      },
+      "id": "sv07",
+      "logo": "https://assets.tcgdex.net/en/sv/sv07/logo",
+      "name": "Stellar Crown"
+    },
+    "stage": "Stage1",
+    "types": [
+      "Colorless"
+    ],
+    "updated": "2026-04-28T20:19:50+01:00",
+    "variants": {
+      "firstEdition": false,
+      "holo": true,
+      "normal": false,
+      "reverse": true,
+      "wPromo": false
+    },
+    "variants_detailed": [
+      {
+        "size": "standard",
+        "type": "holo",
+        "variantId": "jr7oetx1mqug9"
+      },
+      {
+        "size": "standard",
+        "type": "reverse",
+        "variantId": "cm4kqul3x1bwlz1f"
+      }
+    ]
+  },
+  "tcgdex_id": "sv07-115"
+}
