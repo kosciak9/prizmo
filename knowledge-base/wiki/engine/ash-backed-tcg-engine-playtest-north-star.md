@@ -1,25 +1,28 @@
-# Six-Deck Fully Playable TCG Engine North Star
+# Dragapult/Alakazam Two-Deck Fully Playable TCG Engine North Star
 
-- Updated: 2026-06-02 (north-star reset)
+- Updated: 2026-06-16 (north-star refocus to Dragapult-versus-Alakazam)
 - Sources: Project codebase; local validation; wiki log; Electric documentation (2026-05-30)
 - Raw: [Electric Streams documentation notes](../../raw/engine/2026-05-30-electric-streams-docs.md)
 
 ## Scope
 
-This is the current north star for Prizmo's Pokémon TCG work: an Ash-backed, server-authoritative rules engine where two humans can play **all six current fixture decks end-to-end, step by step, through any normal scenario those decks create** through a card-first browser UI built for experienced Pokémon TCG players.
+This is the current north star for Prizmo's Pokémon TCG work: an Ash-backed, server-authoritative rules engine where two in-browser seats (including a one-user self-practice mode) can play Dragapult-versus-Alakazam matchups end-to-end, step by step, through normal scenarios using a card-first browser UI built for experienced Pokémon TCG players.
 
-The first priority is not broad arbitrary-deck coverage, UI polish, Electric Streams, an AI opponent, an exact PTCGL clone, or post-game coaching. The near-term goal is narrower and stricter: every card needed by the six supported fixture decks must be playable through the canonical Ash engine or a deliberate generic behavior path with full mechanics for its printed gameplay text. Unsupported target-deck card behavior is a milestone blocker, not acceptable polish debt. Autonomous agents should choose six-deck playability work before any other product, UI, stream, or expansion task.
+The first priority is not broad arbitrary-deck coverage, UI polish, Electric Streams, an AI opponent, an exact PTCGL clone, or post-game coaching. The near-term goal is narrower and stricter: every card needed by the supported Dragapult/Alakazam fixture scope must be playable through the canonical Ash engine or a deliberate generic behavior path with full mechanics for its printed gameplay text. Unsupported target-deck card behavior is a milestone blocker, not acceptable polish debt. Autonomous agents should choose this two-deck playability work before any other product, UI, stream, or expansion task.
 
-Important correction for future agents: a coverage inventory, `EngineCardRegistry` entry, behavior overlay, or “blocker list empty” note is never sufficient to declare DONE. Complete gameplay means the live play surface has no visible `Pending card text` for target-deck gameplay, target-deck actions can be submitted through Ash/React where a real player needs them, and timing/lock/Ability/attack/Trainer/Tool/Stadium/Special Energy interactions work in the scenarios those six decks naturally produce.
+Important correction for future agents: a coverage inventory, `EngineCardRegistry` entry, behavior overlay, or “blocker list empty” note is never sufficient to declare DONE. Complete gameplay means the live play surface has no visible `Pending card text` for target-deck gameplay, target-deck actions can be submitted through Ash/React where a real player needs them, and timing/lock/Ability/attack/Trainer/Tool/Stadium/Special Energy interactions work in the scenarios those Dragapult/Alakazam scenarios naturally produce.
 
-Target decks:
+Current target scope:
 
 - `27431` — Dragapult
 - `27147` — Alakazam
-- `27599` — Raging Bolt Ogerpon
-- `27445` — Festival Lead
-- `27514` — Lopunny Dudunsparce
-- `27459` — Rocket Mewtwo
+
+Deckline references for those variants:
+
+- Dragapult fixture variants currently tracked in code: `dragapult_plain28256.ex`, `dragapult_dusknoir28236.ex`, and `dragapult_blaziken28253.ex` (NAIC deck IDs 28256/28236/28253).
+- Alakazam baseline references remain in `knowledge-base/wiki/engine/dragapult-alakazam-full-game-implementation-scope.md` (especially the Variant/Tech scope tables and deck-level references).
+
+- Historical direction: the six-deck first milestone was documented on 2026-06-02 and remains relevant for reusable validation, but current scope is focused on the Dragapult-versus-Alakazam matchup set.
 
 ## Current baseline
 
@@ -86,11 +89,11 @@ Target decks:
 
 ## Product north star
 
-The first playable product surface should be an experienced-player React SPA game client over the Ash-backed engine where the six target decks can be played as real games, not a debug-first test harness, rules tutorial, or broad-but-shallow deck loader.
+The first playable product surface should be an experienced-player React SPA game client over the Ash-backed engine where the Dragapult/Alakazam target scope can be played as real games, not a debug-first test harness, rules tutorial, or broad-but-shallow deck loader.
 
-It should let two humans:
+It should let one user run a full two-seat practice surface:
 
-1. create or join a game using any of the six target decklists without hand-picked opening hands or scripted prize maps;
+1. create or join a game using Dragapult and Alakazam decklines (including variant tech substitutions) without hand-picked opening hands or scripted prize maps;
 2. complete normal RNG-backed setup, including shuffling, opening hands, prizes, mulligan-relevant state, and initial Active or Bench choices where supported;
 3. see each player's public board, discard, prizes remaining, deck count, turn state, and legal action affordances;
 4. see the current player's private hand and prompts with compact card imagery;
@@ -99,11 +102,11 @@ It should let two humans:
 7. watch a chronological event log without raw payload noise in the normal play path;
 8. refresh or reconnect without losing game state or the random sequence history.
 
-### Six-deck playability and RNG expectations
+### Dragapult/Alakazam playability and RNG expectations
 
-- The normal first-milestone path should accept the six target decklists and play them through the committed card catalog plus canonical Ash engine behavior. Arbitrary imported decklists remain a later milestone until the six-deck blocker list is closed.
-- "Fully playable" means every card in the six target decklists has executable behavior or a deliberate generic behavior path sufficient for normal play. Normal setup, turn flow, attacks, abilities, Trainers, Tools, Stadiums, Energy attachment/payment, prize taking, Knock Outs, switching, search/draw/discard flows, and relevant replacement-Active flows should work without fixture-only hand scripting. Full mechanics includes timing windows, once-per-turn markers, Item/attack/retreat locks, coin flips, prompted choices, conditional legality gates, replacement Active, KO/prize consequences, and all public/private information boundaries those cards require.
-- Unsupported behavior inside the six target decks is a blocker. Generic fallback is acceptable only for truly generic primitives such as Basic Energy, plain damage, or already-standardized attach/play mechanics. Unsupported behavior outside those six decks may still be surfaced as pending/unavailable.
+- The normal first-milestone path should accept the Dragapult/Alakazam target scope and play it through the committed card catalog plus canonical Ash engine behavior. Arbitrary imported decklists remain a later milestone until this blocker list is closed.
+- "Fully playable" means every card in the Dragapult/Alakazam target scope has executable behavior or a deliberate generic behavior path sufficient for normal play. Normal setup, turn flow, attacks, abilities, Trainers, Tools, Stadiums, Energy attachment/payment, prize taking, Knock Outs, switching, search/draw/discard flows, and relevant replacement-Active flows should work without fixture-only hand scripting. Full mechanics includes timing windows, once-per-turn markers, Item/attack/retreat locks, coin flips, prompted choices, conditional legality gates, replacement Active, KO/prize consequences, and all public/private information boundaries those cards require.
+- Unsupported behavior inside this scope is a blocker. Generic fallback is acceptable only for truly generic primitives such as Basic Energy, plain damage, or already-standardized attach/play mechanics. Unsupported behavior outside this scope may still be surfaced as pending/unavailable.
 - Setup and draws must use engine-owned RNG. Preseeded hands, scripted prize maps, and manually ordered draws are only acceptable in explicit tests, demos, or replay fixtures.
 - RNG must be persisted enough for trust and replay. Store the game seed or equivalent random source metadata, record shuffle and random-choice domain facts, and make seeded test runs deterministic while production-like games default to fresh randomness.
 - The database remains the source of truth. Clients never pick hidden-zone order, prize placement, or random outcomes locally.
@@ -151,7 +154,7 @@ Validation target: the playable loop should be testable by two independent brows
 
 Source notes: [Electric Streams documentation notes](../../raw/engine/2026-05-30-electric-streams-docs.md).
 
-Electric Streams remains a strong candidate for the later game-data stream because it provides append-only durable streams, offset-based replay, browser-friendly SSE, JSON message mode, and idempotent producer support. It is explicitly deferred until the six target decks are fully playable unless a tiny stream task is required to unblock six-deck validation.
+Electric Streams remains a strong candidate for the later game-data stream because it provides append-only durable streams, offset-based replay, browser-friendly SSE, JSON message mode, and idempotent producer support. It is explicitly deferred until the Dragapult-versus-Alakazam two-deck north-star is fully playable unless a tiny stream task is required to unblock that scope directly.
 
 The preferred architecture to explore:
 
@@ -195,16 +198,16 @@ Important boundary: Electric should be a delivery and replay layer, not the rule
 
 ## Immediate implementation plan
 
-### 1. Treat six-deck full playability as the next step and the north star
+### 1. Treat two-deck full playability as the current execution north-star
 
-- Autonomous agents should choose work that moves one or more of the six target decks toward full playability before choosing UI polish, Electric Streams, broad open-deck work, non-target deck expansion, AI, coaching, or renderer experiments.
-- Preseeded fixtures, deterministic seeds, current-game handoffs, and narrow scenario tests are allowed when they prove engine correctness, prevent regressions, or validate a card behavior path for the six target decks.
-- Each batch should state which target deck/card blocker it closes or which six-deck validation gap it reduces.
-- If a task does not reduce six-deck blockers, defer it unless the user explicitly overrides this north-star reset.
+- Autonomous agents should choose work that moves the Dragapult/Alakazam two-deck scope toward full playability before UI polish, Electric Streams, broad open-deck expansion, non-target deck expansion, AI, coaching, or renderer experiments.
+- Preseeded fixtures, deterministic seeds, current-game handoffs, and narrow scenario tests are allowed when they prove engine correctness, prevent regressions, or validate a card behavior path for the two-deck scope.
+- Each batch should state which target-card blocker it closes or which two-deck validation gap it reduces.
+- If a task does not reduce two-deck blockers, defer it unless the user explicitly overrides this current north-star direction.
 
-### 2. Inventory all unique cards across the six target decks
+### 2. Inventory all unique cards for the two target lines
 
-- Generate or maintain a six-deck card coverage inventory from the committed deck modules.
+- Generate or maintain a current card inventory for `27431` (Dragapult variants) and `27147` (Alakazam variants), plus tracked NAIC fixtures (e.g., deck IDs `28256`, `28253`, `28236` and their tech variants).
 - Classify every unique card as `engine-defined`, `generic-supported`, `partial`, or `blocker` against the canonical Ash engine path, not only metadata/overlay coverage.
 - Verify card IDs against the committed catalog before naming blockers. Do not repeat stale handoff mistakes such as treating `POR-086` as Earthen Vessel or `JTG-120` as Togekiss.
 - Prioritize blockers by gameplay criticality: core attackers and Energy/payment paths first, then mandatory draw/search/switch/Trainer flows, then conditional Tools/Stadiums/Abilities, then lower-frequency edge text.
@@ -213,13 +216,13 @@ Important boundary: Electric should be a delivery and replay layer, not the rule
 
 - Implement missing target-deck cards through `Prizmo.TcgEngine.Cards.Registry`, generic mechanics, Stadium/Tool/Special Energy support modules, or explicit behavior hooks as appropriate.
 - Prefer reusable primitives when they naturally cover multiple target decks, but do not postpone a deck-critical blocker in pursuit of perfect arbitrary-deck generality.
-- Keep unsupported behavior explicit for non-target cards, but drive the unsupported blocker count for the six target decks to zero.
+- Keep unsupported behavior explicit for non-target cards, but drive the unsupported blocker count for the two target lines to zero.
 - Validate card behavior through focused tests, rollback Tidewave/scenario checks, or browser play where appropriate.
 
 ### 4. Validate each target deck as a playable game
 
-- For each of the six target decks, prove setup from a real decklist with engine-owned shuffle/opening hand/prize state.
-- Prove the deck's normal game plan can execute through legal UI/Ash actions: setup, attaching, evolving, searching/drawing, using key Abilities/Trainers, attacking, taking prizes, replacing Active, and continuing turns.
+- For each Dragapult variant and Alakazam baseline, prove setup from a real decklist with engine-owned shuffle/opening hand/prize state.
+- Prove each variant matchup path can execute through legal UI/Ash actions: setup, attaching, evolving, searching/drawing, using key Abilities/Trainers, attacking, taking prizes, replacing Active, and continuing turns.
 - Use two independent browser sessions for milestone validation when practical.
 - Keep `mix check` green at the end of implementation batches.
 
@@ -234,7 +237,7 @@ Important boundary: Electric should be a delivery and replay layer, not the rule
 - Completed (batch 225): event history visual polish — turn separators, per-type colored category indicators, compressed layout, removed verbose explanation text, compact player badges.
 - Completed (batch 227): large-hand density and overlap — adaptive hand layout with four density tiers (normal 2-column, compact 3-column, dense 4-column with compact tiles, overflow flex-wrap overlap). Hands up to 15 cards are visible simultaneously without scrolling; 16+ cards use overlapping flex layout.
 - Completed (batch 229): card-attached on-board action affordances — multi-intent rendering on board cards (Active, Bench) so all available actions display as compact inline `CardActionButton` components instead of a single first-wins badge. Multi-attack Pokémon show each attack as a distinct button with the attack name.
-- Deferred UI work: further animation, layout refinement, and visual polish should wait until the six target decks are fully playable unless a UI defect blocks playability validation.
+- Deferred UI work: further animation, layout refinement, and visual polish should wait until the Dragapult-versus-Alakazam two-deck north-star is fully playable unless a UI defect blocks playability validation.
 
 ### 6. Expand only the core engine mechanics needed for those decks
 
@@ -257,9 +260,9 @@ Port or reimplement the old simulator's valuable rules into `Prizmo.TcgEngine` i
 - Convert old simulator-specific card actions into generic costs, effects, operations, prompts, and hooks.
 - Track unsupported behavior explicitly instead of silently falling back.
 
-### 8. Deferred: spike Electric Streams after six-deck playability
+### 8. Deferred: spike Electric Streams after two-deck playability
 
-- Do not pick this before six-deck playability unless the user explicitly overrides the current north star.
+- Do not pick this before Dragapult-versus-Alakazam playability unless the user explicitly overrides the current north star.
 - Later, run a local durable-streams server in development.
 - Publish committed `GameEvent` records for one game into a JSON stream.
 - Add a small React subscriber that catches up from `-1` and tails with SSE.
@@ -269,18 +272,18 @@ Port or reimplement the old simulator's valuable rules into `Prizmo.TcgEngine` i
 
 ## First milestone definition of done
 
-The first milestone is complete when two humans can create and play all six current fixture decks through the browser UI without touching IEx or tests for normal game progress:
+The first milestone is complete when two humans can create and play the Dragapult-versus-Alakazam target scope through the browser UI without touching IEx or tests for normal game progress:
 
-- each player can provide or select any of the six target decklists without hand-ordered draw fixtures;
+- each player can provide or select supported Dragapult and Alakazam decklines without hand-ordered draw fixtures;
 - game creation persists player decklists and engine-owned RNG metadata;
 - setup uses RNG-backed shuffle, opening hands, prize placement, and setup choices where supported;
 - repeated fresh games can produce different hands/prizes, and explicit seeded games are reproducible for tests;
-- every unique card in the six target decks is classified in the maintained coverage inventory;
-- every target-deck card is either engine-defined or covered by a deliberate generic behavior path sufficient for normal play;
-- target-deck unsupported-card blockers are zero;
-- each deck's core attacker, draw/search, Energy/payment, switching, evolution, Tool/Stadium/Special Energy, Ability, prize-taking, KO, and replacement-Active flows work where that deck uses them;
+- every unique card in the Dragapult/Alakazam target scope is classified in the maintained coverage inventory;
+- every target-card is either engine-defined or covered by a deliberate generic behavior path sufficient for normal play;
+- target-scope unsupported-card blockers are zero;
+- each variant's core attacker, draw/search, Energy/payment, switching, evolution, Tool/Stadium/Special Energy, Ability, prize-taking, KO, and replacement-Active flows work where that deck uses them;
 - both players can see correct public/private views with card fronts and card backs for the major physical card zones;
-- non-target loaded decks with unsupported card behavior do not crash setup or generic play. Unsupported actions outside the six target decks are clearly blocked or marked;
+- non-target loaded decks with unsupported card behavior do not crash setup or generic play. Unsupported actions outside the two-target scope are clearly blocked or marked;
 - core generic actions work through the UI for supported cards and states;
 - legal actions are compact and visible without tutorial-style explanations dominating the board;
 - hand, prize, deck, discard, Active, and Bench layout is benchmarked and space-efficient enough for real play;
@@ -294,23 +297,23 @@ The first milestone is complete when two humans can create and play all six curr
 ## Non-goals for the first milestone
 
 - Full Standard support.
-- Full executable behavior for arbitrary imported decklists beyond the six target decks.
-- Additional fixture decks beyond the current six.
+- Full executable behavior for arbitrary imported decklists beyond the Dragapult-versus-Alakazam scope.
+- Additional fixture decks beyond the current Dragapult and Alakazam variants.
 - AI opponent.
 - Mobile-native renderer.
 - Production-grade card animation, foil, tilt, or 3D renderer effects.
 - PTCGL log import/replay.
 - Replacing Ash/Postgres persistence with streams.
 - Electric Streams adoption or stream-backed UI transport.
-- Further UI polish unless it unblocks six-deck playability validation.
+- Further UI polish unless it unblocks two-deck playability validation.
 - Teaching new players how Pokémon TCG works inside the main play surface.
 
 ## Key decisions captured
 
 - Canonical rules engine: `lib/prizmo/tcg_engine/`.
-- Near-term product target: all six current fixture decks fully playable through engine-owned persisted RNG and a card-first experienced-player React SPA playtest UI.
-- Autonomous-agent selection rule: pick six-deck card coverage, behavior implementation, or playability validation before UI polish, Electric Streams, broad open-deck expansion, AI, coaching, or non-target deck work.
-- Later open-deck target: arbitrary decklist game creation with explicit unsupported behavior remains valuable after the six target decks are fully playable.
+- Near-term product target: Dragapult-versus-Alakazam playable matchups through engine-owned persisted RNG and a card-first experienced-player React SPA playtest UI.
+- Autonomous-agent selection rule: pick two-deck card coverage, behavior implementation, or playability validation before UI polish, Electric Streams, broad open-deck expansion, AI, coaching, or non-target deck work.
+- Later open-deck target: arbitrary decklist game creation with explicit unsupported behavior remains valuable after the two-deck target scope is fully playable.
 - Stream direction: explore Electric Streams for durable event delivery/replay later, with Ash/Postgres remaining authoritative.
 - Legacy simulator: reference only until useful scenarios are ported or deleted.
 - UI transport: do not revive the temporary Phoenix channel unless Electric or plain HTTP/SSE spikes fail.

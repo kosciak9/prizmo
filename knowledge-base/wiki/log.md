@@ -6,6 +6,24 @@
 - Validation: docs-only update; no tests run.
 - Remaining/blocking notes: untracked `game/ptcg_game/*` remains intentionally untouched unless explicitly requested.
 
+## [2026-06-16] docs update | North-star scope wording and scope link alignment
+- Task attempted: cleaned north-star language in `ash-backed-tcg-engine-playtest-north-star.md`, added explicit deckline references, and added north-star link/fixture references in `dragapult-alakazam-full-game-implementation-scope.md`.
+- Files changed: `knowledge-base/wiki/engine/ash-backed-tcg-engine-playtest-north-star.md`, `knowledge-base/wiki/engine/dragapult-alakazam-full-game-implementation-scope.md`, `knowledge-base/wiki/log.md`.
+- Validation: wiki-only update; no tests run.
+- Remaining/blocking notes: none.
+
+## [2026-06-16] docs update | North-star/handoff wording hardening
+- Task attempted: reconciled active scope language between north-star and handoff artifacts so operational work is focused on Dragapult-versus-Alakazam two-deck execution, while keeping six-deck references explicitly tagged as historical.
+- Files changed: `knowledge-base/wiki/engine/ash-backed-tcg-engine-playtest-handoff.md`, `knowledge-base/wiki/engine/ash-backed-tcg-engine-playtest-north-star.md`, `knowledge-base/wiki/index.md`, `knowledge-base/wiki/log.md`.
+- Validation: wiki-only update; no tests run.
+- Remaining/blocking notes: none.
+
+## [2026-06-16] docs update | North-star pivot to Dragapult-vs-Alakazam self-practice
+- Task attempted: aligned KB north-star documentation with the user-facing scope shift from the six-deck checkpoint to Dragapult-versus-Alakazam two-deck self-practice coverage.
+- Files changed: `knowledge-base/wiki/engine/ash-backed-tcg-engine-playtest-north-star.md`, `knowledge-base/wiki/engine/ash-backed-tcg-engine-playtest-handoff.md`, `knowledge-base/wiki/index.md`, `knowledge-base/wiki/log.md`.
+- Validation: wiki-only update; no tests run.
+- Remaining/blocking notes: the handoff and historical entries still include six-deck milestones; those are now documented as historical context in the updated north-star page and handoff notes.
+
 ## [2026-06-16] codebase update | Cursed Blast SPA wiring and Dragapult variant status
 - Task attempted: wired the generated Ash RPC for `use_tcg_engine_cursed_blast` into the React SPA action rail and refreshed the Dragapult/Alakazam scope article with current canonical-engine progress and remaining blockers.
 - Files changed: `lib/prizmo_web/spa/lib/ash/client.ts`, `lib/prizmo_web/spa/features/home/routes/index.tsx`, `knowledge-base/wiki/engine/dragapult-alakazam-full-game-implementation-scope.md`, `knowledge-base/wiki/index.md`, `knowledge-base/wiki/log.md`

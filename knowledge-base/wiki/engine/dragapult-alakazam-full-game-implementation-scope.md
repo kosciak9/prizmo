@@ -100,3 +100,8 @@ These cards already have TCGdex metadata and behavior overlays but lack executab
 - [Ash-backed TCG Engine Playtest Handoff](ash-backed-tcg-engine-playtest-handoff.md)
 - [Full-Game Two-Deck Simulator Implementation](full-game-two-deck-simulator-implementation.md)
 - [Alakazam Competitive Intelligence](../../wiki/meta/alakazam-competitive-intelligence.md)
+- [Ash-backed TCG Engine Playtest North Star](ash-backed-tcg-engine-playtest-north-star.md)
+- Dragapult variant fixture decklists in code:
+  - [`lib/prizmo/tcg/decks/dragapult_plain28256.ex`](../../../lib/prizmo/tcg/decks/dragapult_plain28256.ex)
+  - [`lib/prizmo/tcg/decks/dragapult_dusknoir28236.ex`](../../../lib/prizmo/tcg/decks/dragapult_dusknoir28236.ex)
+  - [`lib/prizmo/tcg/decks/dragapult_blaziken28253.ex`](../../../lib/prizmo/tcg/decks/dragapult_blaziken28253.ex)

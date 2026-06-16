@@ -1,8 +1,16 @@
 # Ash-backed TCG Engine Playtest Handoff
 
-- Updated: 2026-06-02 (north-star reset)
+- Updated: 2026-06-16 (active scope narrowed to Dragapult-versus-Alakazam)
 - Sources: Project codebase; local validation; wiki log
 - Raw: N/A — operational handoff
+
+- This document is the active operational handoff for current two-deck work, but includes historical six-deck-era sections below for continuity.
+
+## [2026-06-16] Scope shift handoff — Dragapult/Alakazam two-deck self-practice north-star
+
+- Current state: the durable north-star direction is now the Dragapult-versus-Alakazam self-practice slice for first playable mechanics, with the open-deck create/rejoin/seeded setup stack and two-seat browser flow now supporting practical matchup play.
+- Current operators should treat the earlier six-deck milestone as historical context and prioritize Dragapult/Alakazam matcher coverage until that scope is closed to visible `Pending card text` and scenario-blocking mechanics.
+- If a task does not reduce Dragapult/Alakazam visible blockers in live GameView pending text or improve reliable two-seat self-practice flow, defer it unless the user explicitly re-broadens scope.
 
 ## [2026-06-02] Iteration 246 handoff — Fezandipiti ex Flip the Script Ability command
 
@@ -44,10 +52,10 @@
 - Validation: `mix format --check-formatted` passes. Wiki log entry added.
 - Recommended next atomic task: close the highest-impact core-attacker blocker slice (TEF-123 Raging Bolt ex + TEF-128/129 Dunsparce/Dudunsparce + PFL-084/TWM-080 Mega Lopunny ex) or the high-frequency Supporter (SCR-135 Glass Trumpet). Verify every card ID against the committed catalog before implementing. Do not move to UI polish, Electric Streams, or non-target deck work until the six-deck blocker list is empty.
 
-## North-star reset handoff
+## North-star reset handoff (historical — six-deck milestone)
 
-- Current direction: follow the canonical [Six-Deck Fully Playable TCG Engine North Star](ash-backed-tcg-engine-playtest-north-star.md). The first milestone is all six current fixture decks fully playable before anything else.
-- Selection rule for autonomous agents: choose six-deck card coverage inventory, target-deck behavior implementation, or target-deck playability validation before UI polish, Electric Streams, broad open-deck expansion, AI, coaching, renderer work, or non-target deck authoring. If a task does not reduce six-deck blockers, defer it unless the user explicitly overrides this reset.
+- Historical direction (now superseded): [Six-Deck Fully Playable TCG Engine North Star](ash-backed-tcg-engine-playtest-north-star.md) was used as the first broad milestone before scope narrowed to Dragapult-versus-Alakazam two-deck execution.
+- Historical selection rule for autonomous agents: choose six-deck card coverage inventory, target-deck behavior implementation, or target-deck playability validation before UI polish, Electric Streams, broad open-deck expansion, AI, coaching, renderer work, or non-target deck authoring. If a task does not reduce six-deck blockers, defer it unless the user explicitly overrides that reset.
 - Target decks: `27431` Dragapult, `27147` Alakazam, `27599` Raging Bolt Ogerpon, `27445` Festival Lead, `27514` Lopunny Dudunsparce, and `27459` Rocket Mewtwo.
 - Definition of fully playable: every card in those decks must have canonical Ash engine behavior or a deliberate generic behavior path sufficient for normal play. Unsupported target-deck behavior is a blocker. Generic fallback is acceptable for truly generic primitives such as Basic Energy/plain damage/already-standardized attachment and play mechanics; it is not acceptable for printed target-deck effects that affect gameplay.
 - Selection rule for validation: game `f6df7025-7d0f-4d9b-9bc2-31c864de1d4e`, preseeded fixtures, deterministic seeds, and narrow scripted scenarios remain valid when they prove engine correctness, prevent regressions, or validate a six-deck card behavior path. They should not be mistaken for complete deck playability by themselves.
