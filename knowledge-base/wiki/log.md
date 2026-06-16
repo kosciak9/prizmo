@@ -1,5 +1,13 @@
 # Wiki Log
 
+## [2026-06-16] docs update | Dragapult/Alakazam GameView pending-text inventory (post plain-tech overlays)
+
+- Task attempted: produced the required authoritative live GameView / playability pending-text inventory for the current north-star target decks (Dragapult 27431 variants + Alakazam 27147) after the 2026-06-16 plain Dragapult tech Supporter batch. This fulfills the explicit north-star requirement that "complete gameplay means the live play surface has no visible `Pending card text` for target-deck gameplay."
+- Files changed: new `knowledge-base/wiki/engine/dragapult-alakazam-gameview-pending-text-inventory-2026-06-16.md`, `knowledge-base/wiki/log.md`.
+- Result: **Zero visible pending-text blockers** for core Dragapult and Alakazam cards. The three plain Dragapult tech Supporters (`TWM-080`, `SFA-064`, `POR-084`) are now past the visible pending-text stage. Alakazam tech fixture/support, dedicated mechanics tests, and two-seat browser validation remain as documented non-blocker work.
+- Validation: wiki-only batch; `mix format --check-formatted` passes.
+- Recommended next: Alakazam tech fixture/support slice (if a visible pending-text gap appears after adding common tech swaps), dedicated mechanics tests for the new Supporter behaviors, or two-seat browser validation per the north-star/handoff guidance.
+
 ## [2026-06-16] codebase update | Plain Dragapult tech Supporter behavior overlays (SFA-064, POR-084)
 
 - Task attempted: added behavior overlays for the three remaining plain Dragapult tech cards from deck 28256. TWM-080 (Mega Lopunny ex) already had an EngineCardRegistry entry (`@mega_lopunny_ex_twm`). SFA-064 (Xerosic's Machinations) and POR-084 (Rosa's Encouragement) received behavior overlays in `sfa.ex` and `por.ex` declaring their respective effect types (`:opponent_discards_to_hand_size` and `:attach_basic_energy_from_discard_to_stage2_if_more_prizes`). Both cards now resolve through the generic Supporter `play_card` path; full resolution wiring remains future work.
