@@ -1,5 +1,16 @@
 # Wiki Log
 
+## [2026-06-16] codebase update | Dragapult and Alakazam full-game implementation scope
+- Task attempted: researched NAIC 2026 Dragapult and Alakazam variant pool from Limitless TCG aggregate + specific topping lists, cross-referenced against current Ash-backed persisted engine support.
+- Files changed: new `knowledge-base/raw/meta/2026-06-16-naic-2026-dragapult-and-alakazam-deck-cards.md` (raw Limitless card data), new `knowledge-base/wiki/engine/dragapult-alakazam-full-game-implementation-scope.md` (implementation plan), `knowledge-base/wiki/index.md`, `knowledge-base/wiki/log.md`
+- Validation: wiki-only update; verified card counts against Limitless aggregate pages (deck 284 Dragapult, deck 350 Alakazam) and three specific NAIC decklists (28253, 28236, 28256). Confirmed 47 new unique card IDs all missing TCGdex metadata cache.
+- Remaining/blocking notes: next action should be TCGdex metadata fetch for the 47 new card IDs, then close the 8 fixture-deck engine blockers (MEG-054, MEG-055, MEG-056, TWM-129, TEF-129, TEF-024, SFA-040, ASC-039) before implementing new cards.
+
+## [2026-06-16] ingest | Alakazam Competitive Intelligence
+
+- Added: `knowledge-base/wiki/meta/alakazam-competitive-intelligence.md`.
+- Captured: NAIC 2026 Alakazam Dudunsparce statistics, hostile matchup conclusions, Rocket's Articuno and Festival Lead / Dipplin mechanics, local Prizmo Alakazam battle-log references, and the user's long-term intent to specialize in Alakazam.
+
 ## [2026-06-03] codebase update | Six-deck GameView pending-text inventory (post-256)
 
 - Task attempted: produced the required authoritative live GameView / playability pending-text inventory across all six target decks after the iteration 256 final single-deck blocker closure. This fulfills the explicit "refresh the authoritative six-deck GameView pending-text inventory one final time to confirm zero blockers" recommendation from the iteration 256 log entry and the 2026-06-02 north-star reset.

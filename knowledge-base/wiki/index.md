@@ -21,6 +21,7 @@ Research notes for possible future rules-engine, simulator, replay, and card-beh
 
 | Article | Summary | Updated |
 | --- | --- | --- |
+| [Dragapult and Alakazam Full-Game Implementation Scope](engine/dragapult-alakazam-full-game-implementation-scope.md) | Comprehensive scope for exact printed-text-fidelity full games between Dragapult and Alakazam variants using NAIC 2026 data, including 47 new card IDs and 8 engine gap-closure tasks. | 2026-06-16 |
 | [Six-Deck Fully Playable TCG Engine North Star](engine/ash-backed-tcg-engine-playtest-north-star.md) | Current north-star plan: make all six fixture decks fully playable step by step through complete Ash mechanics before UI polish, Electric Streams, broad open-deck expansion, AI, coaching, or non-target deck work. | 2026-06-02 |
 | [Ash-backed TCG Engine Playtest Handoff](engine/ash-backed-tcg-engine-playtest-handoff.md) | Current operational handoff for autonomous agents: live target-deck pending gameplay text means not done; prioritize full six-deck mechanics and playability validation before other work. | 2026-06-02 |
 | [Card Engine Authoring Models](engine/card-engine-authoring-models.md) | Comparison of code-first, generated-stub, Elixir macro DSL, hybrid metadata/behavior, and coverage-tooling patterns for exact Standard-only PTCG card behavior. | 2026-05-27 |
@@ -34,6 +35,7 @@ Competitive ecosystem references for decks, tournaments, and manual research.
 
 | Article | Summary | Updated |
 | --- | --- | --- |
+| [Alakazam Competitive Intelligence](meta/alakazam-competitive-intelligence.md) | Durable Alakazam focus page for NAIC 2026 stats, hostile matchup mechanics, tech-card hypotheses, and future testing priorities. | 2026-06-16 |
 | [Pokémon TCG Competitive Resource Map](meta/pokemon-tcg-competitive-resource-map.md) | Where to look for tournament history, deep event views, deck-building heuristics, and manual tools like TrainerHill. | 2026-05-26 |
 | [Pokémon TCG Practice Tool Surface](meta/pokemon-tcg-practice-tool-surface.md) | Survey of existing Pokémon TCG practice, prep, guide, and community tool categories. | 2026-05-26 |
 
