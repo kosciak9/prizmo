@@ -26,6 +26,20 @@ defmodule Prizmo.Tcg.Cards.Behaviors.DRI do
     )
   end
 
+  card "DRI-040" do
+    attack(:collect, effect: %{type: :draw_after_attack, count: 1})
+    attack(:combustion, effect: nil)
+  end
+
+  card "DRI-041" do
+    attack(:combustion, effect: nil)
+
+    attack(:double_kick,
+      damage: 0,
+      effect: %{type: :bonus_damage_per_coin_heads_count, bonus_damage: 40}
+    )
+  end
+
   card "DRI-051" do
     ability(:repelling_veil,
       effect: %{type: :prevent_attack_effects_to_basic_team_rocket_pokemon}

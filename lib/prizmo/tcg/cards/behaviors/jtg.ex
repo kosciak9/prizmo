@@ -3,6 +3,14 @@ defmodule Prizmo.Tcg.Cards.Behaviors.JTG do
 
   use Prizmo.Tcg.Cards.DSL
 
+  card "JTG-024" do
+    ability(:seething_spirit,
+      effect: %{type: :attach_basic_energy_from_discard_to_own_pokemon}
+    )
+
+    attack(:smolder_sault, effect: %{type: :attacker_cannot_attack_next_turn})
+  end
+
   card "JTG-056" do
     ability(:fairy_zone,
       effect: %{type: :opponent_darkness_pokemon_weakness_becomes_psychic}

@@ -21,6 +21,7 @@ defmodule Prizmo.TcgEngine.AttackEffects do
       discard_cards_from_hand: 3,
       get_card: 2,
       get_cards: 2,
+      list_cards: 1,
       move_attached_card_to_hand: 3,
       move_deck_card_to_hand: 3,
       move_play_card_to_hand: 3,
@@ -60,6 +61,8 @@ defmodule Prizmo.TcgEngine.AttackEffects do
   alias Prizmo.TcgEngine.TurnStore
 
   @copy_opponent_active_tera_pokemon_attack :copy_opponent_active_tera_pokemon_attack
+  @spherical_shield_card_id "TEF-024"
+  @spherical_shield_effect_id "spherical_shield"
 
   @supported_effect_types [
     :bonus_damage_per_benched_pokemon,
@@ -81,6 +84,7 @@ defmodule Prizmo.TcgEngine.AttackEffects do
     :defending_pokemon_cannot_retreat_next_turn,
     :discard_hand_then_draw,
     :draw_after_attack,
+    :active_damage_counters_per_hand_card,
     :damage_any_opponent_pokemon,
     :damage_per_own_basic_pokemon_in_play,
     :damage_per_own_benched_pokemon,
@@ -1727,12 +1731,23 @@ defmodule Prizmo.TcgEngine.AttackEffects do
     if TeraBenchProtection.prevents_attack_damage?(bench_target) do
       {:ok, TeraBenchProtection.prevented_attack_damage_result(bench_target, damage)}
     else
-      prevented_bench_attack_damage_by_marker_result(
-        game_id,
-        attacking_player_id,
-        bench_target,
-        damage
-      )
+      case spherical_shield_bench_prevention_result(
+             game_id,
+             attacking_player_id,
+             bench_target,
+             damage
+           ) do
+        {:ok, damage_result} ->
+          {:ok, damage_result}
+
+        :not_prevented ->
+          prevented_bench_attack_damage_by_marker_result(
+            game_id,
+            attacking_player_id,
+            bench_target,
+            damage
+          )
+      end
     end
   end
 
@@ -1786,27 +1801,89 @@ defmodule Prizmo.TcgEngine.AttackEffects do
          bench_target,
          damage
        ) do
-    with {:ok, turn} <- TurnStore.current_turn(game_id),
-         {:prevented, prevention_payload} <-
-           AttackPrevention.attack_effect_prevention_payload(
-             bench_target,
-             turn,
-             attacking_player_id
-           ) do
+    case spherical_shield_bench_prevention_result(
+           game_id,
+           attacking_player_id,
+           bench_target,
+           damage
+         ) do
+      {:ok, damage_result} ->
+        {:ok, damage_result}
+
+      :not_prevented ->
+        with {:ok, turn} <- TurnStore.current_turn(game_id),
+             {:prevented, prevention_payload} <-
+               AttackPrevention.attack_effect_prevention_payload(
+                 bench_target,
+                 turn,
+                 attacking_player_id
+               ) do
+          {:ok,
+           Map.merge(
+             %{
+               damage: 0,
+               prevented_damage: damage,
+               resulting_damage: bench_target.damage,
+               knocked_out?: false,
+               damage_prevented?: true
+             },
+             prevention_payload
+           )}
+        else
+          _not_prevented -> :not_prevented
+        end
+    end
+  end
+
+  defp spherical_shield_bench_prevention_result(
+         game_id,
+         attacking_player_id,
+         %CardInstance{zone: :bench, owner_player_id: owner_player_id} = bench_target,
+         damage
+       )
+       when owner_player_id != attacking_player_id do
+    with {:ok, cards} <- list_cards(game_id),
+         %CardInstance{} = shield_card <- active_spherical_shield_card(cards, owner_player_id) do
       {:ok,
-       Map.merge(
-         %{
-           damage: 0,
-           prevented_damage: damage,
-           resulting_damage: bench_target.damage,
-           knocked_out?: false,
-           damage_prevented?: true
-         },
-         prevention_payload
-       )}
+       %{
+         damage: 0,
+         prevented_damage: damage,
+         resulting_damage: bench_target.damage,
+         knocked_out?: false,
+         damage_prevented?: true,
+         damage_prevention: @spherical_shield_effect_id,
+         attack_prevention_source_card_id: shield_card.card_id,
+         attack_prevention_source_card_instance_id: shield_card.id,
+         attack_prevention_source_effect_id: @spherical_shield_effect_id,
+         attack_prevention_source_player_id: owner_player_id,
+         protected_card_instance_id: bench_target.id
+       }}
     else
       _not_prevented -> :not_prevented
     end
+  end
+
+  defp spherical_shield_bench_prevention_result(
+         _game_id,
+         _attacking_player_id,
+         %CardInstance{},
+         _damage
+       ),
+       do: :not_prevented
+
+  defp active_spherical_shield_card(cards, owner_player_id) when is_list(cards) do
+    Enum.find(cards, fn
+      %CardInstance{
+        card_id: @spherical_shield_card_id,
+        owner_player_id: ^owner_player_id,
+        zone: zone
+      }
+      when zone in [:active, :bench] ->
+        true
+
+      %CardInstance{} ->
+        false
+    end)
   end
 
   defp opponent_player_id(game_id, player_id) do

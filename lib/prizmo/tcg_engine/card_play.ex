@@ -24,7 +24,7 @@ defmodule Prizmo.TcgEngine.CardPlay do
 
   import Prizmo.TcgEngine.Requirements,
     only: [
-      require_ace_spec_available: 2,
+      require_ace_spec_available: 3,
       require_can_evolve_target: 2,
       require_card_owned_by_player: 2,
       require_card_zone: 2,
@@ -77,7 +77,7 @@ defmodule Prizmo.TcgEngine.CardPlay do
                definition.first_turn_supporter_allowed_when_going_first?
            ),
          :ok <- ItemLocks.require_item_unlocked_if_item(metadata, game.id, player_id, turn),
-         :ok <- require_ace_spec_available(player, metadata),
+         :ok <- require_ace_spec_available(player, metadata, game.id),
          :ok <- require_effect_available(game, turn, player, definition) do
       {:ok, metadata}
     end
@@ -99,7 +99,7 @@ defmodule Prizmo.TcgEngine.CardPlay do
          {:ok, metadata} <- require_trainer_type(card.card_id, allowed_types),
          :ok <- require_supporter_available(player, metadata, game, turn, opts),
          :ok <- ItemLocks.require_item_unlocked_if_item(metadata, game.id, player_id, turn) do
-      require_ace_spec_available(player, metadata)
+      require_ace_spec_available(player, metadata, game.id)
     end
   end
 

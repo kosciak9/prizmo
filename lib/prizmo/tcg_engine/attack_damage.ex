@@ -249,6 +249,21 @@ defmodule Prizmo.TcgEngine.AttackDamage do
 
   defp apply_effect(damage, _attacker_card, _defender_card, nil), do: {:ok, damage}
 
+  defp apply_effect(
+         _damage,
+         %CardInstance{game_id: game_id, owner_player_id: player_id},
+         _defender_card,
+         %{
+           type: :active_damage_counters_per_hand_card,
+           counters_per_card: counters
+         }
+       )
+       when is_integer(counters) and counters >= 0 do
+    with {:ok, hand_cards} <- CardStore.cards_in_zone(game_id, player_id, :hand) do
+      {:ok, length(hand_cards) * counters * 10}
+    end
+  end
+
   defp apply_effect(damage, _attacker_card, %CardInstance{} = defender_card, %{
          type: :bonus_damage_per_energy_attached_to_defender,
          bonus_damage: bonus_damage

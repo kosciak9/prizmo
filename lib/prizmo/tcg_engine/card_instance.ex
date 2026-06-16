@@ -31,8 +31,14 @@ defmodule Prizmo.TcgEngine.CardInstance do
       transition(:place_prize, from: :deck, to: :prize)
       transition(:attach, from: :hand, to: :attached)
       transition(:attach_from_deck, from: :deck, to: :attached)
+      transition(:attach_from_discard, from: :discard, to: :attached)
       transition(:return_to_hand, from: :attached, to: :hand)
-      transition(:shuffle_into_deck, from: [:attached, :discard, :hand], to: :deck)
+
+      transition(:shuffle_into_deck,
+        from: [:active, :bench, :attached, :discard, :hand],
+        to: :deck
+      )
+
       transition(:evolve_to_active, from: :hand, to: :active)
       transition(:evolve_to_bench, from: :hand, to: :bench)
       transition(:evolve_under, from: [:active, :bench], to: :attached)
@@ -61,6 +67,7 @@ defmodule Prizmo.TcgEngine.CardInstance do
     define :place_prize
     define :attach
     define :attach_from_deck
+    define :attach_from_discard
     define :return_to_hand
     define :shuffle_into_deck
     define :reorder_deck
@@ -148,13 +155,25 @@ defmodule Prizmo.TcgEngine.CardInstance do
       change transition_state(:attached)
     end
 
+    update :attach_from_discard do
+      accept [:attached_to_card_instance_id, :position]
+      change transition_state(:attached)
+    end
+
     update :return_to_hand do
       accept [:attached_to_card_instance_id, :position]
       change transition_state(:hand)
     end
 
     update :shuffle_into_deck do
-      accept [:attached_to_card_instance_id, :position]
+      accept [
+        :attached_to_card_instance_id,
+        :position,
+        :damage,
+        :status,
+        :evolves_from_card_instance_id
+      ]
+
       change transition_state(:deck)
     end
 

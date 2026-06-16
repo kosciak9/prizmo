@@ -81,6 +81,7 @@ defmodule Prizmo.TcgEngine.Mechanics do
   alias Prizmo.TcgEngine.CardInstance
   alias Prizmo.TcgEngine.CardPlay
   alias Prizmo.TcgEngine.Cards.Registry, as: EngineCardRegistry
+  alias Prizmo.TcgEngine.CardStore
   alias Prizmo.TcgEngine.ChoiceValidator
   alias Prizmo.TcgEngine.EnergyEffects
   alias Prizmo.TcgEngine.EventPayloads
@@ -493,7 +494,7 @@ defmodule Prizmo.TcgEngine.Mechanics do
            :ok <- require_card_zone(card, :hand),
            {:ok, metadata} <- require_trainer_type(card.card_id, [:item, :supporter]),
            :ok <- require_supporter_available(player, metadata, game, turn),
-           :ok <- require_ace_spec_available(player, metadata),
+           :ok <- require_ace_spec_available(player, metadata, game.id),
            {:ok, position} <- next_discard_position(game.id, player_id),
            {:ok, _card} <- update(card, :discard, %{position: position}),
            {:ok, _player} <- mark_trainer_flags(player, metadata),
@@ -950,7 +951,7 @@ defmodule Prizmo.TcgEngine.Mechanics do
            :ok <- require_card_owned_by_player(card, player_id),
            :ok <- require_card_zone(card, :hand),
            {:ok, metadata} <- require_trainer_type(card.card_id, [:stadium]),
-           :ok <- require_ace_spec_available(player, metadata),
+           :ok <- require_ace_spec_available(player, metadata, game.id),
            {:ok, _discarded_stadiums} <- discard_existing_stadiums(game.id),
            {:ok, _card} <- update(card, :play_stadium, %{position: 1}),
            {:ok, recovered_special_conditions} <-
@@ -1114,6 +1115,57 @@ defmodule Prizmo.TcgEngine.Mechanics do
     end)
   end
 
+  @spec use_blaziken_ex_seething_spirit(
+          Game.t() | String.t(),
+          String.t(),
+          String.t(),
+          String.t(),
+          String.t()
+        ) :: {:ok, Game.t()} | {:error, term()}
+  def use_blaziken_ex_seething_spirit(
+        game_or_id,
+        player_id,
+        source_card_instance_id,
+        energy_card_instance_id,
+        target_card_instance_id
+      )
+      when is_binary(player_id) and is_binary(source_card_instance_id) and
+             is_binary(energy_card_instance_id) and
+             is_binary(target_card_instance_id) do
+    transaction(fn ->
+      with {:ok, game} <- get_game(game_or_id),
+           {:ok, turn} <- require_action_window_for_player(game, player_id),
+           :ok <- CardPlay.require_no_awaiting_pending_effect(game.id),
+           {:ok, source_card} <- get_card(game.id, source_card_instance_id),
+           {:ok, energy_card} <- get_card(game.id, energy_card_instance_id),
+           {:ok, target_card} <- get_card(game.id, target_card_instance_id),
+           :ok <- require_card_owned_by_player(source_card, player_id),
+           :ok <- AbilityEffects.require_seething_spirit_available(game.id, source_card, turn),
+           :ok <- require_card_owned_by_player(energy_card, player_id),
+           :ok <- require_card_zone(energy_card, :discard),
+           :ok <- AbilityEffects.require_basic_energy(energy_card),
+           :ok <- require_card_owned_by_player(target_card, player_id),
+           :ok <- require_in_play_pokemon_zone(target_card),
+           {:ok, ability_result} <-
+             attach_seething_spirit_energy(game, source_card, energy_card, target_card, turn),
+           {:ok, _event} <-
+             write_event_and_snapshot(
+               game.id,
+               :ability_used,
+               player_id,
+               seething_spirit_event_payload(
+                 turn,
+                 source_card,
+                 energy_card,
+                 target_card,
+                 ability_result
+               )
+             ) do
+        get_game(game.id)
+      end
+    end)
+  end
+
   @spec use_fezandipiti_flip_the_script(Game.t() | String.t(), String.t(), String.t()) ::
           {:ok, Game.t()} | {:error, term()}
   def use_fezandipiti_flip_the_script(game_or_id, player_id, source_card_instance_id)
@@ -1139,6 +1191,99 @@ defmodule Prizmo.TcgEngine.Mechanics do
     end)
   end
 
+  @spec use_psychic_draw(Game.t() | String.t(), String.t(), String.t()) ::
+          {:ok, Game.t()} | {:error, term()}
+  def use_psychic_draw(game_or_id, player_id, source_card_instance_id)
+      when is_binary(player_id) and is_binary(source_card_instance_id) do
+    transaction(fn ->
+      with {:ok, game} <- get_game(game_or_id),
+           {:ok, turn} <- require_action_window_for_player(game, player_id),
+           :ok <- CardPlay.require_no_awaiting_pending_effect(game.id),
+           {:ok, player} <- get_player(game.id, player_id),
+           {:ok, source_card} <- get_card(game.id, source_card_instance_id),
+           :ok <- require_card_owned_by_player(source_card, player_id),
+           :ok <- AbilityEffects.require_psychic_draw_available(source_card, turn),
+           {:ok, ability_result} <- draw_psychic_draw_cards(game, player, source_card, turn),
+           {:ok, _event} <-
+             write_event_and_snapshot(
+               game.id,
+               :ability_used,
+               player_id,
+               psychic_draw_event_payload(turn, source_card, ability_result)
+             ) do
+        get_game(game.id)
+      end
+    end)
+  end
+
+  @spec use_drakloak_recon_directive(Game.t() | String.t(), String.t(), String.t(), String.t()) ::
+          {:ok, Game.t()} | {:error, term()}
+  def use_drakloak_recon_directive(
+        game_or_id,
+        player_id,
+        source_card_instance_id,
+        chosen_card_instance_id
+      )
+      when is_binary(player_id) and is_binary(source_card_instance_id) and
+             is_binary(chosen_card_instance_id) do
+    transaction(fn ->
+      with {:ok, game} <- get_game(game_or_id),
+           {:ok, turn} <- require_action_window_for_player(game, player_id),
+           :ok <- CardPlay.require_no_awaiting_pending_effect(game.id),
+           {:ok, player} <- get_player(game.id, player_id),
+           {:ok, source_card} <- get_card(game.id, source_card_instance_id),
+           {:ok, top_cards} <- CardStore.deck_cards_for_player(player.id, 2),
+           :ok <- require_card_owned_by_player(source_card, player_id),
+           :ok <- AbilityEffects.require_recon_directive_available(source_card, top_cards, turn),
+           {:ok, chosen_card} <- require_top_deck_choice(top_cards, chosen_card_instance_id),
+           other_cards = Enum.reject(top_cards, &(&1.id == chosen_card.id)),
+           {:ok, ability_result} <-
+             resolve_recon_directive_choice(
+               game,
+               player,
+               source_card,
+               chosen_card,
+               other_cards,
+               turn
+             ),
+           {:ok, _event} <-
+             write_event_and_snapshot(
+               game.id,
+               :ability_used,
+               player_id,
+               recon_directive_event_payload(turn, source_card, ability_result)
+             ) do
+        get_game(game.id)
+      end
+    end)
+  end
+
+  @spec use_dudunsparce_run_away_draw(Game.t() | String.t(), String.t(), String.t()) ::
+          {:ok, Game.t()} | {:error, term()}
+  def use_dudunsparce_run_away_draw(game_or_id, player_id, source_card_instance_id)
+      when is_binary(player_id) and is_binary(source_card_instance_id) do
+    transaction(fn ->
+      with {:ok, game} <- get_game(game_or_id),
+           {:ok, turn} <- require_action_window_for_player(game, player_id),
+           :ok <- CardPlay.require_no_awaiting_pending_effect(game.id),
+           {:ok, player} <- get_player(game.id, player_id),
+           {:ok, source_card} <- get_card(game.id, source_card_instance_id),
+           :ok <- require_card_owned_by_player(source_card, player_id),
+           :ok <- AbilityEffects.require_run_away_draw_available(source_card, turn),
+           {:ok, ability_result} <-
+             draw_and_shuffle_run_away_draw(game, player, source_card, turn),
+           {:ok, _event} <-
+             write_event_and_snapshot(
+               game.id,
+               :ability_used,
+               player_id,
+               run_away_draw_event_payload(turn, source_card, ability_result)
+             ) do
+        get_game(game.id)
+      end
+    end)
+  end
+
   @spec attach_tool(Game.t() | String.t(), String.t(), String.t(), String.t()) ::
           {:ok, Game.t()} | {:error, term()}
   def attach_tool(game_or_id, player_id, tool_card_instance_id, target_card_instance_id)
@@ -1157,7 +1302,7 @@ defmodule Prizmo.TcgEngine.Mechanics do
            :ok <- require_card_zone(tool_card, :hand),
            :ok <- require_in_play_pokemon_zone(target_card),
            {:ok, metadata} <- require_trainer_type(tool_card.card_id, [:tool]),
-           :ok <- require_ace_spec_available(player, metadata),
+           :ok <- require_ace_spec_available(player, metadata, game.id),
            :ok <- require_no_tool_attached(game.id, target_card.id),
            {:ok, position} <- next_attachment_position(game.id, target_card.id),
            {:ok, _tool_card} <-
@@ -2378,6 +2523,35 @@ defmodule Prizmo.TcgEngine.Mechanics do
     end
   end
 
+  defp attach_seething_spirit_energy(
+         %Game{} = game,
+         %CardInstance{} = source_card,
+         %CardInstance{} = energy_card,
+         %CardInstance{} = target_card,
+         %Turn{} = turn
+       ) do
+    with {:ok, position} <- next_attachment_position(game.id, target_card.id),
+         {:ok, attached_energy} <-
+           update(energy_card, :attach_from_discard, %{
+             attached_to_card_instance_id: target_card.id,
+             position: position
+           }),
+         {:ok, recovered_special_condition} <-
+           StadiumEffects.recover_special_condition(game.id, target_card),
+         {:ok, current_source_card} <- get_card(game.id, source_card.id),
+         {:ok, _source_card} <-
+           update(current_source_card, :set_markers, %{
+             markers: AbilityEffects.put_seething_spirit_used_marker(current_source_card, turn)
+           }) do
+      {:ok,
+       %{
+         attached_energy: attached_energy,
+         attached_position: position,
+         recovered_special_condition: recovered_special_condition
+       }}
+    end
+  end
+
   defp draw_flip_the_script_cards(
          %Game{} = game,
          player,
@@ -2395,8 +2569,160 @@ defmodule Prizmo.TcgEngine.Mechanics do
     end
   end
 
+  defp draw_psychic_draw_cards(
+         %Game{} = game,
+         player,
+         %CardInstance{} = source_card,
+         %Turn{} = turn
+       ) do
+    with {:ok, draw_count} <- AbilityEffects.psychic_draw_count(source_card),
+         {:ok, drawn_cards} <- draw_cards_from_deck(game.id, player, draw_count),
+         {:ok, current_source_card} <- get_card(game.id, source_card.id),
+         {:ok, _source_card} <-
+           update(current_source_card, :set_markers, %{
+             markers: AbilityEffects.put_psychic_draw_used_marker(current_source_card, turn)
+           }) do
+      {:ok, %{draw_count: draw_count, drawn_cards: drawn_cards}}
+    end
+  end
+
+  defp require_top_deck_choice(top_cards, chosen_card_instance_id) when is_list(top_cards) do
+    case Enum.find(top_cards, &(&1.id == chosen_card_instance_id)) do
+      %CardInstance{} = chosen_card -> {:ok, chosen_card}
+      nil -> {:error, :recon_directive_choice_not_in_top_two}
+    end
+  end
+
+  defp resolve_recon_directive_choice(
+         %Game{} = game,
+         player,
+         %CardInstance{} = source_card,
+         %CardInstance{} = chosen_card,
+         other_cards,
+         %Turn{} = turn
+       )
+       when is_list(other_cards) do
+    with {:ok, moved_chosen_card} <-
+           move_deck_card_to_hand(game.id, player.player_id, chosen_card),
+         {:ok, bottomed_cards} <-
+           reorder_deck_cards_to_bottom(game.id, player.player_id, other_cards),
+         {:ok, current_source_card} <- get_card(game.id, source_card.id),
+         {:ok, _source_card} <-
+           update(current_source_card, :set_markers, %{
+             markers: AbilityEffects.put_recon_directive_used_marker(current_source_card, turn)
+           }) do
+      {:ok, %{chosen_card: moved_chosen_card, bottomed_cards: bottomed_cards}}
+    end
+  end
+
+  defp reorder_deck_cards_to_bottom(_game_id, _player_id, []), do: {:ok, []}
+
+  defp reorder_deck_cards_to_bottom(game_id, player_id, bottom_cards) do
+    bottom_card_ids = MapSet.new(bottom_cards, & &1.id)
+
+    with {:ok, deck_cards} <- cards_in_zone(game_id, player_id, :deck) do
+      bottom_cards_in_deck = Enum.filter(deck_cards, &MapSet.member?(bottom_card_ids, &1.id))
+      top_cards = Enum.reject(deck_cards, &MapSet.member?(bottom_card_ids, &1.id))
+
+      with {:ok, _reordered_cards} <- reorder_deck_cards(top_cards ++ bottom_cards_in_deck) do
+        {:ok, bottom_cards_in_deck}
+      end
+    end
+  end
+
+  defp draw_and_shuffle_run_away_draw(
+         %Game{} = game,
+         player,
+         %CardInstance{} = source_card,
+         %Turn{} = turn
+       ) do
+    with {:ok, draw_count} <- AbilityEffects.run_away_draw_count(source_card),
+         {:ok, drawn_cards} <- draw_cards_from_deck(game.id, player, draw_count),
+         {:ok, current_source_card} <- get_card(game.id, source_card.id),
+         {:ok, marked_source_card} <-
+           update(current_source_card, :set_markers, %{
+             markers: AbilityEffects.put_run_away_draw_used_marker(current_source_card, turn)
+           }),
+         {:ok, shuffled_stack_cards} <-
+           shuffle_in_play_stack_into_deck(game, turn, player, marked_source_card) do
+      {:ok,
+       %{
+         draw_count: draw_count,
+         drawn_cards: drawn_cards,
+         shuffled_stack_cards: shuffled_stack_cards
+       }}
+    end
+  end
+
+  defp shuffle_in_play_stack_into_deck(
+         %Game{} = game,
+         %Turn{} = turn,
+         player,
+         %CardInstance{} = source_card
+       ) do
+    with {:ok, attached_cards} <- CardStore.attached_cards(game.id, source_card.id),
+         stack_cards = [source_card | attached_cards],
+         {:ok, returned_cards} <- return_stack_to_deck(game.id, player.player_id, stack_cards),
+         {:ok, _shuffled_deck} <-
+           shuffle_player_deck_for_ability(
+             game,
+             turn,
+             player.player_id,
+             source_card,
+             AbilityEffects.run_away_draw_ability_id()
+           ) do
+      {:ok, returned_cards}
+    end
+  end
+
+  defp return_stack_to_deck(game_id, player_id, stack_cards) do
+    with {:ok, deck_count} <- CardStore.deck_count(game_id, player_id) do
+      stack_cards
+      |> Enum.with_index(deck_count + 1)
+      |> Enum.map(fn {card, position} ->
+        update(card, :shuffle_into_deck, %{
+          attached_to_card_instance_id: nil,
+          evolves_from_card_instance_id: nil,
+          damage: 0,
+          status: nil,
+          position: position
+        })
+      end)
+      |> collect_results()
+    end
+  end
+
+  defp shuffle_player_deck_for_ability(
+         %Game{} = game,
+         %Turn{} = turn,
+         player_id,
+         %CardInstance{} = source_card,
+         ability_id
+       ) do
+    context =
+      {:ability_deck_shuffle, player_id, turn.turn_number, source_card.instance_id, ability_id}
+
+    with {:ok, cards} <- cards_in_zone(game.id, player_id, :deck) do
+      cards
+      |> shuffle_cards(game.rng_seed, context)
+      |> reorder_deck_cards()
+    end
+  end
+
+  defp shuffle_cards(cards, seed, context) when is_binary(seed),
+    do: Rng.shuffle(cards, seed, context)
+
+  defp shuffle_cards(cards, _seed, _context), do: Enum.shuffle(cards)
+
+  defp reorder_deck_cards(cards) do
+    cards
+    |> Enum.with_index(1)
+    |> Enum.map(fn {card, position} -> update(card, :reorder_deck, %{position: position}) end)
+    |> collect_results()
+  end
+
   defp draw_cards_from_deck(game_id, player, draw_count) do
-    with {:ok, cards} <- Prizmo.TcgEngine.CardStore.deck_cards_for_player(player.id, draw_count) do
+    with {:ok, cards} <- CardStore.deck_cards_for_player(player.id, draw_count) do
       cards
       |> Enum.map(&move_deck_card_to_hand(game_id, player.player_id, &1))
       |> collect_results()
@@ -2464,6 +2790,39 @@ defmodule Prizmo.TcgEngine.Mechanics do
     "Teal Dance attached Grass Energy and drew #{card_count} cards."
   end
 
+  defp seething_spirit_event_payload(
+         %Turn{} = turn,
+         %CardInstance{} = source_card,
+         %CardInstance{} = energy_card,
+         %CardInstance{} = target_card,
+         ability_result
+       ) do
+    maybe_put(
+      %{
+        turn_id: turn.id,
+        source: EventPayloads.card_source(source_card),
+        source_card_id: source_card.card_id,
+        source_card_instance_id: source_card.id,
+        ability_id: Atom.to_string(AbilityEffects.seething_spirit_ability_id()),
+        effect_type: :attach_basic_energy_from_discard_to_own_pokemon,
+        energy_card_instance_id: energy_card.id,
+        target_card_instance_id: target_card.id,
+        attached_position: ability_result.attached_position,
+        cards: seething_spirit_moved_card_payloads(target_card, ability_result.attached_energy),
+        public_note: "Seething Spirit attached Basic Energy from the discard pile."
+      },
+      :recovered_special_condition,
+      ability_result.recovered_special_condition
+    )
+  end
+
+  defp seething_spirit_moved_card_payloads(target_card, attached_energy) do
+    attached_energy
+    |> List.wrap()
+    |> EventPayloads.moved_cards(:discard, :attached)
+    |> Enum.map(&Map.put(&1, :to_attached_to_card_instance_id, target_card.id))
+  end
+
   defp flip_the_script_event_payload(
          %Turn{} = turn,
          %CardInstance{} = source_card,
@@ -2488,6 +2847,81 @@ defmodule Prizmo.TcgEngine.Mechanics do
 
   defp flip_the_script_public_note(card_count) do
     "Flip the Script drew #{card_count} cards."
+  end
+
+  defp psychic_draw_event_payload(%Turn{} = turn, %CardInstance{} = source_card, ability_result) do
+    drawn_cards = ability_result.drawn_cards
+
+    %{
+      turn_id: turn.id,
+      source: EventPayloads.card_source(source_card),
+      source_card_id: source_card.card_id,
+      source_card_instance_id: source_card.id,
+      ability_id: Atom.to_string(AbilityEffects.psychic_draw_ability_id()),
+      effect_type: :evolution_draw,
+      drawn_card_count: length(drawn_cards),
+      cards: EventPayloads.moved_cards(drawn_cards, :deck, :hand),
+      public_note: psychic_draw_public_note(source_card, length(drawn_cards))
+    }
+  end
+
+  defp psychic_draw_public_note(%CardInstance{card_id: "MEG-056"}, 1) do
+    "Psychic Draw drew 1 card."
+  end
+
+  defp psychic_draw_public_note(%CardInstance{card_id: "MEG-056"}, card_count) do
+    "Psychic Draw drew #{card_count} cards."
+  end
+
+  defp psychic_draw_public_note(%CardInstance{}, 1), do: "Psychic Draw drew 1 card."
+
+  defp psychic_draw_public_note(%CardInstance{}, card_count) do
+    "Psychic Draw drew #{card_count} cards."
+  end
+
+  defp recon_directive_event_payload(
+         %Turn{} = turn,
+         %CardInstance{} = source_card,
+         ability_result
+       ) do
+    %{
+      turn_id: turn.id,
+      source: EventPayloads.card_source(source_card),
+      source_card_id: source_card.card_id,
+      source_card_instance_id: source_card.id,
+      ability_id: Atom.to_string(AbilityEffects.recon_directive_ability_id()),
+      effect_type: :top_two_choose_one_to_hand_other_to_bottom,
+      chosen_card_instance_id: ability_result.chosen_card.id,
+      bottomed_card_instance_ids: Enum.map(ability_result.bottomed_cards, & &1.id),
+      cards: EventPayloads.moved_cards([ability_result.chosen_card], :deck, :hand),
+      public_note:
+        "Recon Directive put 1 of the top cards into hand and the other on the bottom of the deck."
+    }
+  end
+
+  defp run_away_draw_event_payload(%Turn{} = turn, %CardInstance{} = source_card, ability_result) do
+    %{
+      turn_id: turn.id,
+      source: EventPayloads.card_source(source_card),
+      source_card_id: source_card.card_id,
+      source_card_instance_id: source_card.id,
+      ability_id: Atom.to_string(AbilityEffects.run_away_draw_ability_id()),
+      effect_type: :draw_then_shuffle_self_into_deck,
+      drawn_card_count: length(ability_result.drawn_cards),
+      shuffled_card_instance_ids: Enum.map(ability_result.shuffled_stack_cards, & &1.id),
+      cards:
+        EventPayloads.moved_cards(ability_result.drawn_cards, :deck, :hand) ++
+          EventPayloads.moved_cards(ability_result.shuffled_stack_cards, :in_play, :deck),
+      public_note: run_away_draw_public_note(length(ability_result.drawn_cards))
+    }
+  end
+
+  defp run_away_draw_public_note(1) do
+    "Run Away Draw drew 1 card, then shuffled Dudunsparce and attached cards into the deck."
+  end
+
+  defp run_away_draw_public_note(card_count) do
+    "Run Away Draw drew #{card_count} cards, then shuffled Dudunsparce and attached cards into the deck."
   end
 
   defp collect_results(results) do

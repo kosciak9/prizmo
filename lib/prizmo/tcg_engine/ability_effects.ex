@@ -31,6 +31,17 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
   @flip_the_script_marker_atom_key :"ability_used:flip_the_script"
   @flip_the_script_draw_count 3
   @flip_the_script_unavailable_reason :flip_the_script_requires_own_pokemon_ko_during_opponents_last_turn
+  @seething_spirit_card_id "JTG-024"
+  @seething_spirit_ability_id :seething_spirit
+  @seething_spirit_effect_type :attach_basic_energy_from_discard_to_own_pokemon
+  @psychic_draw_ability_id :psychic_draw
+  @psychic_draw_effect_type :evolution_draw
+  @recon_directive_ability_id :recon_directive
+  @recon_directive_effect_type :top_two_choose_one_to_hand_other_to_bottom
+  @run_away_draw_ability_id :run_away_draw
+  @run_away_draw_effect_type :draw_then_shuffle_self_into_deck
+  @damp_card_id "ASC-039"
+  @damp_ability_id :damp
 
   def adrena_brain_card_id, do: @adrena_brain_card_id
   def adrena_brain_ability_id, do: @adrena_brain_ability_id
@@ -41,6 +52,12 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
   def flip_the_script_card_id, do: @flip_the_script_card_id
   def flip_the_script_ability_id, do: @flip_the_script_ability_id
   def flip_the_script_draw_count, do: @flip_the_script_draw_count
+  def seething_spirit_card_id, do: @seething_spirit_card_id
+  def seething_spirit_ability_id, do: @seething_spirit_ability_id
+  def psychic_draw_ability_id, do: @psychic_draw_ability_id
+  def recon_directive_ability_id, do: @recon_directive_ability_id
+  def run_away_draw_ability_id, do: @run_away_draw_ability_id
+  def damp_ability_id, do: @damp_ability_id
 
   def adrena_brain_source?(%CardInstance{card_id: @adrena_brain_card_id}), do: true
   def adrena_brain_source?(%CardInstance{}), do: false
@@ -50,6 +67,37 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
 
   def flip_the_script_source?(%CardInstance{card_id: @flip_the_script_card_id}), do: true
   def flip_the_script_source?(%CardInstance{}), do: false
+
+  def seething_spirit_source?(%CardInstance{} = source) do
+    match?({:ok, _effect}, seething_spirit_effect(source))
+  end
+
+  def psychic_draw_source?(%CardInstance{} = source) do
+    match?({:ok, _effect}, psychic_draw_effect(source))
+  end
+
+  def recon_directive_source?(%CardInstance{} = source) do
+    match?({:ok, _effect}, recon_directive_effect(source))
+  end
+
+  def run_away_draw_source?(%CardInstance{} = source) do
+    match?({:ok, _effect}, run_away_draw_effect(source))
+  end
+
+  def damp_active?(game_id) when is_binary(game_id) do
+    case CardStore.list_cards(game_id) do
+      {:ok, cards} -> Enum.any?(cards, &damp_active_card?/1)
+      {:error, _reason} -> false
+    end
+  end
+
+  def require_self_knock_out_ability_not_blocked(game_id) when is_binary(game_id) do
+    if damp_active?(game_id) do
+      {:error, :self_knock_out_abilities_blocked_by_damp}
+    else
+      :ok
+    end
+  end
 
   def adrena_brain_available?(%CardInstance{} = source, attached_cards, %Turn{} = turn)
       when is_list(attached_cards) do
@@ -100,6 +148,74 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
         turn,
         source.owner_player_id
       )
+    end
+  end
+
+  def seething_spirit_available?(%CardInstance{} = source, discard_cards, %Turn{} = turn)
+      when is_list(discard_cards) do
+    seething_spirit_source?(source) and in_play?(source) and
+      Enum.any?(discard_cards, &basic_energy?/1) and
+      not ability_used_this_turn?(source, turn, @seething_spirit_ability_id)
+  end
+
+  def require_seething_spirit_available(game_id, %CardInstance{} = source, %Turn{} = turn)
+      when is_binary(game_id) do
+    with {:ok, _effect} <- seething_spirit_effect(source),
+         :ok <- require_in_play(source),
+         {:ok, discard_cards} <-
+           CardStore.cards_in_zone(game_id, source.owner_player_id, :discard),
+         :ok <- require_discard_basic_energy(source, discard_cards) do
+      require_ability_unused(source, turn, @seething_spirit_ability_id)
+    end
+  end
+
+  def psychic_draw_available?(%CardInstance{} = source, %Turn{} = turn) do
+    require_psychic_draw_available(source, turn) == :ok
+  end
+
+  def require_psychic_draw_available(%CardInstance{} = source, %Turn{} = turn) do
+    with {:ok, _effect} <- psychic_draw_effect(source),
+         :ok <- require_in_play(source),
+         :ok <- require_evolved_this_turn(source, turn) do
+      require_ability_unused(source, turn, @psychic_draw_ability_id)
+    end
+  end
+
+  def recon_directive_available?(%CardInstance{} = source, deck_cards, %Turn{} = turn)
+      when is_list(deck_cards) do
+    recon_directive_source?(source) and in_play?(source) and deck_cards != [] and
+      not ability_used_this_turn?(source, turn, @recon_directive_ability_id)
+  end
+
+  def require_recon_directive_available(%CardInstance{} = source, deck_cards, %Turn{} = turn)
+      when is_list(deck_cards) do
+    with {:ok, _effect} <- recon_directive_effect(source),
+         :ok <- require_in_play(source),
+         :ok <- require_non_empty_deck(source, deck_cards) do
+      require_ability_unused(source, turn, @recon_directive_ability_id)
+    end
+  end
+
+  def run_away_draw_available?(%CardInstance{} = source, %Turn{} = turn) do
+    require_run_away_draw_available(source, turn) == :ok
+  end
+
+  def require_run_away_draw_available(%CardInstance{} = source, %Turn{} = turn) do
+    with {:ok, _effect} <- run_away_draw_effect(source),
+         :ok <- require_in_play(source) do
+      require_ability_unused(source, turn, @run_away_draw_ability_id)
+    end
+  end
+
+  def psychic_draw_count(%CardInstance{} = source) do
+    with {:ok, %{draw_count: draw_count}} <- psychic_draw_effect(source) do
+      {:ok, draw_count}
+    end
+  end
+
+  def run_away_draw_count(%CardInstance{} = source) do
+    with {:ok, %{draw_count: draw_count}} <- run_away_draw_effect(source) do
+      {:ok, draw_count}
     end
   end
 
@@ -195,6 +311,22 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
     })
   end
 
+  def put_seething_spirit_used_marker(%CardInstance{} = source, %Turn{} = turn) do
+    put_ability_used_marker(source, turn, @seething_spirit_ability_id)
+  end
+
+  def put_psychic_draw_used_marker(%CardInstance{} = source, %Turn{} = turn) do
+    put_ability_used_marker(source, turn, @psychic_draw_ability_id)
+  end
+
+  def put_recon_directive_used_marker(%CardInstance{} = source, %Turn{} = turn) do
+    put_ability_used_marker(source, turn, @recon_directive_ability_id)
+  end
+
+  def put_run_away_draw_used_marker(%CardInstance{} = source, %Turn{} = turn) do
+    put_ability_used_marker(source, turn, @run_away_draw_ability_id)
+  end
+
   def adrena_brain_used_this_turn?(%CardInstance{markers: markers}, %Turn{} = turn) do
     markers
     |> adrena_brain_marker()
@@ -214,6 +346,13 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
   def flip_the_script_used_this_turn?(%CardInstance{markers: markers}, %Turn{} = turn) do
     markers
     |> flip_the_script_marker()
+    |> marker_matches_turn?(turn)
+  end
+
+  def ability_used_this_turn?(%CardInstance{markers: markers}, %Turn{} = turn, ability_id)
+      when is_atom(ability_id) do
+    markers
+    |> ability_marker(ability_id)
     |> marker_matches_turn?(turn)
   end
 
@@ -297,6 +436,22 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
     end
   end
 
+  def basic_energy?(%CardInstance{} = card) do
+    case CardCatalog.fetch(card.card_id) do
+      {:ok, %{supertype: :energy, energy_type: :basic}} -> true
+      {:ok, _metadata} -> false
+      {:error, _reason} -> false
+    end
+  end
+
+  def require_basic_energy(%CardInstance{} = energy_card) do
+    if basic_energy?(energy_card) do
+      :ok
+    else
+      {:error, {:not_basic_energy, energy_card.id}}
+    end
+  end
+
   def require_basic_grass_energy(%CardInstance{} = energy_card) do
     if basic_grass_energy?(energy_card) do
       :ok
@@ -315,6 +470,11 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
 
   defp in_play?(%CardInstance{zone: zone}), do: zone in [:active, :bench]
 
+  defp damp_active_card?(%CardInstance{card_id: @damp_card_id, zone: zone})
+       when zone in [:active, :bench], do: true
+
+  defp damp_active_card?(%CardInstance{}), do: false
+
   defp require_attached_darkness_energy(%CardInstance{} = source, attached_cards) do
     if Enum.any?(attached_cards, &darkness_energy?/1) do
       :ok
@@ -328,6 +488,45 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
       :ok
     else
       {:error, {:missing_hand_basic_energy_type, source.id, @teal_dance_required_type}}
+    end
+  end
+
+  defp require_discard_basic_energy(%CardInstance{} = source, discard_cards) do
+    if Enum.any?(discard_cards, &basic_energy?/1) do
+      :ok
+    else
+      {:error, {:missing_discard_basic_energy, source.id}}
+    end
+  end
+
+  defp require_evolved_this_turn(
+         %CardInstance{
+           evolves_from_card_instance_id: evolves_from,
+           turn_entered_play: turn_number
+         },
+         %Turn{turn_number: turn_number}
+       )
+       when not is_nil(evolves_from) do
+    :ok
+  end
+
+  defp require_evolved_this_turn(%CardInstance{} = source, %Turn{} = turn) do
+    {:error,
+     {:ability_requires_evolved_this_turn, source.id, source.evolves_from_card_instance_id,
+      source.turn_entered_play, turn.turn_number}}
+  end
+
+  defp require_non_empty_deck(%CardInstance{}, [_first | _rest]), do: :ok
+
+  defp require_non_empty_deck(%CardInstance{} = source, []) do
+    {:error, {:ability_requires_cards_in_deck, source.id}}
+  end
+
+  defp require_ability_unused(%CardInstance{} = source, %Turn{} = turn, ability_id) do
+    if ability_used_this_turn?(source, turn, ability_id) do
+      {:error, {:ability_already_used_this_turn, source.id, ability_id}}
+    else
+      :ok
     end
   end
 
@@ -379,6 +578,64 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
     end
   end
 
+  defp seething_spirit_effect(%CardInstance{card_id: card_id}) do
+    with {:ok, %{abilities: abilities}} <- CardCatalog.fetch(card_id),
+         %{effect: %{type: @seething_spirit_effect_type}} <-
+           Map.get(abilities, @seething_spirit_ability_id) do
+      {:ok, %{}}
+    else
+      _other ->
+        {:error,
+         {:unsupported_ability_effect, card_id, @seething_spirit_ability_id,
+          @seething_spirit_effect_type}}
+    end
+  end
+
+  defp psychic_draw_effect(%CardInstance{card_id: card_id}) do
+    with {:ok, %{abilities: abilities}} <- CardCatalog.fetch(card_id),
+         %{effect: effect} <- Map.get(abilities, @psychic_draw_ability_id),
+         %{
+           type: @psychic_draw_effect_type,
+           count: draw_count
+         } <- effect do
+      {:ok, %{draw_count: draw_count}}
+    else
+      _other ->
+        {:error,
+         {:unsupported_ability_effect, card_id, @psychic_draw_ability_id,
+          @psychic_draw_effect_type}}
+    end
+  end
+
+  defp recon_directive_effect(%CardInstance{card_id: card_id}) do
+    with {:ok, %{abilities: abilities}} <- CardCatalog.fetch(card_id),
+         %{effect: %{type: @recon_directive_effect_type}} <-
+           Map.get(abilities, @recon_directive_ability_id) do
+      {:ok, %{}}
+    else
+      _other ->
+        {:error,
+         {:unsupported_ability_effect, card_id, @recon_directive_ability_id,
+          @recon_directive_effect_type}}
+    end
+  end
+
+  defp run_away_draw_effect(%CardInstance{card_id: card_id}) do
+    with {:ok, %{abilities: abilities}} <- CardCatalog.fetch(card_id),
+         %{effect: effect} <- Map.get(abilities, @run_away_draw_ability_id),
+         %{
+           type: @run_away_draw_effect_type,
+           count: draw_count
+         } <- effect do
+      {:ok, %{draw_count: draw_count}}
+    else
+      _other ->
+        {:error,
+         {:unsupported_ability_effect, card_id, @run_away_draw_ability_id,
+          @run_away_draw_effect_type}}
+    end
+  end
+
   defp adrena_brain_marker(markers) when is_map(markers) do
     Map.get(markers, @adrena_brain_marker_key) || Map.get(markers, @adrena_brain_marker_atom_key)
   end
@@ -397,6 +654,29 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
   end
 
   defp flip_the_script_marker(_markers), do: nil
+
+  defp put_ability_used_marker(
+         %CardInstance{markers: markers, card_id: card_id},
+         %Turn{} = turn,
+         ability_id
+       ) do
+    markers
+    |> normalize_markers()
+    |> Map.put(ability_marker_key(ability_id), %{
+      "ability_id" => Atom.to_string(ability_id),
+      "source_card_id" => card_id,
+      "turn_id" => turn.id,
+      "turn_number" => turn.turn_number
+    })
+  end
+
+  defp ability_marker(markers, ability_id) when is_map(markers) and is_atom(ability_id) do
+    Map.get(markers, ability_marker_key(ability_id))
+  end
+
+  defp ability_marker(_markers, _ability_id), do: nil
+
+  defp ability_marker_key(ability_id), do: "ability_used:#{ability_id}"
 
   defp previous_turn(_game_id, turn_number) when turn_number <= 1,
     do: {:error, @flip_the_script_unavailable_reason}

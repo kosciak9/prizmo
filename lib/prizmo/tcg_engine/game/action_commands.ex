@@ -476,6 +476,42 @@ defmodule Prizmo.TcgEngine.Game.ActionCommands do
       end
     end
 
+    action :use_blaziken_ex_seething_spirit_command, :struct do
+      description "Use Blaziken ex's Seething Spirit Ability to attach Basic Energy from discard."
+
+      constraints instance_of: Game
+
+      argument :game_id, :uuid do
+        allow_nil? false
+      end
+
+      argument :player_id, :string do
+        allow_nil? false
+      end
+
+      argument :source_card_instance_id, :uuid do
+        allow_nil? false
+      end
+
+      argument :energy_card_instance_id, :uuid do
+        allow_nil? false
+      end
+
+      argument :target_card_instance_id, :uuid do
+        allow_nil? false
+      end
+
+      run fn input, _context ->
+        Mechanics.use_blaziken_ex_seething_spirit(
+          input.arguments.game_id,
+          input.arguments.player_id,
+          input.arguments.source_card_instance_id,
+          input.arguments.energy_card_instance_id,
+          input.arguments.target_card_instance_id
+        )
+      end
+    end
+
     action :use_fezandipiti_flip_the_script_command, :struct do
       description "Use Fezandipiti ex's Flip the Script Ability to draw after an own KO last turn."
 
@@ -495,6 +531,89 @@ defmodule Prizmo.TcgEngine.Game.ActionCommands do
 
       run fn input, _context ->
         Mechanics.use_fezandipiti_flip_the_script(
+          input.arguments.game_id,
+          input.arguments.player_id,
+          input.arguments.source_card_instance_id
+        )
+      end
+    end
+
+    action :use_psychic_draw_command, :struct do
+      description "Use Kadabra or Alakazam's Psychic Draw Ability after evolving from hand."
+
+      constraints instance_of: Game
+
+      argument :game_id, :uuid do
+        allow_nil? false
+      end
+
+      argument :player_id, :string do
+        allow_nil? false
+      end
+
+      argument :source_card_instance_id, :uuid do
+        allow_nil? false
+      end
+
+      run fn input, _context ->
+        Mechanics.use_psychic_draw(
+          input.arguments.game_id,
+          input.arguments.player_id,
+          input.arguments.source_card_instance_id
+        )
+      end
+    end
+
+    action :use_drakloak_recon_directive_command, :struct do
+      description "Use Drakloak's Recon Directive Ability to choose 1 of the top 2 deck cards."
+
+      constraints instance_of: Game
+
+      argument :game_id, :uuid do
+        allow_nil? false
+      end
+
+      argument :player_id, :string do
+        allow_nil? false
+      end
+
+      argument :source_card_instance_id, :uuid do
+        allow_nil? false
+      end
+
+      argument :chosen_card_instance_id, :uuid do
+        allow_nil? false
+      end
+
+      run fn input, _context ->
+        Mechanics.use_drakloak_recon_directive(
+          input.arguments.game_id,
+          input.arguments.player_id,
+          input.arguments.source_card_instance_id,
+          input.arguments.chosen_card_instance_id
+        )
+      end
+    end
+
+    action :use_dudunsparce_run_away_draw_command, :struct do
+      description "Use Dudunsparce's Run Away Draw Ability to draw, then shuffle itself into the deck."
+
+      constraints instance_of: Game
+
+      argument :game_id, :uuid do
+        allow_nil? false
+      end
+
+      argument :player_id, :string do
+        allow_nil? false
+      end
+
+      argument :source_card_instance_id, :uuid do
+        allow_nil? false
+      end
+
+      run fn input, _context ->
+        Mechanics.use_dudunsparce_run_away_draw(
           input.arguments.game_id,
           input.arguments.player_id,
           input.arguments.source_card_instance_id

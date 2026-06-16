@@ -17,6 +17,22 @@ defmodule Prizmo.Tcg.Cards.Behaviors.MEG do
     attack(:super_psy_bolt, effect: nil)
   end
 
+  card "MEG-054" do
+    attack(:teleportation_attack,
+      damage: 10,
+      effect: %{type: :switch_self_with_bench}
+    )
+  end
+
+  card "MEG-056" do
+    ability(:psychic_draw, effect: %{type: :evolution_draw, count: 3})
+
+    attack(:powerful_hand,
+      damage: 0,
+      effect: %{type: :active_damage_counters_per_hand_card, counters_per_card: 2}
+    )
+  end
+
   card "MEG-117" do
     card_effect(
       effect: %{

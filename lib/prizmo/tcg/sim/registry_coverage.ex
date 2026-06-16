@@ -58,6 +58,7 @@ defmodule Prizmo.Tcg.Sim.RegistryCoverage do
   @implemented_effect_types MapSet.new([
                               :active_damage_counters_per_hand_card,
                               :active_draw_once_per_turn,
+                              :attach_basic_energy_from_discard_to_own_pokemon,
                               :attach_basic_energy_from_discard_to_self,
                               :attach_basic_energy_from_discard_to_benched_colorless_if_tera_in_play,
                               :attach_basic_grass_energy_from_hand_to_self_then_draw,

@@ -2,7 +2,9 @@ defmodule Prizmo.TcgEngine.Requirements do
   @moduledoc false
 
   alias Prizmo.TcgEngine.AttackLocks
+  alias Prizmo.TcgEngine.CardCatalog
   alias Prizmo.TcgEngine.CardInstance
+  alias Prizmo.TcgEngine.CardStore
   alias Prizmo.TcgEngine.Game
   alias Prizmo.TcgEngine.GamePlayer
   alias Prizmo.TcgEngine.PendingEffect
@@ -126,6 +128,53 @@ defmodule Prizmo.TcgEngine.Requirements do
   end
 
   def require_ace_spec_available(%GamePlayer{}, _metadata), do: :ok
+
+  def require_ace_spec_available(%GamePlayer{} = player, metadata, game_id)
+      when is_binary(game_id) do
+    with :ok <- require_ace_spec_available(player, metadata) do
+      require_not_blocked_by_ace_nullifier(player, metadata, game_id)
+    end
+  end
+
+  defp require_not_blocked_by_ace_nullifier(
+         %GamePlayer{player_id: player_id},
+         %{ace_spec?: true},
+         game_id
+       ) do
+    with {:ok, cards} <- CardStore.list_cards(game_id) do
+      if Enum.any?(cards, &active_opponent_ace_nullifier?(&1, player_id, cards)) do
+        {:error, :ace_spec_blocked_by_ace_nullifier}
+      else
+        :ok
+      end
+    end
+  end
+
+  defp require_not_blocked_by_ace_nullifier(%GamePlayer{}, _metadata, _game_id), do: :ok
+
+  defp active_opponent_ace_nullifier?(
+         %CardInstance{card_id: "SFA-040", owner_player_id: owner_player_id, zone: zone, id: id},
+         player_id,
+         cards
+       )
+       when owner_player_id != player_id and zone in [:active, :bench] do
+    Enum.any?(cards, &attached_tool_to?(&1, id))
+  end
+
+  defp active_opponent_ace_nullifier?(%CardInstance{}, _player_id, _cards), do: false
+
+  defp attached_tool_to?(
+         %CardInstance{
+           zone: :attached,
+           attached_to_card_instance_id: attached_to,
+           card_id: card_id
+         },
+         attached_to
+       ) do
+    match?({:ok, %{supertype: :trainer, trainer_type: :tool}}, CardCatalog.fetch(card_id))
+  end
+
+  defp attached_tool_to?(%CardInstance{}, _attached_to), do: false
 
   def require_energy_not_attached_this_turn(%GamePlayer{} = player) do
     if player.energy_attached_this_turn? do

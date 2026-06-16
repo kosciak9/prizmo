@@ -114,15 +114,19 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
        ) do
     [
       play_card_affordance(game, player, current_turn, cards, all_cards),
-      play_stadium_affordance(player, cards),
+      play_stadium_affordance(game, player, cards),
       team_rockets_factory_affordance(game, player, current_turn, all_cards),
       play_basic_to_bench_affordance(player, cards),
       attach_energy_affordance(player, cards),
-      attach_tool_affordance(player, cards),
+      attach_tool_affordance(game, player, cards),
       retreat_affordance(player, current_turn, cards)
     ] ++
       teal_dance_affordances(player, current_turn, cards) ++
+      seething_spirit_affordances(player, current_turn, cards) ++
       flip_the_script_affordances(game, player, current_turn, cards) ++
+      psychic_draw_affordances(player, current_turn, cards) ++
+      recon_directive_affordances(player, current_turn, cards) ++
+      run_away_draw_affordances(player, current_turn, cards) ++
       adrena_brain_affordances(player, current_turn, cards, all_cards) ++
       evolve_from_hand_affordances(player, current_turn, cards, all_cards) ++
       declare_attack_affordances(player, current_turn, cards, all_cards) ++
@@ -155,11 +159,11 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
     end
   end
 
-  defp play_stadium_affordance(%GamePlayer{} = player, cards) do
+  defp play_stadium_affordance(%Game{} = game, %GamePlayer{} = player, cards) do
     source_ids =
       cards
       |> hand_cards()
-      |> Enum.filter(&generic_stadium_playable?(player, &1))
+      |> Enum.filter(&generic_stadium_playable?(game, player, &1))
       |> card_ids()
 
     if Enum.empty?(source_ids) do
@@ -237,11 +241,11 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
     end
   end
 
-  defp attach_tool_affordance(%GamePlayer{} = player, cards) do
+  defp attach_tool_affordance(%Game{} = game, %GamePlayer{} = player, cards) do
     source_ids =
       cards
       |> hand_cards()
-      |> Enum.filter(&generic_tool_attachable?(player, &1))
+      |> Enum.filter(&generic_tool_attachable?(game, player, &1))
       |> card_ids()
 
     target_ids =
@@ -379,6 +383,38 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
 
   defp teal_dance_affordances(_player, _current_turn, _cards), do: []
 
+  defp seething_spirit_affordances(%GamePlayer{} = player, %Turn{} = current_turn, cards) do
+    discard_basic_energy_cards =
+      cards
+      |> discard_cards()
+      |> Enum.filter(&AbilityEffects.basic_energy?/1)
+      |> Enum.sort_by(&{&1.position, &1.instance_id})
+
+    own_in_play_cards = in_play_pokemon_cards(cards)
+
+    for source_card <- own_in_play_cards,
+        AbilityEffects.seething_spirit_available?(
+          source_card,
+          discard_basic_energy_cards,
+          current_turn
+        ),
+        energy_card <- discard_basic_energy_cards,
+        target_card <- own_in_play_cards do
+      affordance(
+        :seething_spirit,
+        seething_spirit_label(energy_card, target_card),
+        :command,
+        player.player_id,
+        source_card_instance_ids: [source_card.id, energy_card.id],
+        target_card_instance_ids: [target_card.id],
+        choice_keys: ["basic_energy_from_discard", "target_pokemon"],
+        note: "Attach this Basic Energy from your discard pile to 1 of your Pokémon."
+      )
+    end
+  end
+
+  defp seething_spirit_affordances(_player, _current_turn, _cards), do: []
+
   defp flip_the_script_affordances(
          %Game{} = game,
          %GamePlayer{} = player,
@@ -402,6 +438,65 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
   end
 
   defp flip_the_script_affordances(_game, _player, _current_turn, _cards), do: []
+
+  defp psychic_draw_affordances(%GamePlayer{} = player, %Turn{} = current_turn, cards) do
+    cards
+    |> in_play_pokemon_cards()
+    |> Enum.filter(&AbilityEffects.psychic_draw_available?(&1, current_turn))
+    |> Enum.map(fn source_card ->
+      affordance(
+        :psychic_draw,
+        "Use Psychic Draw",
+        :command,
+        player.player_id,
+        source_card_instance_ids: [source_card.id],
+        note:
+          "If this Pokémon evolved from hand this turn, draw cards from Psychic Draw. This Ability can be used once for this Pokémon this turn."
+      )
+    end)
+  end
+
+  defp psychic_draw_affordances(_player, _current_turn, _cards), do: []
+
+  defp recon_directive_affordances(%GamePlayer{} = player, %Turn{} = current_turn, cards) do
+    top_deck_cards = cards |> deck_cards() |> Enum.take(2)
+
+    for source_card <- in_play_pokemon_cards(cards),
+        AbilityEffects.recon_directive_available?(source_card, top_deck_cards, current_turn),
+        chosen_card <- top_deck_cards do
+      affordance(
+        :recon_directive,
+        "Use Recon Directive",
+        :command,
+        player.player_id,
+        source_card_instance_ids: [source_card.id],
+        target_card_instance_ids: [chosen_card.id],
+        choice_keys: ["chosen_top_card"],
+        note:
+          "Look at the top 2 cards of your deck. Choose 1 to put into your hand; put the other on the bottom of your deck."
+      )
+    end
+  end
+
+  defp recon_directive_affordances(_player, _current_turn, _cards), do: []
+
+  defp run_away_draw_affordances(%GamePlayer{} = player, %Turn{} = current_turn, cards) do
+    cards
+    |> in_play_pokemon_cards()
+    |> Enum.filter(&AbilityEffects.run_away_draw_available?(&1, current_turn))
+    |> Enum.map(fn source_card ->
+      affordance(
+        :run_away_draw,
+        "Use Run Away Draw",
+        :command,
+        player.player_id,
+        source_card_instance_ids: [source_card.id],
+        note: "Draw 3 cards. Then shuffle Dudunsparce and all attached cards into your deck."
+      )
+    end)
+  end
+
+  defp run_away_draw_affordances(_player, _current_turn, _cards), do: []
 
   defp declare_attack_affordances(
          %GamePlayer{} = player,
@@ -470,6 +565,18 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
 
   defp hand_cards(cards), do: Enum.filter(cards, &(&1.zone == :hand))
 
+  defp deck_cards(cards) do
+    cards
+    |> Enum.filter(&(&1.zone == :deck))
+    |> Enum.sort_by(&{&1.position, &1.instance_id})
+  end
+
+  defp discard_cards(cards) do
+    cards
+    |> Enum.filter(&(&1.zone == :discard))
+    |> Enum.sort_by(&{&1.position, &1.instance_id})
+  end
+
   defp active_pokemon_card(cards) do
     Enum.find(cards, &(&1.zone == :active))
   end
@@ -533,10 +640,12 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
     match?({:ok, %{supertype: :trainer, trainer_type: :tool}}, CardCatalog.fetch(card_id))
   end
 
-  defp generic_stadium_playable?(%GamePlayer{} = player, %CardInstance{card_id: card_id}) do
+  defp generic_stadium_playable?(%Game{} = game, %GamePlayer{} = player, %CardInstance{
+         card_id: card_id
+       }) do
     with {:ok, %{supertype: :trainer, trainer_type: :stadium} = metadata} <-
            CardCatalog.fetch(card_id),
-         :ok <- Requirements.require_ace_spec_available(player, metadata) do
+         :ok <- Requirements.require_ace_spec_available(player, metadata, game.id) do
       true
     else
       _other -> false
@@ -547,10 +656,12 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
     Enum.find(cards, &(&1.zone == :stadium and StadiumEffects.team_rockets_factory_card?(&1)))
   end
 
-  defp generic_tool_attachable?(%GamePlayer{} = player, %CardInstance{card_id: card_id}) do
+  defp generic_tool_attachable?(%Game{} = game, %GamePlayer{} = player, %CardInstance{
+         card_id: card_id
+       }) do
     with {:ok, %{supertype: :trainer, trainer_type: :tool} = metadata} <-
            CardCatalog.fetch(card_id),
-         :ok <- Requirements.require_ace_spec_available(player, metadata) do
+         :ok <- Requirements.require_ace_spec_available(player, metadata, game.id) do
       true
     else
       _other -> false
@@ -907,6 +1018,10 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
 
   defp teal_dance_label(source_card, energy_card) do
     "Use Teal Dance: attach #{card_name(energy_card)} to #{card_name(source_card)}"
+  end
+
+  defp seething_spirit_label(energy_card, target_card) do
+    "Use Seething Spirit: attach #{card_name(energy_card)} to #{card_name(target_card)}"
   end
 
   defp adrena_brain_note(1) do
