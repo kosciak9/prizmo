@@ -423,7 +423,7 @@ defmodule Prizmo.TcgEngine.AttackDamage do
          %CardInstance{owner_player_id: owner_player_id, zone: zone, card_id: card_id},
          attacker_player_id
        )
-       when owner_player_id != attacker_player_id and zone in [:active, :bench] do
+       when owner_player_id == attacker_player_id and zone in [:active, :bench] do
     case CardCatalog.fetch(card_id) do
       {:ok,
        %{

@@ -1,5 +1,12 @@
 # Wiki Log
 
+## [2026-06-17] codebase update | Goal 1 Dragapult validation batch
+
+- Task attempted: closed the explicit Goal 1 mechanics-validation gap that remained after live latest-Limitless card coverage reached green. Added focused canonical-engine coverage for Fairy Zone weakness remapping, Chi-Yu `Ground Melter` Stadium discard, Duskull `Come and Get You` discard-to-bench prompt flow, Dusclops `Cursed Blast` knockout prize/replacement flow plus `Damp` blocking, and `Jamming Tower` suppressing `JTG-151` Lillie's Pearl Prize reduction. The Fairy Zone validation exposed and fixed a real engine bug: `AttackDamage` was previously checking the defending side for Fairy Zone instead of the attacking player's in-play source.
+- Files changed: `lib/prizmo/tcg_engine/attack_damage.ex`, `test/prizmo/tcg_engine/mechanics_test.exs`, `knowledge-base/wiki/engine/dragapult-alakazam-full-game-implementation-scope.md`, `knowledge-base/wiki/log.md`.
+- Validation: focused `mix test test/prizmo/tcg_engine/mechanics_test.exs` (20/0) and full `mix check` passed.
+- Remaining/blocking notes: the explicit mechanics-test gap for Fairy Zone / Ground Melter / Come and Get You / Cursed Blast / Jamming Tower is now closed. Goal 1 remains open because full two-seat browser/play-surface validation across the important Dragapult variants against Alakazam is still pending.
+
 ## [2026-06-17] codebase update | Goal 1 live Dragapult fixture corpus expansion
 
 - Task attempted: closed the largest remaining Goal 1 fixture-drift bucket by replacing the historical single-deck Dragapult live-fixture assumption with the current Limitless latest-result deck-id set. `Prizmo.Tcg.Goal1.LatestLimitless` now tracks the full live Dragapult result universe (`28236`, `28250`, `28253`, `28255`, `28256`, `28258`, `28259`, `28261`, `27611`, `28264`, `28268`, `28271`) by adding nine new static Goal 1 deck modules under `lib/prizmo/tcg/goal_1/decks/` and removing stale fixture `27431` from the canonical Goal 1 audit/corpus list.

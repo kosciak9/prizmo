@@ -3,8 +3,14 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
 
   alias Prizmo.Tcg.Decks.Alakazam27147
   alias Prizmo.Tcg.Decks.Dragapult27431
+  alias Prizmo.Tcg.Decks.DragapultBlaziken28253
+  alias Prizmo.Tcg.Decks.DragapultDusknoir28236
   alias Prizmo.Tcg.Decks.DragapultPlain28256
   alias Prizmo.Tcg.Decks.RocketMewtwo27459
+  alias Prizmo.Tcg.Goal1.Decks.Dragapult28255
+  alias Prizmo.Tcg.Goal1.Decks.DragapultBlaziken28258
+  alias Prizmo.TcgEngine.AttackDamage
+  alias Prizmo.TcgEngine.AttackEffects
   alias Prizmo.TcgEngine.CardCatalog
   alias Prizmo.TcgEngine.CardInstance
   alias Prizmo.TcgEngine.GameEvent
@@ -14,6 +20,7 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
   alias Prizmo.TcgEngine.PendingEffect
   alias Prizmo.TcgEngine.Prompt
   alias Prizmo.TcgEngine.Setup
+  alias Prizmo.TcgEngine.ToolEffects
   alias Prizmo.TcgEngine.Turn
 
   require Ash.Query
@@ -523,6 +530,229 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
     end
   end
 
+  describe "Goal 1 Dragapult variant validation" do
+    test "Fairy Zone makes opposing Darkness Pokémon weak to Psychic" do
+      {:ok, game} =
+        create_flow_action_window_game_with_decks(Dragapult28255, DragapultBlaziken28258,
+          player_1_active_card_id: "MEG-088",
+          player_2_active_card_id: "JTG-056"
+        )
+
+      attacker = active_card(game.id, "player_2")
+      defender = active_card(game.id, "player_1")
+      assert {:ok, attack} = CardCatalog.fetch_attack(attacker.card_id, :full_moon_rondo)
+
+      assert {:ok, 40} = AttackDamage.damage_for(attacker, defender, attack)
+    end
+
+    test "Ground Melter gains bonus damage and discards the active Stadium" do
+      {:ok, game} =
+        create_flow_action_window_game_with_decks(DragapultBlaziken28253, Alakazam27147,
+          player_1_active_card_id: "TWM-039",
+          player_2_active_card_id: "MEG-054"
+        )
+
+      stadium = move_owned_card_to_hand(game.id, "player_1", "SCR-131", 1)
+      assert {:ok, game} = Mechanics.play_stadium(game, "player_1", stadium.id)
+
+      attacker = active_card(game.id, "player_1")
+      defender = active_card(game.id, "player_2")
+      assert {:ok, attack} = CardCatalog.fetch_attack(attacker.card_id, :ground_melter)
+
+      assert {:ok, 120} = AttackDamage.damage_for(attacker, defender, attack)
+
+      assert {:ok, effect_payload} =
+               AttackEffects.resolve_after_damage(
+                 game.id,
+                 "player_1",
+                 attacker,
+                 defender,
+                 attack,
+                 %{}
+               )
+
+      assert effect_payload.effect_type == "bonus_damage_if_stadium_in_play_then_discard_stadium"
+      assert effect_payload.stadium_discarded?
+      assert effect_payload.discarded_stadium_card_instance_ids == [stadium.id]
+      assert zone(stadium.id) == :discard
+    end
+
+    test "Come and Get You prompts over discarded Duskull and benches the chosen card" do
+      {:ok, game} =
+        create_flow_action_window_game_with_decks(DragapultDusknoir28236, Alakazam27147,
+          player_1_active_card_id: "PRE-035",
+          player_2_active_card_id: "ASC-142"
+        )
+
+      discarded_duskull =
+        game.id
+        |> other_owned_card("player_1", "PRE-035", [active_card(game.id, "player_1").id])
+        |> move_card_to_hand(1)
+
+      assert {:ok, game} = Mechanics.discard_from_hand(game, "player_1", discarded_duskull.id)
+
+      attacker = active_card(game.id, "player_1")
+      defender = active_card(game.id, "player_2")
+      assert {:ok, attack} = CardCatalog.fetch_attack(attacker.card_id, :come_and_get_you)
+
+      assert {:ok, effect_payload} =
+               AttackEffects.resolve_after_damage(
+                 game.id,
+                 "player_1",
+                 attacker,
+                 defender,
+                 attack,
+                 %{}
+               )
+
+      assert effect_payload.effect_type == "put_up_to_3_duskull_from_discard_to_bench"
+      assert effect_payload.duskull_prompt_created?
+
+      [prompt] = awaiting_prompts(game.id)
+      assert prompt.payload["choice_key"] == "put_duskull_from_discard_to_bench"
+      assert prompt.payload["legal_choices"] == [discarded_duskull.id]
+
+      assert {:ok, game} =
+               Mechanics.choose_prompt(game, "player_1", prompt.id, [discarded_duskull.id])
+
+      benched_duskull = card(discarded_duskull.id)
+      assert benched_duskull.zone == :bench
+
+      completed_event =
+        game.id
+        |> game_events_by_type("attack_effect_completed")
+        |> List.last()
+
+      assert completed_event.payload["effect_key"] == "put_up_to_3_duskull_from_discard_to_bench"
+      assert completed_event.payload["selected_card_instance_ids"] == [discarded_duskull.id]
+    end
+
+    test "Cursed Blast drives knockout prize and replacement flow, and Damp blocks it" do
+      {:ok, game} =
+        create_flow_action_window_game_with_decks(DragapultDusknoir28236, Alakazam27147,
+          player_1_active_card_id: "PRE-035",
+          player_2_active_card_id: "MEG-054"
+        )
+
+      assert {:ok, game} = Mechanics.pass_turn(game, "player_1")
+      assert {:ok, game} = Mechanics.pass_turn(game, "player_2")
+
+      player_1_bench = play_owned_basic_to_bench(game.id, "player_1", "TWM-128", 1)
+      _player_1_other_bench = play_owned_basic_to_bench(game.id, "player_1", "ASC-016", 2)
+      player_2_bench = play_owned_basic_to_bench(game.id, "player_2", "JTG-120", 1)
+      _player_2_other_bench = play_owned_basic_to_bench(game.id, "player_2", "SSP-087", 2)
+
+      duskull = active_card(game.id, "player_1")
+      dusclops = move_owned_card_to_hand(game.id, "player_1", "PRE-036", 1)
+      assert {:ok, game} = Mechanics.evolve_from_hand(game, "player_1", dusclops.id, duskull.id)
+
+      source = active_card(game.id, "player_1")
+      target = active_card(game.id, "player_2")
+
+      assert {:ok, game} = Mechanics.use_cursed_blast(game, "player_1", source.id, target.id)
+      assert zone(source.id) == :discard
+      assert zone(target.id) == :discard
+
+      [player_1_prize_prompt] = awaiting_prompts(game.id)
+      assert player_1_prize_prompt.player_id == "player_1"
+      assert player_1_prize_prompt.payload["choice_key"] == "knockout_prize_cards"
+      assert player_1_prize_prompt.payload["queued_knockout_prize_selection_count"] == 1
+      assert player_1_prize_prompt.payload["knocked_out_card_instance_ids"] == [target.id]
+
+      player_1_prize = List.first(player_1_prize_prompt.payload["legal_choices"])
+
+      assert {:ok, game} =
+               Mechanics.choose_prompt(game, "player_1", player_1_prize_prompt.id, [
+                 player_1_prize
+               ])
+
+      [player_2_prize_prompt] = awaiting_prompts(game.id)
+      assert player_2_prize_prompt.player_id == "player_2"
+      assert player_2_prize_prompt.payload["choice_key"] == "knockout_prize_cards"
+      assert player_2_prize_prompt.payload["knocked_out_card_instance_ids"] == [source.id]
+
+      player_2_prize = List.first(player_2_prize_prompt.payload["legal_choices"])
+
+      assert {:ok, game} =
+               Mechanics.choose_prompt(game, "player_2", player_2_prize_prompt.id, [
+                 player_2_prize
+               ])
+
+      refute active_card_or_nil(game.id, "player_1")
+      refute active_card_or_nil(game.id, "player_2")
+
+      assert {:ok, game} =
+               Mechanics.choose_replacement_active(game, "player_2", player_2_bench.id)
+
+      assert {:ok, game} =
+               Mechanics.choose_replacement_active(game, "player_1", player_1_bench.id)
+
+      assert active_card(game.id, "player_1").id == player_1_bench.id
+      assert active_card(game.id, "player_2").id == player_2_bench.id
+
+      prize_events = game_events_by_type(game.id, "take_knockout_prizes")
+      assert Enum.map(prize_events, & &1.player_id) == ["player_1", "player_2"]
+      assert Enum.all?(prize_events, &(&1.payload["prize_count"] == 1))
+
+      assert Enum.all?(prize_events, fn event ->
+               length(event.payload["taken_prize_card_instance_ids"] || []) == 1
+             end)
+
+      {:ok, damp_game} =
+        create_flow_action_window_game_with_decks(DragapultDusknoir28236, Alakazam27147,
+          player_1_active_card_id: "PRE-035",
+          player_2_active_card_id: "MEG-054"
+        )
+
+      assert {:ok, damp_game} = Mechanics.pass_turn(damp_game, "player_1")
+      assert {:ok, damp_game} = Mechanics.pass_turn(damp_game, "player_2")
+
+      _damp = play_owned_basic_to_bench(damp_game.id, "player_2", "ASC-039", 1)
+
+      damp_duskull = active_card(damp_game.id, "player_1")
+      damp_dusclops = move_owned_card_to_hand(damp_game.id, "player_1", "PRE-036", 1)
+
+      assert {:ok, damp_game} =
+               Mechanics.evolve_from_hand(
+                 damp_game,
+                 "player_1",
+                 damp_dusclops.id,
+                 damp_duskull.id
+               )
+
+      damp_source = active_card(damp_game.id, "player_1")
+      damp_target = active_card(damp_game.id, "player_2")
+
+      assert {:error, :self_knock_out_abilities_blocked_by_damp} =
+               Mechanics.use_cursed_blast(damp_game, "player_1", damp_source.id, damp_target.id)
+
+      assert zone(damp_source.id) == :active
+      assert zone(damp_target.id) == :active
+      assert game_events_by_type(damp_game.id, "ability_used") == []
+    end
+
+    test "Jamming Tower suppresses Lillie's Pearl prize reduction" do
+      {:ok, game} =
+        create_flow_action_window_game_with_decks(DragapultBlaziken28258, Dragapult28255,
+          player_1_active_card_id: "JTG-056",
+          player_2_active_card_id: "MEG-088"
+        )
+
+      pearl = move_owned_card_to_hand(game.id, "player_1", "JTG-151", 1)
+      clefairy = active_card(game.id, "player_1")
+      assert {:ok, game} = Mechanics.attach_tool(game, "player_1", pearl.id, clefairy.id)
+      assert ToolEffects.knockout_prize_reduction(game.id, clefairy) == 1
+
+      assert {:ok, game} = Mechanics.pass_turn(game, "player_1")
+
+      jamming_tower = move_owned_card_to_hand(game.id, "player_2", "TWM-153", 1)
+      assert {:ok, game} = Mechanics.play_stadium(game, "player_2", jamming_tower.id)
+
+      assert zone(jamming_tower.id) == :stadium
+      assert ToolEffects.knockout_prize_reduction(game.id, clefairy) == 0
+    end
+  end
+
   defp create_game do
     Mechanics.create_game([
       {"player_1", Alakazam27147},
@@ -562,18 +792,28 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
     end
   end
 
-  defp create_flow_action_window_game_with_decks(player_1_deck, player_2_deck) do
+  defp create_flow_action_window_game_with_decks(player_1_deck, player_2_deck, opts \\ []) do
     with {:ok, game} <- create_game_with_decks(player_1_deck, player_2_deck),
          {:ok, game} <- Mechanics.call_coin_toss(game, "player_1", :heads),
          {:ok, game} <-
            Mechanics.choose_starting_player(game, game.coin_toss_winner_player_id, "player_1"),
-         player_1_active = setup_active_card(game.id, "player_1", nil),
-         player_2_active = hand_basic_card(game.id, "player_2"),
+         player_1_active = setup_active_card(game.id, "player_1", opts[:player_1_active_card_id]),
+         player_2_active = setup_active_card(game.id, "player_2", opts[:player_2_active_card_id]),
          {:ok, game} <- Mechanics.choose_active_from_hand(game, "player_1", player_1_active.id),
          {:ok, game} <- Mechanics.choose_active_from_hand(game, "player_2", player_2_active.id),
          {:ok, game} <- Mechanics.finish_setup_choices(game, "player_1") do
       Mechanics.finish_setup_choices(game, "player_2")
     end
+  end
+
+  defp play_owned_basic_to_bench(game_id, player_id, card_id, position) do
+    card = move_owned_card_to_hand(game_id, player_id, card_id, position + 20)
+    turn_number = current_turn(game_id).turn_number
+
+    {:ok, card} =
+      ash_update(card, :play_to_bench, %{position: position, turn_entered_play: turn_number})
+
+    card
   end
 
   defp create_started_setup_game do
@@ -626,9 +866,25 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
 
   defp draw_deck_card_to_hand(game_id, player_id, card_id, position) do
     card = deck_card(game_id, player_id, card_id)
+    move_card_to_hand(card, position)
+  end
+
+  defp move_card_to_hand(%CardInstance{zone: :deck} = card, position) do
     {:ok, card} = ash_update(card, :draw_to_hand, %{position: position})
     card
   end
+
+  defp move_card_to_hand(%CardInstance{zone: :prize} = card, position) do
+    {:ok, card} = ash_update(card, :take_prize, %{position: position})
+    card
+  end
+
+  defp move_card_to_hand(%CardInstance{zone: :discard} = card, position) do
+    {:ok, card} = ash_update(card, :recover_to_hand, %{position: position})
+    card
+  end
+
+  defp move_card_to_hand(%CardInstance{} = card, _position), do: card
 
   defp move_owned_card_to_hand(game_id, player_id, card_id, position) do
     game_id
@@ -661,6 +917,17 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
     )
     |> Ash.Query.sort(position: :asc)
     |> Ash.read!()
+    |> List.first()
+  end
+
+  defp other_owned_card(game_id, player_id, card_id, excluded_ids) do
+    CardInstance
+    |> Ash.Query.filter(
+      game_id == ^game_id and owner_player_id == ^player_id and card_id == ^card_id
+    )
+    |> Ash.Query.sort(position: :asc)
+    |> Ash.read!()
+    |> Enum.reject(&(&1.id in excluded_ids))
     |> List.first()
   end
 
@@ -737,14 +1004,24 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
   defp setup_active_card(game_id, player_id, nil), do: hand_basic_card(game_id, player_id)
 
   defp setup_active_card(game_id, player_id, card_id) do
-    card = deck_card(game_id, player_id, card_id)
-    {:ok, card} = ash_update(card, :draw_to_hand, %{position: 99})
-    card
+    move_owned_card_to_hand(game_id, player_id, card_id, 99)
   end
 
   defp active_card(game_id, player_id) do
     CardInstance
     |> Ash.Query.filter(game_id == ^game_id and owner_player_id == ^player_id and zone == :active)
+    |> Ash.read_one!()
+  end
+
+  defp active_card_or_nil(game_id, player_id) do
+    CardInstance
+    |> Ash.Query.filter(game_id == ^game_id and owner_player_id == ^player_id and zone == :active)
+    |> Ash.read_one!()
+  end
+
+  defp card(card_id) do
+    CardInstance
+    |> Ash.Query.filter(id == ^card_id)
     |> Ash.read_one!()
   end
 
@@ -780,6 +1057,13 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
   defp prompts(game_id) do
     Prompt
     |> Ash.Query.filter(game_id == ^game_id)
+    |> Ash.Query.sort(created_at: :asc)
+    |> Ash.read!()
+  end
+
+  defp awaiting_prompts(game_id) do
+    Prompt
+    |> Ash.Query.filter(game_id == ^game_id and status == :awaiting_choice)
     |> Ash.Query.sort(created_at: :asc)
     |> Ash.read!()
   end
