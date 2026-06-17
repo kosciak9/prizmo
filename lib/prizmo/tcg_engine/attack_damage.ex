@@ -333,6 +333,11 @@ defmodule Prizmo.TcgEngine.AttackDamage do
     do: {:ok, damage}
 
   defp apply_effect(damage, _attacker_card, _defender_card, %{
+         type: :confuse_defender_active_then_move_opponent_damage_counters
+       }),
+       do: {:ok, damage}
+
+  defp apply_effect(damage, _attacker_card, _defender_card, %{
          type: :defending_pokemon_cannot_retreat_next_turn
        }),
        do: {:ok, damage}

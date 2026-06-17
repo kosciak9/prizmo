@@ -433,7 +433,17 @@ defmodule Prizmo.TcgEngine.GameView do
         end
 
       _other ->
-        default_public_event_details()
+        case payload_value(payload, "public_note") do
+          note when is_binary(note) and note != "" ->
+            %{
+              public_note: note,
+              public_card_count: 0,
+              public_revealed_cards: []
+            }
+
+          _other ->
+            default_public_event_details()
+        end
     end
   end
 

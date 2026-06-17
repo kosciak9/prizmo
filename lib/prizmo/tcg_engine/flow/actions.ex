@@ -32,6 +32,8 @@ defmodule Prizmo.TcgEngine.Flow.Actions do
 
   import Prizmo.TcgEngine.TurnStore, only: [current_turn: 1]
 
+  alias Prizmo.TcgEngine.AttackEffects
+  alias Prizmo.TcgEngine.CardCatalog
   alias Prizmo.TcgEngine.EventPayloads
   alias Prizmo.TcgEngine.Flow.Context
   alias Prizmo.TcgEngine.Game
@@ -89,8 +91,29 @@ defmodule Prizmo.TcgEngine.Flow.Actions do
 
   def can_resolve_declared_attack?(%Context{game: %Game{} = game}, _attrs) do
     case current_turn(game.id) do
-      {:ok, %Turn{status: :attack_declared}} -> true
-      _other -> false
+      {:ok,
+       %Turn{
+         status: :attack_declared,
+         active_player_id: active_player_id,
+         pending_attack_id: attack_id,
+         pending_attacker_card_instance_id: attacker_card_instance_id,
+         pending_defender_card_instance_id: defender_card_instance_id
+       }} ->
+        with {:ok, attacker_card} <- get_card(game.id, attacker_card_instance_id),
+             {:ok, defender_card} <- get_card(game.id, defender_card_instance_id),
+             {:ok, attack} <- CardCatalog.fetch_attack(attacker_card.card_id, attack_id) do
+          AttackEffects.auto_resolvable_without_input?(
+            game.id,
+            active_player_id,
+            defender_card,
+            attack
+          )
+        else
+          _error -> true
+        end
+
+      _other ->
+        false
     end
   end
 

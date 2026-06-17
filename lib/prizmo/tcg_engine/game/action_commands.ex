@@ -887,6 +887,11 @@ defmodule Prizmo.TcgEngine.Game.ActionCommands do
         default %{}
       end
 
+      argument :damage_counter_move_selections, {:array, :map} do
+        allow_nil? false
+        default []
+      end
+
       argument :coin_result, :string do
         allow_nil? true
       end
@@ -925,6 +930,7 @@ defmodule Prizmo.TcgEngine.Game.ActionCommands do
           bench_damage_target_card_instance_id:
             Map.get(input.arguments, :bench_damage_target_card_instance_id),
           bench_damage_counter_allocations: input.arguments.bench_damage_counter_allocations,
+          damage_counter_move_selections: input.arguments.damage_counter_move_selections,
           coin_result: Map.get(input.arguments, :coin_result),
           heads_count: Map.get(input.arguments, :heads_count),
           copied_attack_id: Map.get(input.arguments, :copied_attack_id),

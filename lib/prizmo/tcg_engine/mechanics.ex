@@ -1823,7 +1823,8 @@ defmodule Prizmo.TcgEngine.Mechanics do
                )
                |> maybe_put(:handheld_fan_energy_moved, handheld_fan_payload)
              ),
-           {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do
+           {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index),
+           {:ok, game} <- maybe_advance_attack_flow_state(game) do
         with {:ok, prize_selections} <-
                knockout_prize_selections_after_attack(
                  game.id,
@@ -1836,11 +1837,13 @@ defmodule Prizmo.TcgEngine.Mechanics do
                ),
              {:ok, game} <- create_knockout_prize_selections(game.id, prize_selections),
              {:ok, game} <-
-               resolve_active_replacement_after_attack_damage(
+               resolve_active_replacement_after_attack(
                  game,
                  player_id,
                  defender_card.owner_player_id,
-                 damage_result
+                 defender_card,
+                 damage_result,
+                 effect_payload
                ) do
           resolve_self_replacement_after_attack_effect(
             game,
@@ -1852,6 +1855,12 @@ defmodule Prizmo.TcgEngine.Mechanics do
       end
     end)
   end
+
+  defp maybe_advance_attack_flow_state(%Game{flow_state: :turn_attack_declared} = game) do
+    update(game, :set_flow_state, %{flow_state: :turn_attack_resolving})
+  end
+
+  defp maybe_advance_attack_flow_state(%Game{} = game), do: {:ok, game}
 
   @spec finish_attack(Game.t() | String.t(), String.t()) :: {:ok, Game.t()} | {:error, term()}
   def finish_attack(game_or_id, player_id) when is_binary(player_id) do
@@ -1871,24 +1880,41 @@ defmodule Prizmo.TcgEngine.Mechanics do
     end)
   end
 
-  defp resolve_active_replacement_after_attack_damage(
+  defp resolve_active_replacement_after_attack(
+         %Game{status: :finished} = game,
+         _attacking_player_id,
+         _knocked_out_player_id,
+         _defender_card,
+         _damage_result,
+         _effect_payload
+       ) do
+    {:ok, game}
+  end
+
+  defp resolve_active_replacement_after_attack(
          %Game{} = game,
          attacking_player_id,
          knocked_out_player_id,
-         %{
-           knocked_out?: true
-         }
+         _defender_card,
+         %{knocked_out?: true},
+         _effect_payload
        ) do
     resolve_replacement_after_knockout(game, attacking_player_id, knocked_out_player_id)
   end
 
-  defp resolve_active_replacement_after_attack_damage(
+  defp resolve_active_replacement_after_attack(
          %Game{} = game,
-         _attacking_player_id,
-         _knocked_out_player_id,
-         _damage_result
+         attacking_player_id,
+         knocked_out_player_id,
+         %CardInstance{} = defender_card,
+         _damage_result,
+         effect_payload
        ) do
-    {:ok, game}
+    if defender_card.id in effect_knockout_card_instance_ids(effect_payload) do
+      resolve_replacement_after_knockout(game, attacking_player_id, knocked_out_player_id)
+    else
+      {:ok, game}
+    end
   end
 
   defp knockout_prize_selections_after_attack(
@@ -1968,8 +1994,8 @@ defmodule Prizmo.TcgEngine.Mechanics do
              target_card,
              damage_result
            ),
-         {:ok, bench_records} <- bench_knockout_prize_records(game_id, effect_payload) do
-      {:ok, active_records ++ bench_records}
+         {:ok, effect_records} <- effect_knockout_prize_records(game_id, effect_payload) do
+      {:ok, dedupe_knockout_prize_records(active_records ++ effect_records)}
     end
   end
 
@@ -1992,9 +2018,9 @@ defmodule Prizmo.TcgEngine.Mechanics do
     {:ok, []}
   end
 
-  defp bench_knockout_prize_records(game_id, effect_payload) do
+  defp effect_knockout_prize_records(game_id, effect_payload) do
     effect_payload
-    |> bench_knockout_card_instance_ids()
+    |> effect_knockout_card_instance_ids()
     |> Enum.map(fn bench_card_instance_id ->
       with {:ok, target_card} <- get_card(game_id, bench_card_instance_id),
            :ok <- require_card_zone(target_card, :discard) do
@@ -2002,6 +2028,10 @@ defmodule Prizmo.TcgEngine.Mechanics do
       end
     end)
     |> collect_results()
+  end
+
+  defp dedupe_knockout_prize_records(prize_records) do
+    Enum.uniq_by(prize_records, & &1.knocked_out_card_instance_id)
   end
 
   defp knockout_prize_record(knocked_out_player_id, target_card) do
@@ -2016,14 +2046,21 @@ defmodule Prizmo.TcgEngine.Mechanics do
     end
   end
 
-  defp bench_knockout_card_instance_ids(%{bench_knocked_out?: true} = effect_payload) do
+  defp effect_knockout_card_instance_ids(%{effect_knockout_card_instance_ids: ids})
+       when is_list(ids) do
+    ids
+    |> Enum.filter(&is_binary/1)
+    |> Enum.uniq()
+  end
+
+  defp effect_knockout_card_instance_ids(%{bench_knocked_out?: true} = effect_payload) do
     case Map.get(effect_payload, :bench_damage_target_card_instance_id) do
       card_instance_id when is_binary(card_instance_id) -> [card_instance_id]
       _missing -> []
     end
   end
 
-  defp bench_knockout_card_instance_ids(%{bench_damage_counter_allocations: allocations})
+  defp effect_knockout_card_instance_ids(%{bench_damage_counter_allocations: allocations})
        when is_list(allocations) do
     allocations
     |> Enum.filter(&Map.get(&1, :knocked_out?, false))
@@ -2032,7 +2069,7 @@ defmodule Prizmo.TcgEngine.Mechanics do
     |> Enum.uniq()
   end
 
-  defp bench_knockout_card_instance_ids(_effect_payload), do: []
+  defp effect_knockout_card_instance_ids(_effect_payload), do: []
 
   defp self_knockout_prize_records(game_id, knocked_out_player_id, attacker_card, %{
          self_knocked_out?: true

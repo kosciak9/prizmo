@@ -64,6 +64,7 @@ const DISCARD_OWN_BASIC_ENERGY_FOR_DAMAGE_EFFECT = 'damage_per_discarded_own_bas
 const DISCARD_OWN_BENCH_ENERGY_FOR_BONUS_DAMAGE_EFFECT = 'discard_energy_from_own_bench_for_bonus_damage'
 const DISCARD_DEFENDING_ENERGY_ON_COIN_HEADS_EFFECT = 'discard_defending_energy_on_coin_heads'
 const MOVE_OPPONENT_ATTACHED_ENERGY_BETWEEN_POKEMON_EFFECT = 'move_opponent_attached_energy_between_pokemon'
+const STRANGE_HACKING_EFFECT = 'confuse_defender_active_then_move_opponent_damage_counters'
 const SHUFFLE_ATTACHED_ENERGY_INTO_DECK_THEN_DAMAGE_OPPONENT_BENCH_EFFECT =
   'shuffle_attached_energy_into_deck_then_damage_opponent_bench'
 const COPY_OPPONENT_ACTIVE_TERA_POKEMON_ATTACK_EFFECT = 'copy_opponent_active_tera_pokemon_attack'
@@ -861,9 +862,16 @@ type ResolveDeclaredAttackInput = {
   shuffledEnergyCardInstanceIds?: string[]
   benchDamageTargetCardInstanceId?: string | null
   benchDamageCounterAllocations?: Record<string, number>
+  damageCounterMoveSelections?: DamageCounterMoveSelection[]
   coinResult?: CoinResult | null
   headsCount?: number | null
   copiedAttackId?: string | null
+}
+
+type DamageCounterMoveSelection = {
+  fromCardInstanceId: string
+  toCardInstanceId: string
+  damageCounters: number
 }
 
 type ResolveDeclaredAttackCommand = {
@@ -876,6 +884,7 @@ type ResolveDeclaredAttackCommand = {
   shuffledEnergyCardInstanceIds?: string[]
   benchDamageTargetCardInstanceId?: string | null
   benchDamageCounterAllocations?: Record<string, number>
+  damageCounterMoveSelections?: DamageCounterMoveSelection[]
   coinResult?: CoinResult | null
   headsCount?: number | null
   copiedAttackId?: string | null
@@ -2110,10 +2119,13 @@ export function HomeRoute() {
                   playerId,
                   switchBenchCardInstanceId,
                   discardedEnergyCardInstanceIds,
+                  movedOpponentEnergyCardInstanceId,
+                  movedOpponentEnergyTargetCardInstanceId,
                   returnedEnergyCardInstanceId,
                   shuffledEnergyCardInstanceIds,
                   benchDamageTargetCardInstanceId,
                   benchDamageCounterAllocations,
+                  damageCounterMoveSelections,
                   coinResult,
                   headsCount,
                   copiedAttackId
@@ -2124,10 +2136,13 @@ export function HomeRoute() {
                       playerId,
                       switchBenchCardInstanceId,
                       discardedEnergyCardInstanceIds,
+                      movedOpponentEnergyCardInstanceId,
+                      movedOpponentEnergyTargetCardInstanceId,
                       returnedEnergyCardInstanceId,
                       shuffledEnergyCardInstanceIds,
                       benchDamageTargetCardInstanceId,
                       benchDamageCounterAllocations,
+                      damageCounterMoveSelections,
                       coinResult,
                       headsCount,
                       copiedAttackId
@@ -4897,6 +4912,13 @@ function AttackProgressPanel({
   resolveDeclaredAttackPendingPlayerId: string | null
   viewerPlayerId: PlayerId
 }) {
+  const damageCounterMoveKey = (fromCardInstanceId: string, toCardInstanceId: string) =>
+    `${fromCardInstanceId}::${toCardInstanceId}`
+  const parseDamageCounterMoveKey = (key: string): [string, string] | null => {
+    const parts = key.split('::')
+
+    return parts.length === 2 && parts[0] && parts[1] ? [parts[0], parts[1]] : null
+  }
   const [selectedSwitchBenchCardInstanceId, setSelectedSwitchBenchCardInstanceId] = useState('')
   const [selectedDiscardedEnergyCardInstanceIds, setSelectedDiscardedEnergyCardInstanceIds] = useState<string[]>([])
   const [selectedMovedOpponentEnergyCardInstanceId, setSelectedMovedOpponentEnergyCardInstanceId] = useState('')
@@ -4908,6 +4930,9 @@ function AttackProgressPanel({
   const [selectedBenchDamageCounterAllocations, setSelectedBenchDamageCounterAllocations] = useState<
     Record<string, number>
   >({})
+  const [selectedDamageCounterMoveAllocations, setSelectedDamageCounterMoveAllocations] = useState<Record<string, number>>(
+    {}
+  )
   const [selectedCoinResult, setSelectedCoinResult] = useState<CoinResult | ''>('')
   const [selectedHeadsCount, setSelectedHeadsCount] = useState('')
   const [selectedCopiedAttackId, setSelectedCopiedAttackId] = useState('')
@@ -4946,6 +4971,7 @@ function AttackProgressPanel({
   const pendingAttackRequiresBenchDamageCounters = Boolean(
     turn?.pendingAttackRequiresBenchDamageCounters || resolutionEffectType === 'opponent_bench_damage_counters'
   )
+  const pendingAttackRequiresDamageCounterMoves = resolutionEffectType === STRANGE_HACKING_EFFECT
   const pendingAttackRequiresCoinResult = Boolean(
     turn?.pendingAttackRequiresCoinResult ||
       resolutionEffectType === 'bonus_damage_on_coin_heads' ||
@@ -5100,6 +5126,78 @@ function AttackProgressPanel({
     (total, counters) => total + counters,
     0
   )
+  const opponentInPlayDamageCounterMoveCards = useMemo(
+    () =>
+      pendingAttackRequiresDamageCounterMoves
+        ? [opponentPlayer?.active, ...(opponentPlayer?.bench ?? [])].filter((card): card is CardSummary => Boolean(card))
+        : [],
+    [opponentPlayer?.active, opponentPlayer?.bench, pendingAttackRequiresDamageCounterMoves]
+  )
+  const damageCounterMoveSourceOptions = useMemo(
+    () =>
+      opponentInPlayDamageCounterMoveCards.filter(card => {
+        const availableCounters = Math.floor(card.damage / 10)
+
+        return availableCounters > 0 && opponentInPlayDamageCounterMoveCards.some(otherCard => otherCard.id !== card.id)
+      }),
+    [opponentInPlayDamageCounterMoveCards]
+  )
+  const damageCounterMoveTargetOptionsBySource = useMemo(
+    () =>
+      new Map(
+        damageCounterMoveSourceOptions.map(sourceCard => [
+          sourceCard.id,
+          opponentInPlayDamageCounterMoveCards.filter(targetCard => targetCard.id !== sourceCard.id)
+        ])
+      ),
+    [damageCounterMoveSourceOptions, opponentInPlayDamageCounterMoveCards]
+  )
+  const damageCounterMoveSourceAvailableById = useMemo(
+    () => new Map(damageCounterMoveSourceOptions.map(card => [card.id, Math.floor(card.damage / 10)])),
+    [damageCounterMoveSourceOptions]
+  )
+  const damageCounterMovePairKeys = useMemo(() => {
+    const keys = new Set<string>()
+
+    for (const [fromCardInstanceId, targetCards] of damageCounterMoveTargetOptionsBySource.entries()) {
+      for (const targetCard of targetCards) {
+        keys.add(damageCounterMoveKey(fromCardInstanceId, targetCard.id))
+      }
+    }
+
+    return keys
+  }, [damageCounterMoveTargetOptionsBySource])
+  const selectedDamageCounterMoveSelectionsForResolve = useMemo(
+    () =>
+      Object.entries(selectedDamageCounterMoveAllocations).flatMap(([key, counters]) => {
+        const parsedKey = parseDamageCounterMoveKey(key)
+
+        if (!parsedKey || !damageCounterMovePairKeys.has(key) || counters <= 0) {
+          return []
+        }
+
+        const [fromCardInstanceId, toCardInstanceId] = parsedKey
+
+        return [{ fromCardInstanceId, toCardInstanceId, damageCounters: counters }]
+      }),
+    [damageCounterMovePairKeys, selectedDamageCounterMoveAllocations]
+  )
+  const selectedDamageCounterMoveTotalsBySource = useMemo(() => {
+    const totalsBySource = new Map<string, number>()
+
+    for (const selection of selectedDamageCounterMoveSelectionsForResolve) {
+      totalsBySource.set(
+        selection.fromCardInstanceId,
+        (totalsBySource.get(selection.fromCardInstanceId) ?? 0) + selection.damageCounters
+      )
+    }
+
+    return totalsBySource
+  }, [selectedDamageCounterMoveSelectionsForResolve])
+  const selectedDamageCounterMoveTotal = selectedDamageCounterMoveSelectionsForResolve.reduce(
+    (total, selection) => total + selection.damageCounters,
+    0
+  )
   const coinResultForResolve = pendingAttackRequiresCoinResult && selectedCoinResult ? selectedCoinResult : null
   const selectedHeadsCountValue = selectedHeadsCount.trim()
   const parsedHeadsCount = Number(selectedHeadsCountValue)
@@ -5125,6 +5223,7 @@ function AttackProgressPanel({
     setSelectedShuffledEnergyCardInstanceIds([])
     setSelectedBenchDamageTargetCardInstanceId('')
     setSelectedBenchDamageCounterAllocations({})
+    setSelectedDamageCounterMoveAllocations({})
     setSelectedCoinResult('')
     setSelectedHeadsCount('')
     setSelectedCopiedAttackId('')
@@ -5187,6 +5286,18 @@ function AttackProgressPanel({
         : nextAllocations
     })
   }, [benchDamageCounterOptionIds])
+
+  useEffect(() => {
+    setSelectedDamageCounterMoveAllocations(previousAllocations => {
+      const nextAllocations = Object.fromEntries(
+        Object.entries(previousAllocations).filter(([key]) => damageCounterMovePairKeys.has(key))
+      )
+
+      return Object.keys(nextAllocations).length === Object.keys(previousAllocations).length
+        ? previousAllocations
+        : nextAllocations
+    })
+  }, [damageCounterMovePairKeys])
 
   if (!turn || (turn.status !== 'attack_declared' && turn.status !== 'attack_resolving')) {
     return null
@@ -5251,6 +5362,14 @@ function AttackProgressPanel({
     pendingAttackRequiresBenchDamageCounters && benchDamageCounterOptions.length > 0
   const benchDamageCounterAllocationIncomplete =
     benchDamageCounterAllocationRequired && selectedBenchDamageCounterTotal !== benchDamageCounterRequiredCount
+  const damageCounterMoveOverallocationSource = damageCounterMoveSourceOptions.find(sourceCard => {
+    const selectedCounters = selectedDamageCounterMoveTotalsBySource.get(sourceCard.id) ?? 0
+    const availableCounters = damageCounterMoveSourceAvailableById.get(sourceCard.id) ?? 0
+
+    return selectedCounters > availableCounters
+  })
+  const manualResolveNeededInFlowManagedState =
+    pendingAttackRequiresDamageCounterMoves && damageCounterMoveSourceOptions.length > 0
   const coinResultRequired = pendingAttackRequiresCoinResult && !coinResultForResolve
   const defendingEnergyDiscardRequiresChoice =
     resolutionEffectType === DISCARD_DEFENDING_ENERGY_ON_COIN_HEADS_EFFECT &&
@@ -5287,6 +5406,7 @@ function AttackProgressPanel({
     benchDamageTargetUnavailable ||
     (benchDamageTargetRequired && !selectedBenchDamageTargetIsValid) ||
     benchDamageCounterAllocationIncomplete ||
+    Boolean(damageCounterMoveOverallocationSource) ||
     coinResultRequired ||
     defendingEnergyDiscardRequiresChoice ||
     headsCountRequired
@@ -5313,9 +5433,11 @@ function AttackProgressPanel({
                 : benchDamageTargetUnavailable
                   ? `No opponent Bench target for ${attackLabel}`
                   : benchDamageTargetRequired && !selectedBenchDamageTargetIsValid
-                    ? `Choose a Bench damage target for ${attackLabel}`
+                   ? `Choose a Bench damage target for ${attackLabel}`
                     : benchDamageCounterAllocationIncomplete
                       ? `Allocate exactly ${benchDamageCounterRequiredCount} Bench damage counters for ${attackLabel}`
+                      : damageCounterMoveOverallocationSource
+                        ? `Reduce moved damage counters for ${attackLabel}`
                       : coinResultRequired
                         ? `Choose a coin result for ${attackLabel}`
                         : defendingEnergyDiscardRequiresChoice
@@ -5328,8 +5450,10 @@ function AttackProgressPanel({
     ? `${attackLabel} has resolved. ${
         defender ? `${defender.name} now has ${defender.damage} damage.` : 'Damage and effects are recorded.'
       } The flow machine finishes the attack when blockers are clear.`
-    : attackFlowManaged
+    : attackFlowManaged && !manualResolveNeededInFlowManagedState
       ? `The flow machine resolves ${attackLabel} automatically when no player choice is required.`
+      : manualResolveNeededInFlowManagedState
+        ? `${attackLabel} needs a player-chosen damage-counter redistribution before the persisted engine can finish the attack.`
       : `Resolve ${attackLabel} to apply its persisted damage and any authored effect before ending the turn.`
   const resolutionChecklistItems: ResolutionChecklistItem[] = []
 
@@ -5487,6 +5611,19 @@ function AttackProgressPanel({
     })
   }
 
+  if (pendingAttackRequiresDamageCounterMoves) {
+    resolutionChecklistItems.push({
+      label: 'Damage counter moves',
+      tone: damageCounterMoveOverallocationSource ? 'waiting' : 'ready',
+      value:
+        damageCounterMoveSourceOptions.length === 0
+          ? 'No legal redistribution available'
+          : selectedDamageCounterMoveTotal === 0
+            ? 'Optional effect skipped'
+            : `${selectedDamageCounterMoveTotal} counters across ${selectedDamageCounterMoveSelectionsForResolve.length} move${selectedDamageCounterMoveSelectionsForResolve.length === 1 ? '' : 's'}`
+    })
+  }
+
   const resolutionChecklistReadyCount = resolutionChecklistItems.filter(item => item.tone === 'ready').length
   const toggleDiscardedEnergyCard = (energyCardInstanceId: string) => {
     setSelectedDiscardedEnergyCardInstanceIds(previousSelectedIds => {
@@ -5529,6 +5666,24 @@ function AttackProgressPanel({
       return {
         ...previousAllocations,
         [cardInstanceId]: normalizedCounters
+      }
+    })
+  }
+
+  const setDamageCounterMoveAllocation = (fromCardInstanceId: string, toCardInstanceId: string, counters: number) => {
+    const allocationKey = damageCounterMoveKey(fromCardInstanceId, toCardInstanceId)
+    const normalizedCounters = Math.max(0, Math.floor(counters || 0))
+
+    setSelectedDamageCounterMoveAllocations(previousAllocations => {
+      if (normalizedCounters === 0) {
+        const { [allocationKey]: _removed, ...remainingAllocations } = previousAllocations
+
+        return remainingAllocations
+      }
+
+      return {
+        ...previousAllocations,
+        [allocationKey]: normalizedCounters
       }
     })
   }
@@ -6140,6 +6295,100 @@ function AttackProgressPanel({
           </div>
         ) : null}
 
+        {pendingAttackRequiresDamageCounterMoves ? (
+          <div className="rounded-xl border border-rose-200 bg-rose-50/70 p-3">
+            <div className="space-y-1">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-rose-900">
+                Opponent damage counter moves
+              </p>
+              <p className="text-xs leading-5 text-rose-900/80">
+                Strange Hacking always Confuses the opponent&apos;s Active Pokémon. You may also move any number of
+                damage counters from one of the opponent&apos;s Pokémon to another of their Pokémon. Leave every box at 0
+                to skip the optional move.
+              </p>
+            </div>
+
+            {damageCounterMoveSourceOptions.length > 0 ? (
+              <div className="mt-3 space-y-3">
+                {damageCounterMoveOverallocationSource ? (
+                  <div className="rounded-lg border border-rose-300 bg-rose-100 px-3 py-2 text-xs text-rose-950">
+                    {damageCounterMoveOverallocationSource.name} has{' '}
+                    {selectedDamageCounterMoveTotalsBySource.get(damageCounterMoveOverallocationSource.id) ?? 0}{' '}
+                    counters allocated but only{' '}
+                    {damageCounterMoveSourceAvailableById.get(damageCounterMoveOverallocationSource.id) ?? 0} available
+                    to move.
+                  </div>
+                ) : null}
+
+                {damageCounterMoveSourceOptions.map(sourceCard => {
+                  const availableCounters = damageCounterMoveSourceAvailableById.get(sourceCard.id) ?? 0
+                  const selectedCounters = selectedDamageCounterMoveTotalsBySource.get(sourceCard.id) ?? 0
+                  const targetOptions = damageCounterMoveTargetOptionsBySource.get(sourceCard.id) ?? []
+
+                  return (
+                    <div className="rounded-xl border border-rose-200 bg-stone-50 p-3" key={sourceCard.id}>
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-rose-900">
+                            From {sourceCard.name}
+                          </p>
+                          <p className="mt-1 text-xs leading-5 text-rose-900/80">
+                            {sourceCard.damage} damage on board · move up to {availableCounters} counter
+                            {availableCounters === 1 ? '' : 's'} from this Pokémon.
+                          </p>
+                        </div>
+                        <StatusBadge tone={selectedCounters > availableCounters ? 'warning' : selectedCounters > 0 ? 'active' : 'neutral'}>
+                          {selectedCounters}/{availableCounters}
+                        </StatusBadge>
+                      </div>
+
+                      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                        {targetOptions.map(targetCard => {
+                          const allocationKey = damageCounterMoveKey(sourceCard.id, targetCard.id)
+                          const counters = selectedDamageCounterMoveAllocations[allocationKey] ?? 0
+
+                          return (
+                            <label
+                              className="flex items-start justify-between gap-3 rounded-lg border border-rose-200 bg-stone-50 px-3 py-2 text-xs text-stone-700"
+                              key={allocationKey}
+                            >
+                              <span className="min-w-0">
+                                <span className="block font-medium">To {targetCard.name}</span>
+                                <span className="mt-0.5 block font-mono text-[0.68rem] opacity-70">
+                                  {targetCard.damage} damage · {targetCard.cardId}
+                                </span>
+                              </span>
+                              <input
+                                className="w-16 rounded-lg border border-rose-200 bg-stone-50 px-2 py-1 text-right font-mono text-xs text-rose-950 outline-none focus:border-rose-600 focus:ring-2 focus:ring-rose-100 disabled:cursor-not-allowed disabled:bg-stone-100 disabled:text-stone-400"
+                                disabled={!viewerCanAdvanceAttack || commandPending}
+                                min={0}
+                                onChange={event =>
+                                  setDamageCounterMoveAllocation(
+                                    sourceCard.id,
+                                    targetCard.id,
+                                    Number(event.currentTarget.value)
+                                  )
+                                }
+                                type="number"
+                                value={counters}
+                              />
+                            </label>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            ) : (
+              <p className="mt-3 rounded-lg border border-rose-200 bg-stone-50 px-3 py-2 text-xs text-rose-900">
+                The opponent does not currently have a damaged Pokémon with another legal destination, so this attack
+                will resolve with Confusion only.
+              </p>
+            )}
+          </div>
+        ) : null}
+
         {!viewerCanAdvanceAttack ? (
           <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
             Switch this tab to {formatPlayerId(turn.activePlayerId)} to advance the attack.
@@ -6154,7 +6403,7 @@ function AttackProgressPanel({
           </p>
         ) : null}
 
-        {turn.status === 'attack_declared' && attackFlowManaged ? (
+        {turn.status === 'attack_declared' && attackFlowManaged && !manualResolveNeededInFlowManagedState ? (
           <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
             Attack resolution is flow-managed for this game. If this state remains visible, refresh the board or inspect the engine error before exposing a manual resolve control.
           </p>
@@ -6173,6 +6422,7 @@ function AttackProgressPanel({
                 shuffledEnergyCardInstanceIds: selectedShuffledEnergyIdsForResolve,
                 benchDamageTargetCardInstanceId: benchDamageTargetIdForResolve,
                 benchDamageCounterAllocations: selectedBenchDamageCounterAllocationsForResolve,
+                damageCounterMoveSelections: selectedDamageCounterMoveSelectionsForResolve,
                 coinResult: coinResultForResolve,
                 headsCount: headsCountForResolve,
                 copiedAttackId: copiedAttackIdForResolve

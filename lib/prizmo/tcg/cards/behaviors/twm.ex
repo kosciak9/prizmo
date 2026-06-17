@@ -88,6 +88,10 @@ defmodule Prizmo.Tcg.Cards.Behaviors.TWM do
   end
 
   card "TWM-082" do
+    attack(:strange_hacking,
+      effect: %{type: :confuse_defender_active_then_move_opponent_damage_counters}
+    )
+
     attack(:psychic,
       damage: 10,
       effect: %{type: :bonus_damage_per_energy_attached_to_defender, bonus_damage: 50}

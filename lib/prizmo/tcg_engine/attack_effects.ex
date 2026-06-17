@@ -78,6 +78,7 @@ defmodule Prizmo.TcgEngine.AttackEffects do
     :bonus_damage_per_energy_attached_to_defender,
     :attacker_cannot_attack_next_turn,
     :confuse_defender_active,
+    :confuse_defender_active_then_move_opponent_damage_counters,
     @copy_opponent_active_tera_pokemon_attack,
     :damage_unaffected_by_effects_on_opponent_active,
     :damage_only_if_stadium_in_play,
@@ -118,6 +119,22 @@ defmodule Prizmo.TcgEngine.AttackEffects do
   @spec type(term()) :: term()
   def type(%{type: effect_type}), do: effect_type
   def type(effect), do: effect
+
+  @spec auto_resolvable_without_input?(String.t(), String.t(), CardInstance.t(), map()) ::
+          boolean()
+  def auto_resolvable_without_input?(game_id, player_id, %CardInstance{}, attack)
+      when is_binary(game_id) and is_binary(player_id) and is_map(attack) do
+    case Map.get(attack, :effect) do
+      %{type: :confuse_defender_active_then_move_opponent_damage_counters} ->
+        case opponent_in_play_pokemon_cards(game_id, player_id) do
+          {:ok, opponent_cards} -> not legal_damage_counter_move_available?(opponent_cards)
+          _error -> true
+        end
+
+      _other_effect ->
+        true
+    end
+  end
 
   @spec coin_result(map()) :: {:ok, :heads | :tails} | {:error, term()}
   def coin_result(opts) when is_map(opts) do
@@ -265,6 +282,14 @@ defmodule Prizmo.TcgEngine.AttackEffects do
 
       %{type: :confuse_defender_active} ->
         set_defender_status(game_id, player_id, defender_card, :confused)
+
+      %{type: :confuse_defender_active_then_move_opponent_damage_counters} ->
+        confuse_defender_active_then_move_opponent_damage_counters(
+          game_id,
+          player_id,
+          defender_card,
+          opts
+        )
 
       %{type: :defending_pokemon_cannot_retreat_next_turn} ->
         defender_cannot_retreat_next_turn(game_id, player_id, defender_card)
@@ -1148,6 +1173,24 @@ defmodule Prizmo.TcgEngine.AttackEffects do
     end
   end
 
+  defp confuse_defender_active_then_move_opponent_damage_counters(
+         game_id,
+         attacking_player_id,
+         %CardInstance{} = defender_card,
+         opts
+       ) do
+    with {:ok, status_payload} <-
+           set_defender_status(game_id, attacking_player_id, defender_card, :confused),
+         {:ok, move_payload} <-
+           move_opponent_damage_counters_between_pokemon(game_id, attacking_player_id, opts) do
+      {:ok,
+       %{effect_type: "confuse_defender_active_then_move_opponent_damage_counters"}
+       |> Map.merge(Map.delete(status_payload, :effect_type))
+       |> Map.merge(move_payload)
+       |> Map.put(:public_note, strange_hacking_public_note(status_payload, move_payload))}
+    end
+  end
+
   defp status_condition_prevention_payload(
          game_id,
          attacking_player_id,
@@ -1689,6 +1732,245 @@ defmodule Prizmo.TcgEngine.AttackEffects do
     end
   end
 
+  defp move_opponent_damage_counters_between_pokemon(game_id, player_id, opts) do
+    with {:ok, selections} <- damage_counter_move_selections(opts),
+         {:ok, opponent_cards} <- opponent_in_play_pokemon_cards(game_id, player_id),
+         cards_by_id = Map.new(opponent_cards, &{&1.id, &1}),
+         :ok <- require_damage_counter_move_targets(selections, cards_by_id),
+         :ok <- require_damage_counter_move_counts(selections, cards_by_id),
+         {:ok, move_results} <-
+           build_damage_counter_move_results(game_id, player_id, selections, cards_by_id),
+         {:ok, card_results} <-
+           apply_damage_counter_move_results(game_id, cards_by_id, move_results) do
+      successful_results = Enum.filter(move_results, &Map.get(&1, :applied?, false))
+
+      {:ok,
+       %{
+         opponent_damage_counter_move_applied?: successful_results != [],
+         opponent_damage_counter_move_total:
+           total_damage_counter_move_counters(successful_results),
+         opponent_damage_counter_move_results: move_results,
+         opponent_damage_counter_card_results: card_results,
+         effect_knockout_card_instance_ids:
+           card_results
+           |> Enum.filter(&Map.get(&1, :knocked_out?, false))
+           |> Enum.map(&Map.get(&1, :card_instance_id))
+       }}
+    end
+  end
+
+  defp build_damage_counter_move_results(game_id, player_id, selections, cards_by_id)
+       when is_map(cards_by_id) do
+    selections
+    |> Enum.map(fn %{from_card_instance_id: from_id, to_card_instance_id: to_id} = selection ->
+      from_card = Map.fetch!(cards_by_id, from_id)
+      to_card = Map.fetch!(cards_by_id, to_id)
+
+      damage_counter_move_result(
+        game_id,
+        player_id,
+        from_card,
+        to_card,
+        selection.damage_counters
+      )
+    end)
+    |> collect_results()
+  end
+
+  defp damage_counter_move_result(
+         game_id,
+         player_id,
+         %CardInstance{} = from_card,
+         %CardInstance{} = to_card,
+         damage_counters
+       ) do
+    move_payload = %{
+      from_card_instance_id: from_card.id,
+      from_card_id: from_card.card_id,
+      to_card_instance_id: to_card.id,
+      to_card_id: to_card.card_id,
+      damage_counters: damage_counters,
+      moved_damage: damage_counters * 10
+    }
+
+    case source_damage_counter_move_prevention_payload(game_id, player_id, from_card) do
+      {:prevented, prevention_payload} ->
+        {:ok,
+         move_payload
+         |> Map.merge(prevention_payload)
+         |> Map.put(:applied?, false)
+         |> Map.put(:prevented?, true)}
+
+      :not_prevented ->
+        case target_damage_counter_move_prevention_payload(game_id, player_id, to_card) do
+          {:prevented, prevention_payload} ->
+            {:ok,
+             move_payload
+             |> Map.merge(prevention_payload)
+             |> Map.put(:applied?, false)
+             |> Map.put(:prevented?, true)}
+
+          :not_prevented ->
+            {:ok, Map.merge(move_payload, %{applied?: true, prevented?: false})}
+        end
+    end
+  end
+
+  defp source_damage_counter_move_prevention_payload(
+         game_id,
+         player_id,
+         %CardInstance{} = from_card
+       ) do
+    attack_effect_prevention_payload(game_id, player_id, from_card)
+  end
+
+  defp target_damage_counter_move_prevention_payload(
+         game_id,
+         player_id,
+         %CardInstance{} = to_card
+       ) do
+    case attack_effect_prevention_payload(game_id, player_id, to_card) do
+      {:prevented, prevention_payload} ->
+        {:prevented, prevention_payload}
+
+      :not_prevented ->
+        StadiumEffects.damage_counter_prevention_payload(
+          game_id,
+          to_card,
+          player_id,
+          :opponent_pokemon_effect
+        )
+    end
+  end
+
+  defp apply_damage_counter_move_results(_game_id, _cards_by_id, []), do: {:ok, []}
+
+  defp apply_damage_counter_move_results(game_id, cards_by_id, move_results)
+       when is_map(cards_by_id) do
+    successful_results = Enum.filter(move_results, &Map.get(&1, :applied?, false))
+
+    case successful_results do
+      [] ->
+        {:ok, []}
+
+      _results ->
+        with {:ok, card_results} <-
+               damage_counter_move_card_results(successful_results, cards_by_id),
+             {:ok, _updated_cards} <- update_damage_counter_move_cards(card_results, cards_by_id),
+             {:ok, _discarded_cards} <-
+               discard_knocked_out_damage_counter_move_cards(game_id, card_results, cards_by_id) do
+          {:ok, card_results}
+        end
+    end
+  end
+
+  defp damage_counter_move_card_results(successful_results, cards_by_id)
+       when is_map(cards_by_id) do
+    outgoing_by_card = Enum.reduce(successful_results, %{}, &add_outgoing_damage_counter_move/2)
+    incoming_by_card = Enum.reduce(successful_results, %{}, &add_incoming_damage_counter_move/2)
+
+    affected_card_ids = Enum.uniq(Map.keys(outgoing_by_card) ++ Map.keys(incoming_by_card))
+
+    affected_card_ids
+    |> Enum.map(fn card_instance_id ->
+      card = Map.fetch!(cards_by_id, card_instance_id)
+      outgoing_counters = Map.get(outgoing_by_card, card_instance_id, 0)
+      incoming_counters = Map.get(incoming_by_card, card_instance_id, 0)
+      resulting_damage = card.damage - outgoing_counters * 10 + incoming_counters * 10
+
+      with {:ok, hp} <- pokemon_hp(card.card_id) do
+        {:ok,
+         %{
+           card_instance_id: card.id,
+           card_id: card.card_id,
+           starting_damage: card.damage,
+           resulting_damage: resulting_damage,
+           knocked_out?: resulting_damage >= hp
+         }}
+      end
+    end)
+    |> collect_results()
+  end
+
+  defp add_outgoing_damage_counter_move(result, acc) do
+    Map.update(
+      acc,
+      result.from_card_instance_id,
+      result.damage_counters,
+      &(&1 + result.damage_counters)
+    )
+  end
+
+  defp add_incoming_damage_counter_move(result, acc) do
+    Map.update(
+      acc,
+      result.to_card_instance_id,
+      result.damage_counters,
+      &(&1 + result.damage_counters)
+    )
+  end
+
+  defp update_damage_counter_move_cards(card_results, cards_by_id) when is_map(cards_by_id) do
+    card_results
+    |> Enum.map(fn card_result ->
+      card = Map.fetch!(cards_by_id, card_result.card_instance_id)
+      update(card, :set_damage, %{damage: card_result.resulting_damage})
+    end)
+    |> collect_results()
+  end
+
+  defp discard_knocked_out_damage_counter_move_cards(game_id, card_results, cards_by_id)
+       when is_map(cards_by_id) do
+    card_results
+    |> Enum.filter(&Map.get(&1, :knocked_out?, false))
+    |> Enum.map(fn card_result ->
+      card = Map.fetch!(cards_by_id, card_result.card_instance_id)
+      BattleActions.discard_knocked_out_stack(game_id, card)
+    end)
+    |> collect_results()
+  end
+
+  defp total_damage_counter_move_counters(results) do
+    Enum.reduce(results, 0, fn result, total -> Map.get(result, :damage_counters, 0) + total end)
+  end
+
+  defp movable_damage_counter_count(%CardInstance{damage: damage}) when is_integer(damage) do
+    damage
+    |> max(0)
+    |> div(10)
+  end
+
+  defp movable_damage_counter_count(%CardInstance{}), do: 0
+
+  defp legal_damage_counter_move_available?(opponent_cards) when is_list(opponent_cards) do
+    Enum.any?(opponent_cards, fn source_card ->
+      movable_damage_counter_count(source_card) > 0 and
+        Enum.any?(opponent_cards, &(&1.id != source_card.id))
+    end)
+  end
+
+  defp strange_hacking_public_note(status_payload, move_payload) do
+    status_applied? = Map.get(status_payload, :defender_status_applied?, false)
+    moved_counters = Map.get(move_payload, :opponent_damage_counter_move_total, 0)
+
+    cond do
+      status_applied? and moved_counters > 0 ->
+        "Strange Hacking Confused the opponent's Active Pokémon and moved #{moved_counters} #{pluralize_damage_counter(moved_counters)}."
+
+      status_applied? ->
+        "Strange Hacking Confused the opponent's Active Pokémon."
+
+      moved_counters > 0 ->
+        "Strange Hacking moved #{moved_counters} #{pluralize_damage_counter(moved_counters)}."
+
+      true ->
+        "Strange Hacking resolved."
+    end
+  end
+
+  defp pluralize_damage_counter(1), do: "damage counter"
+  defp pluralize_damage_counter(_count), do: "damage counters"
+
   defp move_opponent_attached_energy_between_pokemon(game_id, player_id, opts) do
     with {:ok, move_option} <- opponent_energy_move_option(game_id, player_id, opts) do
       case move_option do
@@ -1756,6 +2038,139 @@ defmodule Prizmo.TcgEngine.AttackEffects do
       allocations when is_map(allocations) -> {:ok, allocations}
       _invalid -> {:error, :invalid_bench_damage_counter_allocations}
     end
+  end
+
+  defp damage_counter_move_selections(opts) do
+    case Map.get(opts, :damage_counter_move_selections) ||
+           Map.get(opts, "damage_counter_move_selections") do
+      nil ->
+        {:ok, []}
+
+      selections when is_list(selections) ->
+        normalize_damage_counter_move_selections(selections)
+
+      _invalid ->
+        {:error, :invalid_damage_counter_move_selections}
+    end
+  end
+
+  defp normalize_damage_counter_move_selections(selections) when is_list(selections) do
+    selections
+    |> Enum.reduce_while({:ok, %{}}, fn selection, {:ok, acc} ->
+      with {:ok, from_card_instance_id} <-
+             required_selection_string(
+               selection,
+               [
+                 :from_card_instance_id,
+                 "from_card_instance_id",
+                 :fromCardInstanceId,
+                 "fromCardInstanceId"
+               ],
+               :invalid_damage_counter_move_source_card_instance_id
+             ),
+           {:ok, to_card_instance_id} <-
+             required_selection_string(
+               selection,
+               [
+                 :to_card_instance_id,
+                 "to_card_instance_id",
+                 :toCardInstanceId,
+                 "toCardInstanceId"
+               ],
+               :invalid_damage_counter_move_target_card_instance_id
+             ),
+           {:ok, damage_counters} <-
+             required_selection_integer(
+               selection,
+               [:damage_counters, "damage_counters", :damageCounters, "damageCounters"],
+               :invalid_damage_counter_move_count
+             ),
+           true <- damage_counters > 0 || {:error, :invalid_damage_counter_move_count} do
+        key = {from_card_instance_id, to_card_instance_id}
+
+        {:cont, {:ok, Map.update(acc, key, damage_counters, &(&1 + damage_counters))}}
+      else
+        {:error, reason} -> {:halt, {:error, reason}}
+      end
+    end)
+    |> case do
+      {:ok, normalized} ->
+        {:ok,
+         Enum.map(normalized, fn {{from_card_instance_id, to_card_instance_id}, damage_counters} ->
+           %{
+             from_card_instance_id: from_card_instance_id,
+             to_card_instance_id: to_card_instance_id,
+             damage_counters: damage_counters
+           }
+         end)}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  defp required_selection_string(selection, keys, error_reason) when is_map(selection) do
+    case Enum.find_value(keys, fn key ->
+           case Map.get(selection, key) do
+             value when is_binary(value) and value != "" -> value
+             _other -> nil
+           end
+         end) do
+      value when is_binary(value) -> {:ok, value}
+      _missing -> {:error, error_reason}
+    end
+  end
+
+  defp required_selection_string(_selection, _keys, error_reason), do: {:error, error_reason}
+
+  defp required_selection_integer(selection, keys, error_reason) when is_map(selection) do
+    case Enum.find_value(keys, fn key ->
+           case Map.get(selection, key) do
+             value when is_integer(value) -> value
+             _other -> nil
+           end
+         end) do
+      value when is_integer(value) -> {:ok, value}
+      _missing -> {:error, error_reason}
+    end
+  end
+
+  defp required_selection_integer(_selection, _keys, error_reason), do: {:error, error_reason}
+
+  defp require_damage_counter_move_targets([], _cards_by_id), do: :ok
+
+  defp require_damage_counter_move_targets(selections, cards_by_id) when is_map(cards_by_id) do
+    if Enum.all?(selections, fn %{from_card_instance_id: from_id, to_card_instance_id: to_id} ->
+         is_map_key(cards_by_id, from_id) and is_map_key(cards_by_id, to_id) and from_id != to_id
+       end) do
+      :ok
+    else
+      {:error, :invalid_damage_counter_move_target}
+    end
+  end
+
+  defp require_damage_counter_move_counts(selections, cards_by_id) when is_map(cards_by_id) do
+    selections
+    |> Enum.group_by(& &1.from_card_instance_id)
+    |> Enum.reduce_while(:ok, fn {from_card_instance_id, source_selections}, :ok ->
+      from_card = Map.fetch!(cards_by_id, from_card_instance_id)
+      requested_counters = Enum.reduce(source_selections, 0, &(&1.damage_counters + &2))
+      available_counters = movable_damage_counter_count(from_card)
+
+      cond do
+        requested_counters < 1 ->
+          {:halt, {:error, :invalid_damage_counter_move_count}}
+
+        requested_counters > available_counters ->
+          {:halt,
+           {:error,
+            {:not_enough_damage_counters, from_card_instance_id, requested_counters,
+             available_counters}}}
+
+        true ->
+          {:cont, :ok}
+      end
+    end)
   end
 
   defp normalize_bench_damage_counter_allocations(allocations) do
