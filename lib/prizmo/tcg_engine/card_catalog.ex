@@ -33,6 +33,7 @@ defmodule Prizmo.TcgEngine.CardCatalog do
 
   @behavior_modules [
     Prizmo.Tcg.Cards.Behaviors.ASC,
+    Prizmo.Tcg.Cards.Behaviors.BLK,
     Prizmo.Tcg.Cards.Behaviors.CRI,
     Prizmo.Tcg.Cards.Behaviors.DRI,
     Prizmo.Tcg.Cards.Behaviors.JTG,

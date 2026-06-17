@@ -93,6 +93,7 @@ defmodule Prizmo.TcgEngine.AttackEffects do
     :damage_per_own_benched_pokemon,
     :damage_per_own_team_rocket_pokemon_in_play,
     :lock_opponent_items_next_turn,
+    :move_opponent_attached_energy_between_pokemon,
     :recover_trainer_from_discard_to_hand,
     :return_attached_energy_to_hand,
     :opponent_bench_damage_counters,
@@ -288,6 +289,9 @@ defmodule Prizmo.TcgEngine.AttackEffects do
 
       %{type: :discard_defending_energy_on_coin_heads} ->
         discard_defending_energy_on_coin_heads(game_id, player_id, defender_card, opts)
+
+      %{type: :move_opponent_attached_energy_between_pokemon} ->
+        move_opponent_attached_energy_between_pokemon(game_id, player_id, opts)
 
       %{
         type: :slight_intrusion_coin_flip_search_deck_on_heads_self_damage,
@@ -1685,6 +1689,48 @@ defmodule Prizmo.TcgEngine.AttackEffects do
     end
   end
 
+  defp move_opponent_attached_energy_between_pokemon(game_id, player_id, opts) do
+    with {:ok, move_option} <- opponent_energy_move_option(game_id, player_id, opts) do
+      case move_option do
+        nil ->
+          {:ok,
+           %{
+             effect_type: "move_opponent_attached_energy_between_pokemon",
+             moved_energy?: false
+           }}
+
+        %{energy_card: %CardInstance{} = energy_card, attached_to: %CardInstance{} = from_card} ->
+          with {:ok, target_card} <-
+                 opponent_energy_move_target(game_id, player_id, from_card, opts) do
+            case target_card do
+              nil ->
+                {:ok,
+                 %{
+                   effect_type: "move_opponent_attached_energy_between_pokemon",
+                   moved_energy?: false
+                 }}
+
+              %CardInstance{} = target_card ->
+                with {:ok, moved_energy_card} <-
+                       reparent_opponent_attached_energy(game_id, energy_card, target_card) do
+                  {:ok,
+                   %{
+                     effect_type: "move_opponent_attached_energy_between_pokemon",
+                     moved_energy?: true,
+                     moved_opponent_energy_card_instance_id: moved_energy_card.id,
+                     moved_opponent_energy_card_id: moved_energy_card.card_id,
+                     moved_opponent_energy_from_card_instance_id: from_card.id,
+                     moved_opponent_energy_from_card_id: from_card.card_id,
+                     moved_opponent_energy_to_card_instance_id: target_card.id,
+                     moved_opponent_energy_to_card_id: target_card.card_id
+                   }}
+                end
+            end
+          end
+      end
+    end
+  end
+
   defp discarded_energy_card_instance_ids(opts) do
     case Map.get(opts, :discarded_energy_card_instance_ids) ||
            Map.get(opts, "discarded_energy_card_instance_ids") do
@@ -1811,6 +1857,132 @@ defmodule Prizmo.TcgEngine.AttackEffects do
   defp bench_damage_target_card_instance_id(opts) do
     Map.get(opts, :bench_damage_target_card_instance_id) ||
       Map.get(opts, "bench_damage_target_card_instance_id")
+  end
+
+  defp moved_opponent_energy_card_instance_id(opts) do
+    Map.get(opts, :moved_opponent_energy_card_instance_id) ||
+      Map.get(opts, "moved_opponent_energy_card_instance_id")
+  end
+
+  defp moved_opponent_energy_target_card_instance_id(opts) do
+    Map.get(opts, :moved_opponent_energy_target_card_instance_id) ||
+      Map.get(opts, "moved_opponent_energy_target_card_instance_id")
+  end
+
+  defp opponent_energy_move_option(game_id, player_id, opts) do
+    with {:ok, move_options} <- opponent_energy_move_options(game_id, player_id) do
+      case moved_opponent_energy_card_instance_id(opts) do
+        nil ->
+          implicit_opponent_energy_move_option(move_options)
+
+        card_instance_id when is_binary(card_instance_id) ->
+          explicit_opponent_energy_move_option(move_options, card_instance_id)
+
+        _invalid ->
+          {:error, :invalid_moved_opponent_energy_card_instance_id}
+      end
+    end
+  end
+
+  defp implicit_opponent_energy_move_option([]), do: {:ok, nil}
+  defp implicit_opponent_energy_move_option([move_option]), do: {:ok, move_option}
+
+  defp implicit_opponent_energy_move_option([_first | _rest]),
+    do: {:error, :move_opponent_energy_requires_energy_choice}
+
+  defp explicit_opponent_energy_move_option(move_options, card_instance_id) do
+    case Enum.find(move_options, fn %{energy_card: energy_card} ->
+           energy_card.id == card_instance_id
+         end) do
+      nil -> {:error, :invalid_moved_opponent_energy_choice}
+      move_option -> {:ok, move_option}
+    end
+  end
+
+  defp opponent_energy_move_target(game_id, player_id, %CardInstance{} = from_card, opts) do
+    with {:ok, target_options} <-
+           opponent_energy_move_target_options(game_id, player_id, from_card) do
+      case moved_opponent_energy_target_card_instance_id(opts) do
+        nil ->
+          implicit_opponent_energy_move_target(target_options)
+
+        card_instance_id when is_binary(card_instance_id) ->
+          explicit_opponent_energy_move_target(target_options, card_instance_id)
+
+        _invalid ->
+          {:error, :invalid_moved_opponent_energy_target_card_instance_id}
+      end
+    end
+  end
+
+  defp implicit_opponent_energy_move_target([]), do: {:ok, nil}
+  defp implicit_opponent_energy_move_target([target_card]), do: {:ok, target_card}
+
+  defp implicit_opponent_energy_move_target([_first | _rest]),
+    do: {:error, :move_opponent_energy_requires_target}
+
+  defp explicit_opponent_energy_move_target(target_options, card_instance_id) do
+    case Enum.find(target_options, &(&1.id == card_instance_id)) do
+      nil -> {:error, :invalid_moved_opponent_energy_target_choice}
+      target_card -> {:ok, target_card}
+    end
+  end
+
+  defp opponent_energy_move_options(game_id, player_id) do
+    with {:ok, opponent_in_play_cards} <- opponent_in_play_pokemon_cards(game_id, player_id) do
+      case opponent_in_play_cards do
+        [_only_card] ->
+          {:ok, []}
+
+        [] ->
+          {:ok, []}
+
+        _cards ->
+          {:ok,
+           Enum.flat_map(opponent_in_play_cards, fn target_card ->
+             case attached_cards(game_id, target_card.id) do
+               {:ok, attachments} ->
+                 attachments
+                 |> Enum.filter(&energy_card?/1)
+                 |> Enum.map(fn energy_card ->
+                   %{energy_card: energy_card, attached_to: target_card}
+                 end)
+
+               {:error, _reason} ->
+                 []
+             end
+           end)}
+      end
+    end
+  end
+
+  defp opponent_energy_move_target_options(game_id, player_id, %CardInstance{} = from_card) do
+    with {:ok, opponent_in_play_cards} <- opponent_in_play_pokemon_cards(game_id, player_id) do
+      {:ok, Enum.reject(opponent_in_play_cards, &(&1.id == from_card.id))}
+    end
+  end
+
+  defp opponent_in_play_pokemon_cards(game_id, player_id) do
+    with {:ok, opponent_player_id} <- opponent_player_id(game_id, player_id),
+         {:ok, active_cards} <- cards_in_zone(game_id, opponent_player_id, :active),
+         {:ok, bench_cards} <- cards_in_zone(game_id, opponent_player_id, :bench) do
+      {:ok, active_cards ++ bench_cards}
+    end
+  end
+
+  defp energy_card?(%CardInstance{card_id: card_id}), do: match?(:ok, require_energy(card_id))
+
+  defp reparent_opponent_attached_energy(
+         game_id,
+         %CardInstance{} = energy_card,
+         %CardInstance{} = target_card
+       ) do
+    with {:ok, target_attachments} <- attached_cards(game_id, target_card.id) do
+      update(energy_card, :reparent_attachment, %{
+        attached_to_card_instance_id: target_card.id,
+        position: length(target_attachments) + 1
+      })
+    end
   end
 
   defp returned_attached_energy_card(game_id, player_id, %CardInstance{} = attacker_card, opts) do

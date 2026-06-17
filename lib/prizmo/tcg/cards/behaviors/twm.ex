@@ -87,6 +87,13 @@ defmodule Prizmo.Tcg.Cards.Behaviors.TWM do
     attack(:beam, effect: nil)
   end
 
+  card "TWM-082" do
+    attack(:psychic,
+      damage: 10,
+      effect: %{type: :bonus_damage_per_energy_attached_to_defender, bonus_damage: 50}
+    )
+  end
+
   card "TWM-095" do
     ability(:adrena_brain,
       effect: %{type: :move_damage_counters, max_counters: 3, requires_attached_type: :darkness}

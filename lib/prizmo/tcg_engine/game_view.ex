@@ -403,16 +403,37 @@ defmodule Prizmo.TcgEngine.GameView do
   end
 
   defp public_event_details(%GameEvent{type: "resolve_declared_attack", payload: payload}) do
-    if payload_value(payload, "effect_type") == "lock_opponent_items_next_turn" do
-      card_name = payload_card_name(payload, "item_lock_source_card_id", "Itchy Pollen")
+    case payload_value(payload, "effect_type") do
+      "lock_opponent_items_next_turn" ->
+        card_name = payload_card_name(payload, "item_lock_source_card_id", "Itchy Pollen")
 
-      %{
-        public_note: "#{card_name} prevents the opponent from playing Item cards next turn.",
-        public_card_count: 0,
-        public_revealed_cards: []
-      }
-    else
-      default_public_event_details()
+        %{
+          public_note: "#{card_name} prevents the opponent from playing Item cards next turn.",
+          public_card_count: 0,
+          public_revealed_cards: []
+        }
+
+      "move_opponent_attached_energy_between_pokemon" ->
+        if payload_value(payload, "moved_energy?") == true do
+          energy_name = payload_card_name(payload, "moved_opponent_energy_card_id", "Energy")
+
+          from_name =
+            payload_card_name(payload, "moved_opponent_energy_from_card_id", "opponent Pokémon")
+
+          to_name =
+            payload_card_name(payload, "moved_opponent_energy_to_card_id", "opponent Pokémon")
+
+          %{
+            public_note: "Moved #{energy_name} from #{from_name} to #{to_name}.",
+            public_card_count: 0,
+            public_revealed_cards: []
+          }
+        else
+          default_public_event_details()
+        end
+
+      _other ->
+        default_public_event_details()
     end
   end
 
@@ -576,6 +597,13 @@ defmodule Prizmo.TcgEngine.GameView do
   defp payload_atom_key("effect_type"), do: :effect_type
   defp payload_atom_key("item_lock_source_card_id"), do: :item_lock_source_card_id
   defp payload_atom_key("mulligan_number"), do: :mulligan_number
+  defp payload_atom_key("moved_energy?"), do: :moved_energy?
+  defp payload_atom_key("moved_opponent_energy_card_id"), do: :moved_opponent_energy_card_id
+
+  defp payload_atom_key("moved_opponent_energy_from_card_id"),
+    do: :moved_opponent_energy_from_card_id
+
+  defp payload_atom_key("moved_opponent_energy_to_card_id"), do: :moved_opponent_energy_to_card_id
   defp payload_atom_key("public_note"), do: :public_note
   defp payload_atom_key("public_reveal"), do: :public_reveal
   defp payload_atom_key("revealed_cards"), do: :revealed_cards

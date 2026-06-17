@@ -63,6 +63,7 @@ const ULTRA_BALL_POST_SEARCH_HANDOFF_STORAGE_KEY = 'prizmo:tcg-ultra-ball-post-s
 const DISCARD_OWN_BASIC_ENERGY_FOR_DAMAGE_EFFECT = 'damage_per_discarded_own_basic_energy'
 const DISCARD_OWN_BENCH_ENERGY_FOR_BONUS_DAMAGE_EFFECT = 'discard_energy_from_own_bench_for_bonus_damage'
 const DISCARD_DEFENDING_ENERGY_ON_COIN_HEADS_EFFECT = 'discard_defending_energy_on_coin_heads'
+const MOVE_OPPONENT_ATTACHED_ENERGY_BETWEEN_POKEMON_EFFECT = 'move_opponent_attached_energy_between_pokemon'
 const SHUFFLE_ATTACHED_ENERGY_INTO_DECK_THEN_DAMAGE_OPPONENT_BENCH_EFFECT =
   'shuffle_attached_energy_into_deck_then_damage_opponent_bench'
 const COPY_OPPONENT_ACTIVE_TERA_POKEMON_ATTACK_EFFECT = 'copy_opponent_active_tera_pokemon_attack'
@@ -854,6 +855,8 @@ type ResolveDeclaredAttackInput = {
   playerId: PlayerId
   switchBenchCardInstanceId?: string | null
   discardedEnergyCardInstanceIds?: string[]
+  movedOpponentEnergyCardInstanceId?: string | null
+  movedOpponentEnergyTargetCardInstanceId?: string | null
   returnedEnergyCardInstanceId?: string | null
   shuffledEnergyCardInstanceIds?: string[]
   benchDamageTargetCardInstanceId?: string | null
@@ -867,6 +870,8 @@ type ResolveDeclaredAttackCommand = {
   playerId: string
   switchBenchCardInstanceId?: string | null
   discardedEnergyCardInstanceIds?: string[]
+  movedOpponentEnergyCardInstanceId?: string | null
+  movedOpponentEnergyTargetCardInstanceId?: string | null
   returnedEnergyCardInstanceId?: string | null
   shuffledEnergyCardInstanceIds?: string[]
   benchDamageTargetCardInstanceId?: string | null
@@ -4894,6 +4899,9 @@ function AttackProgressPanel({
 }) {
   const [selectedSwitchBenchCardInstanceId, setSelectedSwitchBenchCardInstanceId] = useState('')
   const [selectedDiscardedEnergyCardInstanceIds, setSelectedDiscardedEnergyCardInstanceIds] = useState<string[]>([])
+  const [selectedMovedOpponentEnergyCardInstanceId, setSelectedMovedOpponentEnergyCardInstanceId] = useState('')
+  const [selectedMovedOpponentEnergyTargetCardInstanceId, setSelectedMovedOpponentEnergyTargetCardInstanceId] =
+    useState('')
   const [selectedReturnedEnergyCardInstanceId, setSelectedReturnedEnergyCardInstanceId] = useState('')
   const [selectedShuffledEnergyCardInstanceIds, setSelectedShuffledEnergyCardInstanceIds] = useState<string[]>([])
   const [selectedBenchDamageTargetCardInstanceId, setSelectedBenchDamageTargetCardInstanceId] = useState('')
@@ -4922,6 +4930,8 @@ function AttackProgressPanel({
       resolutionEffectType === DISCARD_OWN_BENCH_ENERGY_FOR_BONUS_DAMAGE_EFFECT ||
       resolutionEffectType === DISCARD_DEFENDING_ENERGY_ON_COIN_HEADS_EFFECT
   )
+  const pendingAttackRequiresMovedOpponentEnergy =
+    resolutionEffectType === MOVE_OPPONENT_ATTACHED_ENERGY_BETWEEN_POKEMON_EFFECT
   const pendingAttackRequiresReturnedEnergy = Boolean(
     turn?.pendingAttackRequiresReturnedEnergy || resolutionEffectType === 'return_attached_energy_to_hand'
   )
@@ -4978,6 +4988,58 @@ function AttackProgressPanel({
   const selectedDiscardedEnergyIdsForResolve = pendingAttackRequiresDiscardedEnergy
     ? selectedDiscardedEnergyCardInstanceIds.filter(id => discardedEnergyOptionIds.has(id))
     : []
+  const movedOpponentEnergyOptions = useMemo(() => {
+    if (!pendingAttackRequiresMovedOpponentEnergy || !opponentPlayer) {
+      return []
+    }
+
+    const inPlayCards = [opponentPlayer.active, ...opponentPlayer.bench].filter(
+      (card): card is CardSummary => Boolean(card)
+    )
+
+    if (inPlayCards.length < 2) {
+      return []
+    }
+
+    return inPlayCards.flatMap(card =>
+      (card.attachedCards ?? [])
+        .filter(isEnergyCard)
+        .map(energyCard => ({ attachedTo: card, energyCard }))
+    )
+  }, [opponentPlayer, pendingAttackRequiresMovedOpponentEnergy])
+  const movedOpponentEnergyOptionIds = useMemo(
+    () => new Set(movedOpponentEnergyOptions.map(option => option.energyCard.id)),
+    [movedOpponentEnergyOptions]
+  )
+  const selectedMovedOpponentEnergyIsValid = movedOpponentEnergyOptionIds.has(selectedMovedOpponentEnergyCardInstanceId)
+  const movedOpponentEnergyChoiceForResolve = pendingAttackRequiresMovedOpponentEnergy
+    ? selectedMovedOpponentEnergyIsValid
+      ? (movedOpponentEnergyOptions.find(option => option.energyCard.id === selectedMovedOpponentEnergyCardInstanceId) ?? null)
+      : movedOpponentEnergyOptions.length === 1
+        ? (movedOpponentEnergyOptions[0] ?? null)
+        : null
+    : null
+  const movedOpponentEnergyCardInstanceIdForResolve = movedOpponentEnergyChoiceForResolve?.energyCard.id ?? null
+  const movedOpponentEnergyTargetOptions = useMemo(() => {
+    if (!pendingAttackRequiresMovedOpponentEnergy || !opponentPlayer || !movedOpponentEnergyChoiceForResolve) {
+      return []
+    }
+
+    return [opponentPlayer.active, ...opponentPlayer.bench]
+      .filter((card): card is CardSummary => Boolean(card))
+      .filter(card => card.id !== movedOpponentEnergyChoiceForResolve.attachedTo.id)
+  }, [movedOpponentEnergyChoiceForResolve, opponentPlayer, pendingAttackRequiresMovedOpponentEnergy])
+  const selectedMovedOpponentEnergyTargetIsValid = movedOpponentEnergyTargetOptions.some(
+    card => card.id === selectedMovedOpponentEnergyTargetCardInstanceId
+  )
+  const movedOpponentEnergyTargetCardInstanceIdForResolve = movedOpponentEnergyChoiceForResolve
+    ? selectedMovedOpponentEnergyTargetIsValid
+      ? selectedMovedOpponentEnergyTargetCardInstanceId
+      : movedOpponentEnergyTargetOptions.length === 1
+        ? (movedOpponentEnergyTargetOptions[0]?.id ?? null)
+        : null
+    : null
+  const movedOpponentEnergyLegalMoveAvailable = movedOpponentEnergyOptions.length > 0
   const returnedEnergyOptions = useMemo(() => {
     if (!pendingAttackRequiresReturnedEnergy || !activePlayer?.active) {
       return []
@@ -5057,6 +5119,8 @@ function AttackProgressPanel({
 
   useEffect(() => {
     setSelectedDiscardedEnergyCardInstanceIds([])
+    setSelectedMovedOpponentEnergyCardInstanceId('')
+    setSelectedMovedOpponentEnergyTargetCardInstanceId('')
     setSelectedReturnedEnergyCardInstanceId('')
     setSelectedShuffledEnergyCardInstanceIds([])
     setSelectedBenchDamageTargetCardInstanceId('')
@@ -5079,6 +5143,18 @@ function AttackProgressPanel({
       return filteredSelectedIds.length === previousSelectedIds.length ? previousSelectedIds : filteredSelectedIds
     })
   }, [discardedEnergyOptionIds])
+
+  useEffect(() => {
+    if (selectedMovedOpponentEnergyCardInstanceId && !selectedMovedOpponentEnergyIsValid) {
+      setSelectedMovedOpponentEnergyCardInstanceId('')
+    }
+  }, [selectedMovedOpponentEnergyCardInstanceId, selectedMovedOpponentEnergyIsValid])
+
+  useEffect(() => {
+    if (selectedMovedOpponentEnergyTargetCardInstanceId && !selectedMovedOpponentEnergyTargetIsValid) {
+      setSelectedMovedOpponentEnergyTargetCardInstanceId('')
+    }
+  }, [selectedMovedOpponentEnergyTargetCardInstanceId, selectedMovedOpponentEnergyTargetIsValid])
 
   useEffect(() => {
     if (selectedReturnedEnergyCardInstanceId && !selectedReturnedEnergyIsValid) {
@@ -5125,6 +5201,17 @@ function AttackProgressPanel({
   const copiedAttackUnavailable = turn.pendingAttackRequiresCopiedAttack && copiedAttackOptions.length === 0
   const copiedAttackRequiresChoice = turn.pendingAttackRequiresCopiedAttack && copiedAttackOptions.length > 1 && !selectedCopiedAttackChoice
   const switchTargetRequired = pendingAttackRequiresSwitchTarget && switchTargetOptions.length > 1
+  const movedOpponentEnergyRequiresChoice =
+    movedOpponentEnergyLegalMoveAvailable && movedOpponentEnergyOptions.length > 1 && !selectedMovedOpponentEnergyIsValid
+  const movedOpponentEnergyTargetRequired =
+    movedOpponentEnergyLegalMoveAvailable &&
+    Boolean(movedOpponentEnergyChoiceForResolve) &&
+    movedOpponentEnergyTargetOptions.length > 1 &&
+    !selectedMovedOpponentEnergyTargetIsValid
+  const movedOpponentEnergyTargetUnavailable =
+    movedOpponentEnergyLegalMoveAvailable &&
+    Boolean(movedOpponentEnergyChoiceForResolve) &&
+    movedOpponentEnergyTargetOptions.length === 0
   const discardedEnergyMaxSelection =
     resolutionEffectType === DISCARD_OWN_BENCH_ENERGY_FOR_BONUS_DAMAGE_EFFECT
       ? 2
@@ -5191,6 +5278,9 @@ function AttackProgressPanel({
     copiedAttackUnavailable ||
     copiedAttackRequiresChoice ||
     (switchTargetRequired && !selectedSwitchTargetIsValid) ||
+    movedOpponentEnergyRequiresChoice ||
+    movedOpponentEnergyTargetUnavailable ||
+    movedOpponentEnergyTargetRequired ||
     returnedEnergyUnavailable ||
     (returnedEnergyRequiresChoice && !selectedReturnedEnergyIsValid) ||
     shuffledEnergyPartialSelection ||
@@ -5208,9 +5298,15 @@ function AttackProgressPanel({
         ? `Choose a copied attack for ${attackLabel}`
         : switchTargetRequired && !selectedSwitchTargetIsValid
           ? `Choose a switch target for ${attackLabel}`
-          : returnedEnergyUnavailable
-            ? `No Energy available to return for ${attackLabel}`
-            : returnedEnergyRequiresChoice && !selectedReturnedEnergyIsValid
+          : movedOpponentEnergyRequiresChoice
+            ? `Choose an opponent Energy to move for ${attackLabel}`
+            : movedOpponentEnergyTargetUnavailable
+              ? `No destination Pokémon for ${attackLabel}`
+              : movedOpponentEnergyTargetRequired
+                ? `Choose the destination Pokémon for ${attackLabel}`
+            : returnedEnergyUnavailable
+              ? `No Energy available to return for ${attackLabel}`
+              : returnedEnergyRequiresChoice && !selectedReturnedEnergyIsValid
               ? `Choose returned Energy for ${attackLabel}`
               : shuffledEnergyPartialSelection
                 ? `Select exactly ${shuffledEnergyRequiredCount} Energy or none for ${attackLabel}`
@@ -5283,6 +5379,36 @@ function AttackProgressPanel({
           ? `Auto: ${switchTargetOptions[0]?.name ?? 'only Bench target'}`
           : 'No switch target needed'
     })
+  }
+
+  if (pendingAttackRequiresMovedOpponentEnergy) {
+    resolutionChecklistItems.push({
+      label: 'Opponent Energy',
+      tone: movedOpponentEnergyRequiresChoice ? 'waiting' : 'ready',
+      value: !movedOpponentEnergyLegalMoveAvailable
+        ? 'No legal move available'
+        : movedOpponentEnergyChoiceForResolve
+          ? movedOpponentEnergyChoiceForResolve.energyCard.name
+          : `${movedOpponentEnergyOptions.length} Energy choices`
+    })
+
+    if (movedOpponentEnergyChoiceForResolve) {
+      resolutionChecklistItems.push({
+        label: 'Destination Pokémon',
+        tone: movedOpponentEnergyTargetUnavailable
+          ? 'blocked'
+          : movedOpponentEnergyTargetRequired
+            ? 'waiting'
+            : 'ready',
+        value: movedOpponentEnergyTargetUnavailable
+          ? 'No legal destination'
+          : movedOpponentEnergyTargetOptions.length > 1
+            ? movedOpponentEnergyTargetCardInstanceIdForResolve
+              ? cardsById.get(movedOpponentEnergyTargetCardInstanceIdForResolve)?.name ?? 'Destination selected'
+              : `${movedOpponentEnergyTargetOptions.length} destination choices`
+            : `Auto: ${movedOpponentEnergyTargetOptions[0]?.name ?? 'only destination'}`
+      })
+    }
   }
 
   if (pendingAttackRequiresDiscardedEnergy) {
@@ -5645,6 +5771,105 @@ function AttackProgressPanel({
           </div>
         ) : null}
 
+        {pendingAttackRequiresMovedOpponentEnergy ? (
+          <div className="rounded-xl border border-indigo-200 bg-indigo-50/70 p-3">
+            <div className="space-y-1">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-indigo-900">Opponent Energy move</p>
+              <p className="text-xs leading-5 text-indigo-900/80">
+                This attack moves 1 Energy from one of the opponent's Pokémon to another of their Pokémon after damage.
+              </p>
+            </div>
+
+            {!movedOpponentEnergyLegalMoveAvailable ? (
+              <p className="mt-3 rounded-lg border border-indigo-200 bg-stone-50 px-3 py-2 text-xs text-indigo-900">
+                The opponent has no legal Energy move available, so this attack will resolve without moving Energy.
+              </p>
+            ) : movedOpponentEnergyOptions.length > 1 ? (
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                {movedOpponentEnergyOptions.map(({ attachedTo, energyCard }) => {
+                  const selected = energyCard.id === selectedMovedOpponentEnergyCardInstanceId
+
+                  return (
+                    <label
+                      className={`flex cursor-pointer items-start gap-2 rounded-lg border px-3 py-2 text-xs transition ${
+                        selected
+                          ? 'border-indigo-700 bg-indigo-100 text-indigo-950'
+                          : 'border-indigo-200 bg-stone-50 text-stone-700 hover:border-indigo-400'
+                      }`}
+                      key={energyCard.id}
+                    >
+                      <input
+                        checked={selected}
+                        className="mt-0.5"
+                        disabled={!viewerCanAdvanceAttack || commandPending}
+                        name="moved-opponent-energy-card-instance-id"
+                        onChange={() => setSelectedMovedOpponentEnergyCardInstanceId(energyCard.id)}
+                        type="radio"
+                      />
+                      <span className="min-w-0">
+                        <span className="block font-medium">{energyCard.name}</span>
+                        <span className="mt-0.5 block font-mono text-[0.68rem] opacity-70">
+                          attached to {attachedTo.name}
+                        </span>
+                      </span>
+                    </label>
+                  )
+                })}
+              </div>
+            ) : (
+              <p className="mt-3 rounded-lg border border-indigo-200 bg-stone-50 px-3 py-2 text-xs text-indigo-900">
+                Only {movedOpponentEnergyOptions[0]?.energyCard.name ?? 'one Energy'} can move, so resolution will use it automatically.
+              </p>
+            )}
+
+            {movedOpponentEnergyChoiceForResolve ? (
+              <div className="mt-3 rounded-xl border border-indigo-200 bg-stone-50 p-3">
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-indigo-900">Destination Pokémon</p>
+
+                {movedOpponentEnergyTargetOptions.length > 1 ? (
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    {movedOpponentEnergyTargetOptions.map(card => {
+                      const selected = card.id === selectedMovedOpponentEnergyTargetCardInstanceId
+
+                      return (
+                        <label
+                          className={`flex cursor-pointer items-start gap-2 rounded-lg border px-3 py-2 text-xs transition ${
+                            selected
+                              ? 'border-indigo-700 bg-indigo-100 text-indigo-950'
+                              : 'border-indigo-200 bg-stone-50 text-stone-700 hover:border-indigo-400'
+                          }`}
+                          key={card.id}
+                        >
+                          <input
+                            checked={selected}
+                            className="mt-0.5"
+                            disabled={!viewerCanAdvanceAttack || commandPending}
+                            name="moved-opponent-energy-target-card-instance-id"
+                            onChange={() => setSelectedMovedOpponentEnergyTargetCardInstanceId(card.id)}
+                            type="radio"
+                          />
+                          <span className="min-w-0">
+                            <span className="block font-medium">{card.name}</span>
+                            <span className="mt-0.5 block font-mono text-[0.68rem] opacity-70">{card.cardId}</span>
+                          </span>
+                        </label>
+                      )
+                    })}
+                  </div>
+                ) : movedOpponentEnergyTargetOptions.length === 1 ? (
+                  <p className="mt-3 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs text-indigo-900">
+                    Only {movedOpponentEnergyTargetOptions[0]?.name ?? 'one destination'} is legal, so resolution will target it automatically.
+                  </p>
+                ) : (
+                  <p className="mt-3 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs text-indigo-900">
+                    No other opponent Pokémon are available, so resolution will skip the Energy move.
+                  </p>
+                )}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+
         {pendingAttackRequiresDiscardedEnergy ? (
           <div className="rounded-xl border border-orange-200 bg-orange-50/70 p-3">
             <div className="space-y-1">
@@ -5942,6 +6167,8 @@ function AttackProgressPanel({
                 playerId: turn.activePlayerId,
                 switchBenchCardInstanceId: selectedSwitchTargetIsValid ? selectedSwitchBenchCardInstanceId : null,
                 discardedEnergyCardInstanceIds: selectedDiscardedEnergyIdsForResolve,
+                movedOpponentEnergyCardInstanceId: movedOpponentEnergyCardInstanceIdForResolve,
+                movedOpponentEnergyTargetCardInstanceId: movedOpponentEnergyTargetCardInstanceIdForResolve,
                 returnedEnergyCardInstanceId: returnedEnergyIdForResolve,
                 shuffledEnergyCardInstanceIds: selectedShuffledEnergyIdsForResolve,
                 benchDamageTargetCardInstanceId: benchDamageTargetIdForResolve,

@@ -342,6 +342,11 @@ defmodule Prizmo.TcgEngine.AttackDamage do
        }), do: {:ok, damage}
 
   defp apply_effect(damage, _attacker_card, _defender_card, %{
+         type: :move_opponent_attached_energy_between_pokemon
+       }),
+       do: {:ok, damage}
+
+  defp apply_effect(damage, _attacker_card, _defender_card, %{
          type: :discard_defending_energy_on_coin_heads
        }),
        do: {:ok, damage}
