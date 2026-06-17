@@ -241,6 +241,17 @@ defmodule Prizmo.Tcg.Goal1.CardCoverage do
   defp unsupported_ability_count(_card), do: 0
 
   defp supported_special_energy?(%{
+         effect: %{
+           type: :bench_basic_psychic_from_deck_when_attached_to_psychic,
+           max_targets: max_targets
+         },
+         provides: provides
+       })
+       when is_integer(max_targets) and max_targets > 0 and is_list(provides) do
+    :psychic in provides
+  end
+
+  defp supported_special_energy?(%{
          effect: %{type: :draw_cards_on_attach_from_hand, count: count},
          provides: provides
        })

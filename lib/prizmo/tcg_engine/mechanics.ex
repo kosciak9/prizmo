@@ -427,6 +427,7 @@ defmodule Prizmo.TcgEngine.Mechanics do
            :ok <- require_game_status(game, :in_progress),
            :ok <- require_active_player(game, player_id),
            {:ok, turn} <- require_current_turn_status(game.id, :action_window),
+           :ok <- CardPlay.require_no_awaiting_pending_effect(game.id),
            {:ok, player} <- get_player(game.id, player_id),
            :ok <- require_energy_not_attached_this_turn(player),
            {:ok, energy_card} <- get_card(game.id, energy_card_instance_id),
@@ -462,7 +463,7 @@ defmodule Prizmo.TcgEngine.Mechanics do
                )
              ),
            {:ok, effect_event} <-
-             EnergyEffects.after_attach_from_hand(game, player, energy_card, target_card),
+             EnergyEffects.after_attach_from_hand(game, turn, player, energy_card, target_card),
            {:ok, _effect_event} <-
              write_energy_attach_effect_event(game.id, player_id, turn.id, effect_event) do
         get_game(game.id)
@@ -666,6 +667,33 @@ defmodule Prizmo.TcgEngine.Mechanics do
          {:ok, game} <- get_game(game.id),
          {:ok, game} <- maybe_create_queued_knockout_prize_selection(game, pending_effect) do
       stabilize_flow(game)
+    end
+  end
+
+  defp resolve_prompt_choice(
+         %Game{} = game,
+         %Prompt{} = prompt,
+         %PendingEffect{source_type: :energy_effect} = pending_effect,
+         player_id,
+         choice_key,
+         normalized_choice
+       ) do
+    with {:ok, prompt} <- resolve_prompt(prompt, normalized_choice),
+         {:ok, _event} <-
+           write_prompt_resolved_event(game.id, prompt, pending_effect, player_id, choice_key),
+         {:ok, pending_effect} <-
+           update(pending_effect, :resume, %{
+             current_player_id: nil,
+             state: Map.put(pending_effect.state || %{}, "last_choice", normalized_choice)
+           }) do
+      EnergyEffects.resume_pending_effect(
+        game,
+        prompt,
+        pending_effect,
+        player_id,
+        choice_key,
+        normalized_choice
+      )
     end
   end
 

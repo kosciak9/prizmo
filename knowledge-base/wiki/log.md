@@ -1,5 +1,12 @@
 # Wiki Log
 
+## [2026-06-17] codebase update | Goal 1 POR-088 Telepathic Psychic Energy support
+
+- Task attempted: closed the last current live latest-result Alakazam partial by fully supporting `POR-088` Telepathic Psychic Energy on the canonical Ash path. Attaching `POR-088` from hand to one of your Psychic Pokémon now opens a prompt over legal Basic Psychic Pokémon in deck, benches the chosen targets, shuffles the deck with persisted RNG metadata, and completes through the shared prompt-resolution flow instead of stopping at provider-only support.
+- Files changed: `lib/prizmo/tcg_engine/energy_effects.ex`, `lib/prizmo/tcg_engine/mechanics.ex`, `lib/prizmo/tcg/goal_1/card_coverage.ex`, `lib/prizmo/tcg_engine/game_view.ex`, `lib/prizmo_web/spa/features/home/routes/index.tsx`, `knowledge-base/wiki/engine/dragapult-alakazam-full-game-implementation-scope.md`, `knowledge-base/wiki/log.md`.
+- Validation: `mix format`, `mix compile --warnings-as-errors`, `node_modules/.bin/tsc --noEmit`, focused `mix test test/prizmo/tcg_engine/mechanics_test.exs` (15/0), direct `mix run -e` smoke validation for the `POR-088` attach prompt/resolution path, refreshed `mix prizmo.goal1.corpus`, and final `mix check` all passed. The smoke flow confirmed prompt creation, benching of the selected Basic Psychic Pokémon, prompt completion, and a resulting `deck_shuffled` event.
+- Remaining/blocking notes: current latest-result Alakazam cards are now fully supported (`supported=38`, `generic-supported=1`, `partial=0`, `unimplemented=0`). Goal 1 remains open because Dragapult latest-result partials (`JTG-151`, `MEG-088`) still remain, the committed fixture corpus still lags live latest-result deck ids, and full two-seat browser validation is still pending.
+
 ## [2026-06-17] codebase update | Goal 1 Strange Hacking attack surface
 
 - Task attempted: advanced the freshest Goal 1 Alakazam latest-Limitless blocker set by fully supporting `TWM-082` Alakazam. `Strange Hacking` now resolves through the canonical declared-attack path: it Confuses the opponent's Active Pokémon, optionally moves any number of damage counters from one opponent Pokémon to another opponent Pokémon, records structured public event payloads, and carries effect-driven KO/prize/replacement handling through the persisted engine. The SPA attack-resolution panel now exposes the redistribution UI, and the top-level resolve mutation now forwards all attack-resolution payload fields instead of dropping some of them.

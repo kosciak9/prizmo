@@ -11449,6 +11449,13 @@ function promptGuidanceMessages(
     ]
   }
 
+  if (choiceKey === 'bench_basic_psychic_from_deck_when_attached_to_psychic') {
+    return [
+      'Telepathic Psychic Energy lets you choose up to 2 Basic Psychic Pokémon from your deck when it is attached from your hand to one of your Psychic Pokémon. The selected cards go straight to your Bench, then the deck is shuffled.',
+      `This prompt accepts ${promptChoiceInstruction(min, max)} from ${legalChoiceCount} legal Basic Psychic Pokémon choices.`
+    ]
+  }
+
   if (choiceKey === 'switch_own_active_with_bench') {
     return [
       'Switch resolves by choosing exactly 1 of your Benched Pokémon. The engine switches it with your current Active Pokémon without discarding Energy.',
