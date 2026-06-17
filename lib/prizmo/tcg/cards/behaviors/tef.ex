@@ -68,6 +68,21 @@ defmodule Prizmo.Tcg.Cards.Behaviors.TEF do
     card_effect(effect: %{type: :search_deck_for_cards_to_top, count: 2})
   end
 
+  card "TEF-146" do
+    card_effect(effect: %{type: :discard_opponent_item_cards_from_hand, max_count: 2})
+  end
+
+  card "TEF-159" do
+    card_effect(
+      effect: %{
+        type: :retreat_cost_reduction_with_low_hp_free_retreat,
+        energy_type: :colorless,
+        amount: 1,
+        remaining_hp_max: 30
+      }
+    )
+  end
+
   card "TEF-161" do
     card_effect(effect: %{type: :prevent_opponent_attack_effects_to_attached_pokemon})
   end

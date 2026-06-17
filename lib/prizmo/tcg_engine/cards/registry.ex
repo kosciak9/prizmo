@@ -805,6 +805,20 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     ]
   }
 
+  @eri %CardDefinition{
+    id: "TEF-146",
+    kind: :trainer,
+    trainer_type: :supporter,
+    play_window: :action_window,
+    effects: [
+      %Effect{
+        key: :discard_opponent_item_cards_from_hand,
+        type: :discard_opponent_item_cards_from_hand,
+        params: %{min_count: 0, max_count: 2}
+      }
+    ]
+  }
+
   @fan_rotom %CardDefinition{
     id: "SCR-118",
     kind: :trainer,
@@ -874,6 +888,7 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     @munkidori.id => @munkidori,
     @cyrano.id => @cyrano,
     @ciphermaniacs_codebreaking.id => @ciphermaniacs_codebreaking,
+    @eri.id => @eri,
     @fan_rotom.id => @fan_rotom
   }
 

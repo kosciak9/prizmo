@@ -4,6 +4,7 @@ defmodule Prizmo.TcgEngine.AttackCosts do
   alias Prizmo.TcgEngine.CardCatalog
   alias Prizmo.TcgEngine.CardInstance
   alias Prizmo.TcgEngine.CardStore
+  alias Prizmo.TcgEngine.StadiumEffects
 
   def require_attack_cost_paid(game_id, %CardInstance{} = attacker_card, attack)
       when is_binary(game_id) and is_map(attack) do
@@ -40,8 +41,11 @@ defmodule Prizmo.TcgEngine.AttackCosts do
     base_cost = attack_cost(attack)
 
     with {:ok, attached_cards} <- CardStore.attached_cards(game_id, attacker_card.id),
+         {:ok, additional_cost} <- StadiumEffects.additional_attack_cost(game_id, attacker_card),
          {:ok, player} <- CardStore.get_player(game_id, player_id),
          {:ok, opponent} <- CardStore.get_opponent(game_id, player_id) do
+      base_cost = base_cost ++ additional_cost
+
       reduced_cost =
         if has_radiant_tsareena?(attached_cards) and
              player.prizes_remaining > opponent.prizes_remaining do

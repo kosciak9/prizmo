@@ -25,6 +25,7 @@ defmodule Prizmo.TcgEngine.StadiumEffects do
   @area_zero_underdepths_effect :bench_limit_8_with_tera_in_play_else_discard_to_5
   @battle_cage_effect :prevent_damage_counters_to_bench_from_opponent_pokemon_effects
   @jamming_tower_effect :pokemon_tools_have_no_effect
+  @nighttime_mine_effect :tera_attack_cost_increase
 
   def supported_stadium?(%{
         supertype: :trainer,
@@ -78,6 +79,13 @@ defmodule Prizmo.TcgEngine.StadiumEffects do
         trainer_type: :stadium,
         effect: %{type: @jamming_tower_effect}
       }), do: true
+
+  def supported_stadium?(%{
+        supertype: :trainer,
+        trainer_type: :stadium,
+        effect: %{type: @nighttime_mine_effect}
+      }),
+      do: true
 
   def supported_stadium?(_card), do: false
 
@@ -295,6 +303,23 @@ defmodule Prizmo.TcgEngine.StadiumEffects do
     end
   end
 
+  def additional_attack_cost(game_id, %CardInstance{} = attacker_card) when is_binary(game_id) do
+    case active_nighttime_mine_stadium(game_id) do
+      {:ok, %CardInstance{}} ->
+        if CardCatalog.tera_pokemon?(attacker_card.card_id) do
+          {:ok, [:colorless]}
+        else
+          {:ok, []}
+        end
+
+      {:ok, nil} ->
+        {:ok, []}
+
+      {:error, _reason} ->
+        {:ok, []}
+    end
+  end
+
   defp active_special_condition_immunity_stadium(game_id) do
     with {:ok, stadiums} <- CardStore.cards_in_zone(game_id, :stadium) do
       stadium = Enum.find(stadiums, &special_condition_immunity_stadium?/1)
@@ -311,6 +336,12 @@ defmodule Prizmo.TcgEngine.StadiumEffects do
   defp active_jamming_tower_stadium(game_id) do
     with {:ok, stadiums} <- CardStore.cards_in_zone(game_id, :stadium) do
       {:ok, Enum.find(stadiums, &jamming_tower_stadium?/1)}
+    end
+  end
+
+  defp active_nighttime_mine_stadium(game_id) do
+    with {:ok, stadiums} <- CardStore.cards_in_zone(game_id, :stadium) do
+      {:ok, Enum.find(stadiums, &nighttime_mine_stadium?/1)}
     end
   end
 
@@ -420,6 +451,24 @@ defmodule Prizmo.TcgEngine.StadiumEffects do
          supertype: :trainer,
          trainer_type: :stadium,
          effect: %{type: @jamming_tower_effect}
+       }} ->
+        true
+
+      {:ok, _card} ->
+        false
+
+      {:error, _reason} ->
+        false
+    end
+  end
+
+  defp nighttime_mine_stadium?(%CardInstance{card_id: card_id}) do
+    case CardCatalog.fetch(card_id) do
+      {:ok,
+       %{
+         supertype: :trainer,
+         trainer_type: :stadium,
+         effect: %{type: @nighttime_mine_effect}
        }} ->
         true
 

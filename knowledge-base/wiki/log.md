@@ -1,5 +1,12 @@
 # Wiki Log
 
+## [2026-06-17] codebase update | Goal 1 Alakazam trainer support slice
+
+- Task attempted: advanced the freshest Goal 1 Alakazam latest-Limitless blocker set by closing the passive/support Trainer slice first. `ASC-197` Nighttime Mine is now an engine-defined Stadium that adds `{C}` to attacks used by each Tera Pokémon in play, `TEF-159` Rescue Board is now an engine-defined Tool that grants normal `-1` Retreat Cost or full free retreat at 30 remaining HP or less, and `TEF-146` Eri now resolves through the canonical `play_card` path with an acting-player prompt over the opponent's revealed Item cards.
+- Files changed: `lib/prizmo/tcg/cards/behaviors/asc.ex`, `lib/prizmo/tcg/cards/behaviors/tef.ex`, `lib/prizmo/tcg_engine/attack_costs.ex`, `lib/prizmo/tcg_engine/card_play.ex`, `lib/prizmo/tcg_engine/cards/registry.ex`, `lib/prizmo/tcg_engine/effect_runner.ex`, `lib/prizmo/tcg_engine/game_view.ex`, `lib/prizmo/tcg_engine/retreat_costs.ex`, `lib/prizmo/tcg_engine/stadium_effects.ex`, `lib/prizmo/tcg_engine/tool_effects.ex`, `lib/prizmo_web/spa/features/home/routes/index.tsx`, `knowledge-base/wiki/engine/dragapult-alakazam-full-game-implementation-scope.md`, `knowledge-base/wiki/log.md`.
+- Validation: `mix format`, `mix compile --warnings-as-errors`, `node_modules/.bin/tsc --noEmit`, focused `mix test test/prizmo/tcg_engine/mechanics_test.exs` (15/0), direct Elixir probe of `CardCoverage` / `supported_*` helpers plus Rescue Board low-HP retreat math, refreshed `mix prizmo.goal1.corpus`, and final `mix check` all passed.
+- Remaining/blocking notes: this shrank the live Alakazam latest-result blocker set from `partial=4, unimplemented=5` to `partial=2, unimplemented=4`. Remaining current live gaps are `MEG-130` Switch (metadata missing), `PFL-094` Wondrous Patch, `TWM-082` Alakazam, `TWM-141` Bloodmoon Ursaluna ex, `BLK-040` Elgyem, and the broader `POR-088` Telepathic Psychic Energy special-energy attach trigger partial.
+
 ## [2026-06-17] codebase update | Goal 1 live latest-Limitless corpus reconciliation report
 
 - Task attempted: extended the earlier Goal 1 deck-id audit into a live card-corpus reconciliation path. The repo can now fetch each latest-result Dragapult and Alakazam decklist from Limitless, diff the resulting unique card corpus against the committed Goal 1 fixture modules, and classify each live card as `supported`, `generic-supported`, `partial`, or `unimplemented` from the current engine/catalog state via `mix prizmo.goal1.corpus`.

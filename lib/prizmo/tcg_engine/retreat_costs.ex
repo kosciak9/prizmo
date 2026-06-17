@@ -29,7 +29,7 @@ defmodule Prizmo.TcgEngine.RetreatCosts do
   def effective_retreat_cost_details(%CardInstance{} = active_card, attached_cards)
       when is_list(attached_cards) do
     with {:ok, printed_cost} <- CardMetadataRequirements.retreat_cost(active_card.card_id) do
-      reductions = ToolEffects.retreat_cost_reductions(attached_cards)
+      reductions = ToolEffects.retreat_cost_reductions(active_card, attached_cards)
       reduction = reductions |> Enum.map(& &1.amount) |> Enum.sum() |> min(printed_cost)
 
       {:ok,
@@ -45,7 +45,7 @@ defmodule Prizmo.TcgEngine.RetreatCosts do
   def effective_retreat_cost_details(game_id, %CardInstance{} = active_card, attached_cards)
       when is_binary(game_id) and is_list(attached_cards) do
     with {:ok, printed_cost} <- CardMetadataRequirements.retreat_cost(active_card.card_id) do
-      reductions = ToolEffects.retreat_cost_reductions(game_id, attached_cards)
+      reductions = ToolEffects.retreat_cost_reductions(game_id, active_card, attached_cards)
       reduction = reductions |> Enum.map(& &1.amount) |> Enum.sum() |> min(printed_cost)
 
       {:ok,

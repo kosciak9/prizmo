@@ -900,6 +900,30 @@ defmodule Prizmo.TcgEngine.CardPlay do
          turn,
          player,
          card,
+         %{type: :discard_opponent_item_cards_from_hand} = effect,
+         target_ids
+       ) do
+    with {:ok, opponent} <- CardStore.get_opponent(game.id, player.player_id),
+         {:ok, target_cards} <- validate_eri_effect(game.id, player.player_id, effect, target_ids),
+         {:ok, _discarded} <-
+           CardStore.discard_cards_from_hand(game.id, opponent.player_id, target_cards),
+         {:ok, _event} <-
+           maybe_write_cards_moved_event(
+             game.id,
+             opponent.player_id,
+             target_cards,
+             card,
+             effect
+           ) do
+      complete_play_card_resolution(game, turn, player, card, effect)
+    end
+  end
+
+  defp complete_play_card_effect(
+         game,
+         turn,
+         player,
+         card,
          %{type: :opponent_discards_to_hand_size} = effect,
          target_ids
        ) do
@@ -1484,6 +1508,14 @@ defmodule Prizmo.TcgEngine.CardPlay do
     end
   end
 
+  defp validate_eri_effect(game_id, player_id, effect, target_ids) do
+    with {:ok, target_ids} <- EffectRunner.validate_choice_selection(effect, target_ids),
+         {:ok, target_cards} <- CardStore.get_cards(game_id, target_ids),
+         :ok <- require_all_eri_targets(game_id, player_id, target_cards) do
+      {:ok, target_cards}
+    end
+  end
+
   defp validate_rosa_effect(game_id, player_id, effect, target_ids) do
     with :ok <- require_more_prizes_than_opponent(game_id, player_id, effect),
          {:ok, target_ids} <-
@@ -1577,6 +1609,18 @@ defmodule Prizmo.TcgEngine.CardPlay do
        ) do
     cards
     |> xerosics_opponent_hand_choice_cards(player_id, choice_step)
+    |> Enum.map(& &1.id)
+    |> then(&{:ok, &1})
+  end
+
+  defp effect_choice_ids(
+         cards,
+         player_id,
+         %{type: :discard_opponent_item_cards_from_hand},
+         _current_turn
+       ) do
+    cards
+    |> eri_opponent_item_choice_cards(player_id)
     |> Enum.map(& &1.id)
     |> then(&{:ok, &1})
   end
@@ -1991,6 +2035,12 @@ defmodule Prizmo.TcgEngine.CardPlay do
     end
   end
 
+  defp eri_opponent_item_choice_cards(cards, player_id) do
+    cards
+    |> Enum.filter(&eri_item_hand_card?(&1, player_id))
+    |> Enum.sort_by(&{&1.position, &1.instance_id})
+  end
+
   defp rosa_choice_cards(cards, player_id) do
     energy_cards = rosa_discard_energy_choice_cards(cards, player_id)
     target_cards = rosa_stage_2_choice_cards(cards, player_id)
@@ -2397,6 +2447,11 @@ defmodule Prizmo.TcgEngine.CardPlay do
   defp rosa_stage_2_target_card?(%CardInstance{} = card, player_id) do
     card.owner_player_id == player_id and card.zone in [:active, :bench] and
       require_stage_2_pokemon(card.card_id) == :ok
+  end
+
+  defp eri_item_hand_card?(%CardInstance{} = card, player_id) do
+    card.owner_player_id != player_id and card.zone == :hand and
+      match?({:ok, _metadata}, require_trainer_type(card.card_id, [:item]))
   end
 
   defp crispin_has_different_energy_types?(energy_cards) do
@@ -2955,6 +3010,30 @@ defmodule Prizmo.TcgEngine.CardPlay do
          payload,
          game_id,
          _player_id,
+         :discard_opponent_item_cards_from_hand,
+         legal_choice_ids
+       ) do
+    case CardStore.list_cards(game_id) do
+      {:ok, cards} ->
+        cards_by_id = Map.new(cards, &{&1.id, &1})
+
+        labels =
+          legal_choice_ids
+          |> Enum.map(&Map.get(cards_by_id, &1))
+          |> Enum.reject(&is_nil/1)
+          |> Enum.map(&eri_choice_label/1)
+
+        Map.put(payload, :legal_choice_labels, labels)
+
+      {:error, _reason} ->
+        payload
+    end
+  end
+
+  defp maybe_put_prompt_choice_labels(
+         payload,
+         game_id,
+         _player_id,
          :attach_basic_energy_from_discard_to_stage2_if_more_prizes,
          legal_choice_ids
        ) do
@@ -3155,6 +3234,14 @@ defmodule Prizmo.TcgEngine.CardPlay do
     }
   end
 
+  defp eri_choice_label(%CardInstance{} = card) do
+    %{
+      id: card.id,
+      label: card_name(card, card.card_id),
+      detail: "Item card in your opponent's revealed hand. Choose up to 2 Item cards to discard."
+    }
+  end
+
   defp rosa_choice_label(%CardInstance{zone: :discard} = card) do
     %{
       id: card.id,
@@ -3342,6 +3429,31 @@ defmodule Prizmo.TcgEngine.CardPlay do
 
   defp maybe_draw_after_opponent_hand_bottomed(%Game{}, %GamePlayer{}, [], _effect) do
     {:ok, []}
+  end
+
+  defp maybe_write_cards_moved_event(_game_id, _player_id, [], _card, _effect), do: {:ok, nil}
+
+  defp maybe_write_cards_moved_event(game_id, player_id, cards, card, effect) do
+    write_event_and_snapshot(game_id, :cards_moved, player_id, %{
+      reason: :effect_resolution,
+      source: EventPayloads.card_source(card),
+      effect_key: effect.key,
+      affected_player_id: player_id,
+      cards: EventPayloads.moved_cards(cards, :hand, :discard)
+    })
+  end
+
+  defp require_all_eri_targets(game_id, player_id, target_cards) do
+    with {:ok, opponent_player} <- CardStore.get_opponent(game_id, player_id),
+         :ok <- require_all_owned_in_zone(target_cards, opponent_player.player_id, :hand) do
+      require_all_item_cards(target_cards)
+    end
+  end
+
+  defp require_all_item_cards(target_cards) do
+    target_cards
+    |> Enum.map(&require_trainer_type(&1.card_id, [:item]))
+    |> collect_ok_results()
   end
 
   defp shuffle_deck_for_effect(%Game{} = game, turn, %GamePlayer{} = player, card, effect) do

@@ -10815,6 +10815,8 @@ function promptSubmitLabel(choiceKey: string, selectedCount: number, max: number
       return `Discard selected Energy ${selectedCount}/${max}`
     case 'opponent_discards_to_hand_size':
       return `Resolve Xerosic's Machinations ${selectedCount}/${max}`
+    case 'discard_opponent_item_cards_from_hand':
+      return `Resolve Eri ${selectedCount}/${max}`
     case 'attach_basic_energy_from_discard_to_stage2_if_more_prizes':
       return `Resolve Rosa's Encouragement ${selectedCount}/${max}`
     case 'switch_team_rocket_bench_and_opponent_bench_to_active':
@@ -10942,6 +10944,13 @@ function promptGuidanceMessages(
     return [
       "Xerosic's Machinations makes the affected opponent choose which cards to discard from their own hand until they have 3 cards left.",
       `This prompt accepts ${promptChoiceInstruction(min, max)} from ${legalChoiceCount} legal hand-card choices.`
+    ]
+  }
+
+  if (choiceKey === 'discard_opponent_item_cards_from_hand') {
+    return [
+      "Eri reveals your opponent's hand and lets you discard up to 2 Item cards from it.",
+      `This prompt accepts ${promptChoiceInstruction(min, max)} from ${legalChoiceCount} legal opponent Item-card choices.`
     ]
   }
 

@@ -3,6 +3,7 @@ defmodule Prizmo.TcgEngine.ToolEffects do
 
   alias Prizmo.TcgEngine.CardCatalog
   alias Prizmo.TcgEngine.CardInstance
+  alias Prizmo.TcgEngine.CardMetadataRequirements
   alias Prizmo.TcgEngine.CardStore
   alias Prizmo.TcgEngine.StadiumEffects
 
@@ -13,6 +14,7 @@ defmodule Prizmo.TcgEngine.ToolEffects do
 
   @supported_tool_effect_types [
     :retreat_cost_reduction,
+    :retreat_cost_reduction_with_low_hp_free_retreat,
     :bonus_attack_damage_to_pokemon_ex_if_attacker_has_no_rule_box,
     :move_energy_from_attacker_to_defender_bench_on_damage,
     :bench_limit_8_with_tera_in_play_else_discard_to_5,
@@ -182,10 +184,11 @@ defmodule Prizmo.TcgEngine.ToolEffects do
     end
   end
 
-  def retreat_cost_reductions(attached_cards) when is_list(attached_cards) do
+  def retreat_cost_reductions(%CardInstance{} = attached_to_card, attached_cards)
+      when is_list(attached_cards) do
     Enum.flat_map(attached_cards, fn
       %CardInstance{} = card ->
-        case retreat_cost_reduction(card.card_id) do
+        case retreat_cost_reduction(attached_to_card, card) do
           amount when amount > 0 ->
             [
               %{
@@ -204,16 +207,17 @@ defmodule Prizmo.TcgEngine.ToolEffects do
     end)
   end
 
-  def retreat_cost_reductions(game_id, attached_cards)
+  def retreat_cost_reductions(game_id, %CardInstance{} = attached_to_card, attached_cards)
       when is_binary(game_id) and is_list(attached_cards) do
     if StadiumEffects.tools_have_no_effect?(game_id) do
       []
     else
-      retreat_cost_reductions(attached_cards)
+      retreat_cost_reductions(attached_to_card, attached_cards)
     end
   end
 
-  def retreat_cost_reduction(card_id) when is_binary(card_id) do
+  def retreat_cost_reduction(%CardInstance{} = attached_to_card, %CardInstance{card_id: card_id})
+      when is_binary(card_id) do
     case CardCatalog.fetch(card_id) do
       {:ok,
        %{
@@ -224,11 +228,47 @@ defmodule Prizmo.TcgEngine.ToolEffects do
       when is_integer(amount) and amount > 0 ->
         amount
 
+      {:ok,
+       %{
+         supertype: :trainer,
+         trainer_type: :tool,
+         effect: %{
+           type: :retreat_cost_reduction_with_low_hp_free_retreat,
+           amount: amount,
+           remaining_hp_max: remaining_hp_max
+         }
+       }}
+      when is_integer(amount) and amount > 0 and is_integer(remaining_hp_max) and
+             remaining_hp_max >= 0 ->
+        if remaining_hp_at_most?(attached_to_card, remaining_hp_max) do
+          printed_retreat_cost(attached_to_card)
+        else
+          amount
+        end
+
       {:ok, _card} ->
         0
 
       {:error, _reason} ->
         0
+    end
+  end
+
+  defp remaining_hp_at_most?(%CardInstance{card_id: card_id, damage: damage}, max_remaining_hp)
+       when is_integer(max_remaining_hp) do
+    case CardCatalog.fetch(card_id) do
+      {:ok, %{supertype: :pokemon, hp: hp}} when is_integer(hp) ->
+        max(hp - (damage || 0), 0) <= max_remaining_hp
+
+      _other ->
+        false
+    end
+  end
+
+  defp printed_retreat_cost(%CardInstance{card_id: card_id}) do
+    case CardMetadataRequirements.retreat_cost(card_id) do
+      {:ok, retreat_cost} when is_integer(retreat_cost) and retreat_cost > 0 -> retreat_cost
+      _other -> 0
     end
   end
 end

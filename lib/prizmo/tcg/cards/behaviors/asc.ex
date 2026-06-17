@@ -29,4 +29,8 @@ defmodule Prizmo.Tcg.Cards.Behaviors.ASC do
       }
     )
   end
+
+  card "ASC-197" do
+    card_effect(effect: %{type: :tera_attack_cost_increase, amount: 1})
+  end
 end
