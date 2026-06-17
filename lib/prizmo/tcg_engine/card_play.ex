@@ -1882,31 +1882,8 @@ defmodule Prizmo.TcgEngine.CardPlay do
         |> Enum.map(& &1.id)
         |> then(&{:ok, &1})
 
-      type
-      when type in [
-             :search_deck,
-             :search_top_deck,
-             :search_basic_energy_split_hand_attach,
-             :flip_coin_then_discard_opponent_attached_energy,
-             :opponent_discards_to_hand_size,
-             :attach_basic_energy_from_discard_to_stage2_if_more_prizes,
-             :attach_basic_psychic_energy_from_discard_to_benched_psychic_pokemon,
-             :heal_mega_evolution_pokemon_ex_then_return_attached_energy_to_hand,
-             :switch_own_active_with_bench,
-             :switch_team_rocket_bench_and_opponent_bench_to_active,
-             :switch_opponent_bench_to_active,
-             :damage_any_opponent_pokemon,
-             :discard_opponent_special_energy,
-             :move_basic_energy_between_own_pokemon,
-             :recover_discard_to_hand,
-             :recover_discard_to_deck,
-             :rare_candy_evolve,
-             :kieran_switch_or_damage_bonus
-           ] ->
-        effect_choice_ids(cards, player_id, choice_step, current_turn)
-
       _other ->
-        {:error, {:unsupported_choice_step, choice_step.key, choice_step.type}}
+        effect_choice_ids(cards, player_id, choice_step, current_turn)
     end
   end
 
@@ -3679,7 +3656,12 @@ defmodule Prizmo.TcgEngine.CardPlay do
 
   defp require_all_item_cards(target_cards) do
     target_cards
-    |> Enum.map(&require_trainer_type(&1.card_id, [:item]))
+    |> Enum.map(fn card ->
+      case require_trainer_type(card.card_id, [:item]) do
+        {:ok, _metadata} -> :ok
+        {:error, reason} -> {:error, reason}
+      end
+    end)
     |> collect_ok_results()
   end
 

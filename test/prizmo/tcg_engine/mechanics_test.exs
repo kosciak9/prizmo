@@ -7,7 +7,9 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
   alias Prizmo.Tcg.Decks.DragapultDusknoir28236
   alias Prizmo.Tcg.Decks.DragapultPlain28256
   alias Prizmo.Tcg.Decks.RocketMewtwo27459
+  alias Prizmo.Tcg.Goal1.Decks.Alakazam28340
   alias Prizmo.Tcg.Goal1.Decks.Dragapult28255
+  alias Prizmo.Tcg.Goal1.Decks.Dragapult28268
   alias Prizmo.Tcg.Goal1.Decks.DragapultBlaziken28258
   alias Prizmo.TcgEngine.AttackDamage
   alias Prizmo.TcgEngine.AttackEffects
@@ -438,6 +440,50 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
       assert length(effect_cards_moved.payload["cards"]) == opponent_hand_before - 3
       assert Enum.all?(effect_cards_moved.payload["cards"], &(&1["from_zone"] == "hand"))
       assert Enum.all?(effect_cards_moved.payload["cards"], &(&1["to_zone"] == "discard"))
+    end
+
+    test "TEF-146 Eri appears in play_card affordances and resolves discard_opponent_item_cards_from_hand prompt" do
+      {:ok, game} = create_flow_action_window_game_with_decks(Dragapult28268, Alakazam28340)
+
+      eri = move_owned_card_to_hand(game.id, "player_2", "TEF-146", 1)
+      item_1 = move_owned_card_to_hand(game.id, "player_1", "TEF-144", 1)
+      item_2 = move_owned_card_to_hand(game.id, "player_1", "POR-081", 2)
+      item_3 = move_owned_card_to_hand(game.id, "player_1", "TWM-165", 3)
+
+      assert {:ok, game} = Mechanics.pass_turn(game, "player_1")
+
+      assert {:ok, view} = GameView.for_player(game.id, "player_2")
+      play_card = Enum.find(view.action_affordances, &(&1.key == "play_card"))
+      assert is_map(play_card)
+      assert eri.id in play_card.source_card_instance_ids
+
+      assert {:ok, game} = Mechanics.play_card(game, "player_2", eri.id, %{})
+
+      [prompt] = prompts(game.id)
+      assert prompt.player_id == "player_2"
+      assert prompt.payload["choice_key"] == "discard_opponent_item_cards_from_hand"
+
+      assert Enum.sort(prompt.payload["legal_choices"]) ==
+               Enum.sort([item_1.id, item_2.id, item_3.id])
+
+      assert {:ok, game} =
+               Mechanics.choose_prompt(game, "player_2", prompt.id, [item_1.id, item_2.id])
+
+      assert zone(item_1.id) == :discard
+      assert zone(item_2.id) == :discard
+      assert zone(item_3.id) == :hand
+
+      effect_cards_moved =
+        game.id
+        |> game_events_by_type("cards_moved")
+        |> Enum.find(&(&1.payload["effect_key"] == "discard_opponent_item_cards_from_hand"))
+
+      assert effect_cards_moved.payload["affected_player_id"] == "player_1"
+
+      assert Enum.map(effect_cards_moved.payload["cards"], & &1["card_id"]) == [
+               item_1.card_id,
+               item_2.card_id
+             ]
     end
 
     test "POR-084 Rosa's Encouragement resolves attach_basic_energy_from_discard_to_stage2_if_more_prizes effect" do
