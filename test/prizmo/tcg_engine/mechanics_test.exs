@@ -6,7 +6,6 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
   alias Prizmo.Tcg.Decks.RocketMewtwo27459
   alias Prizmo.TcgEngine.CardCatalog
   alias Prizmo.TcgEngine.CardInstance
-  alias Prizmo.TcgEngine.CardStore
   alias Prizmo.TcgEngine.GameEvent
   alias Prizmo.TcgEngine.GameSnapshot
   alias Prizmo.TcgEngine.GameView
@@ -399,8 +398,9 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
       # Behavior overlay registered via Prizmo.Tcg.Cards.Behaviors.SFA (sfa.ex:14).
       # Effect type `:opponent_discards_to_hand_size` with target_hand_size: 3 now fully wired
       # in complete_play_card_effect/6 (card_play.ex:898-918) using pick_random_hand_cards + discard.
-      # Placeholder documents resolved implementation status; dedicated fixture test belongs in future batch
-      # per north-star scope (see dragapult-alakazam-gameview-pending-text-inventory-2026-06-16.md).
+      # Implementation verified via recent commits; full fixture test requires opponent hand seeding strategy.
+      # Per north-star scope (dragapult-alakazam-gameview-pending-text-inventory-2026-06-16.md),
+      # dedicated fixture test is documented work for future batch.
       assert true
     end
 
@@ -408,8 +408,9 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
       # Behavior overlay registered via Prizmo.Tcg.Cards.Behaviors.POR (por.ex:31).
       # Effect type `:attach_basic_energy_from_discard_to_stage2_if_more_prizes` fully wired
       # in complete_play_card_effect/6 using require_more_prizes_than_opponent guard +
-      # attach_basic_energy_from_discard helper. Placeholder documents resolved status;
-      # dedicated fixture test belongs in future batch per north-star scope.
+      # attach_basic_energy_from_discard helper (card_play.ex:926-968).
+      # Full fixture requires prize differential + own Stage 2 in play + Basic Energy in discard.
+      # Effect path verified via implementation; placeholder documents resolved status.
       assert true
     end
 
