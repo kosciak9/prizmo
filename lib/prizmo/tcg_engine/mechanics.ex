@@ -727,6 +727,33 @@ defmodule Prizmo.TcgEngine.Mechanics do
   defp resolve_prompt_choice(
          %Game{} = game,
          %Prompt{} = prompt,
+         %PendingEffect{source_type: :ability_effect} = pending_effect,
+         player_id,
+         choice_key,
+         normalized_choice
+       ) do
+    with {:ok, prompt} <- resolve_prompt(prompt, normalized_choice),
+         {:ok, _event} <-
+           write_prompt_resolved_event(game.id, prompt, pending_effect, player_id, choice_key),
+         {:ok, pending_effect} <-
+           update(pending_effect, :resume, %{
+             current_player_id: nil,
+             state: Map.put(pending_effect.state || %{}, "last_choice", normalized_choice)
+           }) do
+      AbilityEffects.resume_pending_effect(
+        game,
+        prompt,
+        pending_effect,
+        player_id,
+        choice_key,
+        normalized_choice
+      )
+    end
+  end
+
+  defp resolve_prompt_choice(
+         %Game{} = game,
+         %Prompt{} = prompt,
          %PendingEffect{} = pending_effect,
          player_id,
          choice_key,
@@ -1286,12 +1313,6 @@ defmodule Prizmo.TcgEngine.Mechanics do
     end)
   end
 
-  @spec use_fan_call(Game.t() | String.t(), String.t(), String.t()) ::
-          {:ok, Game.t()} | {:error, term()}
-  def use_fan_call(_game_or_id, _player_id, _source_card_instance_id) do
-    {:error, :fan_call_requires_search_deck_prompt_integration}
-  end
-
   @spec use_drakloak_recon_directive(Game.t() | String.t(), String.t(), String.t(), String.t()) ::
           {:ok, Game.t()} | {:error, term()}
   def use_drakloak_recon_directive(
@@ -1358,6 +1379,125 @@ defmodule Prizmo.TcgEngine.Mechanics do
         get_game(game.id)
       end
     end)
+  end
+
+  @spec use_fan_rotom_fan_call(Game.t() | String.t(), String.t(), String.t()) ::
+          {:ok, Game.t()} | {:error, term()}
+  def use_fan_rotom_fan_call(game_or_id, player_id, source_card_instance_id)
+      when is_binary(player_id) and is_binary(source_card_instance_id) do
+    transaction(fn ->
+      with {:ok, game} <- get_game(game_or_id),
+           {:ok, turn} <- require_action_window_for_player(game, player_id),
+           :ok <- CardPlay.require_no_awaiting_pending_effect(game.id),
+           {:ok, _player} <- get_player(game.id, player_id),
+           {:ok, source_card} <- get_card(game.id, source_card_instance_id),
+           :ok <- require_card_owned_by_player(source_card, player_id),
+           :ok <- AbilityEffects.require_fan_call_available(source_card, turn),
+           {:ok, deck_cards} <- cards_in_zone(game.id, player_id, :deck),
+           legal_choice_cards = fan_call_legal_choice_cards(deck_cards),
+           legal_choice_ids = Enum.map(legal_choice_cards, & &1.id),
+           {:ok, current_source_card} <- get_card(game.id, source_card.id),
+           {:ok, marked_source_card} <-
+             update(current_source_card, :set_markers, %{
+               markers: AbilityEffects.put_fan_call_used_marker(current_source_card, turn)
+             }),
+           {:ok, pending_effect} <-
+             create(PendingEffect, :create, %{
+               game_id: game.id,
+               source_type: :ability_effect,
+               source_card_instance_id: marked_source_card.id,
+               source_card_id: marked_source_card.card_id,
+               controller_player_id: player_id,
+               current_player_id: player_id,
+               effect_key: AbilityEffects.fan_call_ability_id(),
+               step: "awaiting_choice",
+               state: %{
+                 "version" => 1,
+                 "kind" => "ability_effect",
+                 "effect_type" => Atom.to_string(AbilityEffects.fan_call_ability_id()),
+                 "player_id" => player_id,
+                 "source_card_instance_id" => marked_source_card.id,
+                 "source_card_id" => marked_source_card.card_id,
+                 "legal_choice_ids" => legal_choice_ids
+               }
+             }),
+           {:ok, pending_effect} <-
+             update(pending_effect, :await_prompt, %{
+               current_player_id: player_id,
+               effect_key: AbilityEffects.fan_call_ability_id(),
+               step: "awaiting_choice",
+               state: pending_effect.state || %{}
+             }),
+           {:ok, _prompt} <-
+             create(Prompt, :create, %{
+               game_id: game.id,
+               turn_id: turn.id,
+               pending_effect_id: pending_effect.id,
+               prompt_type: "select_cards",
+               player_id: player_id,
+               payload: %{
+                 "choice_key" => Atom.to_string(AbilityEffects.fan_call_ability_id()),
+                 "legal_choices" => legal_choice_ids,
+                 "legal_choice_labels" => fan_call_choice_labels(legal_choice_cards),
+                 "min" => 0,
+                 "max" => 3,
+                 "source_card_instance_id" => marked_source_card.id,
+                 "source_card_id" => marked_source_card.card_id
+               }
+             }),
+           {:ok, _event} <-
+             write_event_and_snapshot(
+               game.id,
+               :ability_used,
+               player_id,
+               fan_call_event_payload(turn, marked_source_card)
+             ) do
+        get_game(game.id)
+      end
+    end)
+  end
+
+  defp fan_call_legal_choice_cards(deck_cards) do
+    deck_cards
+    |> Enum.filter(fn card ->
+      case CardCatalog.fetch(card.card_id) do
+        {:ok, %{supertype: :pokemon, types: types}} when is_list(types) ->
+          :colorless in types
+
+        {:ok, %{supertype: :pokemon, type: :colorless}} ->
+          true
+
+        _ ->
+          false
+      end
+    end)
+    |> Enum.filter(fn card ->
+      case pokemon_hp(card.card_id) do
+        {:ok, hp} -> hp <= 100
+        _ -> false
+      end
+    end)
+  end
+
+  defp fan_call_choice_labels(cards) do
+    Enum.map(cards, fn card ->
+      case CardCatalog.fetch(card.card_id) do
+        {:ok, %{name: name}} -> name
+        _ -> card.card_id
+      end
+    end)
+  end
+
+  defp fan_call_event_payload(%Turn{} = turn, %CardInstance{} = source_card) do
+    %{
+      "turn_id" => turn.id,
+      "turn_number" => turn.turn_number,
+      "player_id" => source_card.owner_player_id,
+      "ability_id" => Atom.to_string(AbilityEffects.fan_call_ability_id()),
+      "source_card_id" => source_card.id,
+      "source_card_card_id" => source_card.card_id,
+      "message" => "Fan Rotom used Fan Call."
+    }
   end
 
   @spec attach_tool(Game.t() | String.t(), String.t(), String.t(), String.t()) ::

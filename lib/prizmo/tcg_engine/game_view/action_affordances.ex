@@ -139,6 +139,7 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
       recon_directive_affordances(player, current_turn, cards) ++
       run_away_draw_affordances(player, current_turn, cards) ++
       cursed_blast_affordances(game, player, current_turn, cards, all_cards) ++
+      fan_call_affordances(player, current_turn, cards) ++
       adrena_brain_affordances(player, current_turn, cards, all_cards) ++
       evolve_from_hand_affordances(player, current_turn, cards, all_cards) ++
       declare_attack_affordances(player, current_turn, cards, all_cards) ++
@@ -542,6 +543,23 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
   end
 
   defp cursed_blast_affordances(_game, _player, _current_turn, _cards, _all_cards), do: []
+
+  defp fan_call_affordances(%GamePlayer{} = player, %Turn{} = current_turn, cards) do
+    for source_card <- in_play_pokemon_cards(cards),
+        AbilityEffects.fan_call_available?(source_card, current_turn) do
+      affordance(
+        :fan_call,
+        "Use Fan Call",
+        :command,
+        player.player_id,
+        source_card_instance_ids: [source_card.id],
+        note:
+          "Search your deck for up to 3 Colorless Pokémon with 100 HP or less and put them into your hand. Then, shuffle your deck."
+      )
+    end
+  end
+
+  defp fan_call_affordances(_player, _current_turn, _cards), do: []
 
   defp declare_attack_affordances(
          %GamePlayer{} = player,

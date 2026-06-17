@@ -1,10 +1,23 @@
 defmodule Prizmo.TcgEngine.AbilityEffects do
   @moduledoc false
 
+  import Prizmo.TcgEngine.CardMetadataRequirements, only: [pokemon_hp: 1]
+  import Prizmo.TcgEngine.EventLog, only: [write_event_and_snapshot: 4]
+  import Prizmo.TcgEngine.Operation, only: [update: 3]
+
+  import Prizmo.TcgEngine.Requirements,
+    only: [require_all_owned_in_zone: 3, require_unique_ids: 1]
+
   alias Prizmo.TcgEngine.CardCatalog
   alias Prizmo.TcgEngine.CardInstance
   alias Prizmo.TcgEngine.CardStore
+  alias Prizmo.TcgEngine.EventPayloads
+  alias Prizmo.TcgEngine.Game
   alias Prizmo.TcgEngine.GameEvent
+  alias Prizmo.TcgEngine.GameStore
+  alias Prizmo.TcgEngine.PendingEffect
+  alias Prizmo.TcgEngine.Prompt
+  alias Prizmo.TcgEngine.Rng
   alias Prizmo.TcgEngine.Turn
   alias Prizmo.TcgEngine.TurnStore
 
@@ -66,9 +79,6 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
   def fan_call_card_id, do: @fan_call_card_id
   def fan_call_ability_id, do: @fan_call_ability_id
 
-  def fan_call_source?(%CardInstance{card_id: @fan_call_card_id}), do: true
-  def fan_call_source?(%CardInstance{}), do: false
-
   def adrena_brain_source?(%CardInstance{card_id: @adrena_brain_card_id}), do: true
   def adrena_brain_source?(%CardInstance{}), do: false
 
@@ -104,6 +114,9 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
       {:error, _reason} -> false
     end
   end
+
+  def fan_call_source?(%CardInstance{card_id: @fan_call_card_id}), do: true
+  def fan_call_source?(%CardInstance{}), do: false
 
   def require_self_knock_out_ability_not_blocked(game_id) when is_binary(game_id) do
     if damp_active?(game_id) do
@@ -233,6 +246,10 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
          :ok <- require_self_knock_out_ability_not_blocked(game_id) do
       require_ability_unused(source, turn, @cursed_blast_ability_id)
     end
+  end
+
+  def fan_call_available?(%CardInstance{} = source, %Turn{} = turn) do
+    require_fan_call_available(source, turn) == :ok
   end
 
   def require_fan_call_available(%CardInstance{} = source, %Turn{} = turn) do
@@ -370,6 +387,54 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
 
   def put_cursed_blast_used_marker(%CardInstance{} = source, %Turn{} = turn) do
     put_ability_used_marker(source, turn, @cursed_blast_ability_id)
+  end
+
+  def put_fan_call_used_marker(%CardInstance{} = source, %Turn{} = turn) do
+    put_ability_used_marker(source, turn, @fan_call_ability_id)
+  end
+
+  def resume_pending_effect(
+        %Game{} = game,
+        %Prompt{} = prompt,
+        %PendingEffect{source_type: :ability_effect, effect_key: @fan_call_ability_id} =
+          pending_effect,
+        player_id,
+        _choice_key,
+        selected_card_instance_ids
+      )
+      when is_binary(player_id) and is_list(selected_card_instance_ids) do
+    with :ok <- require_max_target_count(selected_card_instance_ids, 3),
+         :ok <- require_unique_ids(selected_card_instance_ids),
+         :ok <- require_prompt_legal_choices(prompt, selected_card_instance_ids),
+         {:ok, target_cards} <- CardStore.get_cards(game.id, selected_card_instance_ids),
+         :ok <- require_all_owned_in_zone(target_cards, player_id, :deck),
+         :ok <- require_all_fan_call_targets(target_cards),
+         {:ok, moved_cards} <- move_fan_call_targets_to_hand(game.id, player_id, target_cards),
+         {:ok, _event} <-
+           write_event_and_snapshot(game.id, :cards_moved, player_id, %{
+             reason: :ability_effect_resolution,
+             source: pending_effect_source_payload(pending_effect),
+             effect_key: pending_effect.effect_key,
+             cards: EventPayloads.moved_cards(moved_cards, :deck, :hand)
+           }),
+         {:ok, _shuffled_deck} <- shuffle_deck_after_fan_call(game, player_id),
+         {:ok, _event} <-
+           write_event_and_snapshot(game.id, :deck_shuffled, player_id, %{
+             source: pending_effect_source_payload(pending_effect),
+             effect_key: pending_effect.effect_key
+           }),
+         {:ok, _pending_effect} <-
+           update(pending_effect, :complete, %{
+             current_player_id: nil,
+             state:
+               Map.put(
+                 pending_effect.state || %{},
+                 "selected_card_instance_ids",
+                 selected_card_instance_ids
+               )
+           }) do
+      GameStore.get_game(game.id)
+    end
   end
 
   def adrena_brain_used_this_turn?(%CardInstance{markers: markers}, %Turn{} = turn) do
@@ -813,4 +878,98 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
 
   defp normalize_markers(markers) when is_map(markers), do: markers
   defp normalize_markers(_markers), do: %{}
+
+  defp require_max_target_count(target_ids, max) when is_list(target_ids) do
+    if length(target_ids) <= max do
+      :ok
+    else
+      {:error, {:too_many_targets, length(target_ids), max}}
+    end
+  end
+
+  defp require_prompt_legal_choices(%Prompt{payload: payload}, selected_card_instance_ids) do
+    legal_choices = Map.get(payload, "legal_choices", [])
+
+    if Enum.all?(selected_card_instance_ids, &(&1 in legal_choices)) do
+      :ok
+    else
+      {:error, :invalid_prompt_choice}
+    end
+  end
+
+  defp require_all_fan_call_targets(cards) when is_list(cards) do
+    results = Enum.map(cards, &require_fan_call_target/1)
+
+    if Enum.all?(results, &(&1 == :ok)) do
+      :ok
+    else
+      first_error = Enum.find(results, &match?({:error, _}, &1))
+      first_error || :ok
+    end
+  end
+
+  defp require_fan_call_target(%CardInstance{} = card) do
+    with {:ok, metadata} <- CardCatalog.fetch(card.card_id),
+         true <- metadata.supertype == :pokemon || {:error, {:not_pokemon, card.card_id}},
+         true <- colorless_pokemon?(metadata) || {:error, {:not_colorless, card.card_id}},
+         {:ok, hp} <- pokemon_hp(card.card_id),
+         true <- hp <= 100 || {:error, {:hp_too_high, card.card_id, hp, 100}} do
+      :ok
+    end
+  end
+
+  defp colorless_pokemon?(%{supertype: :pokemon, types: types}) when is_list(types) do
+    :colorless in types
+  end
+
+  defp colorless_pokemon?(%{supertype: :pokemon, type: :colorless}), do: true
+  defp colorless_pokemon?(_), do: false
+
+  defp move_fan_call_targets_to_hand(_game_id, _player_id, []), do: {:ok, []}
+
+  defp move_fan_call_targets_to_hand(game_id, player_id, target_cards) do
+    target_cards
+    |> Enum.reduce_while({:ok, []}, fn card, {:ok, acc} ->
+      case CardStore.move_deck_card_to_hand(game_id, player_id, card) do
+        {:ok, moved_card} -> {:cont, {:ok, [moved_card | acc]}}
+        {:error, reason} -> {:halt, {:error, reason}}
+      end
+    end)
+    |> case do
+      {:ok, moved_cards} -> {:ok, Enum.reverse(moved_cards)}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp shuffle_deck_after_fan_call(%Game{} = game, player_id) do
+    context = {:ability_deck_shuffle, player_id, :fan_call}
+
+    with {:ok, cards} <- CardStore.cards_in_zone(game.id, player_id, :deck) do
+      cards
+      |> Rng.shuffle(game.rng_seed, context)
+      |> reorder_deck_cards()
+    end
+  end
+
+  defp reorder_deck_cards(cards) do
+    cards
+    |> Enum.with_index(1)
+    |> Enum.reduce_while({:ok, []}, fn {card, position}, {:ok, acc} ->
+      case update(card, :reorder_deck, %{position: position}) do
+        {:ok, updated_card} -> {:cont, {:ok, [updated_card | acc]}}
+        {:error, reason} -> {:halt, {:error, reason}}
+      end
+    end)
+    |> case do
+      {:ok, reordered} -> {:ok, Enum.reverse(reordered)}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp pending_effect_source_payload(%PendingEffect{} = pending_effect) do
+    %{
+      card_id: pending_effect.source_card_id,
+      card_instance_id: pending_effect.source_card_instance_id
+    }
+  end
 end

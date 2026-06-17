@@ -833,6 +833,129 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
     end
   end
 
+  describe "SCR-118 Fan Call Ability" do
+    alias Prizmo.Tcg.Goal1.Decks.Alakazam28438
+
+    test "Fan Call creates a select_cards prompt with Colorless Pokémon ≤100 HP from deck on first turn" do
+      {:ok, game} =
+        create_flow_action_window_game_with_decks(Alakazam28438, Dragapult27431,
+          player_1_active_card_id: "SCR-118"
+        )
+
+      fan_rotom = active_card(game.id, "player_1")
+      assert fan_rotom.card_id == "SCR-118"
+
+      dudunsparce_in_hand =
+        CardInstance
+        |> Ash.Query.filter(
+          game_id == ^game.id and owner_player_id == "player_1" and card_id == "JTG-120" and
+            zone == :hand
+        )
+        |> Ash.read!()
+
+      for card <- dudunsparce_in_hand do
+        {:ok, _} = ash_update(card, :shuffle_into_deck, %{})
+      end
+
+      assert {:ok, game} =
+               Mechanics.use_fan_rotom_fan_call(game, "player_1", fan_rotom.id)
+
+      prompt =
+        Prompt
+        |> Ash.Query.filter(game_id == ^game.id and player_id == "player_1")
+        |> Ash.read!()
+        |> List.first()
+
+      assert prompt
+      assert prompt.prompt_type == "select_cards"
+      assert prompt.payload["min"] == 0
+      assert prompt.payload["max"] == 3
+      assert prompt.payload["choice_key"] == "fan_call"
+
+      legal_choices = prompt.payload["legal_choices"]
+      assert length(legal_choices) > 0
+
+      for choice_id <- legal_choices do
+        choice_card =
+          CardInstance
+          |> Ash.Query.filter(id == ^choice_id)
+          |> Ash.read_one!()
+
+        assert choice_card.owner_player_id == "player_1"
+        assert choice_card.zone == :deck
+        assert choice_card.card_id == "JTG-120"
+      end
+
+      deck_before = cards_in_zone(game.id, "player_1", :deck)
+      hand_before = cards_in_zone(game.id, "player_1", :hand)
+
+      selected = Enum.take(legal_choices, 1)
+
+      assert {:ok, game} =
+               Mechanics.choose_prompt(game, "player_1", prompt.id, selected)
+
+      for card_id <- selected do
+        assert zone(card_id) == :hand
+      end
+
+      deck_after = cards_in_zone(game.id, "player_1", :deck)
+      hand_after = cards_in_zone(game.id, "player_1", :hand)
+
+      assert length(hand_after) == length(hand_before) + length(selected)
+      assert length(deck_after) == length(deck_before) - length(selected)
+
+      assert game_events_by_type(game.id, "ability_used") != []
+      assert game_events_by_type(game.id, "cards_moved") != []
+      assert game_events_by_type(game.id, "deck_shuffled") != []
+
+      pending_effects =
+        PendingEffect
+        |> Ash.Query.filter(game_id == ^game.id)
+        |> Ash.read!()
+
+      assert Enum.all?(pending_effects, &(&1.status == :completed))
+    end
+
+    test "Fan Call is unavailable after being used once" do
+      {:ok, game} =
+        create_flow_action_window_game_with_decks(Alakazam28438, Dragapult27431,
+          player_1_active_card_id: "SCR-118"
+        )
+
+      fan_rotom = active_card(game.id, "player_1")
+
+      dudunsparce_in_hand =
+        CardInstance
+        |> Ash.Query.filter(
+          game_id == ^game.id and owner_player_id == "player_1" and card_id == "JTG-120" and
+            zone == :hand
+        )
+        |> Ash.read!()
+
+      for card <- dudunsparce_in_hand do
+        {:ok, _} = ash_update(card, :shuffle_into_deck, %{})
+      end
+
+      assert {:ok, game} =
+               Mechanics.use_fan_rotom_fan_call(game, "player_1", fan_rotom.id)
+
+      prompt =
+        Prompt
+        |> Ash.Query.filter(game_id == ^game.id and player_id == "player_1")
+        |> Ash.read!()
+        |> List.first()
+
+      legal_choices = prompt.payload["legal_choices"]
+      selected = Enum.take(legal_choices, 1)
+
+      assert {:ok, game} =
+               Mechanics.choose_prompt(game, "player_1", prompt.id, selected)
+
+      assert {:error, {:ability_already_used_this_turn, _, :fan_call}} =
+               Mechanics.use_fan_rotom_fan_call(game, "player_1", fan_rotom.id)
+    end
+  end
+
   defp create_game do
     Mechanics.create_game([
       {"player_1", Alakazam27147},
@@ -840,11 +963,14 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
     ])
   end
 
-  defp create_game_with_decks(player_1_deck, player_2_deck) do
-    Mechanics.create_game([
-      {"player_1", player_1_deck},
-      {"player_2", player_2_deck}
-    ])
+  defp create_game_with_decks(player_1_deck, player_2_deck, opts) do
+    Mechanics.create_game(
+      [
+        {"player_1", player_1_deck},
+        {"player_2", player_2_deck}
+      ],
+      opts
+    )
   end
 
   defp create_seeded_game(seed) do
@@ -873,7 +999,10 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
   end
 
   defp create_flow_action_window_game_with_decks(player_1_deck, player_2_deck, opts \\ []) do
-    with {:ok, game} <- create_game_with_decks(player_1_deck, player_2_deck),
+    with {:ok, game} <-
+           create_game_with_decks(player_1_deck, player_2_deck,
+             rng_seed: Keyword.get(opts, :rng_seed, "test-seed")
+           ),
          {:ok, game} <- Mechanics.call_coin_toss(game, "player_1", :heads),
          {:ok, game} <-
            Mechanics.choose_starting_player(game, game.coin_toss_winner_player_id, "player_1"),
