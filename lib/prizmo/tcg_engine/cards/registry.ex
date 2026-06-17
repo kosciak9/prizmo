@@ -223,6 +223,20 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     ]
   }
 
+  @switch %CardDefinition{
+    id: "MEG-130",
+    kind: :trainer,
+    trainer_type: :item,
+    play_window: :action_window,
+    effects: [
+      %Effect{
+        key: :switch_own_active_with_bench,
+        type: :switch_own_active_with_bench,
+        params: %{count: 1}
+      }
+    ]
+  }
+
   @night_stretcher %CardDefinition{
     id: "ASC-196",
     kind: :trainer,
@@ -819,6 +833,20 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     ]
   }
 
+  @wondrous_patch %CardDefinition{
+    id: "PFL-094",
+    kind: :trainer,
+    trainer_type: :item,
+    play_window: :action_window,
+    effects: [
+      %Effect{
+        key: :attach_basic_psychic_energy_from_discard_to_benched_psychic_pokemon,
+        type: :attach_basic_psychic_energy_from_discard_to_benched_psychic_pokemon,
+        params: %{count: 2}
+      }
+    ]
+  }
+
   @fan_rotom %CardDefinition{
     id: "SCR-118",
     kind: :trainer,
@@ -850,6 +878,7 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     @dawn.id => @dawn,
     @enhanced_hammer.id => @enhanced_hammer,
     @energy_switch.id => @energy_switch,
+    @switch.id => @switch,
     @hilda.id => @hilda,
     @judge.id => @judge,
     @lanas_aid.id => @lanas_aid,
@@ -889,6 +918,7 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     @cyrano.id => @cyrano,
     @ciphermaniacs_codebreaking.id => @ciphermaniacs_codebreaking,
     @eri.id => @eri,
+    @wondrous_patch.id => @wondrous_patch,
     @fan_rotom.id => @fan_rotom
   }
 

@@ -50,6 +50,10 @@ defmodule Prizmo.Tcg.Cards.Behaviors.MEG do
     card_effect(effect: %{type: :damage_on_bench_for_basic_non_darkness})
   end
 
+  card "MEG-130" do
+    card_effect(effect: %{type: :switch_own_active_with_bench})
+  end
+
   card "MEG-132" do
     card_effect(
       effect: %{type: :heal_mega_evolution_pokemon_ex_then_return_attached_energy_to_hand}

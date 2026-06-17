@@ -10819,6 +10819,10 @@ function promptSubmitLabel(choiceKey: string, selectedCount: number, max: number
       return `Resolve Eri ${selectedCount}/${max}`
     case 'attach_basic_energy_from_discard_to_stage2_if_more_prizes':
       return `Resolve Rosa's Encouragement ${selectedCount}/${max}`
+    case 'attach_basic_psychic_energy_from_discard_to_benched_psychic_pokemon':
+      return `Resolve Wondrous Patch ${selectedCount}/${max}`
+    case 'switch_own_active_with_bench':
+      return `Switch to selected Bench Pokémon ${selectedCount}/${max}`
     case 'switch_team_rocket_bench_and_opponent_bench_to_active':
       return `Resolve Team Rocket's Giovanni ${selectedCount}/${max}`
     case 'switch_opponent_bench_to_active':
@@ -10958,6 +10962,20 @@ function promptGuidanceMessages(
     return [
       "Rosa's Encouragement requires exactly 1 of your Stage 2 Pokémon in play plus 1 or 2 Basic Energy cards from your discard pile. All selected Energy cards attach to the chosen Stage 2 target.",
       `This prompt accepts ${promptChoiceInstruction(min, max)} from ${legalChoiceCount} legal discard-Energy and Stage 2 choices.`
+    ]
+  }
+
+  if (choiceKey === 'attach_basic_psychic_energy_from_discard_to_benched_psychic_pokemon') {
+    return [
+      'Wondrous Patch requires exactly 1 Basic Psychic Energy from your discard pile and 1 of your Benched Psychic Pokémon. The selected Energy attaches to the selected Bench target.',
+      `This prompt accepts ${promptChoiceInstruction(min, max)} from ${legalChoiceCount} legal discard-Energy and Benched Psychic choices.`
+    ]
+  }
+
+  if (choiceKey === 'switch_own_active_with_bench') {
+    return [
+      'Switch resolves by choosing exactly 1 of your Benched Pokémon. The engine switches it with your current Active Pokémon without discarding Energy.',
+      `This prompt accepts ${promptChoiceInstruction(min, max)} from ${legalChoiceCount} legal Bench choices.`
     ]
   }
 

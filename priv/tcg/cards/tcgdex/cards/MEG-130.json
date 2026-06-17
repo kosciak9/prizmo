@@ -1,0 +1,58 @@
+{
+  "prizmo_id": "MEG-130",
+  "source": {
+    "base_url": "https://api.tcgdex.net/v2/en",
+    "dynamic_fields_removed": [
+      "pricing"
+    ],
+    "language": "en",
+    "provider": "TCGdex"
+  },
+  "tcgdex": {
+    "category": "Trainer",
+    "effect": "Switch your Active Pokémon with 1 of your Benched Pokémon.",
+    "id": "me01-130",
+    "illustrator": "Studio Bora Inc.",
+    "image": "https://assets.tcgdex.net/en/me/me01/130",
+    "legal": {
+      "expanded": true,
+      "standard": true
+    },
+    "localId": "130",
+    "name": "Switch",
+    "rarity": "Common",
+    "regulationMark": "I",
+    "set": {
+      "cardCount": {
+        "official": 132,
+        "total": 188
+      },
+      "id": "me01",
+      "logo": "https://assets.tcgdex.net/en/me/me01/logo",
+      "name": "Mega Evolution",
+      "symbol": "https://assets.tcgdex.net/univ/me/me01/symbol"
+    },
+    "trainerType": "Item",
+    "updated": "2026-04-21T19:02:59Z",
+    "variants": {
+      "firstEdition": false,
+      "holo": false,
+      "normal": true,
+      "reverse": true,
+      "wPromo": false
+    },
+    "variants_detailed": [
+      {
+        "size": "standard",
+        "type": "normal",
+        "variantId": "endfynwn4n10gzq"
+      },
+      {
+        "size": "standard",
+        "type": "reverse",
+        "variantId": "cm4kqul3x1bwlz1f"
+      }
+    ]
+  },
+  "tcgdex_id": "me01-130"
+}

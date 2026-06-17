@@ -42,17 +42,15 @@ defmodule Prizmo.TcgEngine.AttackCosts do
 
     with {:ok, attached_cards} <- CardStore.attached_cards(game_id, attacker_card.id),
          {:ok, additional_cost} <- StadiumEffects.additional_attack_cost(game_id, attacker_card),
-         {:ok, player} <- CardStore.get_player(game_id, player_id),
-         {:ok, opponent} <- CardStore.get_opponent(game_id, player_id) do
+         {:ok, opponent} <- CardStore.get_opponent(game_id, player_id),
+         {:ok, player_prize_count} <- prize_count(game_id, player_id),
+         {:ok, opponent_prize_count} <- prize_count(game_id, opponent.player_id) do
       base_cost = base_cost ++ additional_cost
 
       reduced_cost =
-        if has_radiant_tsareena?(attached_cards) and
-             player.prizes_remaining > opponent.prizes_remaining do
-          remove_one_colorless(base_cost)
-        else
-          base_cost
-        end
+        base_cost
+        |> maybe_apply_radiant_tsareena(attached_cards, player_prize_count, opponent_prize_count)
+        |> maybe_apply_seasoned_skill(attacker_card, attack, player_prize_count)
 
       {:ok, reduced_cost}
     else
@@ -60,8 +58,64 @@ defmodule Prizmo.TcgEngine.AttackCosts do
     end
   end
 
+  defp maybe_apply_radiant_tsareena(
+         cost,
+         attached_cards,
+         player_prize_count,
+         opponent_prize_count
+       )
+       when is_integer(player_prize_count) and is_integer(opponent_prize_count) do
+    if has_radiant_tsareena?(attached_cards) and player_prize_count > opponent_prize_count do
+      remove_colorless(cost, 1)
+    else
+      cost
+    end
+  end
+
+  defp maybe_apply_seasoned_skill(
+         cost,
+         %CardInstance{} = attacker_card,
+         attack,
+         player_prize_count
+       )
+       when is_integer(player_prize_count) do
+    remove_colorless(
+      cost,
+      seasoned_skill_reduction_count(attacker_card, attack, player_prize_count)
+    )
+  end
+
+  defp seasoned_skill_reduction_count(
+         %CardInstance{card_id: card_id},
+         %{id: :blood_moon},
+         player_prize_count
+       )
+       when is_integer(player_prize_count) and player_prize_count >= 0 do
+    with {:ok, %{abilities: abilities}} <- CardCatalog.fetch(card_id),
+         %{effect: %{type: :reduce_attack_cost_by_colorless_per_opponent_prize_taken}} <-
+           Map.get(abilities, :seasoned_skill) do
+      max(6 - player_prize_count, 0)
+    else
+      _other -> 0
+    end
+  end
+
+  defp seasoned_skill_reduction_count(_attacker_card, _attack, _player), do: 0
+
   defp has_radiant_tsareena?(attached_cards) do
     Enum.any?(attached_cards, &(&1.card_id == "SSP-169"))
+  end
+
+  defp remove_colorless(cost, count) when is_integer(count) and count > 0 do
+    Enum.reduce(1..count, cost, fn _, reduced_cost -> remove_one_colorless(reduced_cost) end)
+  end
+
+  defp remove_colorless(cost, _count), do: cost
+
+  defp prize_count(game_id, player_id) do
+    with {:ok, prizes} <- CardStore.cards_in_zone(game_id, player_id, :prize) do
+      {:ok, length(prizes)}
+    end
   end
 
   defp remove_one_colorless(cost) do

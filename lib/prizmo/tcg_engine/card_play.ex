@@ -400,6 +400,36 @@ defmodule Prizmo.TcgEngine.CardPlay do
          turn,
          player,
          card,
+         %{type: :switch_own_active_with_bench} = effect,
+         target_ids
+       ) do
+    with {:ok, [bench_card]} <-
+           validate_own_bench_switch_effect(game.id, player.player_id, effect, target_ids),
+         {:ok, active_card} <- own_active_card(game.id, player.player_id),
+         bench_position = bench_card.position,
+         {:ok, moved_active_card} <-
+           update(active_card, :move_active_to_bench, %{position: bench_position, status: nil}),
+         {:ok, moved_bench_card} <-
+           update(bench_card, :promote_to_active, %{position: 1, status: nil}),
+         {:ok, _event} <-
+           write_event_and_snapshot(game.id, :cards_moved, player.player_id, %{
+             reason: :effect_resolution,
+             source: EventPayloads.card_source(card),
+             effect_key: effect.key,
+             cards: [
+               switched_card_payload(moved_active_card, :active, :bench),
+               switched_card_payload(moved_bench_card, :bench, :active)
+             ]
+           }) do
+      complete_play_card_resolution(game, turn, player, card, effect)
+    end
+  end
+
+  defp complete_play_card_effect(
+         game,
+         turn,
+         player,
+         card,
          %{type: :opponent_hand_to_bottom_then_draw_if_any} = effect,
          _target_ids
        ) do
@@ -425,6 +455,29 @@ defmodule Prizmo.TcgEngine.CardPlay do
              effect_key: effect.key,
              affected_player_id: opponent_player.player_id,
              cards: EventPayloads.moved_cards(drawn_cards, :deck, :hand)
+           }) do
+      complete_play_card_resolution(game, turn, player, card, effect)
+    end
+  end
+
+  defp complete_play_card_effect(
+         game,
+         turn,
+         player,
+         card,
+         %{type: :attach_basic_psychic_energy_from_discard_to_benched_psychic_pokemon} = effect,
+         target_ids
+       ) do
+    with {:ok, {energy_card, target_card}} <-
+           validate_wondrous_patch_effect(game.id, player.player_id, effect, target_ids),
+         :ok <- attach_basic_energy_from_discard(game.id, [energy_card], [target_card]),
+         {:ok, _event} <-
+           write_event_and_snapshot(game.id, :cards_moved, player.player_id, %{
+             reason: :effect_resolution,
+             source: EventPayloads.card_source(card),
+             effect_key: effect.key,
+             affected_player_id: player.player_id,
+             cards: wondrous_patch_attached_energy_payloads(energy_card, target_card)
            }) do
       complete_play_card_resolution(game, turn, player, card, effect)
     end
@@ -1422,6 +1475,14 @@ defmodule Prizmo.TcgEngine.CardPlay do
     end
   end
 
+  defp validate_own_bench_switch_effect(game_id, player_id, effect, target_ids) do
+    with {:ok, target_ids} <- EffectRunner.validate_choice_selection(effect, target_ids),
+         {:ok, target_cards} <- CardStore.get_cards(game_id, target_ids),
+         :ok <- require_all_owned_in_zone(target_cards, player_id, :bench) do
+      {:ok, target_cards}
+    end
+  end
+
   defp validate_opponent_in_play_damage_target(game_id, player_id, target_ids) do
     with {:ok, target_ids} <-
            EffectRunner.validate_choice_selection(%{min_count: 1, max_count: 1}, target_ids),
@@ -1524,6 +1585,18 @@ defmodule Prizmo.TcgEngine.CardPlay do
          {:ok, {_energy_cards, _target_card}} <-
            selected_rosa_cards(target_cards, player_id, effect) do
       {:ok, target_cards}
+    end
+  end
+
+  defp validate_wondrous_patch_effect(game_id, player_id, effect, target_ids) do
+    with {:ok, target_ids} <-
+           EffectRunner.validate_choice_selection(
+             effect,
+             target_ids,
+             :wrong_wondrous_patch_choice_count
+           ),
+         {:ok, target_cards} <- CardStore.get_cards(game_id, target_ids) do
+      selected_wondrous_patch_cards(target_cards, player_id)
     end
   end
 
@@ -1640,11 +1713,30 @@ defmodule Prizmo.TcgEngine.CardPlay do
   defp effect_choice_ids(
          cards,
          player_id,
+         %{type: :attach_basic_psychic_energy_from_discard_to_benched_psychic_pokemon},
+         _current_turn
+       ) do
+    cards
+    |> wondrous_patch_choice_cards(player_id)
+    |> Enum.map(& &1.id)
+    |> then(&{:ok, &1})
+  end
+
+  defp effect_choice_ids(
+         cards,
+         player_id,
          %{type: :heal_mega_evolution_pokemon_ex_then_return_attached_energy_to_hand},
          _current_turn
        ) do
     cards
     |> wallys_compassion_choice_cards(player_id)
+    |> Enum.map(& &1.id)
+    |> then(&{:ok, &1})
+  end
+
+  defp effect_choice_ids(cards, player_id, %{type: :switch_own_active_with_bench}, _current_turn) do
+    cards
+    |> own_bench_choice_cards(player_id)
     |> Enum.map(& &1.id)
     |> then(&{:ok, &1})
   end
@@ -1798,7 +1890,9 @@ defmodule Prizmo.TcgEngine.CardPlay do
              :flip_coin_then_discard_opponent_attached_energy,
              :opponent_discards_to_hand_size,
              :attach_basic_energy_from_discard_to_stage2_if_more_prizes,
+             :attach_basic_psychic_energy_from_discard_to_benched_psychic_pokemon,
              :heal_mega_evolution_pokemon_ex_then_return_attached_energy_to_hand,
+             :switch_own_active_with_bench,
              :switch_team_rocket_bench_and_opponent_bench_to_active,
              :switch_opponent_bench_to_active,
              :damage_any_opponent_pokemon,
@@ -2062,6 +2156,29 @@ defmodule Prizmo.TcgEngine.CardPlay do
     cards
     |> Enum.filter(&rosa_stage_2_target_card?(&1, player_id))
     |> Enum.sort_by(&{in_play_zone_sort(&1.zone), &1.position, &1.instance_id})
+  end
+
+  defp wondrous_patch_choice_cards(cards, player_id) do
+    energy_cards = wondrous_patch_discard_energy_choice_cards(cards, player_id)
+    target_cards = wondrous_patch_benched_psychic_choice_cards(cards, player_id)
+
+    if energy_cards == [] or target_cards == [] do
+      []
+    else
+      energy_cards ++ target_cards
+    end
+  end
+
+  defp wondrous_patch_discard_energy_choice_cards(cards, player_id) do
+    cards
+    |> Enum.filter(&wondrous_patch_basic_psychic_energy_card?(&1, player_id))
+    |> Enum.sort_by(&{&1.position, &1.instance_id})
+  end
+
+  defp wondrous_patch_benched_psychic_choice_cards(cards, player_id) do
+    cards
+    |> Enum.filter(&wondrous_patch_benched_psychic_target_card?(&1, player_id))
+    |> Enum.sort_by(&{&1.position, &1.instance_id})
   end
 
   defp crispin_basic_energy_choice_cards(cards, player_id) do
@@ -2449,6 +2566,17 @@ defmodule Prizmo.TcgEngine.CardPlay do
       require_stage_2_pokemon(card.card_id) == :ok
   end
 
+  defp wondrous_patch_basic_psychic_energy_card?(%CardInstance{} = card, player_id) do
+    card.owner_player_id == player_id and card.zone == :discard and
+      require_search_filter(card, %{kind: :energy, energy_type: :basic, provides: :psychic}) ==
+        :ok
+  end
+
+  defp wondrous_patch_benched_psychic_target_card?(%CardInstance{} = card, player_id) do
+    card.owner_player_id == player_id and card.zone == :bench and
+      require_search_filter(card, %{kind: :pokemon, type: :psychic}) == :ok
+  end
+
   defp eri_item_hand_card?(%CardInstance{} = card, player_id) do
     card.owner_player_id != player_id and card.zone == :hand and
       match?({:ok, _metadata}, require_trainer_type(card.card_id, [:item]))
@@ -2555,6 +2683,25 @@ defmodule Prizmo.TcgEngine.CardPlay do
       end
     else
       {:error, :invalid_rosa_choices}
+    end
+  end
+
+  defp selected_wondrous_patch_cards(cards, player_id) do
+    energy_cards = Enum.filter(cards, &wondrous_patch_basic_psychic_energy_card?(&1, player_id))
+    target_cards = Enum.filter(cards, &wondrous_patch_benched_psychic_target_card?(&1, player_id))
+
+    case {energy_cards, target_cards} do
+      {[energy_card], [target_card]} ->
+        {:ok, {energy_card, target_card}}
+
+      {[], _target_cards} ->
+        {:error, :wondrous_patch_requires_basic_psychic_energy_in_discard}
+
+      {_energy_cards, []} ->
+        {:error, :wondrous_patch_requires_benched_psychic_target}
+
+      {energy_cards, target_cards} ->
+        {:error, {:wrong_wondrous_patch_target_mix, length(energy_cards), length(target_cards)}}
     end
   end
 
@@ -2873,6 +3020,14 @@ defmodule Prizmo.TcgEngine.CardPlay do
     end)
   end
 
+  defp wondrous_patch_attached_energy_payloads(energy_card, target_card) do
+    [
+      moved_card_payload(energy_card, :discard, :attached,
+        to_attached_to_card_instance_id: target_card.id
+      )
+    ]
+  end
+
   defp rare_candy_evolution_payloads(
          evolved_card,
          evolved_under_card,
@@ -3058,6 +3213,30 @@ defmodule Prizmo.TcgEngine.CardPlay do
          payload,
          game_id,
          _player_id,
+         :attach_basic_psychic_energy_from_discard_to_benched_psychic_pokemon,
+         legal_choice_ids
+       ) do
+    case CardStore.list_cards(game_id) do
+      {:ok, cards} ->
+        cards_by_id = Map.new(cards, &{&1.id, &1})
+
+        labels =
+          legal_choice_ids
+          |> Enum.map(&Map.get(cards_by_id, &1))
+          |> Enum.reject(&is_nil/1)
+          |> Enum.map(&wondrous_patch_choice_label/1)
+
+        Map.put(payload, :legal_choice_labels, labels)
+
+      {:error, _reason} ->
+        payload
+    end
+  end
+
+  defp maybe_put_prompt_choice_labels(
+         payload,
+         game_id,
+         _player_id,
          :heal_mega_evolution_pokemon_ex_then_return_attached_energy_to_hand,
          legal_choice_ids
        ) do
@@ -3070,6 +3249,30 @@ defmodule Prizmo.TcgEngine.CardPlay do
           |> Enum.map(&Map.get(cards_by_id, &1))
           |> Enum.reject(&is_nil/1)
           |> Enum.map(&wallys_compassion_choice_label/1)
+
+        Map.put(payload, :legal_choice_labels, labels)
+
+      {:error, _reason} ->
+        payload
+    end
+  end
+
+  defp maybe_put_prompt_choice_labels(
+         payload,
+         game_id,
+         _player_id,
+         :switch_own_active_with_bench,
+         legal_choice_ids
+       ) do
+    case CardStore.list_cards(game_id) do
+      {:ok, cards} ->
+        cards_by_id = Map.new(cards, &{&1.id, &1})
+
+        labels =
+          legal_choice_ids
+          |> Enum.map(&Map.get(cards_by_id, &1))
+          |> Enum.reject(&is_nil/1)
+          |> Enum.map(&switch_choice_label/1)
 
         Map.put(payload, :legal_choice_labels, labels)
 
@@ -3259,6 +3462,22 @@ defmodule Prizmo.TcgEngine.CardPlay do
     }
   end
 
+  defp wondrous_patch_choice_label(%CardInstance{zone: :discard} = card) do
+    %{
+      id: card.id,
+      label: card_name(card, card.card_id),
+      detail: "Basic Psychic Energy in your discard pile to attach with Wondrous Patch."
+    }
+  end
+
+  defp wondrous_patch_choice_label(%CardInstance{} = card) do
+    %{
+      id: card.id,
+      label: card_name(card, card.card_id),
+      detail: "Your Benched Psychic Pokémon to receive the selected Basic Psychic Energy."
+    }
+  end
+
   defp wallys_compassion_choice_label(%CardInstance{} = card) do
     %{
       id: card.id,
@@ -3286,6 +3505,14 @@ defmodule Prizmo.TcgEngine.CardPlay do
       id: card.id,
       label: card_name(card, card.card_id),
       detail: "Target Pokémon in #{Atom.to_string(card.zone)}"
+    }
+  end
+
+  defp switch_choice_label(%CardInstance{} = card) do
+    %{
+      id: card.id,
+      label: card_name(card, card.card_id),
+      detail: "Your Benched Pokémon to switch into the Active Spot."
     }
   end
 

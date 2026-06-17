@@ -127,6 +127,14 @@ defmodule Prizmo.Tcg.Cards.Behaviors.TWM do
     )
   end
 
+  card "TWM-141" do
+    ability(:seasoned_skill,
+      effect: %{type: :reduce_attack_cost_by_colorless_per_opponent_prize_taken}
+    )
+
+    attack(:blood_moon, damage: 240, effect: %{type: :attacker_cannot_attack_next_turn})
+  end
+
   card "TWM-143" do
     card_effect(
       effect: %{

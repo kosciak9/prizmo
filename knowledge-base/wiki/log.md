@@ -1,5 +1,12 @@
 # Wiki Log
 
+## [2026-06-17] codebase update | Goal 1 Alakazam switch patch and Bloodmoon slice
+
+- Task attempted: advanced the freshest Goal 1 Alakazam latest-Limitless blocker set by closing three current `unimplemented` live cards at once. `MEG-130` Switch now has committed TCGdex metadata and resolves through the canonical `play_card` path with a Bench-choice prompt, `PFL-094` Wondrous Patch now resolves through a mixed prompt over discard Basic Psychic Energy plus Benched Psychic targets, and `TWM-141` Bloodmoon Ursaluna ex now has executable `Seasoned Skill` attack-cost reduction plus `Blood Moon` attack-lock resolution. The batch also corrected `AttackCosts` to use actual Prize-zone counts for prize-based reductions.
+- Files changed: `lib/prizmo/tcg/cards/behaviors/meg.ex`, `lib/prizmo/tcg/cards/behaviors/pfl.ex`, `lib/prizmo/tcg/cards/behaviors/twm.ex`, `lib/prizmo/tcg_engine/attack_costs.ex`, `lib/prizmo/tcg_engine/card_play.ex`, `lib/prizmo/tcg_engine/cards/registry.ex`, `lib/prizmo/tcg_engine/effect_runner.ex`, `lib/prizmo_web/spa/features/home/routes/index.tsx`, `priv/tcg/cards/tcgdex/cards/MEG-130.json`, `knowledge-base/wiki/engine/dragapult-alakazam-full-game-implementation-scope.md`, `knowledge-base/wiki/log.md`.
+- Validation: `mix format`, `mix compile --warnings-as-errors`, `node_modules/.bin/tsc --noEmit`, focused `mix test test/prizmo/tcg_engine/mechanics_test.exs` (15/0), refreshed `mix prizmo.goal1.corpus`, rollback-safe Elixir smoke validation for Wondrous Patch prompt/resolution + Switch prompt/resolution + Blood Moon cost reduction, and final `mix check` all passed.
+- Remaining/blocking notes: this shrank the live Alakazam latest-result blocker set from `partial=2, unimplemented=4` to `partial=2, unimplemented=1`. Remaining current live gaps are `TWM-082` Alakazam, `BLK-040` Elgyem, and the broader `POR-088` Telepathic Psychic Energy special-energy attach-trigger partial.
+
 ## [2026-06-17] codebase update | Goal 1 Alakazam trainer support slice
 
 - Task attempted: advanced the freshest Goal 1 Alakazam latest-Limitless blocker set by closing the passive/support Trainer slice first. `ASC-197` Nighttime Mine is now an engine-defined Stadium that adds `{C}` to attacks used by each Tera Pokémon in play, `TEF-159` Rescue Board is now an engine-defined Tool that grants normal `-1` Retreat Cost or full free retreat at 30 remaining HP or less, and `TEF-146` Eri now resolves through the canonical `play_card` path with an acting-player prompt over the opponent's revealed Item cards.
