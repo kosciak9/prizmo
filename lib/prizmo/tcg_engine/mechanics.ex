@@ -2027,12 +2027,20 @@ defmodule Prizmo.TcgEngine.Mechanics do
     end
   end
 
-  defp active_knockout_prize_records(game_id, knocked_out_player_id, target_card, %{
-         knocked_out?: true
-       }) do
+  defp active_knockout_prize_records(
+         game_id,
+         knocked_out_player_id,
+         target_card,
+         %{knocked_out?: true} = damage_result
+       ) do
     with {:ok, current_target_card} <- get_card(game_id, target_card.id),
          :ok <- require_card_zone(current_target_card, :discard),
-         {:ok, prize_record} <- knockout_prize_record(knocked_out_player_id, current_target_card) do
+         {:ok, prize_record} <-
+           knockout_prize_record(
+             knocked_out_player_id,
+             current_target_card,
+             prize_count: Map.get(damage_result, :knockout_prize_count)
+           ) do
       {:ok, [prize_record]}
     end
   end
@@ -2044,6 +2052,24 @@ defmodule Prizmo.TcgEngine.Mechanics do
          _damage_result
        ) do
     {:ok, []}
+  end
+
+  defp effect_knockout_prize_records(
+         game_id,
+         %{bench_knocked_out?: true, bench_damage_target_card_instance_id: card_instance_id} =
+           effect_payload
+       )
+       when is_binary(card_instance_id) do
+    with {:ok, target_card} <- get_card(game_id, card_instance_id),
+         :ok <- require_card_zone(target_card, :discard),
+         {:ok, prize_record} <-
+           knockout_prize_record(
+             target_card.owner_player_id,
+             target_card,
+             prize_count: Map.get(effect_payload, :bench_knockout_prize_count)
+           ) do
+      {:ok, [prize_record]}
+    end
   end
 
   defp effect_knockout_prize_records(game_id, effect_payload) do
@@ -2062,8 +2088,8 @@ defmodule Prizmo.TcgEngine.Mechanics do
     Enum.uniq_by(prize_records, & &1.knocked_out_card_instance_id)
   end
 
-  defp knockout_prize_record(knocked_out_player_id, target_card) do
-    with {:ok, prize_count} <- knockout_prize_count(target_card) do
+  defp knockout_prize_record(knocked_out_player_id, target_card, opts \\ []) do
+    with {:ok, prize_count} <- knockout_prize_count_from_opts(target_card, opts) do
       {:ok,
        %{
          knocked_out_card_id: target_card.card_id,
@@ -2071,6 +2097,16 @@ defmodule Prizmo.TcgEngine.Mechanics do
          knocked_out_player_id: knocked_out_player_id,
          prize_count: prize_count
        }}
+    end
+  end
+
+  defp knockout_prize_count_from_opts(target_card, opts) when is_list(opts) do
+    case Keyword.get(opts, :prize_count) do
+      prize_count when is_integer(prize_count) and prize_count >= 0 ->
+        {:ok, prize_count}
+
+      _other ->
+        knockout_prize_count(target_card)
     end
   end
 

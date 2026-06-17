@@ -1701,6 +1701,7 @@ defmodule Prizmo.TcgEngine.AttackEffects do
          bench_prevented_damage: Map.get(damage_result, :prevented_damage, 0),
          bench_resulting_damage: damage_result.resulting_damage,
          bench_knocked_out?: damage_result.knocked_out?,
+         bench_knockout_prize_count: Map.get(damage_result, :knockout_prize_count),
          bench_damage_applied?: damage_result.damage > 0,
          bench_damage_prevented?: Map.get(damage_result, :damage_prevented?, false),
          bench_damage_prevention: Map.get(damage_result, :damage_prevention)
@@ -2532,18 +2533,33 @@ defmodule Prizmo.TcgEngine.AttackEffects do
         with {:ok, target_hp} <- pokemon_hp(bench_target.card_id),
              new_damage = bench_target.damage + damage,
              knocked_out? = new_damage >= target_hp,
+             {:ok, knockout_prize_count} <-
+               maybe_bench_knockout_prize_count(game_id, bench_target, knocked_out?, kind),
              {:ok, _bench_target} <- update(bench_target, :set_damage, %{damage: new_damage}),
              {:ok, _discarded_cards} <-
                maybe_discard_knocked_out_bench_stack(game_id, bench_target, knocked_out?) do
           {:ok,
-           %{
-             damage: damage,
-             resulting_damage: new_damage,
-             knocked_out?: knocked_out?
-           }}
+           maybe_put_knockout_prize_count(
+             %{damage: damage, resulting_damage: new_damage, knocked_out?: knocked_out?},
+             knockout_prize_count
+           )}
         end
     end
   end
+
+  defp maybe_bench_knockout_prize_count(_game_id, _bench_target, false, _kind), do: {:ok, nil}
+
+  defp maybe_bench_knockout_prize_count(game_id, %CardInstance{} = bench_target, true, :damage),
+    do: BattleActions.knockout_prize_count_for_opponent_attack(game_id, bench_target)
+
+  defp maybe_bench_knockout_prize_count(_game_id, _bench_target, true, _kind), do: {:ok, nil}
+
+  defp maybe_put_knockout_prize_count(payload, knockout_prize_count)
+       when is_integer(knockout_prize_count) and knockout_prize_count >= 0 do
+    Map.put(payload, :knockout_prize_count, knockout_prize_count)
+  end
+
+  defp maybe_put_knockout_prize_count(payload, _knockout_prize_count), do: payload
 
   defp maybe_discard_knocked_out_bench_stack(_game_id, _bench_target, false), do: {:ok, []}
 

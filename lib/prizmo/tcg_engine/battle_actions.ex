@@ -10,6 +10,7 @@ defmodule Prizmo.TcgEngine.BattleActions do
   alias Prizmo.TcgEngine.CardInstance
   alias Prizmo.TcgEngine.CardStore
   alias Prizmo.TcgEngine.TeraBenchProtection
+  alias Prizmo.TcgEngine.ToolEffects
   alias Prizmo.TcgEngine.TurnStore
 
   def attached_energy_cards_for_retreat(game_id, active_card_id, energy_card_instance_ids) do
@@ -38,6 +39,14 @@ defmodule Prizmo.TcgEngine.BattleActions do
   def knockout_prize_count(%CardInstance{} = target_card) do
     with {:ok, card} <- CardCatalog.fetch(target_card.card_id) do
       {:ok, prize_count_for_card(card)}
+    end
+  end
+
+  def knockout_prize_count_for_opponent_attack(game_id, %CardInstance{} = target_card)
+      when is_binary(game_id) do
+    with {:ok, base_prize_count} <- knockout_prize_count(target_card) do
+      reduction = ToolEffects.knockout_prize_reduction(game_id, target_card)
+      {:ok, max(base_prize_count - reduction, 0)}
     end
   end
 
@@ -75,18 +84,32 @@ defmodule Prizmo.TcgEngine.BattleActions do
       :not_prevented ->
         with {:ok, target_hp} <- pokemon_hp(target_card.card_id),
              new_damage = target_card.damage + damage,
+             knocked_out? = new_damage >= target_hp,
+             {:ok, knockout_prize_count} <-
+               maybe_attack_knockout_prize_count(game_id, target_card, knocked_out?),
              {:ok, _target_card} <- update(target_card, :set_damage, %{damage: new_damage}),
              {:ok, knocked_out?} <-
                maybe_knock_out(game_id, attacking_player_id, target_card, new_damage, target_hp) do
           {:ok,
-           %{
-             damage: damage,
-             resulting_damage: new_damage,
-             knocked_out?: knocked_out?
-           }}
+           maybe_put_knockout_prize_count(
+             %{damage: damage, resulting_damage: new_damage, knocked_out?: knocked_out?},
+             knockout_prize_count
+           )}
         end
     end
   end
+
+  defp maybe_attack_knockout_prize_count(_game_id, _target_card, false), do: {:ok, nil}
+
+  defp maybe_attack_knockout_prize_count(game_id, %CardInstance{} = target_card, true),
+    do: knockout_prize_count_for_opponent_attack(game_id, target_card)
+
+  defp maybe_put_knockout_prize_count(payload, knockout_prize_count)
+       when is_integer(knockout_prize_count) and knockout_prize_count >= 0 do
+    Map.put(payload, :knockout_prize_count, knockout_prize_count)
+  end
+
+  defp maybe_put_knockout_prize_count(payload, _knockout_prize_count), do: payload
 
   defp prevented_attack_damage_result(game_id, attacking_player_id, target_card, damage) do
     if TeraBenchProtection.prevents_attack_damage?(target_card) do

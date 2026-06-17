@@ -19,7 +19,8 @@ defmodule Prizmo.TcgEngine.ToolEffects do
     :move_energy_from_attacker_to_defender_bench_on_damage,
     :bench_limit_8_with_tera_in_play_else_discard_to_5,
     :reduce_attack_cost_by_colorless_if_more_prizes_remaining,
-    :draw_cards_if_damaged_as_active_by_attack
+    :draw_cards_if_damaged_as_active_by_attack,
+    :reduce_opponents_knockout_prize_count_by_one
   ]
 
   def supported_tool?(%{supertype: :trainer, trainer_type: :tool, effect: %{type: type}})
@@ -31,6 +32,24 @@ defmodule Prizmo.TcgEngine.ToolEffects do
     case CardCatalog.fetch(card_id) do
       {:ok, card} -> supported_tool?(card)
       {:error, _reason} -> false
+    end
+  end
+
+  @doc """
+  Returns how many fewer Prize cards an attacking opponent should take when the
+  target Pokémon is Knocked Out by damage from that opponent's attack.
+  """
+  def knockout_prize_reduction(game_id, %CardInstance{} = target_card) when is_binary(game_id) do
+    with false <- StadiumEffects.tools_have_no_effect?(game_id),
+         {:ok, target_catalog_card} <- CardCatalog.fetch(target_card.card_id),
+         {:ok, attachments} <- CardStore.attached_cards(game_id, target_card.id) do
+      case Enum.map(attachments, &knockout_prize_reduction_from_tool(&1, target_catalog_card)) do
+        [] -> 0
+        reductions -> Enum.max(reductions)
+      end
+    else
+      true -> 0
+      _other -> 0
     end
   end
 
@@ -183,6 +202,39 @@ defmodule Prizmo.TcgEngine.ToolEffects do
        }}
     end
   end
+
+  defp knockout_prize_reduction_from_tool(%CardInstance{card_id: card_id}, %{name: target_name})
+       when is_binary(target_name) do
+    case CardCatalog.fetch(card_id) do
+      {:ok,
+       %{
+         supertype: :trainer,
+         trainer_type: :tool,
+         effect: %{type: :reduce_opponents_knockout_prize_count_by_one, amount: amount} = effect
+       }}
+      when is_integer(amount) and amount > 0 ->
+        if attached_pokemon_matches_prize_reduction?(target_name, effect), do: amount, else: 0
+
+      _other ->
+        0
+    end
+  end
+
+  defp knockout_prize_reduction_from_tool(%CardInstance{}, _target_card), do: 0
+
+  defp attached_pokemon_matches_prize_reduction?(target_name, %{
+         required_attached_pokemon_name_prefix: prefix
+       })
+       when is_binary(target_name) and is_binary(prefix) do
+    String.starts_with?(target_name, prefix)
+  end
+
+  defp attached_pokemon_matches_prize_reduction?(_target_name, %{
+         required_attached_pokemon_name_prefix: _prefix
+       }),
+       do: false
+
+  defp attached_pokemon_matches_prize_reduction?(_target_name, _effect), do: true
 
   def retreat_cost_reductions(%CardInstance{} = attached_to_card, attached_cards)
       when is_list(attached_cards) do

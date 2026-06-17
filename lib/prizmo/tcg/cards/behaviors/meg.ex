@@ -59,4 +59,8 @@ defmodule Prizmo.Tcg.Cards.Behaviors.MEG do
       effect: %{type: :heal_mega_evolution_pokemon_ex_then_return_attached_energy_to_hand}
     )
   end
+
+  card "MEG-088" do
+    attack(:clutch, effect: %{type: :defending_pokemon_cannot_retreat_next_turn})
+  end
 end

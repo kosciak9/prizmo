@@ -1,5 +1,12 @@
 # Wiki Log
 
+## [2026-06-17] codebase update | Goal 1 Dragapult latest-result corpus closed
+
+- Task attempted: closed the last two live latest-result Dragapult partials on the canonical Ash path. `MEG-088` Yveltal now overlays `Clutch` onto the existing `defending_pokemon_cannot_retreat_next_turn` attack-effect path, and `JTG-151` Lillie's Pearl now counts as an engine-defined Tool whose Prize-reduction text is preserved through knockout accounting when an attached Lillie's Pokémon is Knocked Out by damage from an opponent's attack.
+- Files changed: `lib/prizmo/tcg/cards/behaviors/jtg.ex`, `lib/prizmo/tcg/cards/behaviors/meg.ex`, `lib/prizmo/tcg_engine/tool_effects.ex`, `lib/prizmo/tcg_engine/battle_actions.ex`, `lib/prizmo/tcg_engine/attack_effects.ex`, `lib/prizmo/tcg_engine/mechanics.ex`, `knowledge-base/wiki/engine/dragapult-alakazam-full-game-implementation-scope.md`, `knowledge-base/wiki/log.md`.
+- Validation: `mix format`, `mix compile --warnings-as-errors`, direct `mix run -e` smoke validation for Yveltal `Clutch` retreat-lock persistence plus Lillie's Pearl Prize reduction on `JTG-056`, refreshed `mix prizmo.goal1.corpus`, and focused `mix test test/prizmo/tcg_engine/mechanics_test.exs` (15/0) all passed. The smoke flow confirmed `Clutch` applies a retreat lock that remains active on the next turn and that a Knocked Out Lillie's Clefairy ex with Pearl attached yields `knockout_prize_count: 1` instead of the normal 2.
+- Remaining/blocking notes: the live latest-result card corpus for both Goal 1 archetypes is now fully supported (`Dragapult supported=46, generic-supported=3; Alakazam supported=38, generic-supported=1`). Goal 1 still remains open because the committed fixture corpus still lags the live deck-id set, dedicated mechanics coverage for several previously delivered interactions is still sparse, and full two-seat browser/play-surface validation remains unfinished.
+
 ## [2026-06-17] codebase update | Goal 1 POR-088 Telepathic Psychic Energy support
 
 - Task attempted: closed the last current live latest-result Alakazam partial by fully supporting `POR-088` Telepathic Psychic Energy on the canonical Ash path. Attaching `POR-088` from hand to one of your Psychic Pokémon now opens a prompt over legal Basic Psychic Pokémon in deck, benches the chosen targets, shuffles the deck with persisted RNG metadata, and completes through the shared prompt-resolution flow instead of stopping at provider-only support.

@@ -38,4 +38,14 @@ defmodule Prizmo.Tcg.Cards.Behaviors.JTG do
       }
     )
   end
+
+  card "JTG-151" do
+    card_effect(
+      effect: %{
+        type: :reduce_opponents_knockout_prize_count_by_one,
+        amount: 1,
+        required_attached_pokemon_name_prefix: "Lillie's "
+      }
+    )
+  end
 end
