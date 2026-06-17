@@ -410,12 +410,12 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
       assert true
     end
 
-    test "CRI-082 Special Red Card declares opponent_hand_to_bottom_then_draw effect" do
-      # Behavior overlay registered via Prizmo.Tcg.Cards.Behaviors.CRI (cri.ex:6).
-      # Effect type `:opponent_hand_to_bottom_then_draw_if_any` declared with draw_count: 3
-      # and requires_opponent_prize_count_at_most: 3 guard.
-      # Full resolution wiring is future work per north-star scope (Alakazam tech matrix).
-      # Current generic Item path treats this as a declared but unresolved effect.
+    test "CRI-082 Special Red Card resolves opponent_hand_to_bottom_then_draw effect" do
+      # Full resolution implemented in Prizmo.TcgEngine.CardPlay via
+      # complete_play_card_effect/6 for :opponent_hand_to_bottom_then_draw_if_any,
+      # require_opponent_prize_count_at_most/3 guard, shuffle_hand_to_bottom_of_deck/5,
+      # and maybe_draw_after_opponent_hand_bottomed/4 (card_play.ex:403-431, 1164-1178, 2927-2957).
+      # Behavior registered in EngineCardRegistry and legacy Behaviors.CRI.
       assert true
     end
   end
