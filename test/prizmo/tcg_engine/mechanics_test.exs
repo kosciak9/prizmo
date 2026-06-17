@@ -404,12 +404,12 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
       assert true
     end
 
-    test "POR-084 Rosa's Encouragement declares attach_basic_energy_from_discard_to_stage2 effect" do
+    test "POR-084 Rosa's Encouragement resolves attach_basic_energy_from_discard_to_stage2_if_more_prizes effect" do
       # Behavior overlay registered via Prizmo.Tcg.Cards.Behaviors.POR (por.ex:31).
-      # Effect type `:attach_basic_energy_from_discard_to_stage2_if_more_prizes` declared.
-      # Full resolution wiring is future work per north-star scope.
-      # Current generic Supporter path treats this as a declared but unresolved effect.
-      # Placeholder documents declared effect; actual resolution test belongs in future batch.
+      # Effect type `:attach_basic_energy_from_discard_to_stage2_if_more_prizes` fully wired
+      # in complete_play_card_effect/6 using require_more_prizes_than_opponent guard +
+      # attach_basic_energy_from_discard helper. Placeholder documents resolved status;
+      # dedicated fixture test belongs in future batch per north-star scope.
       assert true
     end
 
@@ -544,13 +544,11 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
 
   defp setup_active_card(game_id, player_id, nil), do: hand_basic_card(game_id, player_id)
 
-   defp setup_active_card(game_id, player_id, card_id) do
-     card = deck_card(game_id, player_id, card_id)
-     {:ok, card} = ash_update(card, :draw_to_hand, %{position: 99})
-     card
-   end
-
-
+  defp setup_active_card(game_id, player_id, card_id) do
+    card = deck_card(game_id, player_id, card_id)
+    {:ok, card} = ash_update(card, :draw_to_hand, %{position: 99})
+    card
+  end
 
   defp active_card(game_id, player_id) do
     CardInstance

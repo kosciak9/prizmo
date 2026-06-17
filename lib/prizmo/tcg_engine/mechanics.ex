@@ -2791,6 +2791,20 @@ defmodule Prizmo.TcgEngine.Mechanics do
     end
   end
 
+  def attach_energy_from_discard(
+        game_id,
+        %CardInstance{} = energy_card,
+        %CardInstance{} = target_card
+      ) do
+    with {:ok, game} <- get_game(game_id),
+         {:ok, position} <- next_attachment_position(game.id, target_card.id) do
+      update(energy_card, :attach_from_discard, %{
+        attached_to_card_instance_id: target_card.id,
+        position: position
+      })
+    end
+  end
+
   defp attach_seething_spirit_energy(
          %Game{} = game,
          %CardInstance{} = source_card,

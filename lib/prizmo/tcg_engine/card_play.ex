@@ -928,6 +928,51 @@ defmodule Prizmo.TcgEngine.CardPlay do
          turn,
          player,
          card,
+         %{type: :attach_basic_energy_from_discard_to_stage2_if_more_prizes} = effect,
+         _target_ids
+       ) do
+    # Rosa's Encouragement — attach up to max_targets Basic Energy from discard to own Stage 2s
+    # when player has strictly more Prizes remaining than opponent.
+    # For first-pass implementation we auto-select eligible energy and targets (simplest legal path).
+    with {:ok, player_prizes} <-
+           CardStore.cards_in_zone(game.id, player.player_id, :prize),
+         {:ok, opponent} <- CardStore.get_opponent(game.id, player.player_id),
+         {:ok, opponent_prizes} <-
+           CardStore.cards_in_zone(game.id, opponent.player_id, :prize),
+         true <- length(player_prizes) > length(opponent_prizes),
+         {:ok, discard_cards} <-
+           CardStore.cards_in_zone(game.id, player.player_id, :discard),
+         basic_energy =
+           discard_cards
+           |> Enum.filter(&(&1.supertype == :energy and &1.card_type == :basic))
+           |> Enum.take(effect.params.max_targets),
+         {:ok, stage2_targets} <-
+           CardStore.cards_in_zone(game.id, player.player_id, :play),
+         stage2_targets =
+           stage2_targets
+           |> Enum.filter(&(&1.card_stage == :stage2))
+           |> Enum.take(length(basic_energy)),
+         :ok <- attach_basic_energy_from_discard(game.id, basic_energy, stage2_targets),
+         {:ok, _event} <-
+           write_event_and_snapshot(game.id, :cards_moved, player.player_id, %{
+             reason: :effect_resolution,
+             source: EventPayloads.card_source(card),
+             effect_key: effect.key,
+             cards:
+               EventPayloads.moved_cards(basic_energy, :discard, :attached) ++
+                 EventPayloads.moved_cards(stage2_targets, :play, :play)
+           }) do
+      complete_play_card_resolution(game, turn, player, card, effect)
+    else
+      _ -> {:error, :rosa_energy_attach_failed}
+    end
+  end
+
+  defp complete_play_card_effect(
+         game,
+         turn,
+         player,
+         card,
          %{type: :kieran_switch_or_damage_bonus} = effect,
          target_ids
        ) do
@@ -1123,6 +1168,9 @@ defmodule Prizmo.TcgEngine.CardPlay do
       {:ok, %{type: :opponent_hand_to_bottom_then_draw_if_any} = effect} ->
         require_opponent_prize_count_at_most(game.id, player.player_id, effect)
 
+      {:ok, %{type: :attach_basic_energy_from_discard_to_stage2_if_more_prizes} = effect} ->
+        require_more_prizes_than_opponent(game.id, player.player_id, effect)
+
       {:ok, _effect} ->
         :ok
 
@@ -1204,6 +1252,21 @@ defmodule Prizmo.TcgEngine.CardPlay do
   end
 
   defp require_opponent_prize_count_at_most(_game_id, _player_id, _effect), do: :ok
+
+  defp require_more_prizes_than_opponent(game_id, player_id, _effect) do
+    with {:ok, player} <- CardStore.get_player(game_id, player_id),
+         {:ok, opponent} <- CardStore.get_opponent(game_id, player_id),
+         {:ok, player_prizes} <-
+           CardStore.cards_in_zone(game_id, player.player_id, :prize),
+         {:ok, opponent_prizes} <-
+           CardStore.cards_in_zone(game_id, opponent.player_id, :prize) do
+      if length(player_prizes) > length(opponent_prizes) do
+        :ok
+      else
+        {:error, :rosa_requires_strictly_more_prizes_than_opponent}
+      end
+    end
+  end
 
   defp any_knockout_for_player?(%GameEvent{payload: payload}, player_id) do
     payload
@@ -3377,5 +3440,21 @@ defmodule Prizmo.TcgEngine.CardPlay do
       {:ok, values} -> {:ok, Enum.reverse(values)}
       {:error, reason} -> {:error, reason}
     end
+  end
+
+  defp attach_basic_energy_from_discard(game_id, energy_cards, target_cards)
+       when is_list(energy_cards) and is_list(target_cards) do
+    energy_cards
+    |> Enum.zip(target_cards)
+    |> Enum.reduce_while(:ok, fn {energy, target}, :ok ->
+      case Prizmo.TcgEngine.Mechanics.attach_energy_from_discard(
+             game_id,
+             energy,
+             target
+           ) do
+        {:ok, _} -> {:cont, :ok}
+        {:error, reason} -> {:halt, {:error, reason}}
+      end
+    end)
   end
 end
