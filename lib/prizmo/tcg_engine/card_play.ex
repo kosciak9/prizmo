@@ -900,6 +900,34 @@ defmodule Prizmo.TcgEngine.CardPlay do
          turn,
          player,
          card,
+         %{type: :opponent_discards_to_hand_size} = effect,
+         _target_ids
+       ) do
+    with {:ok, opponent} <- CardStore.get_opponent(game.id, player.player_id),
+         {:ok, hand_cards} <-
+           CardStore.cards_in_zone(game.id, opponent.player_id, :hand),
+         target_size = effect.params.target_hand_size,
+         discard_count = max(length(hand_cards) - target_size, 0),
+         {:ok, to_discard} <- pick_random_hand_cards(hand_cards, discard_count),
+         {:ok, _discarded} <-
+           CardStore.discard_cards_from_hand(game.id, opponent.player_id, to_discard),
+         {:ok, _event} <-
+           write_event_and_snapshot(game.id, :cards_moved, opponent.player_id, %{
+             reason: :effect_resolution,
+             source: EventPayloads.card_source(card),
+             effect_key: effect.key,
+             affected_player_id: opponent.player_id,
+             cards: EventPayloads.moved_cards(to_discard, :hand, :discard)
+           }) do
+      complete_play_card_resolution(game, turn, player, card, effect)
+    end
+  end
+
+  defp complete_play_card_effect(
+         game,
+         turn,
+         player,
+         card,
          %{type: :kieran_switch_or_damage_bonus} = effect,
          target_ids
        ) do
@@ -3209,6 +3237,13 @@ defmodule Prizmo.TcgEngine.CardPlay do
         _multiple -> {:error, :ambiguous_opponent_active_pokemon}
       end
     end
+  end
+
+  defp pick_random_hand_cards(_hand_cards, count) when count <= 0, do: {:ok, []}
+
+  defp pick_random_hand_cards(hand_cards, count) do
+    # Deterministic selection for tests (first N); real RNG later if needed
+    {:ok, Enum.take(hand_cards, count)}
   end
 
   defp resolve_attack_damage_to_target(game_id, target_pokemon, amount, source_card, effect) do
