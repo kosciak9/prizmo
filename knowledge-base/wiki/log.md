@@ -1,5 +1,12 @@
 # Wiki Log
 
+## [2026-06-17] codebase update | Goal 1 live Dragapult fixture corpus expansion
+
+- Task attempted: closed the largest remaining Goal 1 fixture-drift bucket by replacing the historical single-deck Dragapult live-fixture assumption with the current Limitless latest-result deck-id set. `Prizmo.Tcg.Goal1.LatestLimitless` now tracks the full live Dragapult result universe (`28236`, `28250`, `28253`, `28255`, `28256`, `28258`, `28259`, `28261`, `27611`, `28264`, `28268`, `28271`) by adding nine new static Goal 1 deck modules under `lib/prizmo/tcg/goal_1/decks/` and removing stale fixture `27431` from the canonical Goal 1 audit/corpus list.
+- Files changed: new `lib/prizmo/tcg/goal_1/decks/dragapult*.ex` live fixture modules for deck ids `28250`, `28255`, `28258`, `28259`, `28261`, `27611`, `28264`, `28268`, and `28271`; `lib/prizmo/tcg/goal_1/latest_limitless.ex`; `knowledge-base/wiki/engine/dragapult-alakazam-full-game-implementation-scope.md`; `knowledge-base/wiki/log.md`.
+- Validation: `mix format`, `mix compile --warnings-as-errors`, `mix prizmo.goal1.audit`, `mix prizmo.goal1.corpus`, and `mix check` passed. The refreshed audit now reports no missing or stale committed Goal 1 fixtures for either archetype, and the corpus report shows the committed Dragapult live fixture corpus now covers the full current latest-result card set (`live unique cards: 49`, `committed fixture unique cards: 49`) with `supported=46`, `generic-supported=3`, `partial=0`, `unimplemented=0`.
+- Remaining/blocking notes: Goal 1 still remains open because dedicated validation for Fairy Zone / Ground Melter / Come and Get You / Cursed Blast prize-replacement-Damp interactions / Jamming Tower is still sparse, and full two-seat play-surface validation across the important Dragapult variants against Alakazam is still pending.
+
 ## [2026-06-17] codebase update | Goal 1 live Alakazam fixture corpus expansion
 
 - Task attempted: closed the largest remaining Goal 1 fixture-drift bucket by replacing the historical single-deck Alakazam live-fixture assumption with the current Limitless latest-result deck-id set. `Prizmo.Tcg.Goal1.LatestLimitless` now tracks twelve dedicated Goal 1 Alakazam deck modules (`28275`, `28291`, `28310`, `28337`, `28340`, `28368`, `28385`, `28398`, `28405`, `28431`, `28438`, `27615`) under `lib/prizmo/tcg/goal_1/decks/` instead of treating stale baseline `27147` as the live Goal 1 Alakazam corpus.

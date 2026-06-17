@@ -8,7 +8,6 @@ defmodule Prizmo.Tcg.Goal1.LatestLimitless do
   """
 
   alias Prizmo.Tcg.Data.Limitless
-  alias Prizmo.Tcg.Decks.Dragapult27431
   alias Prizmo.Tcg.Decks.DragapultBlaziken28253
   alias Prizmo.Tcg.Decks.DragapultDusknoir28236
   alias Prizmo.Tcg.Decks.DragapultPlain28256
@@ -25,6 +24,15 @@ defmodule Prizmo.Tcg.Goal1.LatestLimitless do
   alias Prizmo.Tcg.Goal1.Decks.Alakazam28405
   alias Prizmo.Tcg.Goal1.Decks.Alakazam28431
   alias Prizmo.Tcg.Goal1.Decks.Alakazam28438
+  alias Prizmo.Tcg.Goal1.Decks.Dragapult27611
+  alias Prizmo.Tcg.Goal1.Decks.Dragapult28250
+  alias Prizmo.Tcg.Goal1.Decks.Dragapult28255
+  alias Prizmo.Tcg.Goal1.Decks.Dragapult28261
+  alias Prizmo.Tcg.Goal1.Decks.Dragapult28264
+  alias Prizmo.Tcg.Goal1.Decks.Dragapult28268
+  alias Prizmo.Tcg.Goal1.Decks.Dragapult28271
+  alias Prizmo.Tcg.Goal1.Decks.DragapultBlaziken28258
+  alias Prizmo.Tcg.Goal1.Decks.DragapultDusknoir28259
 
   @type audit_row :: %{
           key: atom(),
@@ -73,10 +81,18 @@ defmodule Prizmo.Tcg.Goal1.LatestLimitless do
       label: "Dragapult",
       overview_deck_id: "284",
       fixture_modules: [
-        Dragapult27431,
         DragapultDusknoir28236,
+        Dragapult28250,
         DragapultBlaziken28253,
-        DragapultPlain28256
+        Dragapult28255,
+        DragapultPlain28256,
+        DragapultBlaziken28258,
+        DragapultDusknoir28259,
+        Dragapult28261,
+        Dragapult27611,
+        Dragapult28264,
+        Dragapult28268,
+        Dragapult28271
       ]
     },
     %{
