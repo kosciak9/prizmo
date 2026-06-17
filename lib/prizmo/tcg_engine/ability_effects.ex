@@ -44,6 +44,8 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
   @cursed_blast_effect_type :damage_counters_to_opponent_pokemon_then_self_knock_out
   @damp_card_id "ASC-039"
   @damp_ability_id :damp
+  @fan_call_card_id "SCR-118"
+  @fan_call_ability_id :fan_call
 
   def adrena_brain_card_id, do: @adrena_brain_card_id
   def adrena_brain_ability_id, do: @adrena_brain_ability_id
@@ -61,6 +63,11 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
   def run_away_draw_ability_id, do: @run_away_draw_ability_id
   def cursed_blast_ability_id, do: @cursed_blast_ability_id
   def damp_ability_id, do: @damp_ability_id
+  def fan_call_card_id, do: @fan_call_card_id
+  def fan_call_ability_id, do: @fan_call_ability_id
+
+  def fan_call_source?(%CardInstance{card_id: @fan_call_card_id}), do: true
+  def fan_call_source?(%CardInstance{}), do: false
 
   def adrena_brain_source?(%CardInstance{card_id: @adrena_brain_card_id}), do: true
   def adrena_brain_source?(%CardInstance{}), do: false
