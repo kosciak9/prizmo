@@ -31,12 +31,13 @@ The older one-matchup framing is superseded. The target is not just one Dragapul
 - Plain Dragapult / Alakazam tech Trainer coverage now includes canonical `play_card` registry wiring plus focused mechanics coverage for `SFA-064` Xerosic's Machinations, `POR-084` Rosa's Encouragement, and `CRI-082` Special Red Card. `SFA-064` now uses an opponent-owned discard prompt so the affected player chooses which hand cards to discard, and `POR-084` now uses a mixed prompt over discard Basic Energy plus Stage 2 targets instead of first-pass auto-selection.
 - The 2026-06-16 live GameView pending-text inventory reported zero visible pending-text blockers for the then-current Dragapult/Alakazam visible scope after the plain-tech Supporter batch.
 - The legacy `Prizmo.Tcg.Sim` registry now has CI compatibility overlays for the plain Dragapult and Dragapult/Blaziken variant-only cards (`DRI-040`, `DRI-041`, `JTG-024`, `POR-084`, `SFA-064`), and the pairwise known-deck smoke matrix compiles with unique deck-id test names and passes under `mix check`.
+- The repo now has a live corpus-audit task, `mix prizmo.goal1.audit`, that compares committed Goal 1 fixtures against the current Limitless latest-result deck ids without forcing those live decks into the legacy known-deck pool. As of 2026-06-17, Dragapult fixtures still cover `27431`, `28236`, `28253`, and `28256`, while live latest results also include `28250`, `28255`, `28258`, `28259`, `28261`, `27611`, `28264`, `28268`, and `28271`; Alakazam fixtures still cover only `27147`, while live latest results currently include `28275`, `28291`, `28310`, `28337`, `28340`, `28368`, `28385`, `28398`, `28405`, `28431`, `28438`, and `27615`.
 - That inventory does **not** close Goal 1 by itself. Goal 1 also requires latest-Limitless variant coverage, executable mechanics, tests/fixtures, and play-surface validation.
 
 ## Known remaining work
 
-- Refresh the latest-Limitless Dragapult and Alakazam variant/card corpus.
-- Reconcile historical NAIC/captured cards against the latest corpus.
+- Extend the committed Goal 1 fixture corpus to cover the current live latest-result deck ids for Dragapult and Alakazam, or explicitly freeze a narrower representative fixture set with rationale.
+- Refresh and reconcile the latest-Limitless Dragapult and Alakazam variant/card corpus against those live latest-result ids instead of treating the historical `27431` / `27147` fixtures as current by default.
 - Add or update Alakazam tech fixture/support for common swaps such as `ASC-197`, `TEF-146`, `PFL-094`, `TEF-159`, and `SCR-137` when they appear in the latest corpus.
 - Add dedicated tests for Fairy Zone/Weakness, Ground Melter Stadium discard, Come and Get You, Cursed Blast prize/replacement/Damp interactions, and Jamming Tower.
 - Run full two-seat validation for each important Dragapult variant against Alakazam through the current play scaffolding until Godot replaces the in-game surface.

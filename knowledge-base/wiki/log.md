@@ -1,5 +1,12 @@
 # Wiki Log
 
+## [2026-06-17] codebase update | Goal 1 live latest-Limitless corpus audit task
+
+- Task attempted: added a small Req-backed Limitless fetcher plus `mix prizmo.goal1.audit` so the repository can compare its committed Goal 1 fixtures against the live latest-result deck ids for Dragapult and Alakazam. This closes the blind spot where the KB said "refresh latest-Limitless corpus" but the codebase had no first-class way to detect drift from the older `27431` / `27147` fixture era.
+- Files changed: `lib/prizmo/tcg/data/limitless.ex`, `lib/prizmo/tcg/goal_1/latest_limitless.ex`, `lib/mix/tasks/prizmo.goal1.audit.ex`, `knowledge-base/wiki/engine/dragapult-alakazam-full-game-implementation-scope.md`, `knowledge-base/wiki/log.md`.
+- Validation: `mix format`, `mix compile --warnings-as-errors`, and `mix prizmo.goal1.audit` passed. The live audit reported committed Dragapult fixtures `27431`, `28236`, `28253`, `28256` vs latest-result ids `28236`, `28250`, `28253`, `28255`, `28256`, `28258`, `28259`, `28261`, `27611`, `28264`, `28268`, `28271`, and committed Alakazam fixture `27147` vs latest-result ids `28275`, `28291`, `28310`, `28337`, `28340`, `28368`, `28385`, `28398`, `28405`, `28431`, `28438`, `27615`.
+- Remaining/blocking notes: the audit exposes the current Goal 1 fixture drift but does not yet ingest those newer lists into the committed deck corpus. The next high-value batch is to decide whether to add those live lists as new fixtures or to document a narrower representative fixture set, then reconcile card/mechanic coverage against that explicit scope.
+
 ## [2026-06-17] codebase update | Prompt-driven SFA-064 and POR-084 trainer resolution
 
 - Task attempted: replaced the last first-pass auto-selection paths in the active Goal 1 plain-tech Supporter slice. `SFA-064` Xerosic's Machinations now pauses on an opponent-owned hand-discard prompt so the affected player chooses which cards to discard down to 3, while `POR-084` Rosa's Encouragement now pauses on a mixed prompt over discard Basic Energy plus in-play Stage 2 targets. The read model now hides action-window affordances from the active player while a prompt is waiting on the other seat, so two-seat prompt ownership stays consistent in GameView/SPA.
