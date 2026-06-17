@@ -1021,6 +1021,8 @@ export function HomeRoute() {
   const [playerTwoDeckKey, setPlayerTwoDeckKey] = useState('')
   const [playerOneOpenDeckText, setPlayerOneOpenDeckText] = useState('')
   const [playerTwoOpenDeckText, setPlayerTwoOpenDeckText] = useState('')
+  const [playerOnePremadeDeckLoading, setPlayerOnePremadeDeckLoading] = useState(false)
+  const [playerTwoPremadeDeckLoading, setPlayerTwoPremadeDeckLoading] = useState(false)
   const [gameRngSeed, setGameRngSeed] = useState('')
   const [ultraBallPostSearchHandoff, setUltraBallPostSearchHandoff] =
     useState<UltraBallPostSearchHandoff | null>(readStoredUltraBallPostSearchHandoff)
@@ -1056,6 +1058,24 @@ export function HomeRoute() {
   const parsedPlayerTwoOpenDeck = useMemo(() => parseOpenDeckText(playerTwoOpenDeckText), [playerTwoOpenDeckText])
   const gameRngSeedValue = gameRngSeed.trim()
 
+  const handlePlayerOneDeckKeyChange = (deckKey: string) => {
+    if (launcherMode === 'regular' && regularSourceMode === 'premade') {
+      setPlayerOnePremadeDeckLoading(true)
+      setPlayerOneOpenDeckText('')
+    }
+
+    setPlayerOneDeckKey(deckKey)
+  }
+
+  const handlePlayerTwoDeckKeyChange = (deckKey: string) => {
+    if (launcherMode === 'regular' && regularSourceMode === 'premade') {
+      setPlayerTwoPremadeDeckLoading(true)
+      setPlayerTwoOpenDeckText('')
+    }
+
+    setPlayerTwoDeckKey(deckKey)
+  }
+
   useEffect(() => {
     setUltraBallPostSearchHandoff(currentHandoff => {
       if (!currentHandoff) {
@@ -1073,26 +1093,62 @@ export function HomeRoute() {
   // Premade deck preload for regular games
   useEffect(() => {
     if (launcherMode !== 'regular' || regularSourceMode !== 'premade') {
+      setPlayerOnePremadeDeckLoading(false)
+      setPlayerTwoPremadeDeckLoading(false)
       return
     }
 
-    const loadPremade = async (deckKey: string, setText: (text: string) => void) => {
-      if (!deckKey) return
+    let cancelled = false
+
+    const loadPremade = async (
+      deckKey: string,
+      setText: (text: string) => void,
+      setLoading: (loading: boolean) => void
+    ) => {
+      if (!deckKey) {
+        setLoading(false)
+        return
+      }
+
+      setLoading(true)
+
       try {
         const blueprint = await getDeckBlueprint(deckKey)
+
+        if (cancelled) {
+          return
+        }
+
         const text = formatDeckCountsToText(blueprint.counts)
         setText(text)
       } catch (err) {
         // Silently ignore — user can still paste manually
         console.warn('Failed to load premade deck blueprint', err)
+      } finally {
+        if (!cancelled) {
+          setLoading(false)
+        }
       }
     }
 
     if (selectedPlayerOneDeckKey) {
-      void loadPremade(selectedPlayerOneDeckKey, setPlayerOneOpenDeckText)
+      void loadPremade(
+        selectedPlayerOneDeckKey,
+        setPlayerOneOpenDeckText,
+        setPlayerOnePremadeDeckLoading
+      )
     }
+
     if (selectedPlayerTwoDeckKey) {
-      void loadPremade(selectedPlayerTwoDeckKey, setPlayerTwoOpenDeckText)
+      void loadPremade(
+        selectedPlayerTwoDeckKey,
+        setPlayerTwoOpenDeckText,
+        setPlayerTwoPremadeDeckLoading
+      )
+    }
+
+    return () => {
+      cancelled = true
     }
   }, [launcherMode, regularSourceMode, selectedPlayerOneDeckKey, selectedPlayerTwoDeckKey])
 
@@ -1449,11 +1505,20 @@ export function HomeRoute() {
     [decks, selectedPlayerTwoDeckKey]
   )
   const fixtureLoadoutsReady = Boolean(selectedPlayerOneDeckKey && selectedPlayerTwoDeckKey)
-  const openDeckLoadoutsReady = isOpenDeckReady(parsedPlayerOneOpenDeck) && isOpenDeckReady(parsedPlayerTwoOpenDeck)
+  const regularPremadeDecklistsLoading =
+    launcherMode === 'regular' &&
+    regularSourceMode === 'premade' &&
+    (playerOnePremadeDeckLoading || playerTwoPremadeDeckLoading)
+  const openDeckLoadoutsReady =
+    !regularPremadeDecklistsLoading &&
+    isOpenDeckReady(parsedPlayerOneOpenDeck) &&
+    isOpenDeckReady(parsedPlayerTwoOpenDeck)
   const loadoutsReady = launcherMode === 'regular' ? openDeckLoadoutsReady : fixtureLoadoutsReady
   const loadoutDetail =
     launcherMode === 'regular'
-      ? openDeckLoadoutDetail(parsedPlayerOneOpenDeck, parsedPlayerTwoOpenDeck, gameRngSeedValue)
+      ? regularPremadeDecklistsLoading
+        ? 'Loading the selected premade decklists into the editable deck editors.'
+        : openDeckLoadoutDetail(parsedPlayerOneOpenDeck, parsedPlayerTwoOpenDeck, gameRngSeedValue)
       : selectedPlayerOneDeck && selectedPlayerTwoDeck
         ? `${supportedDeckLabel(selectedPlayerOneDeck, deckNamesByKey)} vs ${supportedDeckLabel(selectedPlayerTwoDeck, deckNamesByKey)} with ${rngSeedDetail(gameRngSeedValue)}.`
         : decks.length > 0
@@ -1767,14 +1832,14 @@ export function HomeRoute() {
                           playerId={PLAYER_ONE_ID}
                           value={selectedPlayerOneDeckKey}
                           decks={decks}
-                          onChange={setPlayerOneDeckKey}
+                          onChange={handlePlayerOneDeckKeyChange}
                         />
                         <DeckSelect
                           label={launcherMode === 'fixture' ? 'Player 2 fixture' : 'Player 2 premade'}
                           playerId={PLAYER_TWO_ID}
                           value={selectedPlayerTwoDeckKey}
                           decks={decks}
-                          onChange={setPlayerTwoDeckKey}
+                          onChange={handlePlayerTwoDeckKeyChange}
                         />
                       </>
                     ) : null}
@@ -1784,6 +1849,12 @@ export function HomeRoute() {
                         {regularSourceMode === 'premade' ? (
                           <InlineNotice tone="info" title="Editable premade lists">
                             Premade choices load into these deck editors. Adjust either list before creating the regular shuffled board.
+                          </InlineNotice>
+                        ) : null}
+
+                        {regularPremadeDecklistsLoading ? (
+                          <InlineNotice tone="info" title="Syncing premade decklists">
+                            Create stays disabled until both selected premades finish loading into the editable decklists.
                           </InlineNotice>
                         ) : null}
 
