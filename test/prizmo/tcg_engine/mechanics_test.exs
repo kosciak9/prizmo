@@ -7,6 +7,7 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
   alias Prizmo.Tcg.Decks.DragapultDusknoir28236
   alias Prizmo.Tcg.Decks.DragapultPlain28256
   alias Prizmo.Tcg.Decks.RocketMewtwo27459
+  alias Prizmo.Tcg.Goal1.Decks.Alakazam28291
   alias Prizmo.Tcg.Goal1.Decks.Alakazam28340
   alias Prizmo.Tcg.Goal1.Decks.Dragapult28255
   alias Prizmo.Tcg.Goal1.Decks.Dragapult28268
@@ -573,6 +574,39 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
       assert length(to_deck_event.payload["cards"]) == opponent_hand_before
       assert to_hand_event.payload["affected_player_id"] == "player_1"
       assert length(to_hand_event.payload["cards"]) == 3
+    end
+
+    test "TEF-145 Ciphermaniac's Codebreaking appears in play_card affordances and stacks chosen cards on top of deck" do
+      {:ok, game} = create_flow_action_window_game_with_decks(Dragapult28255, Alakazam28291)
+
+      ciphermaniac = move_owned_card_to_hand(game.id, "player_2", "TEF-145", 1)
+
+      assert {:ok, game} = Mechanics.pass_turn(game, "player_1")
+
+      assert {:ok, view} = GameView.for_player(game.id, "player_2")
+      play_card = Enum.find(view.action_affordances, &(&1.key == "play_card"))
+      assert is_map(play_card)
+      assert ciphermaniac.id in play_card.source_card_instance_ids
+
+      assert {:ok, game} = Mechanics.play_card(game, "player_2", ciphermaniac.id, %{})
+
+      [prompt] = prompts(game.id)
+      [chosen_1, chosen_2 | _rest] = prompt.payload["legal_choices"]
+
+      assert prompt.player_id == "player_2"
+      assert prompt.payload["choice_key"] == "search_deck_for_cards_to_top"
+
+      assert {:ok, game} =
+               Mechanics.choose_prompt(game, "player_2", prompt.id, [chosen_1, chosen_2])
+
+      assert zone(ciphermaniac.id) == :discard
+
+      assert game.id
+             |> cards_in_zone("player_2", :deck)
+             |> Enum.take(2)
+             |> Enum.map(& &1.id) == [chosen_1, chosen_2]
+
+      refute "deck_shuffled" in Enum.take(event_types(game.id), -6)
     end
   end
 

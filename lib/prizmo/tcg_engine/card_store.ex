@@ -243,6 +243,32 @@ defmodule Prizmo.TcgEngine.CardStore do
     |> collect_results()
   end
 
+  def move_deck_cards_to_top(_game_id, _player_id, []), do: {:ok, []}
+
+  def move_deck_cards_to_top(game_id, player_id, top_cards) do
+    top_card_ids = MapSet.new(top_cards, & &1.id)
+
+    with {:ok, deck_cards} <- cards_in_zone(game_id, player_id, :deck) do
+      ordered_top_cards =
+        Enum.map(top_cards, fn top_card ->
+          Enum.find(deck_cards, &(&1.id == top_card.id))
+        end)
+
+      remaining_cards = Enum.reject(deck_cards, &MapSet.member?(top_card_ids, &1.id))
+
+      with {:ok, reordered_cards} <- reorder_deck_cards(ordered_top_cards ++ remaining_cards) do
+        {:ok, Enum.take(reordered_cards, length(ordered_top_cards))}
+      end
+    end
+  end
+
+  defp reorder_deck_cards(cards) do
+    cards
+    |> Enum.with_index(1)
+    |> Enum.map(fn {card, position} -> update(card, :reorder_deck, %{position: position}) end)
+    |> collect_results()
+  end
+
   defp collect_results(results) do
     results
     |> Enum.reduce_while({:ok, []}, fn

@@ -1427,7 +1427,7 @@ defmodule Prizmo.TcgEngine.CardPlay do
     with {:ok, target_ids} <- EffectRunner.validate_search_deck_selection(effect, target_ids),
          {:ok, target_cards} <- CardStore.get_cards(game_id, target_ids),
          :ok <- require_all_owned_in_zone(target_cards, player_id, :deck),
-         :ok <- require_all_search_filters(target_cards, effect.params.filter),
+         :ok <- require_all_search_filters(target_cards, Map.get(effect.params, :filter)),
          :ok <-
            require_required_search_groups(target_cards, Map.get(effect.params, :required_groups)),
          :ok <- require_max_search_groups(target_cards, Map.get(effect.params, :max_groups)) do
@@ -1447,7 +1447,7 @@ defmodule Prizmo.TcgEngine.CardPlay do
          {:ok, target_cards} <- CardStore.get_cards(game_id, target_ids),
          :ok <- require_all_owned_in_zone(target_cards, player_id, :deck),
          :ok <- require_all_in_top_deck(game_id, player_id, target_cards, look_count, effect.key),
-         :ok <- require_all_search_filters(target_cards, effect.params.filter) do
+         :ok <- require_all_search_filters(target_cards, Map.get(effect.params, :filter)) do
       {:ok, target_cards}
     end
   end
@@ -1617,6 +1617,16 @@ defmodule Prizmo.TcgEngine.CardPlay do
     |> collect_results()
   end
 
+  defp move_search_targets(
+         game,
+         _turn,
+         player,
+         %{params: %{destination: :deck_top}},
+         target_cards
+       ) do
+    CardStore.move_deck_cards_to_top(game.id, player.player_id, target_cards)
+  end
+
   defp move_search_targets(game, turn, player, %{params: %{destination: :bench}}, target_cards) do
     CardStore.move_deck_cards_to_bench(game.id, player.player_id, target_cards, turn.turn_number)
   end
@@ -1632,6 +1642,7 @@ defmodule Prizmo.TcgEngine.CardPlay do
   end
 
   defp search_effect_destination_zone(%{params: %{destination: :bench}}), do: :bench
+  defp search_effect_destination_zone(%{params: %{destination: :deck_top}}), do: :deck
   defp search_effect_destination_zone(%{params: %{destination: :hand}}), do: :hand
 
   defp effect_choice_ids(cards, player_id, choice_step, current_turn)
@@ -2004,7 +2015,7 @@ defmodule Prizmo.TcgEngine.CardPlay do
     choices =
       cards
       |> Enum.filter(&(&1.owner_player_id == player_id and &1.zone == :deck))
-      |> Enum.filter(&matches_search_filter?(&1, choice_step.params.filter))
+      |> Enum.filter(&matches_search_filter?(&1, Map.get(choice_step.params, :filter)))
       |> maybe_hide_when_bench_full(cards, player_id, choice_step)
 
     if required_search_groups_available?(choices, Map.get(choice_step.params, :required_groups)) do
@@ -2018,7 +2029,7 @@ defmodule Prizmo.TcgEngine.CardPlay do
     choices =
       cards
       |> top_deck_cards(player_id, Map.fetch!(choice_step.params, :look_count))
-      |> Enum.filter(&matches_search_filter?(&1, choice_step.params.filter))
+      |> Enum.filter(&matches_search_filter?(&1, Map.get(choice_step.params, :filter)))
 
     if required_search_groups_available?(choices, Map.get(choice_step.params, :required_groups)) do
       choices
@@ -2320,6 +2331,8 @@ defmodule Prizmo.TcgEngine.CardPlay do
   defp require_search_filter(%CardInstance{} = card, %{kind: :pokemon, stage: :basic, max_hp: 70}) do
     require_poffin_targets([card])
   end
+
+  defp require_search_filter(%CardInstance{}, nil), do: :ok
 
   defp require_search_filter(%CardInstance{} = card, %{kind: :pokemon, stage: stage}) do
     case CardCatalog.fetch(card.card_id) do
