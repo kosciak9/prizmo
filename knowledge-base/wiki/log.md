@@ -1,5 +1,12 @@
 # Wiki Log
 
+## [2026-06-17] codebase update | Goal 1 deeper seeded browser validation
+
+- Task attempted: broadened Goal 1 live validation beyond the earlier representative setup/pass trio by running a deeper seeded two-seat browser game on unvalidated latest-result fixtures. Supported game `01234059-e7b7-4297-9883-1d8c4e625200` used Dragapult `28250` versus Alakazam `28310` with explicit seed `goal1-28250-vs-28310-seed-a` and progressed through two player-1 mulligans with public reveal, player-2 optional 2-card mulligan compensation draw, player-1 `Buddy-Buddy Poffin` prompt resolution into `Dreepy` + `Dunsparce`, player-1 Darkness attachment to `Munkidori`, and player-2 `POR-088` Telepathic Psychic Energy attach-trigger prompt/resolution on `Abra`, then resumed cleanly to the next player action window.
+- Files changed: `knowledge-base/wiki/engine/dragapult-alakazam-full-game-implementation-scope.md`, `knowledge-base/wiki/engine/ash-backed-tcg-engine-playtest-handoff.md`, `knowledge-base/wiki/log.md`.
+- Validation: browser validation on `http://localhost:4003`; seeded game `01234059-e7b7-4297-9883-1d8c4e625200`; Tidewave/SQL verification confirmed `tcg_engine_games.rng_seed = "goal1-28250-vs-28310-seed-a"`, `rng_seed_source = "explicit"`, `status = "in_progress"`, `flow_state = "turn_action_window"`, and latest events included player-2 `energy_attach_effect_completed`, `deck_shuffled`, player-2 `turn_passed`, and reopened Turn 3 player-1 `action_window_opened`.
+- Remaining/blocking notes: no new engine or SPA defect surfaced in this run. Goal 1 still remains open because broader latest-result fixture coverage is still incomplete; continue seeded two-seat browser runs across more live deck ids and keep preferring prompt-heavy or mid-game lines that add new validation signal.
+
 ## [2026-06-17] codebase update | Goal 1 seeded fixture launcher
 
 - Task attempted: enabled engine-owned RNG parity for supported Goal 1 fixture games. Supported-deck creation now shuffles fixture decks on create with fresh RNG metadata by default, accepts explicit `rng_seed` through the Ash action/resource code interface, and exposes the same deterministic seed field in fixture mode of the SPA so deeper Goal 1 browser-validation runs can be reproduced exactly.
