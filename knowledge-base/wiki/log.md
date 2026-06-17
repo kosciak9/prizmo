@@ -1,5 +1,12 @@
 # Wiki Log
 
+## [2026-06-17] codebase update | Goal 1 representative browser validation
+
+- Task attempted: closed the remaining representative Goal 1 two-seat browser-validation batch through the supported-deck launcher and current React play surface. Validated Dragapult/Dusknoir `28236`, Dragapult/Blaziken `28253`, and plain Dragapult `28256` against live Alakazam Dudunsparce `28275` using separate player-1/player-2 tabs. Each run progressed through coin toss, starting-player choice, opening Active selection, opening Bench selection when available, setup-ready, prize/setup completion, Turn 1 player-1 action window, player-1 pass, and Turn 2 player-2 action window. The Blaziken run also exercised a player-2 mulligan reveal plus player-1 compensation draw with no IEx/database intervention.
+- Files changed: `knowledge-base/wiki/engine/dragapult-alakazam-full-game-implementation-scope.md`, `knowledge-base/wiki/engine/dragapult-alakazam-gameview-pending-text-inventory-2026-06-16.md`, `knowledge-base/wiki/engine/ash-backed-tcg-engine-playtest-handoff.md`, `knowledge-base/wiki/index.md`, `knowledge-base/wiki/log.md`.
+- Validation: browser validation on `http://localhost:4003`; Dusknoir game `04f89b2d-b424-49a0-bef2-21a9eb2b2c00`; Blaziken game `af57a106-1b5d-47eb-99c2-93dee8c0cb17`; plain game `7625fcfd-f9ef-42ab-a8da-8c3c1e24e613`. All three showed zero visible `Pending card text` blockers and reached Turn 2 player-2 action window with normal actions exposed.
+- Remaining/blocking notes: this closes the representative setup/pass validation gap for the important Dragapult trio. Goal 1 remains open because broader/deeper live validation across the wider latest-result fixture pool still remains, especially mid-game turn lines beyond setup/pass.
+
 ## [2026-06-17] codebase update | Goal 1 playtest fixture launcher expansion
 
 - Task attempted: exposed the full latest-Limitless Goal 1 fixture universe through the supported-deck launcher without broadening the legacy known-deck smoke surface. `Prizmo.Tcg.Decks` now keeps the old nine-deck stable pool for metadata/sim coverage while exposing a separate Goal 1 `playtest_modules/0` pool for browser validation, `Prizmo.TcgEngine.SupportedDecks` now lists/fetches/creates games from that broader playtest pool, and the SPA disambiguates duplicate deck names with deck ids while defaulting player two to the first cross-archetype matchup (`28275` Alakazam Dudunsparce) instead of another Dragapult variant.

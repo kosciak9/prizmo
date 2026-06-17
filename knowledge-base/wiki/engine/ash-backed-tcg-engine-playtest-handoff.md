@@ -7,6 +7,12 @@
 - This document is historical/operational context. The active canonical roadmap is now [Prizmo TCG Engine and Play Surface North Star](ash-backed-tcg-engine-playtest-north-star.md): Goal 1 latest-Limitless Dragapult/Alakazam completeness, Goal 2 latest top-30 Limitless archetype coverage, Goal 3 React shell + embedded Godot play surface, Goal 4 React Native mobile path, Goal 5 all possible cards.
 - Treat the two-deck and six-deck selection rules below as historical unless they directly help with the current latest-Limitless coverage goals.
 
+## [2026-06-17] Goal 1 representative browser-validation handoff
+
+- Current state: the representative Goal 1 two-seat browser-validation gap is now closed for the key Dragapult trio against live Alakazam Dudunsparce `28275`. Separate player-1/player-2 tabs completed normal UI-only setup and early-turn progression for Dusknoir `28236`, Blaziken `28253`, and plain Dragapult `28256` without IEx/database intervention.
+- Completed validation: supported fixture game `04f89b2d-b424-49a0-bef2-21a9eb2b2c00` validated Dragapult/Dusknoir `28236` versus Alakazam Dudunsparce `28275`; game `af57a106-1b5d-47eb-99c2-93dee8c0cb17` validated Dragapult/Blaziken `28253` versus `28275`; game `7625fcfd-f9ef-42ab-a8da-8c3c1e24e613` validated plain Dragapult `28256` versus `28275`. All three runs reached Turn 1 player-1 action window, player-1 pass, and Turn 2 player-2 action window with normal actions exposed. The Blaziken run also exercised player-2 mulligan reveal plus player-1 compensation draw.
+- Next recommendation: do not repeat representative setup/pass validation unless setup flow or supported-deck launcher behavior changes. The next Goal 1 live-validation work should either go deeper into mid-game turn lines or broaden from the representative trio to more of the current latest-result fixture pool.
+
 ## [2026-06-16] Scope shift handoff — Dragapult/Alakazam two-deck self-practice north-star
 
 - Current state: the durable north-star direction is now the Dragapult-versus-Alakazam self-practice slice for first playable mechanics, with the open-deck create/rejoin/seeded setup stack and two-seat browser flow now supporting practical matchup play.
