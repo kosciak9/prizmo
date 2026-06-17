@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-06-17] test update | CRI-082/SFA-064/POR-084 placeholder documentation clarified
+- Task attempted: clarified the existing placeholder tests for SFA-064, POR-084, and CRI-082 (mechanics_test.exs:397-420) with explicit comments noting that full fixture/resolution tests remain future work per north-star scope. These cards already have behavior overlays or full resolution in card_play.ex; the tests serve as documentation of declared vs. resolved status.
+- Files changed: `test/prizmo/tcg_engine/mechanics_test.exs`.
+- Validation: `mix test test/prizmo/tcg_engine/mechanics_test.exs:397` passes (3 placeholder tests). No engine changes needed; recent commits (26d6131, 6c362a8, 4c083bb) already documented resolved/placeholder status.
+- Remaining/blocking notes: dedicated fixture tests for CRI-082 Special Red Card, SFA-064 Xerosic's Machinations, and POR-084 Rosa's Encouragement remain per `dragapult-alakazam-full-game-implementation-scope.md` "Known remaining work".
+
 ## [2026-06-17] codebase update | Project goal ladder and Godot play-surface roadmap
 
 - Task attempted: clarified the canonical project goal ladder for zero-context agents: Goal 1 latest-Limitless Dragapult/Alakazam completeness, Goal 2 latest top-30 Limitless archetype card coverage, Goal 3 React shell with embedded Godot play surface, Goal 4 React Native mobile path, and Goal 5 all possible cards.

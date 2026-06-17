@@ -399,6 +399,7 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
       # Effect type `:opponent_discards_to_hand_size` with target_hand_size: 3 is declared.
       # Full resolution wiring (prompt + discard execution) is future work per north-star scope.
       # Current generic Supporter path treats this as a declared but unresolved effect.
+      # Placeholder documents declared effect; actual resolution test belongs in future batch.
       assert true
     end
 
@@ -407,6 +408,7 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
       # Effect type `:attach_basic_energy_from_discard_to_stage2_if_more_prizes` declared.
       # Full resolution wiring is future work per north-star scope.
       # Current generic Supporter path treats this as a declared but unresolved effect.
+      # Placeholder documents declared effect; actual resolution test belongs in future batch.
       assert true
     end
 
@@ -416,6 +418,7 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
       # require_opponent_prize_count_at_most/3 guard, shuffle_hand_to_bottom_of_deck/5,
       # and maybe_draw_after_opponent_hand_bottomed/4 (card_play.ex:403-431, 1164-1178, 2927-2957).
       # Behavior registered in EngineCardRegistry and legacy Behaviors.CRI.
+      # Placeholder documents resolved status; full fixture test belongs in future batch.
       assert true
     end
   end
