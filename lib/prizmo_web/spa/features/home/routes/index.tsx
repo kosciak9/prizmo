@@ -1047,8 +1047,10 @@ export function HomeRoute() {
 
   const decks = decksQuery.data ?? []
   const availableGames = availableGamesQuery.data ?? []
-  const selectedPlayerOneDeckKey = playerOneDeckKey || decks[0]?.deckKey || ''
-  const selectedPlayerTwoDeckKey = playerTwoDeckKey || decks[1]?.deckKey || decks[0]?.deckKey || ''
+  const defaultPlayerOneDeckKey = decks[0]?.deckKey ?? ''
+  const defaultPlayerTwoDeckKey = defaultSecondSupportedDeckKey(decks, defaultPlayerOneDeckKey)
+  const selectedPlayerOneDeckKey = playerOneDeckKey || defaultPlayerOneDeckKey
+  const selectedPlayerTwoDeckKey = playerTwoDeckKey || defaultPlayerTwoDeckKey || defaultPlayerOneDeckKey
   const normalisedGameId = session.gameId.trim()
   const parsedPlayerOneOpenDeck = useMemo(() => parseOpenDeckText(playerOneOpenDeckText), [playerOneOpenDeckText])
   const parsedPlayerTwoOpenDeck = useMemo(() => parseOpenDeckText(playerTwoOpenDeckText), [playerTwoOpenDeckText])
@@ -1436,10 +1438,7 @@ export function HomeRoute() {
     queriedGameState && queriedGameState.viewerPlayerId !== session.viewerPlayerId
   )
   const gameState = gameStateHasViewerMismatch ? undefined : queriedGameState
-  const deckNamesByKey = useMemo(
-    () => new Map(decks.map(deck => [deck.deckKey, deck.name])),
-    [decks]
-  )
+  const deckNamesByKey = useMemo(() => buildSupportedDeckLabels(decks), [decks])
   const selectedPlayerOneDeck = useMemo(
     () => decks.find(deck => deck.deckKey === selectedPlayerOneDeckKey) ?? null,
     [decks, selectedPlayerOneDeckKey]
@@ -1455,7 +1454,7 @@ export function HomeRoute() {
     launcherMode === 'regular'
       ? openDeckLoadoutDetail(parsedPlayerOneOpenDeck, parsedPlayerTwoOpenDeck, openDeckRngSeedValue)
       : selectedPlayerOneDeck && selectedPlayerTwoDeck
-        ? `${selectedPlayerOneDeck.name} vs ${selectedPlayerTwoDeck.name}`
+        ? `${supportedDeckLabel(selectedPlayerOneDeck, deckNamesByKey)} vs ${supportedDeckLabel(selectedPlayerTwoDeck, deckNamesByKey)}`
         : decks.length > 0
           ? 'Choose one supported fixture for each player.'
           : 'Waiting for the engine-owned fixture catalog.'
@@ -2450,6 +2449,54 @@ async function listSupportedDecks(): Promise<SupportedDeck[]> {
   }
 
   return result.data as SupportedDeck[]
+}
+
+function buildSupportedDeckLabels(decks: SupportedDeck[]): Map<string, string> {
+  const duplicateCounts = new Map<string, number>()
+
+  decks.forEach(deck => {
+    duplicateCounts.set(deck.name, (duplicateCounts.get(deck.name) ?? 0) + 1)
+  })
+
+  return new Map(
+    decks.map(deck => {
+      const label = (duplicateCounts.get(deck.name) ?? 0) > 1 ? `${deck.name} · ${deck.deckKey}` : deck.name
+      return [deck.deckKey, label]
+    })
+  )
+}
+
+function supportedDeckLabel(deck: SupportedDeck, deckLabelsByKey: Map<string, string>): string {
+  return deckLabelsByKey.get(deck.deckKey) ?? deck.name
+}
+
+function supportedDeckArchetypeKey(deck: SupportedDeck): string {
+  const primarySegment = deck.name.split('/')[0]?.trim() ?? deck.name.trim()
+  const [primaryToken] = primarySegment.split(/\s+/)
+  return (primaryToken || primarySegment).toLowerCase()
+}
+
+function defaultSecondSupportedDeckKey(decks: SupportedDeck[], firstDeckKey: string): string {
+  if (!firstDeckKey) {
+    return decks[1]?.deckKey ?? decks[0]?.deckKey ?? ''
+  }
+
+  const firstDeck = decks.find(deck => deck.deckKey === firstDeckKey)
+
+  if (!firstDeck) {
+    return decks[1]?.deckKey ?? decks[0]?.deckKey ?? ''
+  }
+
+  const firstDeckArchetypeKey = supportedDeckArchetypeKey(firstDeck)
+
+  return (
+    decks.find(
+      deck => deck.deckKey !== firstDeckKey && supportedDeckArchetypeKey(deck) !== firstDeckArchetypeKey
+    )?.deckKey ??
+    decks.find(deck => deck.deckKey !== firstDeckKey && deck.name !== firstDeck.name)?.deckKey ??
+    decks.find(deck => deck.deckKey !== firstDeckKey)?.deckKey ??
+    firstDeckKey
+  )
 }
 
 type DeckBlueprint = {
@@ -9607,6 +9654,8 @@ function DeckSelect({
   onChange: (value: string) => void
 }) {
   const selectedDeck = decks.find(deck => deck.deckKey === value) ?? null
+  const deckLabelsByKey = useMemo(() => buildSupportedDeckLabels(decks), [decks])
+  const selectedDeckLabel = selectedDeck ? supportedDeckLabel(selectedDeck, deckLabelsByKey) : null
 
   return (
     <div className="prizmo-soft-surface rounded-2xl p-3">
@@ -9624,7 +9673,7 @@ function DeckSelect({
           {decks.length === 0 ? <option value="">No decks available</option> : null}
           {decks.map(deck => (
             <option key={deck.deckKey} value={deck.deckKey}>
-              {deck.name}
+              {supportedDeckLabel(deck, deckLabelsByKey)}
             </option>
           ))}
         </select>
@@ -9634,7 +9683,7 @@ function DeckSelect({
         <div className="mt-3 pt-3">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-foreground">{selectedDeck.name}</p>
+              <p className="truncate text-sm font-semibold text-foreground">{selectedDeckLabel}</p>
               <p className="mt-1 font-mono text-xs text-muted-foreground">{selectedDeck.deckKey}</p>
             </div>
             <a
@@ -9757,6 +9806,8 @@ function SupportedDeckCatalog({
   playerOneDeckKey: string
   playerTwoDeckKey: string
 }) {
+  const deckLabelsByKey = useMemo(() => buildSupportedDeckLabels(decks), [decks])
+
   if (decks.length === 0) {
     return (
       <p className="rounded-xl bg-secondary/70 px-3 py-2 text-sm leading-6 text-muted-foreground">
@@ -9778,7 +9829,7 @@ function SupportedDeckCatalog({
           <div className="rounded-xl bg-secondary/70 p-3" key={deck.deckKey}>
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <p className="truncate text-sm font-medium text-foreground">{deck.name}</p>
+                <p className="truncate text-sm font-medium text-foreground">{supportedDeckLabel(deck, deckLabelsByKey)}</p>
                 <p className="mt-1 font-mono text-xs text-muted-foreground">{deck.deckKey}</p>
               </div>
               {selectedSeats.length > 0 ? (

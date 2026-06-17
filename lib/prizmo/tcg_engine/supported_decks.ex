@@ -19,12 +19,12 @@ defmodule Prizmo.TcgEngine.SupportedDecks do
 
   @doc "Returns UI-safe summaries for all supported engine deck fixtures."
   @spec list() :: [Decks.summary()]
-  def list, do: Decks.list()
+  def list, do: Decks.playtest_list()
 
   @doc "Fetches a supported engine deck summary by deck key."
   @spec fetch(deck_key()) :: {:ok, Decks.summary()} | {:error, {:unsupported_deck, term()}}
   def fetch(deck_key) do
-    case Decks.fetch(deck_key) do
+    case Decks.fetch_playtest(deck_key) do
       {:ok, deck_module} -> {:ok, Decks.summary(deck_module)}
       :error -> {:error, {:unsupported_deck, deck_key}}
     end
@@ -42,7 +42,7 @@ defmodule Prizmo.TcgEngine.SupportedDecks do
   @doc "Returns the full blueprint (including raw card counts) for a supported deck key."
   @spec fetch_blueprint(deck_key()) :: {:ok, blueprint()} | {:error, {:unsupported_deck, term()}}
   def fetch_blueprint(deck_key) do
-    case Decks.fetch(deck_key) do
+    case Decks.fetch_playtest(deck_key) do
       {:ok, deck_module} ->
         summary = Decks.summary(deck_module)
 
@@ -117,7 +117,7 @@ defmodule Prizmo.TcgEngine.SupportedDecks do
   defp normalize_selection(selection), do: {:error, {:invalid_player_deck_selection, selection}}
 
   defp fetch_deck_module(deck_key) do
-    case Decks.fetch(deck_key) do
+    case Decks.fetch_playtest(deck_key) do
       {:ok, deck_module} -> {:ok, deck_module}
       :error -> {:error, {:unsupported_deck, deck_key}}
     end

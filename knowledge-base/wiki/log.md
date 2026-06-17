@@ -1,5 +1,12 @@
 # Wiki Log
 
+## [2026-06-17] codebase update | Goal 1 playtest fixture launcher expansion
+
+- Task attempted: exposed the full latest-Limitless Goal 1 fixture universe through the supported-deck launcher without broadening the legacy known-deck smoke surface. `Prizmo.Tcg.Decks` now keeps the old nine-deck stable pool for metadata/sim coverage while exposing a separate Goal 1 `playtest_modules/0` pool for browser validation, `Prizmo.TcgEngine.SupportedDecks` now lists/fetches/creates games from that broader playtest pool, and the SPA disambiguates duplicate deck names with deck ids while defaulting player two to the first cross-archetype matchup (`28275` Alakazam Dudunsparce) instead of another Dragapult variant.
+- Files changed: `lib/prizmo/tcg/decks.ex`, `lib/prizmo/tcg/goal_1/latest_limitless.ex`, `lib/prizmo/tcg_engine/supported_decks.ex`, `lib/prizmo_web/spa/features/home/routes/index.tsx`, `knowledge-base/wiki/engine/dragapult-alakazam-full-game-implementation-scope.md`, `knowledge-base/wiki/log.md`.
+- Validation: `mix compile --warnings-as-errors`, `node_modules/.bin/tsc --noEmit`, focused `mix test test/prizmo/tcg/sim/pairwise_smoke_test.exs` (73/0), browser validation on `http://localhost:4003`, and final `mix check` all passed. Verified launcher state: 30 supported playtest fixtures visible, duplicate `Dragapult` / `Alakazam Dudunsparce` entries are labeled with deck ids, and the default regular-board pairing opens as Dragapult/Dusknoir `28236` versus Alakazam Dudunsparce `28275`.
+- Remaining/blocking notes: this closes the launcher/catalog gap for Goal 1 two-seat validation, but Goal 1 still remains open because representative Dragapult variants still need full end-to-end browser/play-surface validation against Alakazam.
+
 ## [2026-06-17] codebase update | Goal 1 Dragapult validation batch
 
 - Task attempted: closed the explicit Goal 1 mechanics-validation gap that remained after live latest-Limitless card coverage reached green. Added focused canonical-engine coverage for Fairy Zone weakness remapping, Chi-Yu `Ground Melter` Stadium discard, Duskull `Come and Get You` discard-to-bench prompt flow, Dusclops `Cursed Blast` knockout prize/replacement flow plus `Damp` blocking, and `Jamming Tower` suppressing `JTG-151` Lillie's Pearl Prize reduction. The Fairy Zone validation exposed and fixed a real engine bug: `AttackDamage` was previously checking the defending side for Fairy Zone instead of the attacking player's in-play source.

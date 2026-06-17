@@ -120,6 +120,14 @@ defmodule Prizmo.Tcg.Goal1.LatestLimitless do
   @spec tracked_archetypes() :: [map()]
   def tracked_archetypes, do: @goal_1_archetypes
 
+  @doc "Returns the committed Goal 1 fixture modules used by the latest-Limitless audit."
+  @spec fixture_modules() :: [module()]
+  def fixture_modules do
+    @goal_1_archetypes
+    |> Enum.flat_map(& &1.fixture_modules)
+    |> Enum.uniq()
+  end
+
   @doc "Builds the live-versus-committed Goal 1 audit rows for all archetypes."
   @spec audit!() :: [audit_row()]
   def audit! do
