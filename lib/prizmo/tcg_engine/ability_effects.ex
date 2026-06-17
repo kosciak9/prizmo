@@ -235,6 +235,13 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
     end
   end
 
+  def require_fan_call_available(%CardInstance{} = source, %Turn{} = turn) do
+    with {:ok, _effect} <- fan_call_effect(source),
+         :ok <- require_in_play(source) do
+      require_ability_unused(source, turn, @fan_call_ability_id)
+    end
+  end
+
   def psychic_draw_count(%CardInstance{} = source) do
     with {:ok, %{draw_count: draw_count}} <- psychic_draw_effect(source) do
       {:ok, draw_count}
@@ -687,6 +694,19 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
         {:error,
          {:unsupported_ability_effect, card_id, @cursed_blast_ability_id,
           @cursed_blast_effect_type}}
+    end
+  end
+
+  defp fan_call_effect(%CardInstance{card_id: card_id}) do
+    with {:ok, %{abilities: abilities}} <- CardCatalog.fetch(card_id),
+         %{effect: %{type: :search_colorless_pokemon_with_100_hp_or_less_to_hand_on_first_turn}} <-
+           Map.get(abilities, @fan_call_ability_id) do
+      {:ok, %{}}
+    else
+      _other ->
+        {:error,
+         {:unsupported_ability_effect, card_id, @fan_call_ability_id,
+          :search_colorless_pokemon_with_100_hp_or_less_to_hand_on_first_turn}}
     end
   end
 

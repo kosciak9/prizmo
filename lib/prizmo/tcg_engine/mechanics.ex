@@ -1286,6 +1286,12 @@ defmodule Prizmo.TcgEngine.Mechanics do
     end)
   end
 
+  @spec use_fan_call(Game.t() | String.t(), String.t(), String.t()) ::
+          {:ok, Game.t()} | {:error, term()}
+  def use_fan_call(_game_or_id, _player_id, _source_card_instance_id) do
+    {:error, :fan_call_requires_search_deck_prompt_integration}
+  end
+
   @spec use_drakloak_recon_directive(Game.t() | String.t(), String.t(), String.t(), String.t()) ::
           {:ok, Game.t()} | {:error, term()}
   def use_drakloak_recon_directive(

@@ -852,6 +852,7 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     kind: :trainer,
     trainer_type: :supporter,
     play_window: :action_window,
+    first_turn_supporter_allowed_when_going_first?: true,
     effects: [
       %Effect{
         key: :search_colorless_pokemon_with_100_hp_or_less_to_hand_on_first_turn,
