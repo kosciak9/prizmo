@@ -8,12 +8,23 @@ defmodule Prizmo.Tcg.Goal1.LatestLimitless do
   """
 
   alias Prizmo.Tcg.Data.Limitless
-  alias Prizmo.Tcg.Decks.Alakazam27147
   alias Prizmo.Tcg.Decks.Dragapult27431
   alias Prizmo.Tcg.Decks.DragapultBlaziken28253
   alias Prizmo.Tcg.Decks.DragapultDusknoir28236
   alias Prizmo.Tcg.Decks.DragapultPlain28256
   alias Prizmo.Tcg.Goal1.CardCoverage
+  alias Prizmo.Tcg.Goal1.Decks.Alakazam27615
+  alias Prizmo.Tcg.Goal1.Decks.Alakazam28275
+  alias Prizmo.Tcg.Goal1.Decks.Alakazam28291
+  alias Prizmo.Tcg.Goal1.Decks.Alakazam28310
+  alias Prizmo.Tcg.Goal1.Decks.Alakazam28337
+  alias Prizmo.Tcg.Goal1.Decks.Alakazam28340
+  alias Prizmo.Tcg.Goal1.Decks.Alakazam28368
+  alias Prizmo.Tcg.Goal1.Decks.Alakazam28385
+  alias Prizmo.Tcg.Goal1.Decks.Alakazam28398
+  alias Prizmo.Tcg.Goal1.Decks.Alakazam28405
+  alias Prizmo.Tcg.Goal1.Decks.Alakazam28431
+  alias Prizmo.Tcg.Goal1.Decks.Alakazam28438
 
   @type audit_row :: %{
           key: atom(),
@@ -72,7 +83,20 @@ defmodule Prizmo.Tcg.Goal1.LatestLimitless do
       key: :alakazam,
       label: "Alakazam",
       overview_deck_id: "350",
-      fixture_modules: [Alakazam27147]
+      fixture_modules: [
+        Alakazam28275,
+        Alakazam28291,
+        Alakazam28310,
+        Alakazam28337,
+        Alakazam28340,
+        Alakazam28368,
+        Alakazam28385,
+        Alakazam28398,
+        Alakazam28405,
+        Alakazam28431,
+        Alakazam28438,
+        Alakazam27615
+      ]
     }
   ]
 

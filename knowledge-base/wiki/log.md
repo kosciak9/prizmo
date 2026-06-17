@@ -1,5 +1,12 @@
 # Wiki Log
 
+## [2026-06-17] codebase update | Goal 1 live Alakazam fixture corpus expansion
+
+- Task attempted: closed the largest remaining Goal 1 fixture-drift bucket by replacing the historical single-deck Alakazam live-fixture assumption with the current Limitless latest-result deck-id set. `Prizmo.Tcg.Goal1.LatestLimitless` now tracks twelve dedicated Goal 1 Alakazam deck modules (`28275`, `28291`, `28310`, `28337`, `28340`, `28368`, `28385`, `28398`, `28405`, `28431`, `28438`, `27615`) under `lib/prizmo/tcg/goal_1/decks/` instead of treating stale baseline `27147` as the live Goal 1 Alakazam corpus.
+- Files changed: new `lib/prizmo/tcg/goal_1/decks/alakazam*.ex` live fixture modules for the twelve current Alakazam latest-result lists, `lib/prizmo/tcg/goal_1/latest_limitless.ex`, `knowledge-base/wiki/engine/dragapult-alakazam-full-game-implementation-scope.md`, `knowledge-base/wiki/log.md`.
+- Validation: `mix format`, `mix compile --warnings-as-errors`, `mix prizmo.goal1.audit`, `mix prizmo.goal1.corpus`, and `mix check` passed. The refreshed audit now reports no missing or stale committed Goal 1 Alakazam fixtures, and the corpus report shows the committed Alakazam live fixture corpus covers the full current latest-result card set (`live unique cards: 39`, `committed fixture unique cards: 39`) with `supported=38`, `generic-supported=1`, `partial=0`, `unimplemented=0`.
+- Remaining/blocking notes: Goal 1 still remains open because Dragapult live fixture drift is still unresolved, dedicated validation for Fairy Zone / Ground Melter / Come and Get You / Cursed Blast prize-replacement-Damp interactions / Jamming Tower is still sparse, and full two-seat play-surface validation across the important Dragapult variants against Alakazam is still pending.
+
 ## [2026-06-17] codebase update | Goal 1 Dragapult latest-result corpus closed
 
 - Task attempted: closed the last two live latest-result Dragapult partials on the canonical Ash path. `MEG-088` Yveltal now overlays `Clutch` onto the existing `defending_pokemon_cannot_retreat_next_turn` attack-effect path, and `JTG-151` Lillie's Pearl now counts as an engine-defined Tool whose Prize-reduction text is preserved through knockout accounting when an attached Lillie's Pokémon is Knocked Out by damage from an opponent's attack.
