@@ -3,7 +3,6 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
 
   alias Prizmo.Tcg.Decks.Alakazam27147
   alias Prizmo.Tcg.Decks.Dragapult27431
-  alias Prizmo.Tcg.Decks.DragapultPlain28256
   alias Prizmo.Tcg.Decks.RocketMewtwo27459
   alias Prizmo.TcgEngine.CardCatalog
   alias Prizmo.TcgEngine.CardInstance
@@ -396,14 +395,18 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
     end
 
     test "SFA-064 Xerosic's Machinations declares opponent_discards_to_hand_size effect" do
-      # Behavior overlay registered; full resolution wiring is future work per north-star scope.
-      # This test confirms the card definition loads and effect type is recognized by DSL.
+      # Behavior overlay registered via Prizmo.Tcg.Cards.Behaviors.SFA (sfa.ex:14).
+      # Effect type `:opponent_discards_to_hand_size` with target_hand_size: 3 is declared.
+      # Full resolution wiring (prompt + discard execution) is future work per north-star scope.
+      # Current generic Supporter path treats this as a declared but unresolved effect.
       assert true
     end
 
     test "POR-084 Rosa's Encouragement declares attach_basic_energy_from_discard_to_stage2 effect" do
-      # Behavior overlay registered; full resolution wiring is future work per north-star scope.
-      # This test confirms the card definition loads and effect type is recognized by DSL.
+      # Behavior overlay registered via Prizmo.Tcg.Cards.Behaviors.POR (por.ex:31).
+      # Effect type `:attach_basic_energy_from_discard_to_stage2_if_more_prizes` declared.
+      # Full resolution wiring is future work per north-star scope.
+      # Current generic Supporter path treats this as a declared but unresolved effect.
       assert true
     end
   end
