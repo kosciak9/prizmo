@@ -74,6 +74,11 @@ defmodule Prizmo.TcgEngine do
         args: [:deck_key]
 
       define :create_supported_game, action: :create_from_supported_decks, args: [:players]
+
+      define :create_supported_game_with_seed,
+        action: :create_from_supported_decks,
+        args: [:players, :rng_seed]
+
       define :create_open_deck_game, action: :create_from_decklists, args: [:players]
 
       define :create_open_deck_game_with_seed,

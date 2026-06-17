@@ -1021,7 +1021,7 @@ export function HomeRoute() {
   const [playerTwoDeckKey, setPlayerTwoDeckKey] = useState('')
   const [playerOneOpenDeckText, setPlayerOneOpenDeckText] = useState('')
   const [playerTwoOpenDeckText, setPlayerTwoOpenDeckText] = useState('')
-  const [openDeckRngSeed, setOpenDeckRngSeed] = useState('')
+  const [gameRngSeed, setGameRngSeed] = useState('')
   const [ultraBallPostSearchHandoff, setUltraBallPostSearchHandoff] =
     useState<UltraBallPostSearchHandoff | null>(readStoredUltraBallPostSearchHandoff)
 
@@ -1054,7 +1054,7 @@ export function HomeRoute() {
   const normalisedGameId = session.gameId.trim()
   const parsedPlayerOneOpenDeck = useMemo(() => parseOpenDeckText(playerOneOpenDeckText), [playerOneOpenDeckText])
   const parsedPlayerTwoOpenDeck = useMemo(() => parseOpenDeckText(playerTwoOpenDeckText), [playerTwoOpenDeckText])
-  const openDeckRngSeedValue = openDeckRngSeed.trim()
+  const gameRngSeedValue = gameRngSeed.trim()
 
   useEffect(() => {
     setUltraBallPostSearchHandoff(currentHandoff => {
@@ -1116,13 +1116,14 @@ export function HomeRoute() {
         return createOpenDeckGame({
           playerOneCards: parsedPlayerOneOpenDeck.cards,
           playerTwoCards: parsedPlayerTwoOpenDeck.cards,
-          rngSeed: openDeckRngSeedValue.length > 0 ? openDeckRngSeedValue : null
+          rngSeed: gameRngSeedValue.length > 0 ? gameRngSeedValue : null
         })
       }
 
       return createFixtureGame({
         playerOneDeckKey: selectedPlayerOneDeckKey,
-        playerTwoDeckKey: selectedPlayerTwoDeckKey
+        playerTwoDeckKey: selectedPlayerTwoDeckKey,
+        rngSeed: gameRngSeedValue.length > 0 ? gameRngSeedValue : null
       })
     },
     onSuccess: async game => {
@@ -1452,9 +1453,9 @@ export function HomeRoute() {
   const loadoutsReady = launcherMode === 'regular' ? openDeckLoadoutsReady : fixtureLoadoutsReady
   const loadoutDetail =
     launcherMode === 'regular'
-      ? openDeckLoadoutDetail(parsedPlayerOneOpenDeck, parsedPlayerTwoOpenDeck, openDeckRngSeedValue)
+      ? openDeckLoadoutDetail(parsedPlayerOneOpenDeck, parsedPlayerTwoOpenDeck, gameRngSeedValue)
       : selectedPlayerOneDeck && selectedPlayerTwoDeck
-        ? `${supportedDeckLabel(selectedPlayerOneDeck, deckNamesByKey)} vs ${supportedDeckLabel(selectedPlayerTwoDeck, deckNamesByKey)}`
+        ? `${supportedDeckLabel(selectedPlayerOneDeck, deckNamesByKey)} vs ${supportedDeckLabel(selectedPlayerTwoDeck, deckNamesByKey)} with ${rngSeedDetail(gameRngSeedValue)}.`
         : decks.length > 0
           ? 'Choose one supported fixture for each player.'
           : 'Waiting for the engine-owned fixture catalog.'
@@ -1800,23 +1801,24 @@ export function HomeRoute() {
                           value={playerTwoOpenDeckText}
                           onChange={setPlayerTwoOpenDeckText}
                         />
-                        <label className="block space-y-2 rounded-2xl bg-secondary/55 p-3">
-                          <span className="flex items-center justify-between gap-3">
-                            <span className="text-sm font-medium text-foreground">Deterministic seed</span>
-                            <StatusBadge tone={openDeckRngSeedValue ? 'warning' : 'neutral'}>
-                              {openDeckRngSeedValue ? 'explicit' : 'fresh RNG'}
-                            </StatusBadge>
-                          </span>
-                          <input
-                            className="w-full rounded-xl border border-input bg-input/40 px-3 py-2 font-mono text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring/30"
-                            onChange={event => setOpenDeckRngSeed(event.currentTarget.value)}
-                            placeholder="Optional seed for reproducible dev games"
-                            type="text"
-                            value={openDeckRngSeed}
-                          />
-                        </label>
                       </>
                     ) : null}
+
+                    <label className="block space-y-2 rounded-2xl bg-secondary/55 p-3">
+                      <span className="flex items-center justify-between gap-3">
+                        <span className="text-sm font-medium text-foreground">Deterministic seed</span>
+                        <StatusBadge tone={gameRngSeedValue ? 'warning' : 'neutral'}>
+                          {gameRngSeedValue ? 'explicit' : 'fresh RNG'}
+                        </StatusBadge>
+                      </span>
+                      <input
+                        className="w-full rounded-xl border border-input bg-input/40 px-3 py-2 font-mono text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring/30"
+                        onChange={event => setGameRngSeed(event.currentTarget.value)}
+                        placeholder="Optional seed for reproducible dev games"
+                        type="text"
+                        value={gameRngSeed}
+                      />
+                    </label>
                   </>
                 ) : null}
 
@@ -2692,7 +2694,7 @@ function openDeckLoadoutDetail(
   rngSeed: string
 ) {
   if (isOpenDeckReady(playerOneDeck) && isOpenDeckReady(playerTwoDeck)) {
-    const seedDetail = rngSeed ? ` explicit seed ${rngSeed}` : ' fresh RNG seed'
+    const seedDetail = ` ${rngSeedDetail(rngSeed)}`
     const importedLineCount = playerOneDeck.importedLineCount + playerTwoDeck.importedLineCount
     const importDetail = importedLineCount > 0 ? `; ${importedLineCount} external rows normalized` : ''
 
@@ -2704,6 +2706,10 @@ function openDeckLoadoutDetail(
   }
 
   return `Paste ${EXPECTED_OPEN_DECK_CARD_COUNT}-card catalog-backed lists for both players.`
+}
+
+function rngSeedDetail(rngSeed: string) {
+  return rngSeed ? `explicit seed ${rngSeed}` : 'fresh RNG seed'
 }
 
 async function createOpenDeckGame(input: {
@@ -2734,10 +2740,12 @@ async function createOpenDeckGame(input: {
 async function createFixtureGame(input: {
   playerOneDeckKey: string
   playerTwoDeckKey: string
+  rngSeed: string | null
 }): Promise<CreatedGame> {
   const result = await runCreateTcgEngineGame({
     input: {
       activePlayerId: PLAYER_ONE_ID,
+      ...(input.rngSeed ? { rngSeed: input.rngSeed } : {}),
       players: [
         { playerId: PLAYER_ONE_ID, deckKey: input.playerOneDeckKey },
         { playerId: PLAYER_TWO_ID, deckKey: input.playerTwoDeckKey }

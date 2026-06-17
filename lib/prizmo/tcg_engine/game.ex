@@ -63,6 +63,7 @@ defmodule Prizmo.TcgEngine.Game do
     define :list_supported_decks
     define :get_supported_deck_blueprint, args: [:deck_key]
     define :create_from_supported_decks, args: [:players]
+
     define :create_from_decklists, args: [:players]
 
     define :create_from_decklists_with_seed,
@@ -162,13 +163,13 @@ defmodule Prizmo.TcgEngine.Game do
       end
 
       argument :active_player_id, :string
+      argument :rng_seed, :string
 
       run fn input, _context ->
         opts =
-          case Map.get(input.arguments, :active_player_id) do
-            nil -> []
-            active_player_id -> [active_player_id: active_player_id]
-          end
+          []
+          |> maybe_put_opt(:active_player_id, Map.get(input.arguments, :active_player_id))
+          |> maybe_put_opt(:rng_seed, Map.get(input.arguments, :rng_seed))
 
         SupportedDecks.create_game(input.arguments.players, opts)
       end
