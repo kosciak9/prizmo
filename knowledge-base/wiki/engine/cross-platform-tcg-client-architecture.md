@@ -1,18 +1,29 @@
 # Cross-Platform TCG Client Architecture
 
-- Updated: 2026-05-28
-- Sources: Godot docs; Born React Native Godot; Migeran LibGodot; React Three Fiber; React Native Skia; Godot card repositories
+- Updated: 2026-06-17
+- Sources: Godot docs; Born React Native Godot; Migeran LibGodot; React Three Fiber; React Native Skia; Godot card repositories; Project codebase; user direction
 - Raw: [React web/RN renderer research](../../raw/engine/2026-05-28-react-web-rn-renderer-research.md); [Embedded Godot research](../../raw/engine/2026-05-28-embedded-godot-research.md); [Godot card repo validation](../../raw/engine/2026-05-28-godot-card-repo-validation.md); [AI thread capture](../../raw/engine/2026-05-28-tcg-client-renderer-ai-thread.md)
 
 ## Goal
 
-Support three client surfaces:
+This page supports the canonical roadmap's client goals:
 
-1. React web app
-2. React Native app for iOS/Android
-3. Embedded Godot gameplay renderer
+- **Goal 3:** React web shell wrapping embedded Godot as the in-game play surface.
+- **Goal 4:** React Native shell wrapping embedded Godot as the native mobile pathway.
 
-The authoritative game server already exists or will exist separately. The client should render, animate, collect input, send commands, and display server-confirmed state — not own game truth.
+Godot is for playing the game well. It is not the whole product application.
+
+## Target surfaces
+
+Support three coordinated client surfaces:
+
+1. React web product shell
+2. React Native product shell for iOS/Android
+3. Embedded Godot gameplay renderer/play surface
+
+The authoritative game server already exists in the Ash/Postgres engine. Clients should render, animate, collect input, send commands, and display server-confirmed state — not own game truth.
+
+The current React browser game UI is temporary scaffolding for engine validation and protocol discovery. It should inform the shared play protocol, but should not be treated as the long-term in-game UX.
 
 ## Strong recommendation
 
@@ -20,18 +31,20 @@ Use **React/React Native as the product shell** and **embedded Godot as the game
 
 ```text
 React web shell / React Native shell
-  - auth, deck management, settings
-  - coaching panels, history, review UI
+  - auth, deck management, game/session selection, settings
+  - coaching panels, history, review UI when those product surfaces return
   - overlays, navigation, account/product flows
+  - lifecycle wrapper for the embedded Godot play surface
 
 Embedded Godot renderer
   - board/cards/zones/hand/prizes
   - touch-first input and animation
+  - targeting UX and visual feedback
   - command emission
   - server-confirmed state animation
 ```
 
-Do not try to make React, React Native, and Godot all render the same board independently unless a fallback is required. Share the **protocol and view-model contract**, not renderer internals.
+Do not try to make React, React Native, and Godot all render the same board independently unless a temporary fallback/debug tool is required. Share the **protocol and view-model contract**, not renderer internals. Do not put rules logic into React, React Native, or Godot.
 
 ## Why this changed the prior recommendation
 
@@ -97,8 +110,8 @@ Godot renderer
 
 React/RN shell
   ├─ app lifecycle: pause/resume/start/stop Godot
-  ├─ navigation/context: match id, user token, settings
-  ├─ overlays: coaching, logs, debug panels
+  ├─ navigation/context: match id, deck/game/session choice, user token, settings
+  ├─ overlays: coaching, logs, debug panels when product surfaces need them
   └─ telemetry/product events
 ```
 

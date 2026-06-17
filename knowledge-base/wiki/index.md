@@ -17,19 +17,19 @@ Structured APIs that can enrich logs with card, deck, and tournament context.
 | [Integration Risk and Access Notes](data/integration-risk-and-access-notes.md) | Risk-ranked view of stable APIs versus community tooling and manual-only surfaces. | 2026-05-26 |
 
 ## engine
-Research notes for possible future rules-engine, simulator, replay, and card-behavior work.
+Canonical roadmap, server-authoritative TCG engine coverage, and React-shell/Godot-play-surface architecture.
 
 | Article | Summary | Updated |
 | --- | --- | --- |
-| [Dragapult and Alakazam Full-Game Implementation Scope](engine/dragapult-alakazam-full-game-implementation-scope.md) | Current exact printed-text-fidelity scope/status for Dragapult vs Alakazam variants, including closed fixture blockers, Blaziken/Dusknoir mechanics, and remaining tech-card/browser-validation work. | 2026-06-16 |
-| [Dragapult/Alakazam Two-Deck North Star](engine/ash-backed-tcg-engine-playtest-north-star.md) | Current north-star plan: make Dragapult-versus-Alakazam matchups fully playable step by step through complete Ash mechanics before UI polish, Electric Streams, broad open-deck expansion, AI, coaching, or non-target deck work. | 2026-06-16 |
-| [Ash-backed TCG Engine Playtest Handoff](engine/ash-backed-tcg-engine-playtest-handoff.md) | Current operational handoff for autonomous agents: prioritize Dragapult-versus-Alakazam two-deck target mechanics and playability validation (including pending gameplay text) before unrelated polish. | 2026-06-16 |
+| [Dragapult and Alakazam Latest-Limitless Coverage Scope](engine/dragapult-alakazam-full-game-implementation-scope.md) | Goal 1 scope: support all latest Limitless variants for Dragapult and Alakazam through server-side Ash engine behavior, explicit coverage status, and play-surface validation. | 2026-06-17 |
+| [Prizmo TCG Engine and Play Surface North Star](engine/ash-backed-tcg-engine-playtest-north-star.md) | Canonical roadmap: Goal 1 latest-Limitless Dragapult/Alakazam completeness; Goal 2 top 30 Limitless archetype card coverage; Goal 3 React shell + embedded Godot play surface; Goal 4 React Native mobile path; Goal 5 all possible cards. | 2026-06-17 |
+| [Ash-backed TCG Engine Playtest Handoff](engine/ash-backed-tcg-engine-playtest-handoff.md) | Historical/operational handoff for prior two-deck and six-deck engine work; current agents should follow the canonical latest-Limitless/Godot roadmap instead. | 2026-06-17 |
 | [Dragapult/Alakazam GameView Pending-Text Inventory (2026-06-16)](engine/dragapult-alakazam-gameview-pending-text-inventory-2026-06-16.md) | Authoritative live GameView pending-text inventory for the current north-star target decks (Dragapult 27431 variants + Alakazam 27147) confirming zero visible blockers after the plain-tech Supporter batch. | 2026-06-16 |
 | [Card Engine Authoring Models](engine/card-engine-authoring-models.md) | Comparison of code-first, generated-stub, Elixir macro DSL, hybrid metadata/behavior, and coverage-tooling patterns for exact Standard-only PTCG card behavior. | 2026-05-27 |
-| [Cross-Platform TCG Client Architecture](engine/cross-platform-tcg-client-architecture.md) | React web/RN app-shell architecture with embedded Godot as the shared gameplay renderer, including web, Android, and iOS integration risks. | 2026-05-28 |
+| [Cross-Platform TCG Client Architecture](engine/cross-platform-tcg-client-architecture.md) | Goal 3/4 architecture: React web and React Native product shells wrap embedded Godot as the in-game play surface while the Ash/Postgres server remains authoritative. | 2026-06-17 |
 | [Full-Game Two-Deck Simulator Implementation](engine/full-game-two-deck-simulator-implementation.md) | Implementation notes for the ExUnit-first state-machine simulator slice, including undo/redo snapshots and fixed Dragapult vs Alakazam deck skeletons. | 2026-05-28 |
 | [Meta Deck, TCGdex, Card DSL, and LiveView Play North Star](engine/meta-deck-card-dsl-north-star.md) | Historical north-star plan for the old simulator-era deck/card DSL migration; superseded by the Ash-backed engine and playtest UI plan. | 2026-05-30 |
-| [TCG Client Renderer Options](engine/tcg-client-renderer-options.md) | Renderer/client architecture options for a server-authoritative Pokémon-like TCG, with Godot 2D + GDScript as the strongest touch-first direction and `game/*` reserved for Godot experiments. | 2026-06-16 |
+| [TCG Client Renderer Options](engine/tcg-client-renderer-options.md) | Renderer/play-surface direction: current React browser gameplay is temporary scaffolding; React/React Native shells should embed a Godot 2D play surface that consumes a server-authoritative protocol. | 2026-06-17 |
 
 ## meta
 Competitive ecosystem references for decks, tournaments, and manual research.
@@ -41,7 +41,7 @@ Competitive ecosystem references for decks, tournaments, and manual research.
 | [Pokémon TCG Practice Tool Surface](meta/pokemon-tcg-practice-tool-surface.md) | Survey of existing Pokémon TCG practice, prep, guide, and community tool categories. | 2026-05-26 |
 
 ## product
-Product and UX references for turning one played game into actionable improvement.
+Deferred product and UX references for post-game coaching and practice loops; useful later, but not the current engine/play-surface roadmap priority.
 
 | Article | Summary | Updated |
 | --- | --- | --- |
@@ -50,5 +50,5 @@ Product and UX references for turning one played game into actionable improvemen
 | [First Coaching-Rule Taxonomy](product/first-coaching-rule-taxonomy.md) | First-pass rule categories and confidence guidelines for deterministic post-game coaching. | 2026-05-26 |
 | [Learning-Science Patterns for Practice Tools](product/learning-science-patterns-for-practice-tools.md) | Retrieval, spacing, interleaving, and retrospective patterns applicable to practice products. | 2026-05-26 |
 | [Post-Game Review Patterns](product/post-game-review-patterns.md) | Review patterns worth borrowing from mature game-analysis products. | 2026-05-26 |
-| [Pokémon TCG Coach MVP](product/pokemon-tcg-coach-mvp.md) | A grounded MVP for post-game coaching using pasted/uploaded PTCGL logs plus enrichment APIs. | 2026-05-26 |
+| [Pokémon TCG Coach MVP](product/pokemon-tcg-coach-mvp.md) | Deferred product research for post-game coaching using pasted/uploaded PTCGL logs plus enrichment APIs; not the current engine/play-surface priority. | 2026-06-17 |
 | [Pokémon TCG Practice Idea Bank](product/pokemon-tcg-practice-idea-bank.md) | Research-driven concept bank for faster, more effective Pokémon TCG practice modes. | 2026-05-26 |

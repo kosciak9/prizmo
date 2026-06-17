@@ -1,5 +1,12 @@
 # Wiki Log
 
+## [2026-06-17] codebase update | Project goal ladder and Godot play-surface roadmap
+
+- Task attempted: clarified the canonical project goal ladder for zero-context agents: Goal 1 latest-Limitless Dragapult/Alakazam completeness, Goal 2 latest top-30 Limitless archetype card coverage, Goal 3 React shell with embedded Godot play surface, Goal 4 React Native mobile path, and Goal 5 all possible cards.
+- Files changed: `knowledge-base/wiki/engine/ash-backed-tcg-engine-playtest-north-star.md`, `knowledge-base/wiki/engine/dragapult-alakazam-full-game-implementation-scope.md`, `knowledge-base/wiki/engine/tcg-client-renderer-options.md`, `knowledge-base/wiki/engine/cross-platform-tcg-client-architecture.md`, `knowledge-base/wiki/engine/ash-backed-tcg-engine-playtest-handoff.md`, `knowledge-base/wiki/engine/six-deck-gameview-pending-text-inventory-2026-06-03-post-256.md`, `knowledge-base/wiki/product/pokemon-tcg-coach-mvp.md`, `knowledge-base/wiki/index.md`, `knowledge-base/wiki/log.md`.
+- Validation: wiki-only update; markdown/link sanity checks run in this implementation pass.
+- Remaining/blocking notes: future agents should refresh latest Limitless data before claiming Goal 1 or Goal 2 coverage status; current React browser game UI is temporary scaffolding for protocol discovery, not the final play UX.
+
 ## [2026-06-16] docs update | Dragapult/Alakazam GameView pending-text inventory (post plain-tech overlays)
 
 - Task attempted: produced the required authoritative live GameView / playability pending-text inventory for the current north-star target decks (Dragapult 27431 variants + Alakazam 27147) after the 2026-06-16 plain Dragapult tech Supporter batch. This fulfills the explicit north-star requirement that "complete gameplay means the live play surface has no visible `Pending card text` for target-deck gameplay."

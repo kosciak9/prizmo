@@ -1,10 +1,12 @@
 # Pokémon TCG Coach MVP
 
-- Updated: 2026-05-26
+- Updated: 2026-06-17
 - Sources: The Pokémon Company International (Unknown); kagd (Unknown); exinmusic (Unknown); Pokémon TCG API (Unknown); TopDeck.gg (Unknown); TCGdex (Unknown); Chess.com (2025-05-06); JustInBasil (Unknown)
 - Raw: [Pokémon TCG Live](../../raw/ptcgl/2026-05-26-pokemon-tcg-live-overview.md); [Pokémon TCG Battle Replay Parser](../../raw/ptcgl/2026-05-26-pokemon-tcg-battle-replay-parser-readme.md); [Pokémon TCG battle replay sample log](../../raw/ptcgl/2026-05-26-pokemon-tcg-battle-replay-sample-log.md); [Pokémon TCG API docs](../../raw/data/2026-05-26-pokemon-tcg-api-docs.md); [TopDeck.gg API – Tournaments V2](../../raw/data/2026-05-26-topdeck-tournaments-v2-docs.md); [TCGdex API docs](../../raw/data/2026-05-26-tcgdex-api-docs.md); [Chess.com Game Review](../../raw/product/2025-05-06-chesscom-game-review.md); [JustInBasil deck-building guide](../../raw/meta/2026-05-26-justinbasil-deck-building-guide.md)
 
 ## Summary
+
+Status: deferred product direction. This remains useful product research, but it is not the current roadmap priority. The active roadmap is latest-Limitless server-side TCG engine coverage, then React shell + embedded Godot play surface, then React Native mobile path, before broad all-card support. Post-game PTCGL coaching can return after those foundations are stronger.
 
 The most grounded MVP is a post-game coach built around pasted/uploaded PTCGL logs. It should parse one match, surface only the most important turns, explain a small number of findings, and end with one practice habit or drill.
 

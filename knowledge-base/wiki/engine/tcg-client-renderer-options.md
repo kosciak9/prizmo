@@ -1,12 +1,14 @@
 # TCG Client Renderer Options
 
-- Updated: 2026-06-16
-- Sources: ChatGPT shared conversation/export (2026-05-28); cited GitHub repositories and Godot documentation; Project codebase; user instruction
+- Updated: 2026-06-17
+- Sources: ChatGPT shared conversation/export (2026-05-28); cited GitHub repositories and Godot documentation; Project codebase; user direction
 - Raw: [TCG client renderer AI thread](../../raw/engine/2026-05-28-tcg-client-renderer-ai-thread.md)
 
 ## Summary
 
-For a Pokémon-like TCG with an existing authoritative game server, the client should be a thin renderer and command emitter:
+For Prizmo, Godot is the long-term **in-game play surface**, not the entire product UI. React remains the product shell on web, and React Native is the later mobile shell. Godot renders the board, card interactions, targeting UX, animations, feedback, and play feel while the server remains authoritative.
+
+For a Pokémon-like TCG with an existing authoritative game server, the play surface should be a thin renderer and command emitter:
 
 ```text
 server snapshots/events
@@ -16,7 +18,16 @@ server snapshots/events
   → server-confirmed animation
 ```
 
-The strongest direction from the thread is **Godot 2D + GDScript**: native iOS/Android first-class, web as a supported secondary target, server-authoritative protocol, and a touch-first command UI. React + React Three Fiber remains a good browser prototype path, but should be treated as a replaceable renderer rather than the product architecture.
+The strongest direction is **React shell + embedded Godot 2D play surface**: React handles product navigation and setup; Godot handles play; the server handles rules and resolution. The current React browser game UI is temporary scaffolding for engine validation and protocol discovery, not the final play experience. React Native + embedded Godot is the mobile path after the web shell/play-surface split is proven.
+
+## Roadmap position
+
+This article supports Goal 3 and Goal 4 from the canonical north star:
+
+- **Goal 3:** React web shell wraps embedded Godot for the actual game play surface.
+- **Goal 4:** React Native shell wraps embedded Godot for the native mobile path.
+
+Do not interpret this page as a recommendation to replace the product shell with Godot. Godot should not own deck selection, game selection, account/product flows, coaching panels, or broad navigation.
 
 ## Core architectural rule
 
@@ -24,9 +35,10 @@ Keep three states separate:
 
 | State | Owner | Purpose |
 | --- | --- | --- |
-| Server state | Game server | Canonical truth and rules validation |
-| View model | Client adapter | Positions, visibility, legal affordances, labels, highlights |
-| Interaction/animation state | Renderer | Hover, selection, drag, tweening, optimistic/pending affordances |
+| Server state | Ash/Postgres game server | Canonical truth, rules validation, prompts, legal actions, pending effects, hidden information, RNG, persistence |
+| Shell state | React or React Native | Product navigation, deck/game/session selection, auth/account flows, overlays, wrapper lifecycle |
+| View model | Shared play protocol/client adapter | Public/private visibility, legal affordances, labels, highlights, animation hints |
+| Interaction/animation state | Godot play surface | Hover/touch, selection, drag, tweening, targeting UX, confirmed animation, visual feedback |
 
 Short version:
 
@@ -69,16 +81,30 @@ Even if the first implementation is Godot 2D, this style keeps the protocol/view
 
 ## Recommended path
 
-Start with:
+The target shape is:
 
 ```text
-Godot 2D + GDScript
-native iOS/Android as first-class targets
-web as supported secondary/demo target
-WebSocket protocol to existing server
-JSON or binary command protocol
-no client-side game authority
+React web shell
+  ├─ deck/game/session/product UI
+  └─ embedded Godot 2D play surface
+       ├─ board/card rendering
+       ├─ touch/click interaction and targeting UX
+       ├─ animations and visual feedback
+       └─ command emission to authoritative server
+
+later:
+
+React Native shell
+  └─ embedded Godot 2D play surface using the same protocol
 ```
+
+Protocol defaults:
+
+- server-authoritative GameView/action-affordance model;
+- boring JSON first, binary only if payload size or latency requires it;
+- no client-side game authority;
+- shell-to-Godot bridge only for coarse shell/session events;
+- Godot-to-server commands for actual game interactions where possible.
 
 Design the client as “2D with depth,” not flat web UI:
 
