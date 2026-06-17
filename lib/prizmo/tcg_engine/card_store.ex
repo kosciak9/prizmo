@@ -72,8 +72,7 @@ defmodule Prizmo.TcgEngine.CardStore do
 
   def get_player(game_id, player_id) do
     case GamePlayer
-         |> Ash.Query.filter(game_id == ^game_id and id == ^player_id)
-         |> Ash.Query.select(:all)
+         |> Ash.Query.filter(game_id == ^game_id and player_id == ^player_id)
          |> Ash.read_one() do
       {:ok, %GamePlayer{} = player} -> {:ok, player}
       {:ok, nil} -> {:error, :player_not_found}
@@ -83,8 +82,7 @@ defmodule Prizmo.TcgEngine.CardStore do
 
   def get_opponent(game_id, player_id) do
     case GamePlayer
-         |> Ash.Query.filter(game_id == ^game_id and id != ^player_id)
-         |> Ash.Query.select(:all)
+         |> Ash.Query.filter(game_id == ^game_id and player_id != ^player_id)
          |> Ash.read_one() do
       {:ok, %GamePlayer{} = opponent} -> {:ok, opponent}
       {:ok, nil} -> {:error, :opponent_not_found}

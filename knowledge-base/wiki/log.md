@@ -1,5 +1,12 @@
 # Wiki Log
 
+## [2026-06-17] codebase update | Goal 1 tech play_card coverage for SFA-064/POR-084/CRI-082
+
+- Task attempted: finished the in-progress Goal 1 plain-tech slice by wiring `SFA-064` Xerosic's Machinations and `POR-084` Rosa's Encouragement into the canonical `EngineCardRegistry`, then replacing the placeholder-only documentation tests with real Ash-path mechanics coverage for `SFA-064`, `POR-084`, and `CRI-082` Special Red Card. The batch also fixed the `CardStore.get_player/2` / `get_opponent/2` external-id lookup bug and hardened the test setup so post-setup tech cards can be pulled deterministically from deck, prize, or discard instead of flaking on prize placement.
+- Files changed: `lib/prizmo/tcg_engine/card_play.ex`, `lib/prizmo/tcg_engine/card_store.ex`, `lib/prizmo/tcg_engine/cards/registry.ex`, `test/prizmo/tcg_engine/mechanics_test.exs`, `knowledge-base/wiki/engine/dragapult-alakazam-full-game-implementation-scope.md`, `knowledge-base/wiki/log.md`.
+- Validation: focused `mix test test/prizmo/tcg_engine/mechanics_test.exs` passed (15/0); full `mix check` passed all 12 gates.
+- Remaining/blocking notes: `CRI-082` now has dedicated mechanics coverage. `SFA-064` and `POR-084` are now registry-backed and test-covered on the Ash path, but their discard / attachment choices still use first-pass auto-selection rather than prompt-driven choice surfaces.
+
 ## [2026-06-17] codebase update | Legacy sim known-deck smoke coverage restored
 
 - Task attempted: debugged failing `mix check` and restored the legacy `Prizmo.Tcg.Sim` known-deck pairwise smoke matrix for current Dragapult variants. The fix made generated test names unique by including deck ids, mirrored existing DSL/catalog overlays into the legacy sim registry for `DRI-040`, `DRI-041`, `JTG-024`, `POR-084`, and `SFA-064`, and made the coverage assertion compare against the current card count instead of a stale hardcoded total.

@@ -3,6 +3,7 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
 
   alias Prizmo.Tcg.Decks.Alakazam27147
   alias Prizmo.Tcg.Decks.Dragapult27431
+  alias Prizmo.Tcg.Decks.DragapultPlain28256
   alias Prizmo.Tcg.Decks.RocketMewtwo27459
   alias Prizmo.TcgEngine.CardCatalog
   alias Prizmo.TcgEngine.CardInstance
@@ -395,24 +396,107 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
     end
 
     test "SFA-064 Xerosic's Machinations resolves opponent_discards_to_hand_size effect" do
-      {:ok, game} = create_flow_action_window_game()
-      # SFA-064 is not present in the current fixture deck; test documents resolved status.
-      # Dedicated fixture test remains future work per north-star scope.
-      assert true
+      {:ok, game} = create_flow_action_window_game_with_decks(Alakazam27147, DragapultPlain28256)
+
+      sfa = move_owned_card_to_hand(game.id, "player_2", "SFA-064", 1)
+      assert {:ok, game} = Mechanics.pass_turn(game, "player_1")
+
+      opponent_hand_before = card_count_in_zone(game.id, "player_1", :hand)
+      assert opponent_hand_before > 3
+
+      assert {:ok, game} = Mechanics.play_card(game, "player_2", sfa.id, %{})
+
+      assert card_count_in_zone(game.id, "player_1", :hand) == 3
+
+      effect_cards_moved =
+        game.id
+        |> game_events_by_type("cards_moved")
+        |> Enum.find(&(&1.payload["effect_key"] == "opponent_discards_to_hand_size"))
+
+      assert effect_cards_moved.payload["affected_player_id"] == "player_1"
+      assert length(effect_cards_moved.payload["cards"]) == opponent_hand_before - 3
+      assert Enum.all?(effect_cards_moved.payload["cards"], &(&1["from_zone"] == "hand"))
+      assert Enum.all?(effect_cards_moved.payload["cards"], &(&1["to_zone"] == "discard"))
     end
 
     test "POR-084 Rosa's Encouragement resolves attach_basic_energy_from_discard_to_stage2_if_more_prizes effect" do
-      {:ok, game} = create_flow_action_window_game()
-      # POR-084 is not present in the current fixture deck; test documents resolved status.
-      # Dedicated fixture test remains future work per north-star scope.
-      assert true
+      {:ok, game} = create_flow_action_window_game_with_decks(Alakazam27147, DragapultPlain28256)
+
+      assert {:ok, game} = Mechanics.pass_turn(game, "player_1")
+      reduce_opponent_prize_count_to(game.id, "player_1", 3)
+
+      stage2 = owned_card(game.id, "player_2", "TWM-130")
+      assert stage2, "Expected player_2 to have a TWM-130 card for POR-084 setup"
+
+      stage2 = move_owned_card_to_hand(game.id, "player_2", "TWM-130", 1)
+
+      stage2 =
+        case stage2.zone do
+          :hand ->
+            {:ok, stage2} = ash_update(stage2, :play_to_bench, %{position: 1})
+            stage2
+
+          _ ->
+            stage2
+        end
+
+      energy = move_owned_card_to_hand(game.id, "player_2", "MEE-005", 2)
+      assert {:ok, game} = Mechanics.discard_from_hand(game, "player_2", energy.id)
+
+      rosa = move_owned_card_to_hand(game.id, "player_2", "POR-084", 3)
+      assert {:ok, game} = Mechanics.play_card(game, "player_2", rosa.id, %{})
+
+      attached_energy =
+        CardInstance
+        |> Ash.Query.filter(game_id == ^game.id and id == ^energy.id)
+        |> Ash.read_one!()
+
+      assert attached_energy.zone == :attached
+      assert attached_energy.attached_to_card_instance_id == stage2.id
+
+      effect_cards_moved =
+        game.id
+        |> game_events_by_type("cards_moved")
+        |> Enum.find(
+          &(&1.payload["effect_key"] ==
+              "attach_basic_energy_from_discard_to_stage2_if_more_prizes")
+        )
+
+      assert effect_cards_moved.payload["affected_player_id"] == "player_2"
+      assert Enum.any?(effect_cards_moved.payload["cards"], &(&1["from_zone"] == "discard"))
+      assert Enum.any?(effect_cards_moved.payload["cards"], &(&1["to_zone"] == "attached"))
     end
 
     test "CRI-082 Special Red Card resolves opponent_hand_to_bottom_then_draw effect" do
-      {:ok, game} = create_flow_action_window_game()
-      # CRI-082 is not present in the current fixture deck; test documents resolved status.
-      # Dedicated fixture test remains future work per north-star scope.
-      assert true
+      {:ok, game} = create_flow_action_window_game_with_decks(Alakazam27147, DragapultPlain28256)
+
+      cri = move_owned_card_to_hand(game.id, "player_2", "CRI-082", 1)
+      assert {:ok, game} = Mechanics.pass_turn(game, "player_1")
+      reduce_opponent_prize_count_to(game.id, "player_1", 3)
+
+      opponent_hand_before = card_count_in_zone(game.id, "player_1", :hand)
+      assert opponent_hand_before > 0
+
+      assert {:ok, game} = Mechanics.play_card(game, "player_2", cri.id, %{})
+
+      assert card_count_in_zone(game.id, "player_1", :hand) == 3
+
+      special_events =
+        game.id
+        |> game_events_by_type("cards_moved")
+        |> Enum.filter(&(&1.payload["effect_key"] == "opponent_hand_to_bottom_then_draw_if_any"))
+
+      assert length(special_events) == 2
+
+      [to_deck_event, to_hand_event] =
+        Enum.sort_by(special_events, fn event ->
+          if event.payload["destination"] in ["deck_bottom", :deck_bottom], do: 0, else: 1
+        end)
+
+      assert to_deck_event.payload["affected_player_id"] == "player_1"
+      assert length(to_deck_event.payload["cards"]) == opponent_hand_before
+      assert to_hand_event.payload["affected_player_id"] == "player_1"
+      assert length(to_hand_event.payload["cards"]) == 3
     end
   end
 
@@ -420,6 +504,13 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
     Mechanics.create_game([
       {"player_1", Alakazam27147},
       {"player_2", Dragapult27431}
+    ])
+  end
+
+  defp create_game_with_decks(player_1_deck, player_2_deck) do
+    Mechanics.create_game([
+      {"player_1", player_1_deck},
+      {"player_2", player_2_deck}
     ])
   end
 
@@ -440,6 +531,20 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
          {:ok, game} <-
            Mechanics.choose_starting_player(game, game.coin_toss_winner_player_id, "player_1"),
          player_1_active = setup_active_card(game.id, "player_1", opts[:player_1_active_card_id]),
+         player_2_active = hand_basic_card(game.id, "player_2"),
+         {:ok, game} <- Mechanics.choose_active_from_hand(game, "player_1", player_1_active.id),
+         {:ok, game} <- Mechanics.choose_active_from_hand(game, "player_2", player_2_active.id),
+         {:ok, game} <- Mechanics.finish_setup_choices(game, "player_1") do
+      Mechanics.finish_setup_choices(game, "player_2")
+    end
+  end
+
+  defp create_flow_action_window_game_with_decks(player_1_deck, player_2_deck) do
+    with {:ok, game} <- create_game_with_decks(player_1_deck, player_2_deck),
+         {:ok, game} <- Mechanics.call_coin_toss(game, "player_1", :heads),
+         {:ok, game} <-
+           Mechanics.choose_starting_player(game, game.coin_toss_winner_player_id, "player_1"),
+         player_1_active = setup_active_card(game.id, "player_1", nil),
          player_2_active = hand_basic_card(game.id, "player_2"),
          {:ok, game} <- Mechanics.choose_active_from_hand(game, "player_1", player_1_active.id),
          {:ok, game} <- Mechanics.choose_active_from_hand(game, "player_2", player_2_active.id),
@@ -502,6 +607,40 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
     card
   end
 
+  defp move_owned_card_to_hand(game_id, player_id, card_id, position) do
+    game_id
+    |> owned_card(player_id, card_id)
+    |> case do
+      %CardInstance{zone: :deck} = card ->
+        {:ok, card} = ash_update(card, :draw_to_hand, %{position: position})
+        card
+
+      %CardInstance{zone: :prize} = card ->
+        {:ok, card} = ash_update(card, :take_prize, %{position: position})
+        card
+
+      %CardInstance{zone: :discard} = card ->
+        {:ok, card} = ash_update(card, :recover_to_hand, %{position: position})
+        card
+
+      %CardInstance{} = card ->
+        card
+
+      nil ->
+        flunk("Expected to find #{card_id} for #{player_id}")
+    end
+  end
+
+  defp owned_card(game_id, player_id, card_id) do
+    CardInstance
+    |> Ash.Query.filter(
+      game_id == ^game_id and owner_player_id == ^player_id and card_id == ^card_id
+    )
+    |> Ash.Query.sort(position: :asc)
+    |> Ash.read!()
+    |> List.first()
+  end
+
   defp deck_card(game_id, player_id, card_id) do
     game_id
     |> deck_cards(player_id, card_id)
@@ -524,6 +663,44 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
     |> Ash.Query.sort(position: :asc)
     |> Ash.read!()
     |> Enum.reject(&(&1.id in excluded_ids))
+  end
+
+  defp cards_in_zone(game_id, player_id, zone) do
+    CardInstance
+    |> Ash.Query.filter(game_id == ^game_id and owner_player_id == ^player_id and zone == ^zone)
+    |> Ash.Query.sort(position: :asc, instance_id: :asc)
+    |> Ash.read!()
+  end
+
+  defp card_count_in_zone(game_id, player_id, zone) do
+    game_id
+    |> cards_in_zone(player_id, zone)
+    |> length()
+  end
+
+  defp reduce_opponent_prize_count_to(game_id, player_id, target_count) do
+    CardInstance
+    |> Ash.Query.filter(game_id == ^game_id and owner_player_id == ^player_id and zone == :prize)
+    |> Ash.Query.sort(position: :asc)
+    |> Ash.read!()
+    |> Enum.sort_by(& &1.position)
+    |> then(fn cards_in_prize ->
+      over = length(cards_in_prize) - target_count
+
+      cards_in_prize
+      |> Enum.take(max(over, 0))
+      |> Enum.with_index(card_count_in_zone(game_id, player_id, :hand) + 1)
+      |> Enum.each(fn {prize_card, position} ->
+        ash_update(prize_card, :take_prize, %{position: position})
+      end)
+    end)
+  end
+
+  defp game_events_by_type(game_id, type) do
+    GameEvent
+    |> Ash.Query.filter(game_id == ^game_id and type == ^type)
+    |> Ash.Query.sort(index: :asc)
+    |> Ash.read!()
   end
 
   defp hand_basic_card(game_id, player_id) do

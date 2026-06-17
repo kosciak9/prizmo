@@ -28,6 +28,7 @@ The older one-matchup framing is superseded. The target is not just one Dragapul
 - The original eight fixture-deck blockers are closed in the canonical path: Teleportation Attack, Psychic Draw, Powerful Hand, Recon Directive, Run Away Draw, Spherical Shield, ACE Nullifier, and Damp have persisted engine behavior and/or action surfaces.
 - Dragapult Blaziken variant support includes Seething Spirit, Smolder-sault, Fairy Zone Weakness override, Chi-Yu Allure + Ground Melter with Stadium discard, and Special Red Card backend play support.
 - Dragapult Dusknoir variant support includes Come and Get You, Dusclops/Dusknoir Cursed Blast backend resolution, Dusknoir Shadow Bind, Jamming Tower Tool suppression, Battle Cage-style bench damage-counter prevention, and React SPA button/RPC wiring for `cursed_blast` actions.
+- Plain Dragapult / Alakazam tech Trainer coverage now includes canonical `play_card` registry wiring plus focused mechanics coverage for `SFA-064` Xerosic's Machinations, `POR-084` Rosa's Encouragement, and `CRI-082` Special Red Card. `SFA-064` and `POR-084` still use first-pass auto-selection rather than prompt-driven discard/attachment choices.
 - The 2026-06-16 live GameView pending-text inventory reported zero visible pending-text blockers for the then-current Dragapult/Alakazam visible scope after the plain-tech Supporter batch.
 - The legacy `Prizmo.Tcg.Sim` registry now has CI compatibility overlays for the plain Dragapult and Dragapult/Blaziken variant-only cards (`DRI-040`, `DRI-041`, `JTG-024`, `POR-084`, `SFA-064`), and the pairwise known-deck smoke matrix compiles with unique deck-id test names and passes under `mix check`.
 - That inventory does **not** close Goal 1 by itself. Goal 1 also requires latest-Limitless variant coverage, executable mechanics, tests/fixtures, and play-surface validation.
@@ -37,8 +38,8 @@ The older one-matchup framing is superseded. The target is not just one Dragapul
 - Refresh the latest-Limitless Dragapult and Alakazam variant/card corpus.
 - Reconcile historical NAIC/captured cards against the latest corpus.
 - Add or update Alakazam tech fixture/support for common swaps such as `ASC-197`, `TEF-146`, `PFL-094`, `TEF-159`, and `SCR-137` when they appear in the latest corpus.
-- Add fixture/test coverage for `CRI-082` Special Red Card if it remains part of the final Alakazam tech matrix.
-- Add dedicated tests for Fairy Zone/Weakness, Ground Melter Stadium discard, Special Red Card, Come and Get You, Cursed Blast prize/replacement/Damp interactions, and Jamming Tower.
+- Replace the temporary auto-selection paths for `SFA-064` and `POR-084` with prompt-driven discard / Stage 2 target choices if those tech cards remain in the final latest-Limitless matrix.
+- Add dedicated tests for Fairy Zone/Weakness, Ground Melter Stadium discard, Come and Get You, Cursed Blast prize/replacement/Damp interactions, and Jamming Tower.
 - Run full two-seat validation for each important Dragapult variant against Alakazam through the current play scaffolding until Godot replaces the in-game surface.
 
 ## Historical seed variant pool

@@ -931,9 +931,9 @@ defmodule Prizmo.TcgEngine.CardPlay do
          %{type: :attach_basic_energy_from_discard_to_stage2_if_more_prizes} = effect,
          _target_ids
        ) do
-    # Rosa's Encouragement — attach up to max_targets Basic Energy from discard to own Stage 2s
+    # Rosa's Encouragement — attach up to max_targets Basic Energy from discard to 1 own Stage 2
     # when player has strictly more Prizes remaining than opponent.
-    # For first-pass implementation we auto-select eligible energy and targets (simplest legal path).
+    # Current first-pass implementation auto-selects the first eligible Stage 2 target.
     with {:ok, player_prizes} <-
            CardStore.cards_in_zone(game.id, player.player_id, :prize),
          {:ok, opponent} <- CardStore.get_opponent(game.id, player.player_id),
@@ -944,23 +944,25 @@ defmodule Prizmo.TcgEngine.CardPlay do
            CardStore.cards_in_zone(game.id, player.player_id, :discard),
          basic_energy =
            discard_cards
-           |> Enum.filter(&(&1.supertype == :energy and &1.card_type == :basic))
+           |> Enum.filter(&rosa_basic_energy_card?/1)
            |> Enum.take(effect.params.max_targets),
-         {:ok, stage2_targets} <-
-           CardStore.cards_in_zone(game.id, player.player_id, :play),
-         stage2_targets =
-           stage2_targets
-           |> Enum.filter(&(&1.card_stage == :stage2))
-           |> Enum.take(length(basic_energy)),
+         true <- basic_energy != [],
+         {:ok, active_cards} <- CardStore.cards_in_zone(game.id, player.player_id, :active),
+         {:ok, bench_cards} <- CardStore.cards_in_zone(game.id, player.player_id, :bench),
+         %CardInstance{} = stage2_target <-
+           Enum.find(
+             active_cards ++ bench_cards,
+             &rosa_stage_2_target_card?(&1, player.player_id)
+           ),
+         stage2_targets = List.duplicate(stage2_target, length(basic_energy)),
          :ok <- attach_basic_energy_from_discard(game.id, basic_energy, stage2_targets),
          {:ok, _event} <-
            write_event_and_snapshot(game.id, :cards_moved, player.player_id, %{
              reason: :effect_resolution,
              source: EventPayloads.card_source(card),
              effect_key: effect.key,
-             cards:
-               EventPayloads.moved_cards(basic_energy, :discard, :attached) ++
-                 EventPayloads.moved_cards(stage2_targets, :play, :play)
+             affected_player_id: player.player_id,
+             cards: rosa_attached_energy_payloads(basic_energy, stage2_targets)
            }) do
       complete_play_card_resolution(game, turn, player, card, effect)
     else
@@ -2233,6 +2235,15 @@ defmodule Prizmo.TcgEngine.CardPlay do
       require_pokemon_card(card.card_id) == :ok
   end
 
+  defp rosa_basic_energy_card?(%CardInstance{} = card) do
+    card.zone == :discard and require_basic_energy(card.card_id) == :ok
+  end
+
+  defp rosa_stage_2_target_card?(%CardInstance{} = card, player_id) do
+    card.owner_player_id == player_id and card.zone in [:active, :bench] and
+      require_stage_2_pokemon(card.card_id) == :ok
+  end
+
   defp crispin_has_different_energy_types?(energy_cards) do
     energy_cards
     |> Enum.map(&basic_energy_type/1)
@@ -2604,6 +2615,16 @@ defmodule Prizmo.TcgEngine.CardPlay do
         to_attached_to_card_instance_id: target_card.id
       )
     ]
+  end
+
+  defp rosa_attached_energy_payloads(energy_cards, target_cards) do
+    energy_cards
+    |> Enum.zip(target_cards)
+    |> Enum.map(fn {energy_card, target_card} ->
+      moved_card_payload(energy_card, :discard, :attached,
+        to_attached_to_card_instance_id: target_card.id
+      )
+    end)
   end
 
   defp rare_candy_evolution_payloads(

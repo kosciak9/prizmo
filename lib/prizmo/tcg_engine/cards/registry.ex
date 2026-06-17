@@ -333,6 +333,34 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     ]
   }
 
+  @xerosics_machinations %CardDefinition{
+    id: "SFA-064",
+    kind: :trainer,
+    trainer_type: :supporter,
+    play_window: :action_window,
+    effects: [
+      %Effect{
+        key: :opponent_discards_to_hand_size,
+        type: :opponent_discards_to_hand_size,
+        params: %{target_hand_size: 3}
+      }
+    ]
+  }
+
+  @rosas_encouragement %CardDefinition{
+    id: "POR-084",
+    kind: :trainer,
+    trainer_type: :supporter,
+    play_window: :action_window,
+    effects: [
+      %Effect{
+        key: :attach_basic_energy_from_discard_to_stage2_if_more_prizes,
+        type: :attach_basic_energy_from_discard_to_stage2_if_more_prizes,
+        params: %{max_targets: 2}
+      }
+    ]
+  }
+
   @lanas_aid %CardDefinition{
     id: "TWM-155",
     kind: :trainer,
@@ -819,6 +847,8 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     @sacred_ash.id => @sacred_ash,
     @secret_box.id => @secret_box,
     @special_red_card.id => @special_red_card,
+    @xerosics_machinations.id => @xerosics_machinations,
+    @rosas_encouragement.id => @rosas_encouragement,
     @unfair_stamp.id => @unfair_stamp,
     @team_rockets_archer.id => @team_rockets_archer,
     @team_rockets_ariana.id => @team_rockets_ariana,
