@@ -1,5 +1,12 @@
 # Wiki Log
 
+## [2026-06-17] codebase update | Goal 1 live latest-Limitless corpus reconciliation report
+
+- Task attempted: extended the earlier Goal 1 deck-id audit into a live card-corpus reconciliation path. The repo can now fetch each latest-result Dragapult and Alakazam decklist from Limitless, diff the resulting unique card corpus against the committed Goal 1 fixture modules, and classify each live card as `supported`, `generic-supported`, `partial`, or `unimplemented` from the current engine/catalog state via `mix prizmo.goal1.corpus`.
+- Files changed: `lib/prizmo/tcg/data/limitless.ex`, `lib/prizmo/tcg/goal_1/card_coverage.ex`, `lib/prizmo/tcg/goal_1/latest_limitless.ex`, `lib/mix/tasks/prizmo.goal1.corpus.ex`, `knowledge-base/wiki/engine/dragapult-alakazam-full-game-implementation-scope.md`, `knowledge-base/wiki/log.md`.
+- Validation: `mix format`, `mix compile --warnings-as-errors`, and `mix prizmo.goal1.corpus` passed. Verified live outputs: Dragapult latest-result corpus adds `JTG-151`, `MEG-088`, `ASC-181`, `JTG-120`, `TEF-129`, and `TWM-163` beyond the committed fixture corpus, with only `JTG-151` Lillie's Pearl and `MEG-088` Yveltal still partial. Alakazam latest-result corpus adds fifteen cards beyond fixture `27147`, with the current live blockers concentrated in `TEF-146`, `PFL-094`, `TWM-082`, `TWM-141`, `ASC-197`, `TEF-159`, `BLK-040`, missing `MEG-130` metadata, plus the pre-existing `POR-088` partial.
+- Remaining/blocking notes: Goal 1 now has a verified live card-corpus report instead of only a deck-id audit, so the next engine batch should target the real current Alakazam blocker set rather than the older seed-only recommendations. `SCR-137` did not appear in the current latest-result Alakazam corpus, while `MEG-130` surfaced as a missing committed metadata-cache entry.
+
 ## [2026-06-17] codebase update | Goal 1 live latest-Limitless corpus audit task
 
 - Task attempted: added a small Req-backed Limitless fetcher plus `mix prizmo.goal1.audit` so the repository can compare its committed Goal 1 fixtures against the live latest-result deck ids for Dragapult and Alakazam. This closes the blind spot where the KB said "refresh latest-Limitless corpus" but the codebase had no first-class way to detect drift from the older `27431` / `27147` fixture era.
