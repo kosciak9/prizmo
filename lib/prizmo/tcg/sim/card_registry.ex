@@ -54,6 +54,22 @@ defmodule Prizmo.Tcg.Sim.CardRegistry do
         }
       }
     },
+    "DRI-040" => %{
+      attacks: %{
+        collect: %{effect: %{type: :draw_after_attack, count: 1}},
+        combustion: %{effect: nil}
+      }
+    },
+    "DRI-041" => %{
+      evolves_from: "DRI-040",
+      attacks: %{
+        combustion: %{effect: nil},
+        double_kick: %{
+          damage: 0,
+          effect: %{type: :bonus_damage_per_coin_heads_count, bonus_damage: 40}
+        }
+      }
+    },
     "DRI-051" => %{
       abilities: %{
         repelling_veil: %{effect: %{type: :prevent_attack_effects_to_basic_team_rocket_pokemon}}
@@ -550,6 +566,17 @@ defmodule Prizmo.Tcg.Sim.CardRegistry do
         }
       }
     },
+    "JTG-024" => %{
+      evolves_from: "DRI-041",
+      abilities: %{
+        seething_spirit: %{
+          effect: %{type: :attach_basic_energy_from_discard_to_own_pokemon}
+        }
+      },
+      attacks: %{
+        smolder_sault: %{effect: %{type: :attacker_cannot_attack_next_turn}}
+      }
+    },
     "JTG-056" => %{
       abilities: %{
         fairy_zone: %{effect: %{type: :opponent_darkness_pokemon_weakness_becomes_psychic}}
@@ -700,6 +727,9 @@ defmodule Prizmo.Tcg.Sim.CardRegistry do
           effect: nil
         }
       }
+    },
+    "SFA-064" => %{
+      effect: %{type: :opponent_discards_to_hand_size, target_hand_size: 3}
     },
     "ASC-039" => %{
       name: "Psyduck",
@@ -858,6 +888,12 @@ defmodule Prizmo.Tcg.Sim.CardRegistry do
       },
       attacks: %{
         rapid_draw: %{effect: %{type: :draw_after_attack, count: 2}}
+      }
+    },
+    "POR-084" => %{
+      effect: %{
+        type: :attach_basic_energy_from_discard_to_stage2_if_more_prizes,
+        max_targets: 2
       }
     },
     "POR-086" => %{

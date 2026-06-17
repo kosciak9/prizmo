@@ -49,6 +49,8 @@ defmodule Prizmo.Tcg.Sim.RegistryCoverage do
     "WHT-080" => :brave_bangle,
     "TWM-158" => :lucky_helmet,
     "SSP-169" => :counter_gain,
+    "POR-084" => :rosas_encouragement,
+    "SFA-064" => :xerosics_machinations,
     "TWM-150" => :handheld_fan,
     "ASC-181" => :air_balloon,
     "MEG-117" => :forest_of_vitality,

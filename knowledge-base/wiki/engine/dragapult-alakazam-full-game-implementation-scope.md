@@ -29,6 +29,7 @@ The older one-matchup framing is superseded. The target is not just one Dragapul
 - Dragapult Blaziken variant support includes Seething Spirit, Smolder-sault, Fairy Zone Weakness override, Chi-Yu Allure + Ground Melter with Stadium discard, and Special Red Card backend play support.
 - Dragapult Dusknoir variant support includes Come and Get You, Dusclops/Dusknoir Cursed Blast backend resolution, Dusknoir Shadow Bind, Jamming Tower Tool suppression, Battle Cage-style bench damage-counter prevention, and React SPA button/RPC wiring for `cursed_blast` actions.
 - The 2026-06-16 live GameView pending-text inventory reported zero visible pending-text blockers for the then-current Dragapult/Alakazam visible scope after the plain-tech Supporter batch.
+- The legacy `Prizmo.Tcg.Sim` registry now has CI compatibility overlays for the plain Dragapult and Dragapult/Blaziken variant-only cards (`DRI-040`, `DRI-041`, `JTG-024`, `POR-084`, `SFA-064`), and the pairwise known-deck smoke matrix compiles with unique deck-id test names and passes under `mix check`.
 - That inventory does **not** close Goal 1 by itself. Goal 1 also requires latest-Limitless variant coverage, executable mechanics, tests/fixtures, and play-surface validation.
 
 ## Known remaining work

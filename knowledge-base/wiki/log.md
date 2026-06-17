@@ -1,5 +1,12 @@
 # Wiki Log
 
+## [2026-06-17] codebase update | Legacy sim known-deck smoke coverage restored
+
+- Task attempted: debugged failing `mix check` and restored the legacy `Prizmo.Tcg.Sim` known-deck pairwise smoke matrix for current Dragapult variants. The fix made generated test names unique by including deck ids, mirrored existing DSL/catalog overlays into the legacy sim registry for `DRI-040`, `DRI-041`, `JTG-024`, `POR-084`, and `SFA-064`, and made the coverage assertion compare against the current card count instead of a stale hardcoded total.
+- Files changed: `lib/prizmo/tcg/sim/card_registry.ex`, `lib/prizmo/tcg/sim/registry_coverage.ex`, `test/prizmo/tcg/sim/pairwise_smoke_test.exs`, `knowledge-base/wiki/engine/dragapult-alakazam-full-game-implementation-scope.md`, `knowledge-base/wiki/log.md`.
+- Validation: `mix test test/prizmo/tcg/sim/pairwise_smoke_test.exs` passed (73/0); full `mix check` passed all gates.
+- Remaining/blocking notes: the canonical engine remains `lib/prizmo/tcg_engine/`; the `Prizmo.Tcg.Sim` change is a compatibility fix for legacy CI smoke coverage, not a new canonical gameplay surface.
+
 ## [2026-06-17] test update | CRI-082/SFA-064/POR-084 placeholder documentation clarified
 - Task attempted: clarified the existing placeholder tests for SFA-064, POR-084, and CRI-082 (mechanics_test.exs:397-420) with explicit comments noting that full fixture/resolution tests remain future work per north-star scope. These cards already have behavior overlays or full resolution in card_play.ex; the tests serve as documentation of declared vs. resolved status.
 - Files changed: `test/prizmo/tcg_engine/mechanics_test.exs`.
