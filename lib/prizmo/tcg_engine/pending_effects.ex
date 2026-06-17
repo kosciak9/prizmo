@@ -60,8 +60,11 @@ defmodule Prizmo.TcgEngine.PendingEffects do
         %CardInstance{} = card,
         choices,
         phase,
-        choice_key
+        choice_key,
+        current_player_id \\ nil
       ) do
+    current_player_id = current_player_id || player.player_id
+
     state = %{
       version: 1,
       kind: :play_card,
@@ -74,10 +77,10 @@ defmodule Prizmo.TcgEngine.PendingEffects do
 
     case active_for_game(game.id) do
       {:ok, nil} ->
-        create_and_await(game, player, card, state, phase, choice_key)
+        create_and_await(game, player, card, state, phase, choice_key, current_player_id)
 
       {:ok, %PendingEffect{} = pending_effect} ->
-        await(pending_effect, player, state, phase, choice_key)
+        await(pending_effect, state, phase, choice_key, current_player_id)
 
       {:error, reason} ->
         {:error, reason}
@@ -100,7 +103,7 @@ defmodule Prizmo.TcgEngine.PendingEffects do
     end
   end
 
-  defp create_and_await(game, player, card, state, phase, choice_key) do
+  defp create_and_await(game, player, card, state, phase, choice_key, current_player_id) do
     with {:ok, pending_effect} <-
            create(PendingEffect, :create, %{
              game_id: game.id,
@@ -108,18 +111,18 @@ defmodule Prizmo.TcgEngine.PendingEffects do
              source_card_instance_id: card.id,
              source_card_id: card.card_id,
              controller_player_id: player.player_id,
-             current_player_id: player.player_id,
+             current_player_id: current_player_id,
              effect_key: choice_key,
              step: Atom.to_string(phase),
              state: state
            }) do
-      await(pending_effect, player, state, phase, choice_key)
+      await(pending_effect, state, phase, choice_key, current_player_id)
     end
   end
 
-  defp await(pending_effect, player, state, phase, choice_key) do
+  defp await(pending_effect, state, phase, choice_key, current_player_id) do
     update(pending_effect, :await_prompt, %{
-      current_player_id: player.player_id,
+      current_player_id: current_player_id,
       effect_key: choice_key,
       step: Atom.to_string(phase),
       state: state

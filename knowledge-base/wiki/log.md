@@ -1,5 +1,12 @@
 # Wiki Log
 
+## [2026-06-17] codebase update | Prompt-driven SFA-064 and POR-084 trainer resolution
+
+- Task attempted: replaced the last first-pass auto-selection paths in the active Goal 1 plain-tech Supporter slice. `SFA-064` Xerosic's Machinations now pauses on an opponent-owned hand-discard prompt so the affected player chooses which cards to discard down to 3, while `POR-084` Rosa's Encouragement now pauses on a mixed prompt over discard Basic Energy plus in-play Stage 2 targets. The read model now hides action-window affordances from the active player while a prompt is waiting on the other seat, so two-seat prompt ownership stays consistent in GameView/SPA.
+- Files changed: `lib/prizmo/tcg_engine/card_play.ex`, `lib/prizmo/tcg_engine/pending_effects.ex`, `lib/prizmo/tcg_engine/effect_runner.ex`, `lib/prizmo/tcg_engine/cards/registry.ex`, `lib/prizmo/tcg_engine/game_view.ex`, `lib/prizmo/tcg_engine/game_view/action_affordances.ex`, `lib/prizmo_web/spa/features/home/routes/index.tsx`, `test/prizmo/tcg_engine/mechanics_test.exs`, `knowledge-base/wiki/engine/dragapult-alakazam-full-game-implementation-scope.md`, `knowledge-base/wiki/log.md`.
+- Validation: `mix format`, `node_modules/.bin/tsc --noEmit`, `mix compile --warnings-as-errors`, focused `mix test test/prizmo/tcg_engine/mechanics_test.exs` (15/0), and full `mix check` passed.
+- Remaining/blocking notes: the prompt-correctness gap for `SFA-064` / `POR-084` is closed, but Goal 1 still needs refreshed latest-Limitless corpus work, Alakazam tech fixture/support coverage, dedicated validation for Fairy Zone / Ground Melter / Come and Get You / Cursed Blast / Jamming Tower, and broader two-seat browser play validation.
+
 ## [2026-06-17] codebase update | Goal 1 tech play_card coverage for SFA-064/POR-084/CRI-082
 
 - Task attempted: finished the in-progress Goal 1 plain-tech slice by wiring `SFA-064` Xerosic's Machinations and `POR-084` Rosa's Encouragement into the canonical `EngineCardRegistry`, then replacing the placeholder-only documentation tests with real Ash-path mechanics coverage for `SFA-064`, `POR-084`, and `CRI-082` Special Red Card. The batch also fixed the `CardStore.get_player/2` / `get_opponent/2` external-id lookup bug and hardened the test setup so post-setup tech cards can be pulled deterministically from deck, prize, or discard instead of flaking on prize placement.

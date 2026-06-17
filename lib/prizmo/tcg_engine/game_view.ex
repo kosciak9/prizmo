@@ -63,7 +63,8 @@ defmodule Prizmo.TcgEngine.GameView do
              players,
              cards,
              prompts,
-             viewer_player_id
+             viewer_player_id,
+             awaiting_prompt_player_ids(awaiting_prompts)
            ),
          stadium: stadium_view(cards, attached_cards_by_target),
          players:

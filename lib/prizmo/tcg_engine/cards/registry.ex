@@ -356,7 +356,7 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
       %Effect{
         key: :attach_basic_energy_from_discard_to_stage2_if_more_prizes,
         type: :attach_basic_energy_from_discard_to_stage2_if_more_prizes,
-        params: %{max_targets: 2}
+        params: %{min_count: 2, max_count: 3, max_targets: 2}
       }
     ]
   }

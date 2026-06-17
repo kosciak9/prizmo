@@ -21,18 +21,29 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
   alias Prizmo.TcgEngine.Turn
 
   @doc "Returns action affordances visible to the current game viewer."
-  def for_viewer(%Game{} = game, current_turn, players, cards, prompts, viewer_player_id)
+  def for_viewer(
+        %Game{} = game,
+        current_turn,
+        players,
+        cards,
+        prompts,
+        viewer_player_id,
+        awaiting_prompt_player_ids \\ []
+      )
       when is_list(players) and is_list(cards) and is_list(prompts) and
              is_binary(viewer_player_id) do
-    case prompt_affordances(prompts) do
-      [] ->
+    cond do
+      viewer_player_id in awaiting_prompt_player_ids ->
+        prompt_affordances(prompts)
+
+      awaiting_prompt_player_ids != [] ->
+        []
+
+      true ->
         case replacement_active_affordances(game, current_turn, cards, viewer_player_id) do
           [] -> action_window_affordances(game, current_turn, players, cards, viewer_player_id)
           replacement_actions -> replacement_actions
         end
-
-      prompt_actions ->
-        prompt_actions
     end
   end
 

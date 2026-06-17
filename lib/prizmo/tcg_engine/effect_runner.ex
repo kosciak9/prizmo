@@ -8,6 +8,8 @@ defmodule Prizmo.TcgEngine.EffectRunner do
     :search_top_deck,
     :search_basic_energy_split_hand_attach,
     :flip_coin_then_discard_opponent_attached_energy,
+    :opponent_discards_to_hand_size,
+    :attach_basic_energy_from_discard_to_stage2_if_more_prizes,
     :heal_mega_evolution_pokemon_ex_then_return_attached_energy_to_hand,
     :kieran_switch_or_damage_bonus,
     :switch_team_rocket_bench_and_opponent_bench_to_active,

@@ -406,6 +406,20 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
 
       assert {:ok, game} = Mechanics.play_card(game, "player_2", sfa.id, %{})
 
+      [prompt] = prompts(game.id)
+      assert prompt.player_id == "player_1"
+      assert prompt.payload["choice_key"] == "opponent_discards_to_hand_size"
+      assert prompt.payload["min"] == opponent_hand_before - 3
+      assert prompt.payload["max"] == opponent_hand_before - 3
+
+      assert {:ok, game} =
+               Mechanics.choose_prompt(
+                 game,
+                 "player_1",
+                 prompt.id,
+                 Enum.take(prompt.payload["legal_choices"], opponent_hand_before - 3)
+               )
+
       assert card_count_in_zone(game.id, "player_1", :hand) == 3
 
       effect_cards_moved =
@@ -445,6 +459,15 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
 
       rosa = move_owned_card_to_hand(game.id, "player_2", "POR-084", 3)
       assert {:ok, game} = Mechanics.play_card(game, "player_2", rosa.id, %{})
+
+      [prompt] = prompts(game.id)
+      assert prompt.player_id == "player_2"
+
+      assert prompt.payload["choice_key"] ==
+               "attach_basic_energy_from_discard_to_stage2_if_more_prizes"
+
+      assert {:ok, game} =
+               Mechanics.choose_prompt(game, "player_2", prompt.id, [energy.id, stage2.id])
 
       attached_energy =
         CardInstance

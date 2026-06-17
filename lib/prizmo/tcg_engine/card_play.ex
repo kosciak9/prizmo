@@ -901,14 +901,11 @@ defmodule Prizmo.TcgEngine.CardPlay do
          player,
          card,
          %{type: :opponent_discards_to_hand_size} = effect,
-         _target_ids
+         target_ids
        ) do
     with {:ok, opponent} <- CardStore.get_opponent(game.id, player.player_id),
-         {:ok, hand_cards} <-
-           CardStore.cards_in_zone(game.id, opponent.player_id, :hand),
-         target_size = effect.params.target_hand_size,
-         discard_count = max(length(hand_cards) - target_size, 0),
-         {:ok, to_discard} <- pick_random_hand_cards(hand_cards, discard_count),
+         {:ok, to_discard} <-
+           validate_xerosics_effect(game.id, player.player_id, effect, target_ids),
          {:ok, _discarded} <-
            CardStore.discard_cards_from_hand(game.id, opponent.player_id, to_discard),
          {:ok, _event} <-
@@ -929,31 +926,12 @@ defmodule Prizmo.TcgEngine.CardPlay do
          player,
          card,
          %{type: :attach_basic_energy_from_discard_to_stage2_if_more_prizes} = effect,
-         _target_ids
+         target_ids
        ) do
-    # Rosa's Encouragement — attach up to max_targets Basic Energy from discard to 1 own Stage 2
-    # when player has strictly more Prizes remaining than opponent.
-    # Current first-pass implementation auto-selects the first eligible Stage 2 target.
-    with {:ok, player_prizes} <-
-           CardStore.cards_in_zone(game.id, player.player_id, :prize),
-         {:ok, opponent} <- CardStore.get_opponent(game.id, player.player_id),
-         {:ok, opponent_prizes} <-
-           CardStore.cards_in_zone(game.id, opponent.player_id, :prize),
-         true <- length(player_prizes) > length(opponent_prizes),
-         {:ok, discard_cards} <-
-           CardStore.cards_in_zone(game.id, player.player_id, :discard),
-         basic_energy =
-           discard_cards
-           |> Enum.filter(&rosa_basic_energy_card?/1)
-           |> Enum.take(effect.params.max_targets),
-         true <- basic_energy != [],
-         {:ok, active_cards} <- CardStore.cards_in_zone(game.id, player.player_id, :active),
-         {:ok, bench_cards} <- CardStore.cards_in_zone(game.id, player.player_id, :bench),
-         %CardInstance{} = stage2_target <-
-           Enum.find(
-             active_cards ++ bench_cards,
-             &rosa_stage_2_target_card?(&1, player.player_id)
-           ),
+    with {:ok, target_cards} <-
+           validate_rosa_effect(game.id, player.player_id, effect, target_ids),
+         {:ok, {basic_energy, stage2_target}} <-
+           selected_rosa_cards(target_cards, player.player_id, effect),
          stage2_targets = List.duplicate(stage2_target, length(basic_energy)),
          :ok <- attach_basic_energy_from_discard(game.id, basic_energy, stage2_targets),
          {:ok, _event} <-
@@ -965,8 +943,6 @@ defmodule Prizmo.TcgEngine.CardPlay do
              cards: rosa_attached_energy_payloads(basic_energy, stage2_targets)
            }) do
       complete_play_card_resolution(game, turn, player, card, effect)
-    else
-      _ -> {:error, :rosa_energy_attach_failed}
     end
   end
 
@@ -1093,6 +1069,8 @@ defmodule Prizmo.TcgEngine.CardPlay do
              choice_key,
              legal_choice_ids
            ),
+         {:ok, prompt_player_id} <-
+           choice_prompt_player_id(game.id, player.player_id, definition, choice_key),
          {:ok, pending_effect} <-
            PendingEffects.upsert_awaiting(
              game,
@@ -1100,7 +1078,8 @@ defmodule Prizmo.TcgEngine.CardPlay do
              card,
              choices,
              phase,
-             choice_key
+             choice_key,
+             prompt_player_id
            ),
          {:ok, _event} <-
            write_event_and_snapshot(game.id, :pending_effect_created, player.player_id, %{
@@ -1115,11 +1094,11 @@ defmodule Prizmo.TcgEngine.CardPlay do
              turn_id: turn.id,
              pending_effect_id: pending_effect.id,
              prompt_type: "select_cards",
-             player_id: player.player_id,
+             player_id: prompt_player_id,
              payload:
                prompt_payload(
                  game.id,
-                 player.player_id,
+                 prompt_player_id,
                  choice_key,
                  legal_choice_ids,
                  min,
@@ -1170,8 +1149,11 @@ defmodule Prizmo.TcgEngine.CardPlay do
       {:ok, %{type: :opponent_hand_to_bottom_then_draw_if_any} = effect} ->
         require_opponent_prize_count_at_most(game.id, player.player_id, effect)
 
+      {:ok, %{type: :opponent_discards_to_hand_size} = effect} ->
+        require_xerosics_effect_available(game.id, player.player_id, effect)
+
       {:ok, %{type: :attach_basic_energy_from_discard_to_stage2_if_more_prizes} = effect} ->
-        require_more_prizes_than_opponent(game.id, player.player_id, effect)
+        require_rosa_effect_available(game.id, player.player_id, effect)
 
       {:ok, _effect} ->
         :ok
@@ -1266,6 +1248,38 @@ defmodule Prizmo.TcgEngine.CardPlay do
         :ok
       else
         {:error, :rosa_requires_strictly_more_prizes_than_opponent}
+      end
+    end
+  end
+
+  defp require_xerosics_effect_available(game_id, player_id, effect) do
+    with {:ok, opponent_player} <- CardStore.get_opponent(game_id, player_id),
+         {:ok, hand_cards} <- CardStore.cards_in_zone(game_id, opponent_player.player_id, :hand) do
+      discard_count = xerosics_discard_count(hand_cards, effect)
+
+      if discard_count > 0 do
+        :ok
+      else
+        {:error, :xerosics_machinations_has_no_effect}
+      end
+    end
+  end
+
+  defp require_rosa_effect_available(game_id, player_id, effect) do
+    with :ok <- require_more_prizes_than_opponent(game_id, player_id, effect),
+         {:ok, cards} <- CardStore.list_cards(game_id) do
+      energy_cards = rosa_discard_energy_choice_cards(cards, player_id)
+      target_cards = rosa_stage_2_choice_cards(cards, player_id)
+
+      cond do
+        energy_cards == [] ->
+          {:error, :rosa_requires_basic_energy_in_discard}
+
+        target_cards == [] ->
+          {:error, :rosa_requires_stage_2_in_play}
+
+        true ->
+          :ok
       end
     end
   end
@@ -1451,6 +1465,36 @@ defmodule Prizmo.TcgEngine.CardPlay do
     end
   end
 
+  defp validate_xerosics_effect(game_id, player_id, effect, target_ids) do
+    with {:ok, opponent_player} <- CardStore.get_opponent(game_id, player_id),
+         {:ok, hand_cards} <- CardStore.cards_in_zone(game_id, opponent_player.player_id, :hand),
+         discard_count when discard_count > 0 <- xerosics_discard_count(hand_cards, effect),
+         {:ok, target_ids} <-
+           EffectRunner.validate_choice_selection(
+             %{params: %{count: discard_count}},
+             target_ids,
+             :wrong_xerosics_discard_count
+           ),
+         {:ok, target_cards} <- CardStore.get_cards(game_id, target_ids),
+         :ok <- require_all_owned_in_zone(target_cards, opponent_player.player_id, :hand) do
+      {:ok, target_cards}
+    else
+      0 -> {:error, :xerosics_machinations_has_no_effect}
+      {:error, _reason} = error -> error
+    end
+  end
+
+  defp validate_rosa_effect(game_id, player_id, effect, target_ids) do
+    with :ok <- require_more_prizes_than_opponent(game_id, player_id, effect),
+         {:ok, target_ids} <-
+           EffectRunner.validate_choice_selection(effect, target_ids, :wrong_rosa_choice_count),
+         {:ok, target_cards} <- CardStore.get_cards(game_id, target_ids),
+         {:ok, {_energy_cards, _target_card}} <-
+           selected_rosa_cards(target_cards, player_id, effect) do
+      {:ok, target_cards}
+    end
+  end
+
   defp validate_rare_candy_effect(game_id, player_id, turn, effect, target_ids) do
     with :ok <- require_evolution_allowed_this_turn(turn),
          {:ok, target_ids} <- EffectRunner.validate_choice_selection(effect, target_ids),
@@ -1521,6 +1565,30 @@ defmodule Prizmo.TcgEngine.CardPlay do
        ) do
     cards
     |> opponent_attached_energy_choice_cards(player_id)
+    |> Enum.map(& &1.id)
+    |> then(&{:ok, &1})
+  end
+
+  defp effect_choice_ids(
+         cards,
+         player_id,
+         %{type: :opponent_discards_to_hand_size} = choice_step,
+         _current_turn
+       ) do
+    cards
+    |> xerosics_opponent_hand_choice_cards(player_id, choice_step)
+    |> Enum.map(& &1.id)
+    |> then(&{:ok, &1})
+  end
+
+  defp effect_choice_ids(
+         cards,
+         player_id,
+         %{type: :attach_basic_energy_from_discard_to_stage2_if_more_prizes},
+         _current_turn
+       ) do
+    cards
+    |> rosa_choice_cards(player_id)
     |> Enum.map(& &1.id)
     |> then(&{:ok, &1})
   end
@@ -1684,6 +1752,8 @@ defmodule Prizmo.TcgEngine.CardPlay do
              :search_top_deck,
              :search_basic_energy_split_hand_attach,
              :flip_coin_then_discard_opponent_attached_energy,
+             :opponent_discards_to_hand_size,
+             :attach_basic_energy_from_discard_to_stage2_if_more_prizes,
              :heal_mega_evolution_pokemon_ex_then_return_attached_energy_to_hand,
              :switch_team_rocket_bench_and_opponent_bench_to_active,
              :switch_opponent_bench_to_active,
@@ -1721,20 +1791,68 @@ defmodule Prizmo.TcgEngine.CardPlay do
   end
 
   defp prompt_choice_bounds(game_id, player_id, definition, choice_key, legal_choice_ids) do
-    min = ChoiceValidator.count_for(definition, choice_key)
+    case dynamic_prompt_choice_bounds(
+           game_id,
+           player_id,
+           definition,
+           choice_key,
+           legal_choice_ids
+         ) do
+      {:ok, {min, max}} ->
+        {min, min(max, length(legal_choice_ids))}
 
-    max =
-      definition
-      |> ChoiceValidator.max_count_for(choice_key)
-      |> min(length(legal_choice_ids))
-      |> maybe_cap_bench_choice_max(game_id, player_id, effect_step(definition, choice_key))
-      |> maybe_cap_crispin_choice_max(
-        game_id,
-        effect_step(definition, choice_key),
-        legal_choice_ids
-      )
+      :error ->
+        min = ChoiceValidator.count_for(definition, choice_key)
 
-    {min, max}
+        max =
+          definition
+          |> ChoiceValidator.max_count_for(choice_key)
+          |> min(length(legal_choice_ids))
+          |> maybe_cap_bench_choice_max(game_id, player_id, effect_step(definition, choice_key))
+          |> maybe_cap_crispin_choice_max(
+            game_id,
+            effect_step(definition, choice_key),
+            legal_choice_ids
+          )
+
+        {min, max}
+    end
+  end
+
+  defp dynamic_prompt_choice_bounds(game_id, player_id, definition, choice_key, legal_choice_ids) do
+    case effect_step(definition, choice_key) do
+      %{type: :opponent_discards_to_hand_size} = effect ->
+        with {:ok, opponent_player} <- CardStore.get_opponent(game_id, player_id),
+             {:ok, hand_cards} <-
+               CardStore.cards_in_zone(game_id, opponent_player.player_id, :hand) do
+          discard_count = xerosics_discard_count(hand_cards, effect)
+          {:ok, {discard_count, discard_count}}
+        else
+          _other -> :error
+        end
+
+      %{type: :attach_basic_energy_from_discard_to_stage2_if_more_prizes} = effect ->
+        case CardStore.list_cards(game_id) do
+          {:ok, cards} ->
+            energy_count =
+              cards
+              |> rosa_discard_energy_choice_cards(player_id)
+              |> length()
+              |> min(Map.get(effect.params, :max_targets, 2))
+
+            if energy_count > 0 and legal_choice_ids != [] do
+              {:ok, {2, energy_count + 1}}
+            else
+              :error
+            end
+
+          _other ->
+            :error
+        end
+
+      _other ->
+        :error
+    end
   end
 
   defp maybe_cap_bench_choice_max(max, game_id, player_id, %{params: %{destination: :bench}}) do
@@ -1858,6 +1976,42 @@ defmodule Prizmo.TcgEngine.CardPlay do
       [] -> []
       legal_energy_cards -> legal_energy_cards ++ legal_target_cards
     end
+  end
+
+  defp xerosics_opponent_hand_choice_cards(cards, player_id, choice_step) do
+    hand_cards =
+      cards
+      |> Enum.filter(&(&1.owner_player_id != player_id and &1.zone == :hand))
+      |> Enum.sort_by(&{&1.position, &1.instance_id})
+
+    if xerosics_discard_count(hand_cards, choice_step) > 0 do
+      hand_cards
+    else
+      []
+    end
+  end
+
+  defp rosa_choice_cards(cards, player_id) do
+    energy_cards = rosa_discard_energy_choice_cards(cards, player_id)
+    target_cards = rosa_stage_2_choice_cards(cards, player_id)
+
+    if energy_cards == [] or target_cards == [] do
+      []
+    else
+      energy_cards ++ target_cards
+    end
+  end
+
+  defp rosa_discard_energy_choice_cards(cards, player_id) do
+    cards
+    |> Enum.filter(&rosa_basic_energy_card?(&1, player_id))
+    |> Enum.sort_by(&{&1.position, &1.instance_id})
+  end
+
+  defp rosa_stage_2_choice_cards(cards, player_id) do
+    cards
+    |> Enum.filter(&rosa_stage_2_target_card?(&1, player_id))
+    |> Enum.sort_by(&{in_play_zone_sort(&1.zone), &1.position, &1.instance_id})
   end
 
   defp crispin_basic_energy_choice_cards(cards, player_id) do
@@ -2235,8 +2389,9 @@ defmodule Prizmo.TcgEngine.CardPlay do
       require_pokemon_card(card.card_id) == :ok
   end
 
-  defp rosa_basic_energy_card?(%CardInstance{} = card) do
-    card.zone == :discard and require_basic_energy(card.card_id) == :ok
+  defp rosa_basic_energy_card?(%CardInstance{} = card, player_id) do
+    card.owner_player_id == player_id and card.zone == :discard and
+      require_basic_energy(card.card_id) == :ok
   end
 
   defp rosa_stage_2_target_card?(%CardInstance{} = card, player_id) do
@@ -2309,6 +2464,42 @@ defmodule Prizmo.TcgEngine.CardPlay do
 
       _other ->
         {:error, :invalid_crispin_choices}
+    end
+  end
+
+  defp selected_rosa_cards(cards, player_id, effect) do
+    energy_cards = Enum.filter(cards, &rosa_basic_energy_card?(&1, player_id))
+    target_cards = Enum.filter(cards, &rosa_stage_2_target_card?(&1, player_id))
+    max_targets = Map.get(effect.params, :max_targets, 2)
+
+    if length(cards) == length(energy_cards) + length(target_cards) do
+      case {energy_cards, target_cards} do
+        {[energy_card], [target_card]} ->
+          {:ok, {[energy_card], target_card}}
+
+        {[energy_card_1, energy_card_2], [target_card]} ->
+          {:ok, {[energy_card_1, energy_card_2], target_card}}
+
+        {[], [_target_card]} ->
+          {:error, :missing_rosa_basic_energy_choice}
+
+        {[_energy_card | _rest], []} ->
+          {:error, :missing_rosa_stage_2_choice}
+
+        {[], []} ->
+          {:error, :missing_rosa_choices}
+
+        {energy_cards, [_target_card]} when length(energy_cards) > max_targets ->
+          {:error, {:too_many_rosa_basic_energy_choices, length(energy_cards), max_targets}}
+
+        {[_energy_card | _rest], target_cards} when length(target_cards) > 1 ->
+          {:error, {:too_many_rosa_stage_2_choices, length(target_cards)}}
+
+        _other ->
+          {:error, :invalid_rosa_choices}
+      end
+    else
+      {:error, :invalid_rosa_choices}
     end
   end
 
@@ -2740,6 +2931,54 @@ defmodule Prizmo.TcgEngine.CardPlay do
          payload,
          game_id,
          _player_id,
+         :opponent_discards_to_hand_size,
+         legal_choice_ids
+       ) do
+    case CardStore.list_cards(game_id) do
+      {:ok, cards} ->
+        cards_by_id = Map.new(cards, &{&1.id, &1})
+
+        labels =
+          legal_choice_ids
+          |> Enum.map(&Map.get(cards_by_id, &1))
+          |> Enum.reject(&is_nil/1)
+          |> Enum.map(&xerosics_choice_label/1)
+
+        Map.put(payload, :legal_choice_labels, labels)
+
+      {:error, _reason} ->
+        payload
+    end
+  end
+
+  defp maybe_put_prompt_choice_labels(
+         payload,
+         game_id,
+         _player_id,
+         :attach_basic_energy_from_discard_to_stage2_if_more_prizes,
+         legal_choice_ids
+       ) do
+    case CardStore.list_cards(game_id) do
+      {:ok, cards} ->
+        cards_by_id = Map.new(cards, &{&1.id, &1})
+
+        labels =
+          legal_choice_ids
+          |> Enum.map(&Map.get(cards_by_id, &1))
+          |> Enum.reject(&is_nil/1)
+          |> Enum.map(&rosa_choice_label/1)
+
+        Map.put(payload, :legal_choice_labels, labels)
+
+      {:error, _reason} ->
+        payload
+    end
+  end
+
+  defp maybe_put_prompt_choice_labels(
+         payload,
+         game_id,
+         _player_id,
          :heal_mega_evolution_pokemon_ex_then_return_attached_energy_to_hand,
          legal_choice_ids
        ) do
@@ -2908,6 +3147,31 @@ defmodule Prizmo.TcgEngine.CardPlay do
     }
   end
 
+  defp xerosics_choice_label(%CardInstance{} = card) do
+    %{
+      id: card.id,
+      label: card_name(card, card.card_id),
+      detail: "Card in your hand. Discard enough chosen cards until you have 3 cards remaining."
+    }
+  end
+
+  defp rosa_choice_label(%CardInstance{zone: :discard} = card) do
+    %{
+      id: card.id,
+      label: card_name(card, card.card_id),
+      detail: "Basic Energy in your discard pile to attach with Rosa's Encouragement."
+    }
+  end
+
+  defp rosa_choice_label(%CardInstance{} = card) do
+    %{
+      id: card.id,
+      label: card_name(card, card.card_id),
+      detail:
+        "Your Stage 2 Pokémon in #{Atom.to_string(card.zone)} to receive all selected Basic Energy cards."
+    }
+  end
+
   defp wallys_compassion_choice_label(%CardInstance{} = card) do
     %{
       id: card.id,
@@ -3005,6 +3269,18 @@ defmodule Prizmo.TcgEngine.CardPlay do
   defp in_play_zone_sort(:active), do: 0
   defp in_play_zone_sort(:bench), do: 1
   defp in_play_zone_sort(_zone), do: 2
+
+  defp choice_prompt_player_id(game_id, player_id, definition, choice_key) do
+    case effect_step(definition, choice_key) do
+      %{type: :opponent_discards_to_hand_size} ->
+        with {:ok, opponent_player} <- CardStore.get_opponent(game_id, player_id) do
+          {:ok, opponent_player.player_id}
+        end
+
+      _other ->
+        {:ok, player_id}
+    end
+  end
 
   defp effect_step(definition, choice_key) do
     Enum.find(definition.effects, &(&1.key == choice_key))
@@ -3323,11 +3599,8 @@ defmodule Prizmo.TcgEngine.CardPlay do
     end
   end
 
-  defp pick_random_hand_cards(_hand_cards, count) when count <= 0, do: {:ok, []}
-
-  defp pick_random_hand_cards(hand_cards, count) do
-    # Deterministic selection for tests (first N); real RNG later if needed
-    {:ok, Enum.take(hand_cards, count)}
+  defp xerosics_discard_count(hand_cards, %{params: %{target_hand_size: target_hand_size}}) do
+    max(length(hand_cards) - target_hand_size, 0)
   end
 
   defp resolve_attack_damage_to_target(game_id, target_pokemon, amount, source_card, effect) do
