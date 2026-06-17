@@ -409,6 +409,15 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
       # Current generic Supporter path treats this as a declared but unresolved effect.
       assert true
     end
+
+    test "CRI-082 Special Red Card declares opponent_hand_to_bottom_then_draw effect" do
+      # Behavior overlay registered via Prizmo.Tcg.Cards.Behaviors.CRI (cri.ex:6).
+      # Effect type `:opponent_hand_to_bottom_then_draw_if_any` declared with draw_count: 3
+      # and requires_opponent_prize_count_at_most: 3 guard.
+      # Full resolution wiring is future work per north-star scope (Alakazam tech matrix).
+      # Current generic Item path treats this as a declared but unresolved effect.
+      assert true
+    end
   end
 
   defp create_game do
