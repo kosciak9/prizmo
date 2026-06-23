@@ -19,6 +19,7 @@ defmodule Prizmo.TcgEngine.EffectRunner do
     :switch_opponent_bench_to_active,
     :damage_any_opponent_pokemon,
     :discard_opponent_special_energy,
+    :discard_attached_tools,
     :move_basic_energy_between_own_pokemon,
     :recover_discard_to_hand,
     :recover_discard_to_deck,

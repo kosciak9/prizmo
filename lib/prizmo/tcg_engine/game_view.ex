@@ -738,6 +738,17 @@ defmodule Prizmo.TcgEngine.GameView do
   end
 
   defp legal_choice_cards(
+         %Prompt{payload: %{"choice_key" => "discard_attached_tools"} = payload},
+         cards,
+         attached_cards_by_target
+       ) do
+    payload
+    |> prompt_choice_card_instances(cards)
+    |> Enum.filter(&(&1.zone == :attached))
+    |> Enum.map(&card_view(&1, attached_cards_by_target))
+  end
+
+  defp legal_choice_cards(
          %Prompt{payload: payload, player_id: player_id},
          cards,
          attached_cards_by_target

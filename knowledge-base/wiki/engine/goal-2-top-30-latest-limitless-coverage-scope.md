@@ -64,10 +64,10 @@ Those reports are the canonical starting point for autonomous Goal 2 implementat
 - Tracked top archetypes: `30`
 - Tracked cards with usage greater than `0.00`: `377`
 - Coverage buckets from `mix prizmo.goal2.corpus`:
-  - `supported=112`
+  - `supported=114`
   - `generic-supported=7`
   - `partial=12`
-  - `unimplemented=246`
+  - `unimplemented=244`
 - Metadata buckets:
   - `cached=143`
   - `missing=234`
@@ -82,20 +82,22 @@ Important interpretation:
 
 The strongest current Goal 2 implementation candidates are the incomplete cards shared by the most archetypes and/or the most total metagame share.
 
+The latest Goal 2 engine batch moved `DRI-176` Team Rocket's Petrel and `ASC-212` Tool Scrapper to `supported`, so the broad cached-metadata queue now starts with Brock's Scouting.
+
 ### Highest-priority shared `unimplemented` cards from current report
 
 | Card | Archetypes | Total share | Notes |
 | --- | --- | --- | --- |
-| `DRI-176` Team Rocket's Petrel | `19` | `81.37%` | Biggest current shared blocker by both breadth and weighted share. |
-| `JTG-146` Brock's Scouting | `11` | `78.46%` | High-frequency Trainer across several top share decks. |
-| `ASC-212` Tool Scrapper | `8` | `73.72%` | Broad Tool-removal primitive; strong cross-archetype leverage. |
-| `TEF-157` Prime Catcher | `7` | `76.55%` | Very high share; metadata exists but effect is still classified unimplemented. |
+| `JTG-146` Brock's Scouting | `11` | `78.46%` | New top cached-metadata blocker after the Petrel/Tool Scrapper batch. |
+| `SSP-177` Gravity Mountain | `8` | `22.79%` | Widest remaining metadata-missing blocker by archetype count. |
+| `TEF-157` Prime Catcher | `7` | `76.55%` | Highest-share remaining cached-metadata Trainer/item gap. |
 | `JTG-121` Dudunsparce ex | `7` | `59.97%` | Shared Pokémon gap across Dragapult-adjacent and Dudunsparce shells. |
 | `SCR-114` Hoothoot | `6` | `61.15%` | Common Noctowl line prerequisite in several archetypes. |
-| `SSP-177` Gravity Mountain | `8` | `22.79%` | Wide but lower-share stadium gap; metadata currently missing. |
 | `SFA-057` Colress's Tenacity | `6` | `13.29%` | Shared Trainer gap with missing metadata. |
 | `ASC-046` Snorunt | `6` | `9.64%` | Shared line across several lower-share archetypes. |
 | `SVI-171` Energy Retrieval | `5` | `11.97%` | Generic recovery Item missing from current classifier support. |
+| `SFA-039` Pecharunt ex | `4` | `63.93%` | Very high weighted share despite fewer archetypes than the broad Trainer gaps. |
+| `TWM-162` Scoop Up Cyclone | `4` | `14.54%` | Shared ACE SPEC gap once the higher-share cached slice is reduced. |
 
 ### Shared `partial` cards worth finishing after the broad unimplemented slice
 
@@ -123,8 +125,8 @@ That means prior Goal 1 and six-deck coverage was not wasted; it now acts as see
 
 ## Recommended next implementation order
 
-1. Prefer shared blockers that already have cached metadata and affect the most total share: `DRI-176`, `JTG-146`, `ASC-212`, `TEF-157`, `JTG-121`.
-2. After the broad cached-metadata slice, decide whether to fill missing metadata for shared staples or implement one archetype-defining line end to end.
+1. Prefer the remaining cached-metadata broad-share blockers first: `JTG-146`, `TEF-157`, `JTG-121`, and `SCR-114`.
+2. After the cached-metadata follow-up slice, decide whether to keep harvesting cached cards (`JTG-157`, `SSP-189`, `SFA-039`) or fill missing metadata for wide staples like `SSP-177`, `SFA-057`, and `SVI-171`.
 3. Keep using `mix prizmo.goal2.corpus` after each batch to re-rank the next blockers by archetype count and weighted share.
 4. Treat one-off low-share cards as later work unless they unblock a shared primitive or a whole still-dead archetype line.
 

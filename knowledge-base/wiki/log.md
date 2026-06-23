@@ -1,5 +1,12 @@
 # Wiki Log
 
+## [2026-06-23] codebase update | Goal 2 Petrel and Tool Scrapper support
+
+- Task attempted: closed the first post-bootstrap Goal 2 shared Trainer slice instead of repeating already-finished selection/reporting work. Added `DRI-176` Team Rocket's Petrel as a generic deck-search Supporter over any Trainer card, and added `ASC-212` Tool Scrapper as a real attached-Tool discard Item that can target either player's Tools.
+- Files changed: `lib/prizmo/tcg_engine/cards/registry.ex`, `lib/prizmo/tcg_engine/effect_runner.ex`, `lib/prizmo/tcg_engine/card_play.ex`, `lib/prizmo/tcg_engine/game_view.ex`, `knowledge-base/wiki/engine/goal-2-top-30-latest-limitless-coverage-scope.md`, `knowledge-base/wiki/engine/ash-backed-tcg-engine-playtest-handoff.md`, `knowledge-base/wiki/log.md`.
+- Validation: `mix format` on changed Elixir files; `mix compile --warnings-as-errors`; direct Tidewave eval of `Prizmo.Tcg.CardCoverage.summarize/1` for `DRI-176` and `ASC-212`; synthetic Tidewave checks of `Prizmo.TcgEngine.CardPlay.required_choices_available?/3` proving Petrel requires a Trainer in deck and Tool Scrapper requires at least one attached Tool; refreshed `mix prizmo.goal2.corpus` confirmed `supported=114` / `unimplemented=244`; final `mix check` passed.
+- Remaining/blocking notes: `DRI-176` and `ASC-212` are no longer in the shared unimplemented queue. `JTG-146` Brock's Scouting is now the top cached-metadata Goal 2 blocker, followed by `TEF-157` Prime Catcher, `JTG-121` Dudunsparce ex, and `SCR-114` Hoothoot; `SSP-177` Gravity Mountain remains the widest metadata-missing shared gap.
+
 ## [2026-06-23] codebase update | Goal 2 top-30 corpus bootstrap
 
 - Task attempted: built the first Goal 2 live metagame/corpus pipeline instead of repeating already-closed Goal 1 work. Generalized the old Goal 1 card classifier into shared `Prizmo.Tcg.CardCoverage`, extended `Prizmo.Tcg.Data.Limitless` to parse the live `/decks?show=100` metagame table plus `/decks/:id/cards` breakdown pages, added `Prizmo.Tcg.Goal2.LatestLimitless` with `mix prizmo.goal2.top30` and `mix prizmo.goal2.corpus`, then recorded the first durable Goal 2 snapshot in the wiki and handoff.

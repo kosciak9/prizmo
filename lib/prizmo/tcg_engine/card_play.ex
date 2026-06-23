@@ -400,6 +400,28 @@ defmodule Prizmo.TcgEngine.CardPlay do
          turn,
          player,
          card,
+         %{type: :discard_attached_tools} = effect,
+         target_ids
+       ) do
+    with {:ok, target_tool_cards} <-
+           validate_attached_tool_discard_effect(game.id, effect, target_ids),
+         {:ok, discarded_tool_cards} <- discard_attached_cards(game.id, target_tool_cards),
+         {:ok, _event} <-
+           write_event_and_snapshot(game.id, :cards_moved, player.player_id, %{
+             reason: :effect_resolution,
+             source: EventPayloads.card_source(card),
+             effect_key: effect.key,
+             cards: EventPayloads.moved_cards(discarded_tool_cards, :attached, :discard)
+           }) do
+      complete_play_card_resolution(game, turn, player, card, effect)
+    end
+  end
+
+  defp complete_play_card_effect(
+         game,
+         turn,
+         player,
+         card,
          %{type: :switch_own_active_with_bench} = effect,
          target_ids
        ) do
@@ -1522,6 +1544,20 @@ defmodule Prizmo.TcgEngine.CardPlay do
     end
   end
 
+  defp validate_attached_tool_discard_effect(game_id, effect, target_ids) do
+    with {:ok, target_ids} <-
+           EffectRunner.validate_choice_selection(
+             effect,
+             target_ids,
+             :wrong_attached_tool_choice_count
+           ),
+         {:ok, target_cards} <- CardStore.get_cards(game_id, target_ids),
+         :ok <- require_all_in_zone(target_cards, :attached),
+         :ok <- require_all_tool_cards(target_cards) do
+      {:ok, target_cards}
+    end
+  end
+
   defp validate_energy_switch_effect(game_id, player_id, effect, target_ids) do
     with {:ok, target_ids} <- EffectRunner.validate_choice_selection(effect, target_ids),
          {:ok, target_cards} <- CardStore.get_cards(game_id, target_ids),
@@ -1791,6 +1827,13 @@ defmodule Prizmo.TcgEngine.CardPlay do
        ) do
     cards
     |> opponent_special_energy_choice_cards(player_id)
+    |> Enum.map(& &1.id)
+    |> then(&{:ok, &1})
+  end
+
+  defp effect_choice_ids(cards, player_id, %{type: :discard_attached_tools}, _current_turn) do
+    cards
+    |> attached_tool_choice_cards(player_id)
     |> Enum.map(& &1.id)
     |> then(&{:ok, &1})
   end
@@ -2191,6 +2234,14 @@ defmodule Prizmo.TcgEngine.CardPlay do
     )
   end
 
+  defp attached_tool_choice_cards(cards, _player_id) do
+    cards
+    |> Enum.filter(&(&1.zone == :attached and tool_card?(&1)))
+    |> Enum.sort_by(
+      &{&1.owner_player_id, &1.attached_to_card_instance_id, &1.position, &1.instance_id}
+    )
+  end
+
   defp opponent_attached_energy_choice_cards(cards, player_id) do
     cards
     |> Enum.filter(
@@ -2407,6 +2458,19 @@ defmodule Prizmo.TcgEngine.CardPlay do
     require_pokemon_card(card.card_id)
   end
 
+  defp require_search_filter(%CardInstance{} = card, %{kind: :trainer}) do
+    case CardCatalog.fetch(card.card_id) do
+      {:ok, %{supertype: :trainer}} ->
+        :ok
+
+      {:ok, metadata} ->
+        {:error, {:not_trainer, metadata.id}}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
   defp require_search_filter(%CardInstance{} = card, %{
          kind: :energy,
          energy_type: :basic,
@@ -2542,6 +2606,10 @@ defmodule Prizmo.TcgEngine.CardPlay do
   end
 
   defp energy_card?(%CardInstance{card_id: card_id}), do: require_energy(card_id) == :ok
+
+  defp tool_card?(%CardInstance{card_id: card_id}) do
+    match?({:ok, _metadata}, require_trainer_type(card_id, [:tool]))
+  end
 
   defp crispin_basic_energy_card?(%CardInstance{} = card, player_id) do
     card.owner_player_id == player_id and card.zone == :deck and
@@ -2902,7 +2970,17 @@ defmodule Prizmo.TcgEngine.CardPlay do
   end
 
   defp discard_attached_energy_card(game, %CardInstance{} = card) do
-    with {:ok, position} <- CardStore.next_discard_position(game.id, card.owner_player_id) do
+    discard_attached_card(game.id, card)
+  end
+
+  defp discard_attached_cards(game_id, cards) when is_list(cards) do
+    cards
+    |> Enum.map(&discard_attached_card(game_id, &1))
+    |> collect_results()
+  end
+
+  defp discard_attached_card(game_id, %CardInstance{} = card) do
+    with {:ok, position} <- CardStore.next_discard_position(game_id, card.owner_player_id) do
       update(card, :discard, %{position: position, attached_to_card_instance_id: nil})
     end
   end
@@ -3378,6 +3456,30 @@ defmodule Prizmo.TcgEngine.CardPlay do
   defp maybe_put_prompt_choice_labels(
          payload,
          game_id,
+         player_id,
+         :discard_attached_tools,
+         legal_choice_ids
+       ) do
+    case CardStore.list_cards(game_id) do
+      {:ok, cards} ->
+        cards_by_id = Map.new(cards, &{&1.id, &1})
+
+        labels =
+          legal_choice_ids
+          |> Enum.map(&Map.get(cards_by_id, &1))
+          |> Enum.reject(&is_nil/1)
+          |> Enum.map(&tool_scrapper_choice_label(&1, cards_by_id, player_id))
+
+        Map.put(payload, :legal_choice_labels, labels)
+
+      {:error, _reason} ->
+        payload
+    end
+  end
+
+  defp maybe_put_prompt_choice_labels(
+         payload,
+         game_id,
          _player_id,
          :move_basic_energy_between_own_pokemon,
          legal_choice_ids
@@ -3440,6 +3542,26 @@ defmodule Prizmo.TcgEngine.CardPlay do
       id: card.id,
       label: card_name(card, card.card_id),
       detail: "Item card in your opponent's revealed hand. Choose up to 2 Item cards to discard."
+    }
+  end
+
+  defp tool_scrapper_choice_label(
+         %CardInstance{owner_player_id: owner_player_id} = card,
+         cards_by_id,
+         player_id
+       ) do
+    attached_to_name =
+      cards_by_id
+      |> Map.get(card.attached_to_card_instance_id)
+      |> card_name("attached Pokémon")
+
+    owner_detail = if owner_player_id == player_id, do: "Your", else: "Opponent's"
+
+    %{
+      id: card.id,
+      label: card_name(card, card.card_id),
+      detail:
+        "#{owner_detail} Tool attached to #{attached_to_name}. Choose up to 2 Tools to discard."
     }
   end
 
@@ -3679,6 +3801,17 @@ defmodule Prizmo.TcgEngine.CardPlay do
     target_cards
     |> Enum.map(fn card ->
       case require_trainer_type(card.card_id, [:item]) do
+        {:ok, _metadata} -> :ok
+        {:error, reason} -> {:error, reason}
+      end
+    end)
+    |> collect_ok_results()
+  end
+
+  defp require_all_tool_cards(target_cards) do
+    target_cards
+    |> Enum.map(fn card ->
+      case require_trainer_type(card.card_id, [:tool]) do
         {:ok, _metadata} -> :ok
         {:error, reason} -> {:error, reason}
       end

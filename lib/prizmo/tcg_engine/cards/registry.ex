@@ -139,6 +139,26 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     ]
   }
 
+  @team_rockets_petrel %CardDefinition{
+    id: "DRI-176",
+    kind: :trainer,
+    trainer_type: :supporter,
+    play_window: :action_window,
+    effects: [
+      %Effect{
+        key: :search_deck_for_trainer_card,
+        type: :search_deck,
+        params: %{
+          filter: %{kind: :trainer},
+          count: 1,
+          destination: :hand,
+          reveal: true,
+          shuffle_after: true
+        }
+      }
+    ]
+  }
+
   @lillies_determination %CardDefinition{
     id: "MEG-119",
     kind: :trainer,
@@ -191,6 +211,20 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
         key: :discard_opponent_special_energy,
         type: :discard_opponent_special_energy,
         params: %{count: 1}
+      }
+    ]
+  }
+
+  @tool_scrapper %CardDefinition{
+    id: "ASC-212",
+    kind: :trainer,
+    trainer_type: :item,
+    play_window: :action_window,
+    effects: [
+      %Effect{
+        key: :discard_attached_tools,
+        type: :discard_attached_tools,
+        params: %{min_count: 1, max_count: 2}
       }
     ]
   }
@@ -896,6 +930,7 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     @unfair_stamp.id => @unfair_stamp,
     @team_rockets_archer.id => @team_rockets_archer,
     @team_rockets_ariana.id => @team_rockets_ariana,
+    @team_rockets_petrel.id => @team_rockets_petrel,
     @kieran.id => @kieran,
     @black_belts_training.id => @black_belts_training,
     @team_rockets_giovanni.id => @team_rockets_giovanni,
@@ -909,6 +944,7 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     @tef_129_dudunsparce.id => @tef_129_dudunsparce,
     @pfl_084_mega_lopunny_ex.id => @pfl_084_mega_lopunny_ex,
     @glass_trumpet.id => @glass_trumpet,
+    @tool_scrapper.id => @tool_scrapper,
     @meowth_ex.id => @meowth_ex,
     @fezandipiti_ex.id => @fezandipiti_ex,
     @genesect.id => @genesect,
