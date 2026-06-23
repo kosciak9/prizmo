@@ -1,11 +1,18 @@
 # Ash-backed TCG Engine Playtest Handoff
 
-- Updated: 2026-06-23 (superseded by latest-Limitless/Godot roadmap)
+- Updated: 2026-06-24 (superseded by latest-Limitless/Godot roadmap)
 - Sources: Project codebase; local validation; wiki log
 - Raw: N/A — operational handoff
 
 - This document is historical/operational context. The active canonical roadmap is now [Prizmo TCG Engine and Play Surface North Star](ash-backed-tcg-engine-playtest-north-star.md): Goal 1 latest-Limitless Dragapult/Alakazam completeness, Goal 2 latest top-30 Limitless archetype coverage, Goal 3 React shell + embedded Godot play surface, Goal 4 React Native mobile path, Goal 5 all possible cards.
 - Treat the two-deck and six-deck selection rules below as historical unless they directly help with the current latest-Limitless coverage goals.
+
+## [2026-06-24] Goal 2 Gravity Mountain + Hero's Cape HP modifier support batch
+
+- Current state: the widest remaining metadata-missing Goal 2 blocker and the broadest shared partial are now closed through reusable HP-modifier infrastructure instead of another narrow metadata import. Added committed TCGdex metadata for `SSP-177` Gravity Mountain, authored the new Stadium effect so every in-play Stage 2 Pokémon gets `-30` HP, and added `TEF-152` Hero's Cape as an engine-defined Tool that grants `+100` HP while Tool effects are live. The canonical engine now rechecks state-based KOs after Stadium play, normal hand evolution, Rare Candy evolution, and attached-Tool discard paths so reduced HP can immediately Knock Out damaged Pokémon when the modifier changes.
+- Current live snapshot: rerunning the live Goal 2 corpus after the batch keeps the same `377` tracked cards but moves the support buckets to `supported=127`, `generic-supported=7`, `partial=10`, and `unimplemented=233`, while the metadata split improves to `cached=147` / `missing=230`. `SSP-177` is no longer in the shared incomplete queue, `TEF-152` is no longer partial, and the next unblocked shared metadata-missing queue is `TWM-162` Scoop Up Cyclone (`4` archetypes / `14.54%` total share), `SCR-132` Briar (`4` / `11.84%`), `ASC-162` Team Rocket's Kangaskhan ex (`4` / `10.82%`), and `SSP-187` Surfer (`4` / `7.49%`).
+- Validation: `mix test test/prizmo/tcg_engine/mechanics_test.exs`; `mix format`; `mix compile --warnings-as-errors`; refreshed `mix prizmo.goal2.corpus`; final `mix check` passed. Focused mechanics coverage proves `SSP-177` immediately Knocks Out an over-damaged Stage 2 when played and lowers later KO thresholds, while `TWM-153` Jamming Tower now suppresses `TEF-152` strongly enough to Knock Out an over-damaged Hero's Cape target.
+- Next recommendation: take the unblocked shared metadata-missing queue `TWM-162` / `SCR-132` / `ASC-162` / `SSP-187` next. If staying on HP work deliberately, the best follow-up is `POR-086` Growing Grass Energy, because the new infrastructure currently covers Stadium and Tool HP modifiers but not attached Special Energy HP changes.
 
 ## [2026-06-23] Goal 2 Colress's Tenacity + Snorunt + Energy Retrieval support batch
 

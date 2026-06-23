@@ -5,6 +5,7 @@ defmodule Prizmo.TcgEngine.ToolEffects do
   alias Prizmo.TcgEngine.CardInstance
   alias Prizmo.TcgEngine.CardMetadataRequirements
   alias Prizmo.TcgEngine.CardStore
+  alias Prizmo.TcgEngine.HpEffects
   alias Prizmo.TcgEngine.StadiumEffects
 
   require Ash.Query
@@ -20,7 +21,8 @@ defmodule Prizmo.TcgEngine.ToolEffects do
     :bench_limit_8_with_tera_in_play_else_discard_to_5,
     :reduce_attack_cost_by_colorless_if_more_prizes_remaining,
     :draw_cards_if_damaged_as_active_by_attack,
-    :reduce_opponents_knockout_prize_count_by_one
+    :reduce_opponents_knockout_prize_count_by_one,
+    :attached_pokemon_hp_modifier
   ]
 
   def supported_tool?(%{supertype: :trainer, trainer_type: :tool, effect: %{type: type}})
@@ -264,7 +266,65 @@ defmodule Prizmo.TcgEngine.ToolEffects do
     if StadiumEffects.tools_have_no_effect?(game_id) do
       []
     else
-      retreat_cost_reductions(attached_to_card, attached_cards)
+      Enum.flat_map(attached_cards, fn
+        %CardInstance{} = card ->
+          case retreat_cost_reduction(game_id, attached_to_card, card) do
+            amount when amount > 0 ->
+              [
+                %{
+                  amount: amount,
+                  card_id: card.card_id,
+                  card_instance_id: card.id
+                }
+              ]
+
+            _amount ->
+              []
+          end
+
+        _card ->
+          []
+      end)
+    end
+  end
+
+  def retreat_cost_reduction(game_id, %CardInstance{} = attached_to_card, %CardInstance{
+        card_id: card_id
+      })
+      when is_binary(game_id) and is_binary(card_id) do
+    case CardCatalog.fetch(card_id) do
+      {:ok,
+       %{
+         supertype: :trainer,
+         trainer_type: :tool,
+         effect: %{type: :retreat_cost_reduction, energy_type: :colorless, amount: amount}
+       }}
+      when is_integer(amount) and amount > 0 ->
+        amount
+
+      {:ok,
+       %{
+         supertype: :trainer,
+         trainer_type: :tool,
+         effect: %{
+           type: :retreat_cost_reduction_with_low_hp_free_retreat,
+           amount: amount,
+           remaining_hp_max: remaining_hp_max
+         }
+       }}
+      when is_integer(amount) and amount > 0 and is_integer(remaining_hp_max) and
+             remaining_hp_max >= 0 ->
+        if remaining_hp_at_most?(game_id, attached_to_card, remaining_hp_max) do
+          printed_retreat_cost(attached_to_card)
+        else
+          amount
+        end
+
+      {:ok, _card} ->
+        0
+
+      {:error, _reason} ->
+        0
     end
   end
 
@@ -314,6 +374,14 @@ defmodule Prizmo.TcgEngine.ToolEffects do
 
       _other ->
         false
+    end
+  end
+
+  defp remaining_hp_at_most?(game_id, %CardInstance{} = card, max_remaining_hp)
+       when is_binary(game_id) and is_integer(max_remaining_hp) do
+    case HpEffects.remaining_hp(game_id, card) do
+      {:ok, remaining_hp} -> remaining_hp <= max_remaining_hp
+      _other -> false
     end
   end
 

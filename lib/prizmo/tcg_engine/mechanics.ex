@@ -88,6 +88,7 @@ defmodule Prizmo.TcgEngine.Mechanics do
   alias Prizmo.TcgEngine.Flow.Interpreter, as: FlowInterpreter
   alias Prizmo.TcgEngine.Game
   alias Prizmo.TcgEngine.GameSetup
+  alias Prizmo.TcgEngine.HpEffects
   alias Prizmo.TcgEngine.PendingEffect
   alias Prizmo.TcgEngine.PendingEffects
   alias Prizmo.TcgEngine.Prompt
@@ -590,6 +591,15 @@ defmodule Prizmo.TcgEngine.Mechanics do
     end)
   end
 
+  @spec resolve_hp_state_based_knockouts(Game.t() | String.t()) ::
+          {:ok, Game.t()} | {:error, term()}
+  def resolve_hp_state_based_knockouts(game_or_id) do
+    with {:ok, game} <- get_game(game_or_id) do
+      targets = hp_state_based_knockout_targets(game.id)
+      resolve_hp_state_based_knockout_targets(game, targets)
+    end
+  end
+
   @spec choose_prompt(Game.t() | String.t(), String.t(), String.t(), term()) ::
           {:ok, Game.t()} | {:error, term()}
   def choose_prompt(game_or_id, player_id, prompt_id, choice)
@@ -1027,7 +1037,8 @@ defmodule Prizmo.TcgEngine.Mechanics do
                  recovered_special_conditions
                )
              ),
-           {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do
+           {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index),
+           {:ok, _game} <- resolve_hp_state_based_knockouts(game.id) do
         get_game(game.id)
       end
     end)
@@ -1892,7 +1903,8 @@ defmodule Prizmo.TcgEngine.Mechanics do
                cleared_status: if(target_card.status, do: Atom.to_string(target_card.status)),
                preserved_attachment_card_instance_ids: Enum.map(reparented_attachments, & &1.id)
              }),
-           {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do
+           {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index),
+           {:ok, _game} <- resolve_hp_state_based_knockouts(game.id) do
         get_game(game.id)
       end
     end)
@@ -2964,13 +2976,13 @@ defmodule Prizmo.TcgEngine.Mechanics do
   end
 
   defp maybe_knock_out_after_adrena_brain(game_id, %CardInstance{} = target_card, new_damage) do
-    with {:ok, target_hp} <- pokemon_hp(target_card.card_id) do
-      if new_damage < target_hp do
-        {:ok, false}
-      else
+    with {:ok, knocked_out?} <- HpEffects.damage_knocks_out?(game_id, target_card, new_damage) do
+      if knocked_out? do
         with {:ok, _discarded_cards} <- discard_knocked_out_stack(game_id, target_card) do
           {:ok, true}
         end
+      else
+        {:ok, false}
       end
     end
   end
@@ -3115,15 +3127,90 @@ defmodule Prizmo.TcgEngine.Mechanics do
   end
 
   defp maybe_knock_out_after_cursed_blast(game_id, %CardInstance{} = target_card, new_damage) do
-    with {:ok, target_hp} <- pokemon_hp(target_card.card_id) do
-      if new_damage < target_hp do
-        {:ok, false}
-      else
+    with {:ok, knocked_out?} <- HpEffects.damage_knocks_out?(game_id, target_card, new_damage) do
+      if knocked_out? do
         with {:ok, _discarded_cards} <- discard_knocked_out_stack(game_id, target_card) do
           {:ok, true}
         end
+      else
+        {:ok, false}
       end
     end
+  end
+
+  defp hp_state_based_knockout_targets(game_id) when is_binary(game_id) do
+    case CardStore.list_cards(game_id) do
+      {:ok, cards} ->
+        cards
+        |> Enum.filter(&(&1.zone in [:active, :bench]))
+        |> Enum.reduce([], fn card, targets ->
+          case HpEffects.damage_knocks_out?(game_id, card, card.damage || 0) do
+            {:ok, true} -> [%{card: card, original_zone: card.zone} | targets]
+            _other -> targets
+          end
+        end)
+        |> Enum.reverse()
+
+      {:error, _reason} ->
+        []
+    end
+  end
+
+  defp resolve_hp_state_based_knockout_targets(%Game{} = game, []), do: {:ok, game}
+
+  defp resolve_hp_state_based_knockout_targets(%Game{} = game, targets) do
+    with {:ok, discarded_targets} <- discard_hp_state_based_knockout_targets(game.id, targets),
+         {:ok, prize_selections} <- hp_state_based_prize_selections(game.id, discarded_targets),
+         {:ok, game} <- create_knockout_prize_selections(game.id, prize_selections) do
+      resolve_hp_state_based_replacements(game, discarded_targets)
+    end
+  end
+
+  defp discard_hp_state_based_knockout_targets(game_id, targets) when is_list(targets) do
+    targets
+    |> Enum.map(fn %{card: card} = target ->
+      with {:ok, _discarded_cards} <- discard_knocked_out_stack(game_id, card),
+           {:ok, discarded_card} <- get_card(game_id, card.id) do
+        {:ok, Map.put(target, :discarded_card, discarded_card)}
+      end
+    end)
+    |> collect_results()
+  end
+
+  defp hp_state_based_prize_selections(game_id, targets) when is_list(targets) do
+    Enum.reduce_while(targets, {:ok, []}, fn %{discarded_card: discarded_card},
+                                             {:ok, selections} ->
+      with {:ok, attacking_player_id} <-
+             opponent_player_id(game_id, discarded_card.owner_player_id),
+           {:ok, prize_record} <-
+             knockout_prize_record(discarded_card.owner_player_id, discarded_card) do
+        {:cont,
+         {:ok, append_knockout_prize_selection(selections, attacking_player_id, [prize_record])}}
+      else
+        {:error, reason} -> {:halt, {:error, reason}}
+      end
+    end)
+  end
+
+  defp resolve_hp_state_based_replacements(%Game{} = game, targets) when is_list(targets) do
+    targets
+    |> Enum.filter(&(&1.original_zone == :active))
+    |> Enum.map(& &1.card.owner_player_id)
+    |> Enum.uniq()
+    |> Enum.reduce_while({:ok, game}, fn knocked_out_player_id, {:ok, current_game} ->
+      with {:ok, attacking_player_id} <-
+             opponent_player_id(current_game.id, knocked_out_player_id),
+           {:ok, next_game} <-
+             resolve_replacement_after_knockout(
+               current_game,
+               attacking_player_id,
+               knocked_out_player_id
+             ) do
+        {:cont, {:ok, next_game}}
+      else
+        {:error, reason} -> {:halt, {:error, reason}}
+      end
+    end)
   end
 
   defp cursed_blast_event_payload(

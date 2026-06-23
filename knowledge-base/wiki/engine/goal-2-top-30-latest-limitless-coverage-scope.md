@@ -1,6 +1,6 @@
 # Goal 2 Top 30 Latest-Limitless Coverage Scope
 
-- Updated: 2026-06-23
+- Updated: 2026-06-24
 - Sources: Project codebase; local validation; live Limitless metagame and card-breakdown pages (2026-06-23)
 - Raw: N/A — codebase update
 
@@ -64,13 +64,13 @@ Those reports are the canonical starting point for autonomous Goal 2 implementat
 - Tracked top archetypes: `30`
 - Tracked cards with usage greater than `0.00`: `377`
 - Coverage buckets from `mix prizmo.goal2.corpus`:
-  - `supported=122`
+  - `supported=127`
   - `generic-supported=7`
-  - `partial=11`
-  - `unimplemented=237`
+  - `partial=10`
+  - `unimplemented=233`
 - Metadata buckets:
-  - `cached=143`
-  - `missing=234`
+  - `cached=147`
+  - `missing=230`
 
 Important interpretation:
 
@@ -82,14 +82,13 @@ Important interpretation:
 
 The strongest current Goal 2 implementation candidates are the incomplete cards shared by the most archetypes and/or the most total metagame share.
 
-The latest Goal 2 engine batch moved `SFA-057` Colress's Tenacity, `ASC-046` Snorunt, and `SVI-171` Energy Retrieval to `supported`, which proves the metadata-missing queue can be reduced cleanly without immediately forcing the broader HP-in-play work that `SSP-177` Gravity Mountain requires. The next weighted cached cards are still Dragapult-only `TWM-099` Hisuian Growlithe and `TWM-100` Hisuian Arcanine, while `SSP-177` now stands alone as the widest remaining metadata-missing gap.
+The latest Goal 2 engine batch closed both the widest metadata-missing blocker and the broadest shared partial by adding reusable HP-modifier infrastructure. `SSP-177` Gravity Mountain now resolves as an engine-defined Stadium that lowers every in-play Stage 2 Pokémon's HP by `30` and immediately rechecks state-based KOs when that threshold matters, while `TEF-152` Hero's Cape now grants `+100` HP through the canonical Tool path and correctly falls off under `TWM-153` Jamming Tower or attached-Tool discard. The current HP work is intentionally not complete for every source type yet: attached Special Energy HP modifiers such as `POR-086` Growing Grass Energy remain partial.
 
 ### Highest-priority remaining `unimplemented` cards from current report
 
 | Card | Archetypes | Total share | Notes |
 | --- | --- | --- | --- |
-| `SSP-177` Gravity Mountain | `8` | `22.79%` | Widest remaining metadata-missing blocker; likely wants reusable HP-modifier infrastructure instead of a one-off Stadium patch. |
-| `TWM-162` Scoop Up Cyclone | `4` | `14.54%` | New top unblocked shared metadata-missing card if Gravity Mountain is deferred for HP work. |
+| `TWM-162` Scoop Up Cyclone | `4` | `14.54%` | New top unblocked shared metadata-missing card after Gravity Mountain moved to supported. |
 | `SCR-132` Briar | `4` | `11.84%` | Shared Supporter gap in several Ogerpon/Hydrapple shells. |
 | `ASC-162` Team Rocket's Kangaskhan ex | `4` | `10.82%` | Shared Rocket shell blocker once the current Trainer recovery/search slice is closed. |
 | `SSP-187` Surfer | `4` | `7.49%` | Shared draw/mobility gap across multiple lower-share archetypes. |
@@ -103,7 +102,6 @@ The latest Goal 2 engine batch moved `SFA-057` Colress's Tenacity, `ASC-046` Sno
 
 | Card | Archetypes | Total share | Current status |
 | --- | --- | --- | --- |
-| `TEF-152` Hero's Cape | `11` | `77.60%` | `partial` |
 | `TWM-064` Wellspring Mask Ogerpon ex | `5` | `58.19%` | `partial` |
 | `TWM-167` Legacy Energy | `6` | `9.34%` | `partial` |
 | `WHT-086` Ignition Energy | `5` | `7.74%` | `partial` |
@@ -125,10 +123,10 @@ That means prior Goal 1 and six-deck coverage was not wasted; it now acts as see
 
 ## Recommended next implementation order
 
-1. Take `SSP-177` Gravity Mountain next as a reusable HP-modifier batch, not a one-off Stadium exception.
-2. If deliberately avoiding HP-in-play infrastructure for one more batch, switch to the now-unblocked shared metadata-missing queue `TWM-162`, `SCR-132`, `ASC-162`, and `SSP-187`.
-3. Keep the remaining Dragapult-only cached pair `TWM-099` / `TWM-100` as deliberate single-archetype cleanup, not the default autonomous queue.
-4. Finish shared partials only after the broad unimplemented slice unless a new HP-modifier path directly closes one of them incidentally.
+1. Take the now-unblocked shared metadata-missing queue `TWM-162`, `SCR-132`, `ASC-162`, and `SSP-187` next.
+2. Keep the remaining Dragapult-only cached pair `TWM-099` / `TWM-100` as deliberate single-archetype cleanup, not the default autonomous queue.
+3. Finish the remaining shared partials only after the broad unimplemented slice unless another batch naturally extends the new HP infrastructure.
+4. If returning to HP work soon, the strongest follow-up is `POR-086` Growing Grass Energy, which still needs attached Special Energy HP handling and removal/recheck coverage.
 5. Keep using `mix prizmo.goal2.corpus` after each batch to re-rank the next blockers by archetype count and weighted share.
 
 ## See Also

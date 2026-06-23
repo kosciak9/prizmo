@@ -1,7 +1,7 @@
 defmodule Prizmo.TcgEngine.BattleActions do
   @moduledoc false
 
-  import Prizmo.TcgEngine.CardMetadataRequirements, only: [pokemon_hp: 1, require_energy: 1]
+  import Prizmo.TcgEngine.CardMetadataRequirements, only: [require_energy: 1]
   import Prizmo.TcgEngine.Operation, only: [update: 3]
   import Prizmo.TcgEngine.Requirements, only: [require_attached_to: 2, require_card_zone: 2]
 
@@ -9,6 +9,7 @@ defmodule Prizmo.TcgEngine.BattleActions do
   alias Prizmo.TcgEngine.CardCatalog
   alias Prizmo.TcgEngine.CardInstance
   alias Prizmo.TcgEngine.CardStore
+  alias Prizmo.TcgEngine.HpEffects
   alias Prizmo.TcgEngine.TeraBenchProtection
   alias Prizmo.TcgEngine.ToolEffects
   alias Prizmo.TcgEngine.TurnStore
@@ -82,14 +83,14 @@ defmodule Prizmo.TcgEngine.BattleActions do
         {:ok, damage_result}
 
       :not_prevented ->
-        with {:ok, target_hp} <- pokemon_hp(target_card.card_id),
-             new_damage = target_card.damage + damage,
-             knocked_out? = new_damage >= target_hp,
+        new_damage = target_card.damage + damage
+
+        with {:ok, knocked_out?} <- HpEffects.damage_knocks_out?(game_id, target_card, new_damage),
              {:ok, knockout_prize_count} <-
                maybe_attack_knockout_prize_count(game_id, target_card, knocked_out?),
              {:ok, _target_card} <- update(target_card, :set_damage, %{damage: new_damage}),
              {:ok, knocked_out?} <-
-               maybe_knock_out(game_id, attacking_player_id, target_card, new_damage, target_hp) do
+               maybe_knock_out(game_id, attacking_player_id, target_card, knocked_out?) do
           {:ok,
            maybe_put_knockout_prize_count(
              %{damage: damage, resulting_damage: new_damage, knocked_out?: knocked_out?},
@@ -143,12 +144,11 @@ defmodule Prizmo.TcgEngine.BattleActions do
     end
   end
 
-  defp maybe_knock_out(_game_id, _attacking_player_id, _target_card, new_damage, target_hp)
-       when new_damage < target_hp do
+  defp maybe_knock_out(_game_id, _attacking_player_id, _target_card, false) do
     {:ok, false}
   end
 
-  defp maybe_knock_out(game_id, _attacking_player_id, target_card, _new_damage, _target_hp) do
+  defp maybe_knock_out(game_id, _attacking_player_id, target_card, true) do
     with {:ok, _discarded_cards} <- discard_knocked_out_stack(game_id, target_card) do
       {:ok, true}
     end

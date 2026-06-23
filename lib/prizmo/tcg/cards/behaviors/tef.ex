@@ -72,6 +72,10 @@ defmodule Prizmo.Tcg.Cards.Behaviors.TEF do
     card_effect(effect: %{type: :discard_opponent_item_cards_from_hand, max_count: 2})
   end
 
+  card "TEF-152" do
+    card_effect(effect: %{type: :attached_pokemon_hp_modifier, amount: 100})
+  end
+
   card "TEF-159" do
     card_effect(
       effect: %{

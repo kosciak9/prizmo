@@ -44,6 +44,10 @@ defmodule Prizmo.Tcg.Cards.Behaviors.SSP do
     )
   end
 
+  card "SSP-177" do
+    card_effect(effect: %{type: :stage_2_pokemon_hp_modifier, amount: -30})
+  end
+
   card "SSP-170" do
     card_effect(effect: %{type: :search_pokemon_ex_to_hand, max_targets: 3})
   end

@@ -26,6 +26,7 @@ defmodule Prizmo.TcgEngine.StadiumEffects do
   @battle_cage_effect :prevent_damage_counters_to_bench_from_opponent_pokemon_effects
   @jamming_tower_effect :pokemon_tools_have_no_effect
   @nighttime_mine_effect :tera_attack_cost_increase
+  @gravity_mountain_effect :stage_2_pokemon_hp_modifier
 
   def supported_stadium?(%{
         supertype: :trainer,
@@ -84,6 +85,13 @@ defmodule Prizmo.TcgEngine.StadiumEffects do
         supertype: :trainer,
         trainer_type: :stadium,
         effect: %{type: @nighttime_mine_effect}
+      }),
+      do: true
+
+  def supported_stadium?(%{
+        supertype: :trainer,
+        trainer_type: :stadium,
+        effect: %{type: @gravity_mountain_effect}
       }),
       do: true
 

@@ -5,7 +5,6 @@ defmodule Prizmo.TcgEngine.AttackEffects do
 
   import Prizmo.TcgEngine.CardMetadataRequirements,
     only: [
-      pokemon_hp: 1,
       require_basic_energy: 1,
       require_energy: 1,
       require_pokemon_card: 1,
@@ -54,6 +53,7 @@ defmodule Prizmo.TcgEngine.AttackEffects do
   alias Prizmo.TcgEngine.EventPayloads
   alias Prizmo.TcgEngine.Game
   alias Prizmo.TcgEngine.GameStore
+  alias Prizmo.TcgEngine.HpEffects
   alias Prizmo.TcgEngine.PendingEffect
   alias Prizmo.TcgEngine.PlayerStore
   alias Prizmo.TcgEngine.Prompt
@@ -1864,7 +1864,7 @@ defmodule Prizmo.TcgEngine.AttackEffects do
 
       _results ->
         with {:ok, card_results} <-
-               damage_counter_move_card_results(successful_results, cards_by_id),
+               damage_counter_move_card_results(game_id, successful_results, cards_by_id),
              {:ok, _updated_cards} <- update_damage_counter_move_cards(card_results, cards_by_id),
              {:ok, _discarded_cards} <-
                discard_knocked_out_damage_counter_move_cards(game_id, card_results, cards_by_id) do
@@ -1873,7 +1873,7 @@ defmodule Prizmo.TcgEngine.AttackEffects do
     end
   end
 
-  defp damage_counter_move_card_results(successful_results, cards_by_id)
+  defp damage_counter_move_card_results(game_id, successful_results, cards_by_id)
        when is_map(cards_by_id) do
     outgoing_by_card = Enum.reduce(successful_results, %{}, &add_outgoing_damage_counter_move/2)
     incoming_by_card = Enum.reduce(successful_results, %{}, &add_incoming_damage_counter_move/2)
@@ -1887,14 +1887,14 @@ defmodule Prizmo.TcgEngine.AttackEffects do
       incoming_counters = Map.get(incoming_by_card, card_instance_id, 0)
       resulting_damage = card.damage - outgoing_counters * 10 + incoming_counters * 10
 
-      with {:ok, hp} <- pokemon_hp(card.card_id) do
+      with {:ok, knocked_out?} <- HpEffects.damage_knocks_out?(game_id, card, resulting_damage) do
         {:ok,
          %{
            card_instance_id: card.id,
            card_id: card.card_id,
            starting_damage: card.damage,
            resulting_damage: resulting_damage,
-           knocked_out?: resulting_damage >= hp
+           knocked_out?: knocked_out?
          }}
       end
     end)
@@ -2538,9 +2538,10 @@ defmodule Prizmo.TcgEngine.AttackEffects do
         {:ok, damage_result}
 
       :not_prevented ->
-        with {:ok, target_hp} <- pokemon_hp(bench_target.card_id),
-             new_damage = bench_target.damage + damage,
-             knocked_out? = new_damage >= target_hp,
+        new_damage = bench_target.damage + damage
+
+        with {:ok, knocked_out?} <-
+               HpEffects.damage_knocks_out?(game_id, bench_target, new_damage),
              {:ok, knockout_prize_count} <-
                maybe_bench_knockout_prize_count(game_id, bench_target, knocked_out?, kind),
              {:ok, _bench_target} <- update(bench_target, :set_damage, %{damage: new_damage}),

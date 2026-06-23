@@ -14,6 +14,7 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
   alias Prizmo.Tcg.Goal1.Decks.DragapultBlaziken28258
   alias Prizmo.TcgEngine.AttackDamage
   alias Prizmo.TcgEngine.AttackEffects
+  alias Prizmo.TcgEngine.BattleActions
   alias Prizmo.TcgEngine.CardCatalog
   alias Prizmo.TcgEngine.CardInstance
   alias Prizmo.TcgEngine.GameEvent
@@ -1098,6 +1099,103 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
 
       assert zone(jamming_tower.id) == :stadium
       assert ToolEffects.knockout_prize_reduction(game.id, clefairy) == 0
+    end
+  end
+
+  describe "Goal 2 HP modifier support slice" do
+    test "Gravity Mountain immediately knocks out a damaged Stage 2 Pokémon when played" do
+      {:ok, game} = create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147)
+
+      bench_position = card_count_in_zone(game.id, "player_1", :bench) + 1
+
+      {:ok, stage_2} = create_custom_owned_card(game.id, "player_1", "PRE-037", 200)
+      {:ok, stage_2} = ash_update(stage_2, :draw_to_hand, %{position: 20})
+
+      {:ok, stage_2} =
+        ash_update(stage_2, :play_to_bench, %{
+          position: bench_position,
+          turn_entered_play: current_turn(game.id).turn_number
+        })
+
+      {:ok, _stage_2} = ash_update(stage_2, :set_damage, %{damage: 130})
+
+      {:ok, gravity_mountain} = create_custom_owned_card(game.id, "player_1", "SSP-177", 201)
+      {:ok, gravity_mountain} = ash_update(gravity_mountain, :draw_to_hand, %{position: 21})
+
+      assert {:ok, game} = Mechanics.play_stadium(game, "player_1", gravity_mountain.id)
+
+      assert zone(gravity_mountain.id) == :stadium
+      assert zone(stage_2.id) == :discard
+
+      [prompt] = awaiting_prompts(game.id)
+      assert prompt.player_id == "player_2"
+      assert prompt.prompt_type == "choose_knockout_prizes"
+      assert prompt.payload["knocked_out_card_instance_ids"] == [stage_2.id]
+    end
+
+    test "Gravity Mountain lowers the knockout threshold for later damage" do
+      {:ok, game} = create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147)
+
+      bench_position = card_count_in_zone(game.id, "player_1", :bench) + 1
+
+      {:ok, stage_2} = create_custom_owned_card(game.id, "player_1", "PRE-037", 210)
+      {:ok, stage_2} = ash_update(stage_2, :draw_to_hand, %{position: 20})
+
+      {:ok, stage_2} =
+        ash_update(stage_2, :play_to_bench, %{
+          position: bench_position,
+          turn_entered_play: current_turn(game.id).turn_number
+        })
+
+      {:ok, _stage_2} = ash_update(stage_2, :set_damage, %{damage: 110})
+
+      {:ok, gravity_mountain} = create_custom_owned_card(game.id, "player_1", "SSP-177", 211)
+      {:ok, gravity_mountain} = ash_update(gravity_mountain, :draw_to_hand, %{position: 21})
+
+      assert {:ok, game} = Mechanics.play_stadium(game, "player_1", gravity_mountain.id)
+      assert awaiting_prompts(game.id) == []
+
+      assert {:ok, %{knocked_out?: true, resulting_damage: 130, knockout_prize_count: 1}} =
+               BattleActions.apply_attack_damage(game.id, "player_2", card(stage_2.id), 20)
+
+      assert zone(stage_2.id) == :discard
+    end
+
+    test "Jamming Tower suppression can knock out a Hero's Cape target" do
+      {:ok, game} = create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147)
+
+      bench_position = card_count_in_zone(game.id, "player_1", :bench) + 1
+
+      {:ok, target} = create_custom_owned_card(game.id, "player_1", "PRE-035", 220)
+      {:ok, target} = ash_update(target, :draw_to_hand, %{position: 20})
+
+      {:ok, target} =
+        ash_update(target, :play_to_bench, %{
+          position: bench_position,
+          turn_entered_play: current_turn(game.id).turn_number
+        })
+
+      {:ok, heros_cape} = create_custom_owned_card(game.id, "player_1", "TEF-152", 221)
+      {:ok, heros_cape} = ash_update(heros_cape, :draw_to_hand, %{position: 21})
+
+      assert {:ok, game} = Mechanics.attach_tool(game, "player_1", heros_cape.id, target.id)
+      {:ok, _target} = ash_update(card(target.id), :set_damage, %{damage: 120})
+
+      assert {:ok, game} = Mechanics.pass_turn(game, "player_1")
+
+      {:ok, jamming_tower} = create_custom_owned_card(game.id, "player_2", "TWM-153", 222)
+      {:ok, jamming_tower} = ash_update(jamming_tower, :draw_to_hand, %{position: 20})
+
+      assert {:ok, game} = Mechanics.play_stadium(game, "player_2", jamming_tower.id)
+
+      assert zone(jamming_tower.id) == :stadium
+      assert zone(target.id) == :discard
+      assert zone(heros_cape.id) == :discard
+
+      [prompt] = awaiting_prompts(game.id)
+      assert prompt.player_id == "player_2"
+      assert prompt.prompt_type == "choose_knockout_prizes"
+      assert prompt.payload["knocked_out_card_instance_ids"] == [target.id]
     end
   end
 

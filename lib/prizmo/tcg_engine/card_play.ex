@@ -48,6 +48,7 @@ defmodule Prizmo.TcgEngine.CardPlay do
   alias Prizmo.TcgEngine.GamePlayer
   alias Prizmo.TcgEngine.GameStore
   alias Prizmo.TcgEngine.ItemLocks
+  alias Prizmo.TcgEngine.Mechanics
   alias Prizmo.TcgEngine.PendingEffects
   alias Prizmo.TcgEngine.PlayerStore
   alias Prizmo.TcgEngine.Prompt
@@ -458,7 +459,8 @@ defmodule Prizmo.TcgEngine.CardPlay do
              source: EventPayloads.card_source(card),
              effect_key: effect.key,
              cards: EventPayloads.moved_cards(discarded_tool_cards, :attached, :discard)
-           }) do
+           }),
+         {:ok, _game} <- Mechanics.resolve_hp_state_based_knockouts(game.id) do
       complete_play_card_resolution(game, turn, player, card, effect)
     end
   end
@@ -483,7 +485,8 @@ defmodule Prizmo.TcgEngine.CardPlay do
              effect_key: effect.key,
              affected_player_id: affected_player_id,
              cards: EventPayloads.moved_cards(discarded_cards, :attached, :discard)
-           }) do
+           }),
+         {:ok, _game} <- Mechanics.resolve_hp_state_based_knockouts(game.id) do
       complete_play_card_resolution(game, turn, player, card, effect)
     end
   end
@@ -779,7 +782,8 @@ defmodule Prizmo.TcgEngine.CardPlay do
                  target_zone,
                  target_basic_card.id
                )
-           }) do
+           }),
+         {:ok, _game} <- Mechanics.resolve_hp_state_based_knockouts(game.id) do
       complete_play_card_resolution(game, turn, player, card, effect)
     end
   end
@@ -4605,7 +4609,7 @@ defmodule Prizmo.TcgEngine.CardPlay do
     energy_cards
     |> Enum.zip(target_cards)
     |> Enum.reduce_while(:ok, fn {energy, target}, :ok ->
-      case Prizmo.TcgEngine.Mechanics.attach_energy_from_discard(
+      case Mechanics.attach_energy_from_discard(
              game_id,
              energy,
              target
