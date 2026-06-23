@@ -1,0 +1,78 @@
+{
+  "prizmo_id": "ASC-046",
+  "source": {
+    "base_url": "https://api.tcgdex.net/v2/en",
+    "dynamic_fields_removed": [
+      "pricing"
+    ],
+    "language": "en",
+    "provider": "TCGdex"
+  },
+  "tcgdex": {
+    "attacks": [
+      {
+        "cost": [
+          "Water"
+        ],
+        "damage": 10,
+        "name": "Chilly"
+      }
+    ],
+    "category": "Pokemon",
+    "hp": 70,
+    "id": "me02.5-046",
+    "illustrator": "Wintr Wandr",
+    "image": "https://assets.tcgdex.net/en/me/me02.5/046",
+    "legal": {
+      "expanded": true,
+      "standard": true
+    },
+    "localId": "046",
+    "name": "Snorunt",
+    "rarity": "Common",
+    "regulationMark": "I",
+    "retreat": 1,
+    "set": {
+      "cardCount": {
+        "official": 217,
+        "total": 295
+      },
+      "id": "me02.5",
+      "logo": "https://assets.tcgdex.net/en/me/me02.5/logo",
+      "name": "Ascended Heroes",
+      "symbol": "https://assets.tcgdex.net/univ/me/me02.5/symbol"
+    },
+    "stage": "Basic",
+    "types": [
+      "Water"
+    ],
+    "updated": "2026-04-15T19:47:06Z",
+    "variants": {
+      "firstEdition": false,
+      "holo": false,
+      "normal": true,
+      "reverse": true,
+      "wPromo": false
+    },
+    "variants_detailed": [
+      {
+        "size": "standard",
+        "type": "normal",
+        "variantId": "endfynwn4n10gzq"
+      },
+      {
+        "foil": "loveball",
+        "size": "standard",
+        "type": "reverse",
+        "variantId": "334f6ffhbf3bxitz7va48fs9a"
+      },
+      {
+        "foil": "energy",
+        "size": "standard",
+        "type": "reverse",
+        "variantId": "3wehmjjju11cdaad92gj82f"
+      }
+    ]
+  },
+  "tcgdex_id": "me02.5-046"
+}

@@ -82,22 +82,22 @@ Important interpretation:
 
 The strongest current Goal 2 implementation candidates are the incomplete cards shared by the most archetypes and/or the most total metagame share.
 
-The latest Goal 2 engine batch moved both `JTG-157` Ruffian and `SSP-189` Tera Orb to `supported`, which effectively closes the remaining multi-archetype cached-metadata queue. The next weighted cached cards are now Dragapult-only `TWM-099` Hisuian Growlithe and `TWM-100` Hisuian Arcanine, while `SSP-177` Gravity Mountain remains the widest metadata-missing gap.
+The latest Goal 2 engine batch moved `SFA-057` Colress's Tenacity, `ASC-046` Snorunt, and `SVI-171` Energy Retrieval to `supported`, which proves the metadata-missing queue can be reduced cleanly without immediately forcing the broader HP-in-play work that `SSP-177` Gravity Mountain requires. The next weighted cached cards are still Dragapult-only `TWM-099` Hisuian Growlithe and `TWM-100` Hisuian Arcanine, while `SSP-177` now stands alone as the widest remaining metadata-missing gap.
 
 ### Highest-priority remaining `unimplemented` cards from current report
 
 | Card | Archetypes | Total share | Notes |
 | --- | --- | --- | --- |
-| `SSP-177` Gravity Mountain | `8` | `22.79%` | Widest remaining metadata-missing blocker by archetype count. |
-| `SFA-057` Colress's Tenacity | `6` | `13.29%` | Shared Trainer gap with missing metadata. |
-| `ASC-046` Snorunt | `6` | `9.64%` | Shared line across several lower-share archetypes. |
-| `SVI-171` Energy Retrieval | `5` | `11.97%` | Generic recovery Item missing from current classifier support. |
-| `TWM-099` Hisuian Growlithe | `1` | `49.22%` | Highest-share remaining cached card after the shared cached slice closed; Dragapult-specific. |
-| `TWM-100` Hisuian Arcanine | `1` | `49.22%` | Companion cached Dragapult line to `TWM-099`; same single-archetype weighted share. |
-| `TWM-162` Scoop Up Cyclone | `4` | `14.54%` | Shared ACE SPEC gap once the higher-share cached slice is reduced. |
-| `SCR-132` Briar | `4` | `11.84%` | Shared Supporter gap in several Ogerpon/Hydrapple shells once the metadata-missing front slice is reduced. |
-| `ASC-162` Team Rocket's Kangaskhan ex | `4` | `10.82%` | Shared Rocket shell blocker once the Trainer slice is closed. |
+| `SSP-177` Gravity Mountain | `8` | `22.79%` | Widest remaining metadata-missing blocker; likely wants reusable HP-modifier infrastructure instead of a one-off Stadium patch. |
+| `TWM-162` Scoop Up Cyclone | `4` | `14.54%` | New top unblocked shared metadata-missing card if Gravity Mountain is deferred for HP work. |
+| `SCR-132` Briar | `4` | `11.84%` | Shared Supporter gap in several Ogerpon/Hydrapple shells. |
+| `ASC-162` Team Rocket's Kangaskhan ex | `4` | `10.82%` | Shared Rocket shell blocker once the current Trainer recovery/search slice is closed. |
 | `SSP-187` Surfer | `4` | `7.49%` | Shared draw/mobility gap across multiple lower-share archetypes. |
+| `MEE-008` Metal Energy | `4` | `3.95%` | Shared basic Energy metadata gap across several Metal shells. |
+| `MEG-116` Fighting Gong | `4` | `2.54%` | Shared Fighting Tool gap spanning multiple archetypes. |
+| `ASC-047` Mega Froslass ex | `4` | `1.27%` | Shared evolution line after `ASC-046` Snorunt moved to supported. |
+| `TEF-155` Morty's Conviction | `3` | `16.57%` | Highest-share three-archetype missing-metadata Trainer once the four-archetype slice is reduced. |
+| `TWM-112` Cornerstone Mask Ogerpon ex | `3` | `15.62%` | Broad three-archetype Pokémon ex blocker following Morty's Conviction. |
 
 ### Shared `partial` cards worth finishing after the broad unimplemented slice
 
@@ -125,11 +125,11 @@ That means prior Goal 1 and six-deck coverage was not wasted; it now acts as see
 
 ## Recommended next implementation order
 
-1. Switch the default autonomous queue to the widest metadata-missing blockers first: `SSP-177`, `SFA-057`, `ASC-046`, and `SVI-171`.
-2. If deliberately staying on cached metadata, clean up the remaining Dragapult-only pair `TWM-099` and `TWM-100` before returning to lower-share cached one-offs.
-3. Finish shared partials only after the broad unimplemented slice unless one of them directly unlocks a currently stalled archetype line.
-4. Keep using `mix prizmo.goal2.corpus` after each batch to re-rank the next blockers by archetype count and weighted share.
-5. Treat one-off low-share cards as later work unless they unblock a shared primitive or a whole still-dead archetype line.
+1. Take `SSP-177` Gravity Mountain next as a reusable HP-modifier batch, not a one-off Stadium exception.
+2. If deliberately avoiding HP-in-play infrastructure for one more batch, switch to the now-unblocked shared metadata-missing queue `TWM-162`, `SCR-132`, `ASC-162`, and `SSP-187`.
+3. Keep the remaining Dragapult-only cached pair `TWM-099` / `TWM-100` as deliberate single-archetype cleanup, not the default autonomous queue.
+4. Finish shared partials only after the broad unimplemented slice unless a new HP-modifier path directly closes one of them incidentally.
+5. Keep using `mix prizmo.goal2.corpus` after each batch to re-rank the next blockers by archetype count and weighted share.
 
 ## See Also
 

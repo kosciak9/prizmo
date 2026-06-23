@@ -771,6 +771,113 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
     end
   end
 
+  describe "Goal 2 metadata-backed support slice" do
+    test "ASC-046 Snorunt metadata makes Chilly executable" do
+      {:ok, game} = create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147)
+
+      {:ok, attacker} = create_custom_owned_card(game.id, "player_1", "ASC-046", 200)
+      defender = active_card(game.id, "player_2")
+
+      assert {:ok, attack} = CardCatalog.fetch_attack(attacker.card_id, :chilly)
+      assert attack.damage == 10
+      assert {:ok, 10} = AttackDamage.damage_for(attacker, defender, attack)
+    end
+
+    test "SFA-057 Colress's Tenacity searches for a Stadium and an Energy" do
+      {:ok, game} = create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147)
+
+      assert {:ok, game} = Mechanics.pass_turn(game, "player_1")
+
+      {:ok, colress} = create_custom_owned_card(game.id, "player_2", "SFA-057", 200)
+      {:ok, colress} = ash_update(colress, :draw_to_hand, %{position: 20})
+
+      {:ok, stadium} = create_custom_owned_card(game.id, "player_2", "SCR-131", 201)
+      {:ok, energy} = create_custom_owned_card(game.id, "player_2", "MEE-005", 202)
+      {:ok, non_matching} = create_custom_owned_card(game.id, "player_2", "PRE-035", 203)
+
+      assert {:ok, game} = Mechanics.play_card(game, "player_2", colress.id, %{})
+
+      [prompt] = awaiting_prompts(game.id)
+      assert prompt.player_id == "player_2"
+      assert prompt.payload["choice_key"] == "search_deck_for_stadium_and_energy"
+      assert prompt.payload["min"] == 2
+      assert prompt.payload["max"] == 2
+      assert stadium.id in prompt.payload["legal_choices"]
+      assert energy.id in prompt.payload["legal_choices"]
+      refute non_matching.id in prompt.payload["legal_choices"]
+
+      assert {:ok, game} =
+               Mechanics.choose_prompt(game, "player_2", prompt.id, [stadium.id, energy.id])
+
+      assert zone(colress.id) == :discard
+      assert zone(stadium.id) == :hand
+      assert zone(energy.id) == :hand
+      assert zone(non_matching.id) == :deck
+
+      cards_moved_event =
+        game.id
+        |> game_events_by_type("cards_moved")
+        |> Enum.find(&(&1.payload["effect_key"] == "search_deck_for_stadium_and_energy"))
+
+      assert cards_moved_event.payload["public_reveal"] == true
+
+      assert Enum.sort(Enum.map(cards_moved_event.payload["cards"], & &1["instance_id"])) ==
+               Enum.sort([stadium.id, energy.id])
+
+      assert game_events_by_type(game.id, "deck_shuffled") != []
+    end
+
+    test "SVI-171 Energy Retrieval returns up to 2 Basic Energy cards from discard to hand" do
+      {:ok, game} = create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147)
+
+      {:ok, energy_retrieval} = create_custom_owned_card(game.id, "player_1", "SVI-171", 200)
+      {:ok, energy_retrieval} = ash_update(energy_retrieval, :draw_to_hand, %{position: 20})
+
+      {:ok, basic_energy_1} = create_custom_owned_card(game.id, "player_1", "MEE-005", 201)
+      {:ok, basic_energy_1} = ash_update(basic_energy_1, :draw_to_hand, %{position: 21})
+
+      {:ok, basic_energy_2} = create_custom_owned_card(game.id, "player_1", "MEE-006", 202)
+      {:ok, basic_energy_2} = ash_update(basic_energy_2, :draw_to_hand, %{position: 22})
+
+      {:ok, special_energy} = create_custom_owned_card(game.id, "player_1", "POR-088", 203)
+      {:ok, special_energy} = ash_update(special_energy, :draw_to_hand, %{position: 23})
+
+      assert {:ok, game} = Mechanics.discard_from_hand(game, "player_1", basic_energy_1.id)
+      assert {:ok, game} = Mechanics.discard_from_hand(game, "player_1", basic_energy_2.id)
+      assert {:ok, game} = Mechanics.discard_from_hand(game, "player_1", special_energy.id)
+
+      assert {:ok, game} = Mechanics.play_card(game, "player_1", energy_retrieval.id, %{})
+
+      [prompt] = awaiting_prompts(game.id)
+      assert prompt.player_id == "player_1"
+      assert prompt.payload["choice_key"] == "recover_basic_energy_from_discard"
+      assert prompt.payload["min"] == 0
+      assert prompt.payload["max"] == 2
+      assert basic_energy_1.id in prompt.payload["legal_choices"]
+      assert basic_energy_2.id in prompt.payload["legal_choices"]
+      refute special_energy.id in prompt.payload["legal_choices"]
+
+      assert {:ok, game} =
+               Mechanics.choose_prompt(game, "player_1", prompt.id, [
+                 basic_energy_1.id,
+                 basic_energy_2.id
+               ])
+
+      assert zone(energy_retrieval.id) == :discard
+      assert zone(basic_energy_1.id) == :hand
+      assert zone(basic_energy_2.id) == :hand
+      assert zone(special_energy.id) == :discard
+
+      cards_moved_event =
+        game.id
+        |> game_events_by_type("cards_moved")
+        |> Enum.find(&(&1.payload["effect_key"] == "recover_basic_energy_from_discard"))
+
+      assert Enum.sort(Enum.map(cards_moved_event.payload["cards"], & &1["instance_id"])) ==
+               Enum.sort([basic_energy_1.id, basic_energy_2.id])
+    end
+  end
+
   describe "Goal 1 Dragapult variant validation" do
     test "Fairy Zone makes opposing Darkness Pokémon weak to Psychic" do
       {:ok, game} =

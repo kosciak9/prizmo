@@ -93,6 +93,35 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     ]
   }
 
+  @colress_tenacity %CardDefinition{
+    id: "SFA-057",
+    kind: :trainer,
+    trainer_type: :supporter,
+    play_window: :action_window,
+    effects: [
+      %Effect{
+        key: :search_deck_for_stadium_and_energy,
+        type: :search_deck,
+        params: %{
+          filter: %{
+            any: [
+              %{kind: :trainer, trainer_type: :stadium},
+              %{kind: :energy}
+            ]
+          },
+          required_groups: [
+            %{filter: %{kind: :trainer, trainer_type: :stadium}, count: 1},
+            %{filter: %{kind: :energy}, count: 1}
+          ],
+          count: 2,
+          destination: :hand,
+          reveal: true,
+          shuffle_after: true
+        }
+      }
+    ]
+  }
+
   @judge %CardDefinition{
     id: "POR-076",
     kind: :trainer,
@@ -355,6 +384,25 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
         key: :switch_own_active_with_bench,
         type: :switch_own_active_with_bench,
         params: %{count: 1}
+      }
+    ]
+  }
+
+  @energy_retrieval %CardDefinition{
+    id: "SVI-171",
+    kind: :trainer,
+    trainer_type: :item,
+    play_window: :action_window,
+    effects: [
+      %Effect{
+        key: :recover_basic_energy_from_discard,
+        type: :recover_discard_to_hand,
+        params: %{
+          filter: %{kind: :energy, energy_type: :basic},
+          min_count: 0,
+          max_count: 2,
+          destination: :hand
+        }
       }
     ]
   }
@@ -997,10 +1045,12 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     @budew.id => @budew,
     @bug_catching_set.id => @bug_catching_set,
     @buddy_buddy_poffin.id => @buddy_buddy_poffin,
+    @colress_tenacity.id => @colress_tenacity,
     @crushing_hammer.id => @crushing_hammer,
     @crispin.id => @crispin,
     @dawn.id => @dawn,
     @enhanced_hammer.id => @enhanced_hammer,
+    @energy_retrieval.id => @energy_retrieval,
     @energy_switch.id => @energy_switch,
     @switch.id => @switch,
     @hilda.id => @hilda,

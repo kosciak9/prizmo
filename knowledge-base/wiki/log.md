@@ -1,5 +1,12 @@
 # Wiki Log
 
+## [2026-06-23] codebase update | Goal 2 Colress's Tenacity, Snorunt, and Energy Retrieval support
+
+- Task attempted: closed the first deliberately unblocked metadata-missing Goal 2 trio instead of forcing Gravity Mountain into a rushed HP implementation. Added committed TCGdex metadata for `ASC-046` Snorunt, `SFA-057` Colress's Tenacity, and `SVI-171` Energy Retrieval; wired `SFA-057` through the generic deck-search path as an exact `1 Stadium + 1 Energy` Supporter; wired `SVI-171` through the generic discard-recovery path as an Item that returns up to 2 Basic Energy cards to hand; and proved `ASC-046` becomes fully supported once its plain-damage `Chilly` attack is present in the committed catalog.
+- Files changed: `lib/prizmo/tcg_engine/cards/registry.ex`, `test/prizmo/tcg_engine/mechanics_test.exs`, `priv/tcg/cards/tcgdex/cards/ASC-046.json`, `priv/tcg/cards/tcgdex/cards/SFA-057.json`, `priv/tcg/cards/tcgdex/cards/SVI-171.json`, `knowledge-base/wiki/engine/goal-2-top-30-latest-limitless-coverage-scope.md`, `knowledge-base/wiki/engine/ash-backed-tcg-engine-playtest-handoff.md`, `knowledge-base/wiki/log.md`.
+- Validation: `mix format` on changed files; `mix test test/prizmo/tcg_engine/mechanics_test.exs`; `mix compile --warnings-as-errors`; `mix prizmo.goal2.corpus` confirmed `supported=125` / `partial=11` / `unimplemented=234` and `cached=146` / `missing=231`; final `mix check` passed.
+- Remaining/blocking notes: `SFA-057`, `ASC-046`, and `SVI-171` are no longer in the shared incomplete queue. `SSP-177` Gravity Mountain now stands alone as the widest remaining metadata-missing blocker and likely deserves a reusable HP-modifier slice next; if that broader work is deferred, the next unblocked shared queue is `TWM-162`, `SCR-132`, `ASC-162`, and `SSP-187`.
+
 ## [2026-06-23] codebase update | Goal 2 Ruffian and Tera Orb support
 
 - Task attempted: closed the last remaining multi-archetype cached Goal 2 Trainer slice instead of continuing to defer high-share authored cards. Added `JTG-157` Ruffian as a real Supporter that discards exactly 1 opponent Tool and 1 opponent Special Energy from the same Pokémon through the canonical prompt/resolution path, and added `SSP-189` Tera Orb as an engine-defined Item on the generic deck-search path using a new Tera Pokémon search filter.
