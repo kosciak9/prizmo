@@ -1,5 +1,12 @@
 # Wiki Log
 
+## [2026-06-23] codebase update | Goal 1 latest-result browser validation closure
+
+- Task attempted: closed the last stale Goal 1 live-browser validation gap by replaying the remaining unproven latest-result Alakazam ids `28398` and `27615` with explicit seeded supported fixtures, then reconciled the canonical roadmap pages to the now-closed validation state.
+- Files changed: `knowledge-base/wiki/engine/ash-backed-tcg-engine-playtest-north-star.md`, `knowledge-base/wiki/engine/dragapult-alakazam-full-game-implementation-scope.md`, `knowledge-base/wiki/engine/ash-backed-tcg-engine-playtest-handoff.md`, `knowledge-base/wiki/index.md`, `knowledge-base/wiki/log.md`.
+- Validation: browser replay on `http://localhost:4003` in supported game `f82a301b-8bb7-42b3-bc62-0a3714004e60` with seed `goal1-28268-vs-28398-7` reached player-2 Turn 2 and cleanly resolved `TEF-146` Eri's single-item `0-1` prompt, `TWM-158` Lucky Helmet attachment, `ASC-197` Nighttime Mine, and a no-trigger `POR-088` attachment to Darkness `Fezandipiti ex`; browser replay in supported game `59d3adc0-537f-4a1a-a44b-dd6c40d4d497` with seed `goal1-28271-vs-27615-17` reached player-2 Turn 2 and cleanly resolved `POR-088` on Psychic `Dedenne` over four distinct `Abra` deck copies, then resolved same-turn `PFL-087` Dawn for `Abra` + `Kadabra` + `Alakazam`; Tidewave verification via `Prizmo.TcgEngine.get_game_state/2` confirmed the resulting no-prompt states for both games; `mix prizmo.goal1.audit` and `mix prizmo.goal1.corpus` both passed green; Playwright console inspection returned 0 errors.
+- Remaining/blocking notes: current known Goal 1 closure criteria are satisfied on the canonical Ash path. The next autonomous roadmap priority is Goal 2 unless new latest-Limitless drift or a fresh Goal 1 regression reopens this scope.
+
 ## [2026-06-23] codebase update | Goal 1 Meowth Last-Ditch Catch trigger fix and `28259` / `28385` seeded replay
 
 - Task attempted: broadened Goal 1 seeded browser validation with live Dragapult `28259` versus live Alakazam `28385` using explicit seed `goal1-28259-vs-28385-seed-101`. The intended line was to validate `POR-062` Meowth ex, `DRI-180` Team Rocket's Watchtower, and `WHT-084` Hilda on one of the remaining unproven latest-result pairings. The first replay surfaced a real canonical bug instead: on player-1 Turn 1, benching `Meowth ex` succeeded, but its printed `Last-Ditch Catch` trigger never opened a prompt or added a Supporter to hand.

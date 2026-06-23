@@ -1,6 +1,6 @@
 # Prizmo TCG Engine and Play Surface North Star
 
-- Updated: 2026-06-17
+- Updated: 2026-06-23
 - Sources: Project codebase; local validation; wiki log; user direction; Electric documentation (2026-05-30)
 - Raw: [Electric Streams documentation notes](../../raw/engine/2026-05-30-electric-streams-docs.md)
 
@@ -13,6 +13,8 @@ Prizmo is building a server-authoritative competitive Pokémon TCG practice engi
 ## Canonical goal ladder
 
 ### Goal 1 — Dragapult + Alakazam latest-Limitless completeness
+
+**Status (2026-06-23):** Current known Goal 1 closure criteria are satisfied on the canonical Ash path. Reopen Goal 1 only when latest-Limitless drift, a fresh browser/play-surface blocker, or a new regression appears; otherwise autonomous roadmap work should move to Goal 2.
 
 Support all latest Limitless variants for both Dragapult and Alakazam.
 
@@ -67,6 +69,8 @@ Expand beyond latest-Limitless/meta coverage to all possible cards.
 This is intentionally after the competitive coverage, Godot play-surface, and native mobile pathway goals. Do not choose broad all-card work before it unblocks Goals 1 or 2 unless the user explicitly redirects.
 
 ## How agents should choose next work
+
+As of 2026-06-23, Goal 1's known latest-Limitless coverage, support, and browser-validation gaps are closed. The default autonomous next selection is Goal 2 unless a new Goal 1 blocker appears.
 
 ### If working on Goal 1
 
