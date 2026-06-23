@@ -7,11 +7,11 @@ defmodule Prizmo.Tcg.Goal1.LatestLimitless do
   scope and should not be assumed current without a live comparison.
   """
 
+  alias Prizmo.Tcg.CardCoverage
   alias Prizmo.Tcg.Data.Limitless
   alias Prizmo.Tcg.Decks.DragapultBlaziken28253
   alias Prizmo.Tcg.Decks.DragapultDusknoir28236
   alias Prizmo.Tcg.Decks.DragapultPlain28256
-  alias Prizmo.Tcg.Goal1.CardCoverage
   alias Prizmo.Tcg.Goal1.Decks.Alakazam27615
   alias Prizmo.Tcg.Goal1.Decks.Alakazam28275
   alias Prizmo.Tcg.Goal1.Decks.Alakazam28291

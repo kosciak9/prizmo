@@ -1,5 +1,12 @@
 # Wiki Log
 
+## [2026-06-23] codebase update | Goal 2 top-30 corpus bootstrap
+
+- Task attempted: built the first Goal 2 live metagame/corpus pipeline instead of repeating already-closed Goal 1 work. Generalized the old Goal 1 card classifier into shared `Prizmo.Tcg.CardCoverage`, extended `Prizmo.Tcg.Data.Limitless` to parse the live `/decks?show=100` metagame table plus `/decks/:id/cards` breakdown pages, added `Prizmo.Tcg.Goal2.LatestLimitless` with `mix prizmo.goal2.top30` and `mix prizmo.goal2.corpus`, then recorded the first durable Goal 2 snapshot in the wiki and handoff.
+- Files changed: `lib/prizmo/tcg/card_coverage.ex`, `lib/prizmo/tcg/data/limitless.ex`, `lib/prizmo/tcg/goal_1/card_coverage.ex`, `lib/prizmo/tcg/goal_1/latest_limitless.ex`, `lib/prizmo/tcg/goal_2/latest_limitless.ex`, `lib/mix/tasks/prizmo.goal2.top30.ex`, `lib/mix/tasks/prizmo.goal2.corpus.ex`, `knowledge-base/wiki/engine/goal-2-top-30-latest-limitless-coverage-scope.md`, `knowledge-base/wiki/engine/ash-backed-tcg-engine-playtest-handoff.md`, `knowledge-base/wiki/index.md`, `knowledge-base/wiki/log.md`.
+- Validation: `mix format` on changed Elixir files; `mix compile --warnings-as-errors`; `mix prizmo.goal2.top30`; `mix prizmo.goal2.corpus`; direct Tidewave eval of `Prizmo.Tcg.Goal2.LatestLimitless.top_archetypes!/0` and `corpus_report!/0`. Live report on 2026-06-23 resolved active metagame format `TEF-CRI`, top-archetype count `30`, tracked card count `377`, and top weighted incomplete cards `DRI-176` Team Rocket's Petrel (`19` archetypes / `81.37%`), `JTG-146` Brock's Scouting (`11` / `78.46%`), and `ASC-212` Tool Scrapper (`8` / `73.72%`).
+- Remaining/blocking notes: Goal 2 now has the enabling corpus/coverage tracker it was missing. The next autonomous batch should implement one coherent shared blocker slice from the fresh report instead of rebuilding selection tooling again. Highest-value cached-metadata blockers are currently `DRI-176`, `JTG-146`, `ASC-212`, `TEF-157`, and `JTG-121`; a parallel concern is the large metadata gap (`missing=234`) in several new archetypes.
+
 ## [2026-06-23] codebase update | Goal 1 latest-result browser validation closure
 
 - Task attempted: closed the last stale Goal 1 live-browser validation gap by replaying the remaining unproven latest-result Alakazam ids `28398` and `27615` with explicit seeded supported fixtures, then reconciled the canonical roadmap pages to the now-closed validation state.
