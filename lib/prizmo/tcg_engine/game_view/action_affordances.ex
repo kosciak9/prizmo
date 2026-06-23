@@ -141,7 +141,7 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
       cursed_blast_affordances(game, player, current_turn, cards, all_cards) ++
       fan_call_affordances(player, current_turn, cards) ++
       adrena_brain_affordances(player, current_turn, cards, all_cards) ++
-      evolve_from_hand_affordances(player, current_turn, cards, all_cards) ++
+      evolve_from_hand_affordances(game, player, current_turn, cards, all_cards) ++
       declare_attack_affordances(player, current_turn, cards, all_cards) ++
       unsupported_card_text_affordances(player, current_turn, cards, all_cards) ++
       [
@@ -279,35 +279,41 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
   end
 
   defp evolve_from_hand_affordances(
+         %Game{} = game,
          %GamePlayer{} = player,
-         %Turn{turn_number: turn_number},
+         %Turn{turn_number: turn_number} = current_turn,
          cards,
          all_cards
-       )
-       when turn_number > 1 do
-    forest_of_vitality = forest_of_vitality_active?(all_cards)
-    evolution_cards = cards |> hand_cards() |> Enum.filter(&evolution_pokemon?/1)
+       ) do
+    case Requirements.require_evolution_allowed_this_turn(game, current_turn) do
+      :ok ->
+        forest_of_vitality = forest_of_vitality_active?(all_cards)
+        evolution_cards = cards |> hand_cards() |> Enum.filter(&evolution_pokemon?/1)
 
-    targets =
-      Enum.filter(
-        in_play_pokemon_cards(cards),
-        &can_evolve_target?(&1, turn_number, forest_of_vitality)
-      )
+        targets =
+          Enum.filter(
+            in_play_pokemon_cards(cards),
+            &can_evolve_target?(&1, turn_number, forest_of_vitality)
+          )
 
-    for evolution_card <- evolution_cards,
-        target_card <- targets,
-        evolves_from?(evolution_card, target_card),
-        same_turn_grass_ok?(evolution_card, target_card, turn_number, forest_of_vitality) do
-      affordance(:evolve_from_hand, "Evolve Pokémon", :command, player.player_id,
-        source_card_instance_ids: [evolution_card.id],
-        target_card_instance_ids: [target_card.id],
-        note:
-          "Use a valid evolution card from hand on a Pokémon that entered play on an earlier turn."
-      )
+        for evolution_card <- evolution_cards,
+            target_card <- targets,
+            evolves_from?(evolution_card, target_card),
+            same_turn_grass_ok?(evolution_card, target_card, turn_number, forest_of_vitality) do
+          affordance(:evolve_from_hand, "Evolve Pokémon", :command, player.player_id,
+            source_card_instance_ids: [evolution_card.id],
+            target_card_instance_ids: [target_card.id],
+            note:
+              "Use a valid evolution card from hand on a Pokémon that entered play on an earlier turn."
+          )
+        end
+
+      _reason ->
+        []
     end
   end
 
-  defp evolve_from_hand_affordances(_player, _current_turn, _cards, _all_cards), do: []
+  defp evolve_from_hand_affordances(_game, _player, _current_turn, _cards, _all_cards), do: []
 
   defp retreat_affordance(_game, %GamePlayer{retreated_this_turn?: true}, _current_turn, _cards),
     do: nil

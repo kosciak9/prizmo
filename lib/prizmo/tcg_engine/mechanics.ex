@@ -1590,7 +1590,7 @@ defmodule Prizmo.TcgEngine.Mechanics do
     transaction(fn ->
       with {:ok, game} <- get_game(game_or_id),
            {:ok, turn} <- require_action_window_for_player(game, player_id),
-           :ok <- require_evolution_allowed_this_turn(turn),
+           :ok <- require_evolution_allowed_this_turn(game, turn),
            {:ok, evolution_card} <- get_card(game.id, evolution_card_instance_id),
            {:ok, target_card} <- get_card(game.id, target_card_instance_id),
            :ok <- require_card_owned_by_player(evolution_card, player_id),

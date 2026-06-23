@@ -184,11 +184,14 @@ defmodule Prizmo.TcgEngine.Requirements do
     end
   end
 
-  def require_evolution_allowed_this_turn(%Turn{} = turn) do
-    if turn.turn_number > 1 do
-      :ok
-    else
+  def require_evolution_allowed_this_turn(%Game{first_player_id: first_player_id}, %Turn{
+        turn_number: turn_number,
+        active_player_id: active_player_id
+      }) do
+    if turn_number == 1 or (turn_number == 2 and active_player_id != first_player_id) do
       {:error, :cannot_evolve_on_first_turn}
+    else
+      :ok
     end
   end
 

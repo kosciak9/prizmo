@@ -29,7 +29,7 @@ defmodule Prizmo.TcgEngine.CardPlay do
       require_card_owned_by_player: 2,
       require_card_zone: 2,
       evolve_action_for_zone: 1,
-      require_evolution_allowed_this_turn: 1,
+      require_evolution_allowed_this_turn: 2,
       require_in_play_pokemon_zone: 1,
       require_supporter_available: 5
     ]
@@ -652,7 +652,7 @@ defmodule Prizmo.TcgEngine.CardPlay do
          target_ids
        ) do
     with {:ok, {stage_2_card, target_basic_card}} <-
-           validate_rare_candy_effect(game.id, player.player_id, turn, effect, target_ids),
+           validate_rare_candy_effect(game, player.player_id, turn, effect, target_ids),
          target_position = target_basic_card.position,
          target_zone = target_basic_card.zone,
          evolve_action = evolve_action_for_zone(target_zone),
@@ -1600,10 +1600,10 @@ defmodule Prizmo.TcgEngine.CardPlay do
     end
   end
 
-  defp validate_rare_candy_effect(game_id, player_id, turn, effect, target_ids) do
-    with :ok <- require_evolution_allowed_this_turn(turn),
+  defp validate_rare_candy_effect(%Game{} = game, player_id, turn, effect, target_ids) do
+    with :ok <- require_evolution_allowed_this_turn(game, turn),
          {:ok, target_ids} <- EffectRunner.validate_choice_selection(effect, target_ids),
-         {:ok, target_cards} <- CardStore.get_cards(game_id, target_ids),
+         {:ok, target_cards} <- CardStore.get_cards(game.id, target_ids),
          {:ok, {stage_2_card, target_basic_card}} <-
            selected_rare_candy_cards(target_cards, player_id, turn.turn_number),
          :ok <- require_rare_candy_evolves_from(stage_2_card.card_id, target_basic_card.card_id) do
@@ -2241,22 +2241,30 @@ defmodule Prizmo.TcgEngine.CardPlay do
     |> Enum.sort_by(&{&1.position, &1.instance_id})
   end
 
-  defp rare_candy_choice_cards(cards, player_id, %{turn_number: turn_number})
-       when turn_number > 1 do
-    stage_2_cards = rare_candy_stage_2_cards(cards, player_id)
-    target_cards = rare_candy_target_cards(cards, player_id, turn_number)
+  defp rare_candy_choice_cards(
+         cards,
+         player_id,
+         %Turn{game_id: game_id, turn_number: turn_number} = turn
+       ) do
+    with {:ok, game} <- GameStore.get_game(game_id),
+         :ok <- require_evolution_allowed_this_turn(game, turn) do
+      stage_2_cards = rare_candy_stage_2_cards(cards, player_id)
+      target_cards = rare_candy_target_cards(cards, player_id, turn_number)
 
-    legal_stage_2_cards =
-      Enum.filter(stage_2_cards, fn stage_2_card ->
-        Enum.any?(target_cards, &rare_candy_evolves_from?(stage_2_card, &1))
-      end)
+      legal_stage_2_cards =
+        Enum.filter(stage_2_cards, fn stage_2_card ->
+          Enum.any?(target_cards, &rare_candy_evolves_from?(stage_2_card, &1))
+        end)
 
-    legal_target_cards =
-      Enum.filter(target_cards, fn target_card ->
-        Enum.any?(stage_2_cards, &rare_candy_evolves_from?(&1, target_card))
-      end)
+      legal_target_cards =
+        Enum.filter(target_cards, fn target_card ->
+          Enum.any?(stage_2_cards, &rare_candy_evolves_from?(&1, target_card))
+        end)
 
-    legal_stage_2_cards ++ legal_target_cards
+      legal_stage_2_cards ++ legal_target_cards
+    else
+      _reason -> []
+    end
   end
 
   defp rare_candy_choice_cards(_cards, _player_id, _current_turn), do: []
