@@ -1,5 +1,12 @@
 # Wiki Log
 
+## [2026-06-23] codebase update | Goal 2 Ruffian and Tera Orb support
+
+- Task attempted: closed the last remaining multi-archetype cached Goal 2 Trainer slice instead of continuing to defer high-share authored cards. Added `JTG-157` Ruffian as a real Supporter that discards exactly 1 opponent Tool and 1 opponent Special Energy from the same Pokémon through the canonical prompt/resolution path, and added `SSP-189` Tera Orb as an engine-defined Item on the generic deck-search path using a new Tera Pokémon search filter.
+- Files changed: `lib/prizmo/tcg_engine/card_play.ex`, `lib/prizmo/tcg_engine/cards/registry.ex`, `lib/prizmo/tcg_engine/effect_runner.ex`, `lib/prizmo/tcg_engine/game_view.ex`, `knowledge-base/wiki/engine/goal-2-top-30-latest-limitless-coverage-scope.md`, `knowledge-base/wiki/engine/ash-backed-tcg-engine-playtest-handoff.md`, `knowledge-base/wiki/log.md`.
+- Validation: `mix test test/prizmo/tcg_engine/mechanics_test.exs`; `mix compile --warnings-as-errors`; `mix prizmo.goal2.corpus` confirmed `supported=122` / `partial=11` / `unimplemented=237`; Tidewave eval on disposable games confirmed `SSP-189` opens `search_deck_for_tera_pokemon`, includes a custom `TWM-025` Tera target, excludes a custom non-Tera `PRE-035`, and resolves the chosen card to hand, while `JTG-157` rejects mixed-Pokémon selections with `:ruffian_targets_must_share_attached_pokemon`, exposes only attached cards from an opponent Pokémon that has both a Tool and a Special Energy, and discards the selected `JTG-151` + `POR-088`; final `mix check` passed.
+- Remaining/blocking notes: `JTG-157` and `SSP-189` are no longer in the shared incomplete queue. The default next Goal 2 priority should now shift to the widest metadata-missing blockers (`SSP-177`, `SFA-057`, `ASC-046`, `SVI-171`), with `TWM-099` and `TWM-100` left as the highest-share remaining cached pair if a Dragapult-only cleanup batch is preferred.
+
 ## [2026-06-23] codebase update | Goal 2 Pecharunt ex support
 
 - Task attempted: closed the top remaining cached-metadata Goal 2 blocker instead of leaving the highest-share shared Darkness pivot unsupported. Added `SFA-039` Pecharunt ex support on the canonical Ash path: `Subjugating Chains` now switches one own Benched Darkness Pokémon except any Pecharunt ex with the Active, then Poisons the promoted target with once-per-turn enforcement across all own copies, and `Irritated Outburst` now deals `60` damage for each Prize card the opponent has taken.

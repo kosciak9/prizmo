@@ -64,10 +64,10 @@ Those reports are the canonical starting point for autonomous Goal 2 implementat
 - Tracked top archetypes: `30`
 - Tracked cards with usage greater than `0.00`: `377`
 - Coverage buckets from `mix prizmo.goal2.corpus`:
-  - `supported=120`
+  - `supported=122`
   - `generic-supported=7`
   - `partial=11`
-  - `unimplemented=239`
+  - `unimplemented=237`
 - Metadata buckets:
   - `cached=143`
   - `missing=234`
@@ -82,9 +82,9 @@ Important interpretation:
 
 The strongest current Goal 2 implementation candidates are the incomplete cards shared by the most archetypes and/or the most total metagame share.
 
-The latest Goal 2 engine batch moved `SFA-039` Pecharunt ex to `supported`, so the remaining broad cached-metadata queue now starts with `JTG-157` Ruffian while `SSP-177` Gravity Mountain remains the widest metadata-missing gap.
+The latest Goal 2 engine batch moved both `JTG-157` Ruffian and `SSP-189` Tera Orb to `supported`, which effectively closes the remaining multi-archetype cached-metadata queue. The next weighted cached cards are now Dragapult-only `TWM-099` Hisuian Growlithe and `TWM-100` Hisuian Arcanine, while `SSP-177` Gravity Mountain remains the widest metadata-missing gap.
 
-### Highest-priority shared `unimplemented` cards from current report
+### Highest-priority remaining `unimplemented` cards from current report
 
 | Card | Archetypes | Total share | Notes |
 | --- | --- | --- | --- |
@@ -92,10 +92,10 @@ The latest Goal 2 engine batch moved `SFA-039` Pecharunt ex to `supported`, so t
 | `SFA-057` Colress's Tenacity | `6` | `13.29%` | Shared Trainer gap with missing metadata. |
 | `ASC-046` Snorunt | `6` | `9.64%` | Shared line across several lower-share archetypes. |
 | `SVI-171` Energy Retrieval | `5` | `11.97%` | Generic recovery Item missing from current classifier support. |
-| `JTG-157` Ruffian | `3` | `58.04%` | Highest-share remaining cached blocker after Pecharunt ex. |
-| `SSP-189` Tera Orb | `3` | `55.91%` | Next cached broad-share blocker across Dragapult, Ogerpon Box, and Raging Bolt shells. |
+| `TWM-099` Hisuian Growlithe | `1` | `49.22%` | Highest-share remaining cached card after the shared cached slice closed; Dragapult-specific. |
+| `TWM-100` Hisuian Arcanine | `1` | `49.22%` | Companion cached Dragapult line to `TWM-099`; same single-archetype weighted share. |
 | `TWM-162` Scoop Up Cyclone | `4` | `14.54%` | Shared ACE SPEC gap once the higher-share cached slice is reduced. |
-| `SCR-132` Briar | `4` | `11.84%` | Shared Supporter gap in several Ogerpon/Hydrapple shells once the wider cached slice is reduced. |
+| `SCR-132` Briar | `4` | `11.84%` | Shared Supporter gap in several Ogerpon/Hydrapple shells once the metadata-missing front slice is reduced. |
 | `ASC-162` Team Rocket's Kangaskhan ex | `4` | `10.82%` | Shared Rocket shell blocker once the Trainer slice is closed. |
 | `SSP-187` Surfer | `4` | `7.49%` | Shared draw/mobility gap across multiple lower-share archetypes. |
 
@@ -125,10 +125,11 @@ That means prior Goal 1 and six-deck coverage was not wasted; it now acts as see
 
 ## Recommended next implementation order
 
-1. Prefer the remaining cached-metadata broad-share blockers first: `JTG-157`, then `SSP-189`, unless a wider missing-metadata primitive (`SSP-177`, `SFA-057`, `ASC-046`, `SVI-171`) becomes the better unblocker.
-2. Finish shared partials only after the broad unimplemented slice unless one of them directly unlocks a currently stalled archetype line.
-3. Keep using `mix prizmo.goal2.corpus` after each batch to re-rank the next blockers by archetype count and weighted share.
-4. Treat one-off low-share cards as later work unless they unblock a shared primitive or a whole still-dead archetype line.
+1. Switch the default autonomous queue to the widest metadata-missing blockers first: `SSP-177`, `SFA-057`, `ASC-046`, and `SVI-171`.
+2. If deliberately staying on cached metadata, clean up the remaining Dragapult-only pair `TWM-099` and `TWM-100` before returning to lower-share cached one-offs.
+3. Finish shared partials only after the broad unimplemented slice unless one of them directly unlocks a currently stalled archetype line.
+4. Keep using `mix prizmo.goal2.corpus` after each batch to re-rank the next blockers by archetype count and weighted share.
+5. Treat one-off low-share cards as later work unless they unblock a shared primitive or a whole still-dead archetype line.
 
 ## See Also
 

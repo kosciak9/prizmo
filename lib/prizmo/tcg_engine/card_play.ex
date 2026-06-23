@@ -15,6 +15,7 @@ defmodule Prizmo.TcgEngine.CardPlay do
       require_rare_candy_evolves_from: 2,
       require_special_energy: 1,
       require_stage_2_pokemon: 1,
+      require_tera_pokemon_card: 1,
       require_team_rocket_pokemon_card: 1,
       require_trainer_type: 2
     ]
@@ -457,6 +458,31 @@ defmodule Prizmo.TcgEngine.CardPlay do
              source: EventPayloads.card_source(card),
              effect_key: effect.key,
              cards: EventPayloads.moved_cards(discarded_tool_cards, :attached, :discard)
+           }) do
+      complete_play_card_resolution(game, turn, player, card, effect)
+    end
+  end
+
+  defp complete_play_card_effect(
+         game,
+         turn,
+         player,
+         card,
+         %{type: :discard_opponent_tool_and_special_energy_from_same_pokemon} = effect,
+         target_ids
+       ) do
+    with {:ok, target_cards} <-
+           validate_ruffian_effect(game.id, player.player_id, effect, target_ids),
+         {:ok, discarded_cards} <- discard_attached_cards(game.id, target_cards),
+         affected_player_id when is_binary(affected_player_id) <-
+           target_cards |> List.first() |> Map.get(:owner_player_id),
+         {:ok, _event} <-
+           write_event_and_snapshot(game.id, :cards_moved, player.player_id, %{
+             reason: :effect_resolution,
+             source: EventPayloads.card_source(card),
+             effect_key: effect.key,
+             affected_player_id: affected_player_id,
+             cards: EventPayloads.moved_cards(discarded_cards, :attached, :discard)
            }) do
       complete_play_card_resolution(game, turn, player, card, effect)
     end
@@ -1615,6 +1641,13 @@ defmodule Prizmo.TcgEngine.CardPlay do
     end
   end
 
+  defp validate_ruffian_effect(game_id, player_id, effect, target_ids) do
+    with {:ok, target_ids} <- EffectRunner.validate_choice_selection(effect, target_ids),
+         {:ok, target_cards} <- CardStore.get_cards(game_id, target_ids) do
+      selected_ruffian_cards(target_cards, player_id)
+    end
+  end
+
   defp validate_energy_switch_effect(game_id, player_id, effect, target_ids) do
     with {:ok, target_ids} <- EffectRunner.validate_choice_selection(effect, target_ids),
          {:ok, target_cards} <- CardStore.get_cards(game_id, target_ids),
@@ -1896,6 +1929,18 @@ defmodule Prizmo.TcgEngine.CardPlay do
        ) do
     cards
     |> opponent_special_energy_choice_cards(player_id)
+    |> Enum.map(& &1.id)
+    |> then(&{:ok, &1})
+  end
+
+  defp effect_choice_ids(
+         cards,
+         player_id,
+         %{type: :discard_opponent_tool_and_special_energy_from_same_pokemon},
+         _current_turn
+       ) do
+    cards
+    |> ruffian_choice_cards(player_id)
     |> Enum.map(& &1.id)
     |> then(&{:ok, &1})
   end
@@ -2321,6 +2366,26 @@ defmodule Prizmo.TcgEngine.CardPlay do
     )
   end
 
+  defp ruffian_choice_cards(cards, player_id) do
+    cards
+    |> Enum.filter(
+      &(&1.owner_player_id != player_id and &1.zone == :attached and
+          is_binary(&1.attached_to_card_instance_id))
+    )
+    |> Enum.sort_by(
+      &{&1.owner_player_id, &1.attached_to_card_instance_id, &1.position, &1.instance_id}
+    )
+    |> Enum.chunk_by(& &1.attached_to_card_instance_id)
+    |> Enum.flat_map(fn attached_cards ->
+      if Enum.any?(attached_cards, &tool_card?/1) and
+           Enum.any?(attached_cards, &special_energy_card?/1) do
+        Enum.filter(attached_cards, &(tool_card?(&1) or special_energy_card?(&1)))
+      else
+        []
+      end
+    end)
+  end
+
   defp attached_tool_choice_cards(cards, _player_id) do
     cards
     |> Enum.filter(&(&1.zone == :attached and tool_card?(&1)))
@@ -2479,6 +2544,10 @@ defmodule Prizmo.TcgEngine.CardPlay do
   end
 
   defp require_search_filter(%CardInstance{}, nil), do: :ok
+
+  defp require_search_filter(%CardInstance{} = card, %{kind: :pokemon, tera?: true}) do
+    require_tera_pokemon_card(card.card_id)
+  end
 
   defp require_search_filter(%CardInstance{} = card, %{kind: :pokemon, stage: stage}) do
     case CardCatalog.fetch(card.card_id) do
@@ -3076,6 +3145,37 @@ defmodule Prizmo.TcgEngine.CardPlay do
     |> Enum.map(&require_special_energy(&1.card_id))
     |> collect_ok_results()
   end
+
+  defp selected_ruffian_cards(cards, player_id) do
+    with :ok <- require_all_opponent_cards(cards, player_id),
+         :ok <- require_all_in_zone(cards, :attached),
+         :ok <- require_ruffian_target_pair(cards) do
+      {:ok, cards}
+    end
+  end
+
+  defp require_ruffian_target_pair([
+         %CardInstance{attached_to_card_instance_id: attached_to_card_instance_id} = first_card,
+         %CardInstance{attached_to_card_instance_id: attached_to_card_instance_id} = second_card
+       ])
+       when is_binary(attached_to_card_instance_id) do
+    cond do
+      tool_card?(first_card) and special_energy_card?(second_card) ->
+        :ok
+
+      special_energy_card?(first_card) and tool_card?(second_card) ->
+        :ok
+
+      true ->
+        {:error, :ruffian_requires_tool_and_special_energy}
+    end
+  end
+
+  defp require_ruffian_target_pair([%CardInstance{}, %CardInstance{}]),
+    do: {:error, :ruffian_targets_must_share_attached_pokemon}
+
+  defp require_ruffian_target_pair(_cards),
+    do: {:error, :ruffian_requires_tool_and_special_energy}
 
   defp require_all_energy_cards(cards) do
     cards
@@ -3684,6 +3784,30 @@ defmodule Prizmo.TcgEngine.CardPlay do
          payload,
          game_id,
          _player_id,
+         :discard_opponent_tool_and_special_energy_from_same_pokemon,
+         legal_choice_ids
+       ) do
+    case CardStore.list_cards(game_id) do
+      {:ok, cards} ->
+        cards_by_id = Map.new(cards, &{&1.id, &1})
+
+        labels =
+          legal_choice_ids
+          |> Enum.map(&Map.get(cards_by_id, &1))
+          |> Enum.reject(&is_nil/1)
+          |> Enum.map(&ruffian_choice_label(&1, cards_by_id))
+
+        Map.put(payload, :legal_choice_labels, labels)
+
+      {:error, _reason} ->
+        payload
+    end
+  end
+
+  defp maybe_put_prompt_choice_labels(
+         payload,
+         game_id,
+         _player_id,
          :move_basic_energy_between_own_pokemon,
          legal_choice_ids
        ) do
@@ -3782,6 +3906,31 @@ defmodule Prizmo.TcgEngine.CardPlay do
       label: card_name(card, card.card_id),
       detail:
         "#{owner_detail} Tool attached to #{attached_to_name}. Choose up to 2 Tools to discard."
+    }
+  end
+
+  defp ruffian_choice_label(%CardInstance{} = card, cards_by_id) do
+    attached_to_name =
+      cards_by_id
+      |> Map.get(card.attached_to_card_instance_id)
+      |> card_name("attached Pokémon")
+
+    detail =
+      cond do
+        tool_card?(card) ->
+          "Opponent's Tool attached to #{attached_to_name}. Ruffian must discard this with 1 Special Energy from the same Pokémon."
+
+        special_energy_card?(card) ->
+          "Opponent's Special Energy attached to #{attached_to_name}. Ruffian must discard this with 1 Tool from the same Pokémon."
+
+        true ->
+          "Opponent attached card on #{attached_to_name}."
+      end
+
+    %{
+      id: card.id,
+      label: card_name(card, card.card_id),
+      detail: detail
     }
   end
 

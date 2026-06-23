@@ -772,6 +772,22 @@ defmodule Prizmo.TcgEngine.GameView do
   end
 
   defp legal_choice_cards(
+         %Prompt{
+           payload:
+             %{"choice_key" => "discard_opponent_tool_and_special_energy_from_same_pokemon"} =
+               payload,
+           player_id: player_id
+         },
+         cards,
+         attached_cards_by_target
+       ) do
+    payload
+    |> prompt_choice_card_instances(cards)
+    |> Enum.filter(&(&1.owner_player_id != player_id and &1.zone == :attached))
+    |> Enum.map(&card_view(&1, attached_cards_by_target))
+  end
+
+  defp legal_choice_cards(
          %Prompt{payload: %{"choice_key" => "discard_attached_tools"} = payload},
          cards,
          attached_cards_by_target

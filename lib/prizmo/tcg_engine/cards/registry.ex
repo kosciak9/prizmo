@@ -199,6 +199,20 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     ]
   }
 
+  @ruffian %CardDefinition{
+    id: "JTG-157",
+    kind: :trainer,
+    trainer_type: :supporter,
+    play_window: :action_window,
+    effects: [
+      %Effect{
+        key: :discard_opponent_tool_and_special_energy_from_same_pokemon,
+        type: :discard_opponent_tool_and_special_energy_from_same_pokemon,
+        params: %{count: 2}
+      }
+    ]
+  }
+
   @lillies_determination %CardDefinition{
     id: "MEG-119",
     kind: :trainer,
@@ -251,6 +265,26 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
         key: :switch_opponent_bench_to_active_then_switch_own_active_with_bench,
         type: :switch_opponent_bench_to_active_then_switch_own_active_with_bench,
         params: %{count: 2}
+      }
+    ]
+  }
+
+  @tera_orb %CardDefinition{
+    id: "SSP-189",
+    kind: :trainer,
+    trainer_type: :item,
+    play_window: :action_window,
+    effects: [
+      %Effect{
+        key: :search_deck_for_tera_pokemon,
+        type: :search_deck,
+        params: %{
+          filter: %{kind: :pokemon, tera?: true},
+          count: 1,
+          destination: :hand,
+          reveal: true,
+          shuffle_after: true
+        }
       }
     ]
   }
@@ -978,9 +1012,11 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     @pokegear_3_0.id => @pokegear_3_0,
     @prime_catcher.id => @prime_catcher,
     @rare_candy.id => @rare_candy,
+    @ruffian.id => @ruffian,
     @sacred_ash.id => @sacred_ash,
     @secret_box.id => @secret_box,
     @special_red_card.id => @special_red_card,
+    @tera_orb.id => @tera_orb,
     @xerosics_machinations.id => @xerosics_machinations,
     @rosas_encouragement.id => @rosas_encouragement,
     @unfair_stamp.id => @unfair_stamp,
