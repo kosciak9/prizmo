@@ -411,7 +411,8 @@ defmodule Prizmo.TcgEngine.Mechanics do
              ),
            {:ok, event} <-
              write_event(game, :play_basic_to_bench, player_id, event_payload),
-           {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do
+           {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index),
+           :ok <- maybe_trigger_last_ditch_catch(game, turn, updated_card) do
         get_game(game.id)
       end
     end)
@@ -1498,6 +1499,95 @@ defmodule Prizmo.TcgEngine.Mechanics do
       "source_card_card_id" => source_card.card_id,
       "message" => "Fan Rotom used Fan Call."
     }
+  end
+
+  defp maybe_trigger_last_ditch_catch(
+         %Game{} = game,
+         %Turn{} = turn,
+         %CardInstance{} = source_card
+       ) do
+    if AbilityEffects.last_ditch_catch_source?(source_card) do
+      with :ok <- AbilityEffects.require_last_ditch_catch_available(game.id, source_card, turn),
+           {:ok, deck_cards} <- cards_in_zone(game.id, source_card.owner_player_id, :deck) do
+        legal_choice_cards = AbilityEffects.last_ditch_catch_legal_choice_cards(deck_cards)
+
+        case legal_choice_cards do
+          [] ->
+            :ok
+
+          _cards ->
+            legal_choice_ids = Enum.map(legal_choice_cards, & &1.id)
+
+            with {:ok, pending_effect} <-
+                   create(PendingEffect, :create, %{
+                     game_id: game.id,
+                     source_type: :ability_effect,
+                     source_card_instance_id: source_card.id,
+                     source_card_id: source_card.card_id,
+                     controller_player_id: source_card.owner_player_id,
+                     current_player_id: source_card.owner_player_id,
+                     effect_key: AbilityEffects.last_ditch_catch_ability_id(),
+                     step: "awaiting_choice",
+                     state: %{
+                       "version" => 1,
+                       "kind" => "ability_effect",
+                       "effect_type" =>
+                         Atom.to_string(AbilityEffects.last_ditch_catch_ability_id()),
+                       "player_id" => source_card.owner_player_id,
+                       "source_card_instance_id" => source_card.id,
+                       "source_card_id" => source_card.card_id,
+                       "legal_choice_ids" => legal_choice_ids
+                     }
+                   }),
+                 {:ok, pending_effect} <-
+                   update(pending_effect, :await_prompt, %{
+                     current_player_id: source_card.owner_player_id,
+                     effect_key: AbilityEffects.last_ditch_catch_ability_id(),
+                     step: "awaiting_choice",
+                     state: pending_effect.state || %{}
+                   }),
+                 {:ok, prompt} <-
+                   create(Prompt, :create, %{
+                     game_id: game.id,
+                     turn_id: turn.id,
+                     pending_effect_id: pending_effect.id,
+                     prompt_type: "select_cards",
+                     player_id: source_card.owner_player_id,
+                     payload: %{
+                       "choice_key" =>
+                         Atom.to_string(AbilityEffects.last_ditch_catch_ability_id()),
+                       "legal_choices" => legal_choice_ids,
+                       "legal_choice_labels" =>
+                         AbilityEffects.last_ditch_catch_choice_labels(legal_choice_cards),
+                       "min" => 0,
+                       "max" => 1,
+                       "source_card_instance_id" => source_card.id,
+                       "source_card_id" => source_card.card_id
+                     }
+                   }),
+                 {:ok, _event} <-
+                   write_event_and_snapshot(
+                     game.id,
+                     :prompt_created,
+                     source_card.owner_player_id,
+                     %{
+                       prompt_id: prompt.id,
+                       pending_effect_id: pending_effect.id,
+                       choice_key: AbilityEffects.last_ditch_catch_ability_id(),
+                       prompt_type: :select_cards
+                     }
+                   ) do
+              :ok
+            end
+        end
+      else
+        {:error, {:ability_already_used_this_turn, _player_id, :last_ditch}} -> :ok
+        {:error, {:unsupported_ability_effect, _card_id, _ability_id, _effect_type}} -> :ok
+        {:error, reason} -> {:error, reason}
+      end
+    else
+      :ok
+    end
   end
 
   @spec attach_tool(Game.t() | String.t(), String.t(), String.t(), String.t()) ::

@@ -493,6 +493,15 @@ defmodule Prizmo.TcgEngine.GameView do
           public_revealed_cards: []
         }
 
+      "last_ditch_catch" ->
+        %{
+          public_note:
+            payload_value(payload, "public_note") ||
+              "#{payload_card_name(payload, "source_card_id", "Meowth ex")} used Last-Ditch Catch.",
+          public_card_count: 0,
+          public_revealed_cards: []
+        }
+
       _other ->
         default_public_event_details()
     end

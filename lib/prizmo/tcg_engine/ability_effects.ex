@@ -44,6 +44,10 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
   @flip_the_script_marker_atom_key :"ability_used:flip_the_script"
   @flip_the_script_draw_count 3
   @flip_the_script_unavailable_reason :flip_the_script_requires_own_pokemon_ko_during_opponents_last_turn
+  @last_ditch_catch_card_id "POR-062"
+  @last_ditch_catch_ability_id :last_ditch_catch
+  @last_ditch_effect_type :search_supporter_when_benched_from_hand
+  @last_ditch_marker_ability_id :last_ditch
   @seething_spirit_card_id "JTG-024"
   @seething_spirit_ability_id :seething_spirit
   @seething_spirit_effect_type :attach_basic_energy_from_discard_to_own_pokemon
@@ -69,6 +73,8 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
   def flip_the_script_card_id, do: @flip_the_script_card_id
   def flip_the_script_ability_id, do: @flip_the_script_ability_id
   def flip_the_script_draw_count, do: @flip_the_script_draw_count
+  def last_ditch_catch_card_id, do: @last_ditch_catch_card_id
+  def last_ditch_catch_ability_id, do: @last_ditch_catch_ability_id
   def seething_spirit_card_id, do: @seething_spirit_card_id
   def seething_spirit_ability_id, do: @seething_spirit_ability_id
   def psychic_draw_ability_id, do: @psychic_draw_ability_id
@@ -87,6 +93,9 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
 
   def flip_the_script_source?(%CardInstance{card_id: @flip_the_script_card_id}), do: true
   def flip_the_script_source?(%CardInstance{}), do: false
+
+  def last_ditch_catch_source?(%CardInstance{card_id: @last_ditch_catch_card_id}), do: true
+  def last_ditch_catch_source?(%CardInstance{}), do: false
 
   def seething_spirit_source?(%CardInstance{} = source) do
     match?({:ok, _effect}, seething_spirit_effect(source))
@@ -176,6 +185,27 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
         source.owner_player_id
       )
     end
+  end
+
+  def require_last_ditch_catch_available(game_id, %CardInstance{} = source, %Turn{} = turn)
+      when is_binary(game_id) do
+    with {:ok, _effect} <- last_ditch_catch_effect(source),
+         :ok <- require_in_play(source) do
+      require_last_ditch_unused(game_id, source.owner_player_id, turn)
+    end
+  end
+
+  def last_ditch_catch_legal_choice_cards(cards) when is_list(cards) do
+    Enum.filter(cards, &last_ditch_catch_target?/1)
+  end
+
+  def last_ditch_catch_choice_labels(cards) when is_list(cards) do
+    Enum.map(cards, fn card ->
+      case CardCatalog.fetch(card.card_id) do
+        {:ok, %{name: name}} -> name
+        _ -> card.card_id
+      end
+    end)
   end
 
   def seething_spirit_available?(%CardInstance{} = source, discard_cards, %Turn{} = turn)
@@ -370,6 +400,10 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
     })
   end
 
+  def put_last_ditch_used_marker(%CardInstance{} = source, %Turn{} = turn) do
+    put_ability_used_marker(source, turn, @last_ditch_marker_ability_id)
+  end
+
   def put_seething_spirit_used_marker(%CardInstance{} = source, %Turn{} = turn) do
     put_ability_used_marker(source, turn, @seething_spirit_ability_id)
   end
@@ -397,6 +431,69 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
   def resume_pending_effect(
         %Game{} = game,
         %Prompt{} = prompt,
+        %PendingEffect{source_type: :ability_effect, effect_key: @last_ditch_catch_ability_id} =
+          pending_effect,
+        player_id,
+        _choice_key,
+        selected_card_instance_ids
+      )
+      when is_binary(player_id) and is_list(selected_card_instance_ids) do
+    with :ok <- require_max_target_count(selected_card_instance_ids, 1),
+         :ok <- require_unique_ids(selected_card_instance_ids),
+         :ok <- require_prompt_legal_choices(prompt, selected_card_instance_ids),
+         {:ok, target_cards} <- CardStore.get_cards(game.id, selected_card_instance_ids),
+         :ok <- require_all_owned_in_zone(target_cards, player_id, :deck) do
+      case target_cards do
+        [] ->
+          complete_pending_effect(pending_effect, selected_card_instance_ids)
+
+        [_supporter_card] = target_cards ->
+          with :ok <- require_all_last_ditch_targets(target_cards),
+               {:ok, turn} <- TurnStore.current_turn(game.id),
+               {:ok, source_card} <-
+                 CardStore.get_card(game.id, pending_effect.source_card_instance_id),
+               {:ok, marked_source_card} <-
+                 update(source_card, :set_markers, %{
+                   markers: put_last_ditch_used_marker(source_card, turn)
+                 }),
+               {:ok, _event} <-
+                 write_event_and_snapshot(game.id, :ability_used, player_id, %{
+                   turn_id: turn.id,
+                   source: EventPayloads.card_source(marked_source_card),
+                   source_card_id: marked_source_card.card_id,
+                   source_card_instance_id: marked_source_card.id,
+                   ability_id: Atom.to_string(@last_ditch_catch_ability_id),
+                   effect_type: @last_ditch_effect_type,
+                   public_note: "Meowth ex used Last-Ditch Catch."
+                 }),
+               {:ok, moved_cards} <- move_deck_targets_to_hand(game.id, player_id, target_cards),
+               moved_cards_payload = EventPayloads.moved_cards(moved_cards, :deck, :hand),
+               {:ok, _event} <-
+                 write_event_and_snapshot(game.id, :cards_moved, player_id, %{
+                   reason: :ability_effect_resolution,
+                   source: EventPayloads.card_source(marked_source_card),
+                   source_card_id: marked_source_card.card_id,
+                   effect_key: pending_effect.effect_key,
+                   cards: moved_cards_payload,
+                   public_reveal: true,
+                   revealed_cards: moved_cards_payload
+                 }),
+               {:ok, _shuffled_deck} <-
+                 shuffle_deck_after_ability_search(game, player_id, @last_ditch_catch_ability_id),
+               {:ok, _event} <-
+                 write_event_and_snapshot(game.id, :deck_shuffled, player_id, %{
+                   source: pending_effect_source_payload(pending_effect),
+                   effect_key: pending_effect.effect_key
+                 }) do
+            complete_pending_effect(pending_effect, selected_card_instance_ids)
+          end
+      end
+    end
+  end
+
+  def resume_pending_effect(
+        %Game{} = game,
+        %Prompt{} = prompt,
         %PendingEffect{source_type: :ability_effect, effect_key: @fan_call_ability_id} =
           pending_effect,
         player_id,
@@ -410,7 +507,7 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
          {:ok, target_cards} <- CardStore.get_cards(game.id, selected_card_instance_ids),
          :ok <- require_all_owned_in_zone(target_cards, player_id, :deck),
          :ok <- require_all_fan_call_targets(target_cards),
-         {:ok, moved_cards} <- move_fan_call_targets_to_hand(game.id, player_id, target_cards),
+         {:ok, moved_cards} <- move_deck_targets_to_hand(game.id, player_id, target_cards),
          {:ok, _event} <-
            write_event_and_snapshot(game.id, :cards_moved, player_id, %{
              reason: :ability_effect_resolution,
@@ -418,22 +515,14 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
              effect_key: pending_effect.effect_key,
              cards: EventPayloads.moved_cards(moved_cards, :deck, :hand)
            }),
-         {:ok, _shuffled_deck} <- shuffle_deck_after_fan_call(game, player_id),
+         {:ok, _shuffled_deck} <-
+           shuffle_deck_after_ability_search(game, player_id, @fan_call_ability_id),
          {:ok, _event} <-
            write_event_and_snapshot(game.id, :deck_shuffled, player_id, %{
              source: pending_effect_source_payload(pending_effect),
              effect_key: pending_effect.effect_key
            }),
-         {:ok, _pending_effect} <-
-           update(pending_effect, :complete, %{
-             current_player_id: nil,
-             state:
-               Map.put(
-                 pending_effect.state || %{},
-                 "selected_card_instance_ids",
-                 selected_card_instance_ids
-               )
-           }) do
+         {:ok, _game} <- complete_pending_effect(pending_effect, selected_card_instance_ids) do
       GameStore.get_game(game.id)
     end
   end
@@ -763,6 +852,19 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
     end
   end
 
+  defp last_ditch_catch_effect(%CardInstance{card_id: card_id}) do
+    with {:ok, %{abilities: abilities}} <- CardCatalog.fetch(card_id),
+         %{effect: %{type: @last_ditch_effect_type}} <-
+           Map.get(abilities, @last_ditch_catch_ability_id) do
+      {:ok, %{}}
+    else
+      _other ->
+        {:error,
+         {:unsupported_ability_effect, card_id, @last_ditch_catch_ability_id,
+          @last_ditch_effect_type}}
+    end
+  end
+
   defp fan_call_effect(%CardInstance{card_id: card_id}) do
     with {:ok, %{abilities: abilities}} <- CardCatalog.fetch(card_id),
          %{effect: %{type: :search_colorless_pokemon_with_100_hp_or_less_to_hand_on_first_turn}} <-
@@ -779,6 +881,22 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
   defp require_fan_call_first_turn(%Turn{turn_number: turn_number}) when turn_number <= 2, do: :ok
 
   defp require_fan_call_first_turn(%Turn{}), do: {:error, :fan_call_only_available_on_first_turn}
+
+  defp require_last_ditch_unused(game_id, player_id, %Turn{} = turn)
+       when is_binary(game_id) and is_binary(player_id) do
+    with {:ok, cards} <- CardStore.list_cards(game_id) do
+      player_cards = Enum.filter(cards, &(&1.owner_player_id == player_id))
+
+      if Enum.any?(
+           player_cards,
+           &ability_used_this_turn?(&1, turn, @last_ditch_marker_ability_id)
+         ) do
+        {:error, {:ability_already_used_this_turn, player_id, @last_ditch_marker_ability_id}}
+      else
+        :ok
+      end
+    end
+  end
 
   defp adrena_brain_marker(markers) when is_map(markers) do
     Map.get(markers, @adrena_brain_marker_key) || Map.get(markers, @adrena_brain_marker_atom_key)
@@ -923,6 +1041,25 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
     end
   end
 
+  defp require_all_last_ditch_targets(cards) when is_list(cards) do
+    results = Enum.map(cards, &require_last_ditch_target/1)
+
+    if Enum.all?(results, &(&1 == :ok)) do
+      :ok
+    else
+      first_error = Enum.find(results, &match?({:error, _}, &1))
+      first_error || :ok
+    end
+  end
+
+  defp require_last_ditch_target(%CardInstance{} = card) do
+    with {:ok, metadata} <- CardCatalog.fetch(card.card_id),
+         true <- metadata.supertype == :trainer || {:error, {:not_trainer, card.card_id}},
+         true <- metadata.trainer_type == :supporter || {:error, {:not_supporter, card.card_id}} do
+      :ok
+    end
+  end
+
   defp colorless_pokemon?(%{supertype: :pokemon, types: types}) when is_list(types) do
     :colorless in types
   end
@@ -930,9 +1067,16 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
   defp colorless_pokemon?(%{supertype: :pokemon, type: :colorless}), do: true
   defp colorless_pokemon?(_), do: false
 
-  defp move_fan_call_targets_to_hand(_game_id, _player_id, []), do: {:ok, []}
+  defp last_ditch_catch_target?(%CardInstance{} = card) do
+    case CardCatalog.fetch(card.card_id) do
+      {:ok, %{supertype: :trainer, trainer_type: :supporter}} -> true
+      _other -> false
+    end
+  end
 
-  defp move_fan_call_targets_to_hand(game_id, player_id, target_cards) do
+  defp move_deck_targets_to_hand(_game_id, _player_id, []), do: {:ok, []}
+
+  defp move_deck_targets_to_hand(game_id, player_id, target_cards) do
     target_cards
     |> Enum.reduce_while({:ok, []}, fn card, {:ok, acc} ->
       case CardStore.move_deck_card_to_hand(game_id, player_id, card) do
@@ -946,13 +1090,28 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
     end
   end
 
-  defp shuffle_deck_after_fan_call(%Game{} = game, player_id) do
-    context = {:ability_deck_shuffle, player_id, :fan_call}
+  defp shuffle_deck_after_ability_search(%Game{} = game, player_id, effect_key) do
+    context = {:ability_deck_shuffle, player_id, effect_key}
 
     with {:ok, cards} <- CardStore.cards_in_zone(game.id, player_id, :deck) do
       cards
       |> Rng.shuffle(game.rng_seed, context)
       |> reorder_deck_cards()
+    end
+  end
+
+  defp complete_pending_effect(%PendingEffect{} = pending_effect, selected_card_instance_ids) do
+    with {:ok, _pending_effect} <-
+           update(pending_effect, :complete, %{
+             current_player_id: nil,
+             state:
+               Map.put(
+                 pending_effect.state || %{},
+                 "selected_card_instance_ids",
+                 selected_card_instance_ids
+               )
+           }) do
+      GameStore.get_game(pending_effect.game_id)
     end
   end
 
