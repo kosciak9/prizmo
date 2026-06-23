@@ -17,6 +17,7 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
   alias Prizmo.TcgEngine.CardCatalog
   alias Prizmo.TcgEngine.CardInstance
   alias Prizmo.TcgEngine.GameEvent
+  alias Prizmo.TcgEngine.GamePlayer
   alias Prizmo.TcgEngine.GameSnapshot
   alias Prizmo.TcgEngine.GameView
   alias Prizmo.TcgEngine.Mechanics
@@ -956,6 +957,108 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
     end
   end
 
+  describe "SCR-114 Hoothoot and SCR-115 Noctowl support" do
+    test "Hoothoot Triple Stab scales damage by heads count" do
+      {:ok, game} = create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147)
+
+      {:ok, attacker} = create_custom_owned_card(game.id, "player_1", "SCR-114", 200)
+      defender = active_card(game.id, "player_2")
+
+      assert {:ok, attack} = CardCatalog.fetch_attack(attacker.card_id, :triple_stab)
+      assert attack.damage == 0
+      assert {:ok, 20} = AttackDamage.damage_for(attacker, defender, attack, %{heads_count: 2})
+    end
+
+    test "Noctowl Jewel Seeker appears after evolving with Tera in play and resolves a Trainer search prompt" do
+      {:ok, game} = create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147)
+
+      assert {:ok, game} = Mechanics.pass_turn(game, "player_1")
+      assert {:ok, game} = Mechanics.pass_turn(game, "player_2")
+
+      current_turn_number = current_turn(game.id).turn_number
+
+      {:ok, hoothoot} = create_custom_owned_card(game.id, "player_1", "SCR-114", 200)
+      {:ok, hoothoot} = ash_update(hoothoot, :draw_to_hand, %{position: 20})
+
+      {:ok, hoothoot} =
+        ash_update(hoothoot, :play_to_bench, %{
+          position: 4,
+          turn_entered_play: current_turn_number - 1
+        })
+
+      {:ok, tera_pokemon} = create_custom_owned_card(game.id, "player_1", "TWM-025", 201)
+      {:ok, tera_pokemon} = ash_update(tera_pokemon, :draw_to_hand, %{position: 21})
+
+      {:ok, _tera_pokemon} =
+        ash_update(tera_pokemon, :play_to_bench, %{
+          position: 5,
+          turn_entered_play: current_turn_number - 1
+        })
+
+      {:ok, noctowl} = create_custom_owned_card(game.id, "player_1", "SCR-115", 202)
+      {:ok, noctowl} = ash_update(noctowl, :draw_to_hand, %{position: 9})
+
+      assert {:ok, game} = Mechanics.evolve_from_hand(game, "player_1", noctowl.id, hoothoot.id)
+
+      assert zone(noctowl.id) == :bench
+
+      evolved_noctowl = card(noctowl.id)
+      assert evolved_noctowl.evolves_from_card_instance_id == hoothoot.id
+
+      assert {:ok, view} = GameView.for_player(game.id, "player_1")
+
+      jewel_seeker = Enum.find(view.action_affordances, &(&1.key == "jewel_seeker"))
+      assert is_map(jewel_seeker)
+      assert jewel_seeker.source_card_instance_ids == [noctowl.id]
+
+      assert {:ok, game} = Mechanics.use_noctowl_jewel_seeker(game, "player_1", noctowl.id)
+
+      [prompt] = awaiting_prompts(game.id)
+      assert prompt.player_id == "player_1"
+      assert prompt.payload["choice_key"] == "jewel_seeker"
+      assert prompt.payload["min"] == 0
+      assert prompt.payload["max"] == 2
+
+      legal_choices = prompt.payload["legal_choices"]
+      assert length(legal_choices) > 0
+
+      for choice_id <- legal_choices do
+        choice_card = card(choice_id)
+
+        assert choice_card.owner_player_id == "player_1"
+        assert choice_card.zone == :deck
+        assert {:ok, %{supertype: :trainer}} = CardCatalog.fetch(choice_card.card_id)
+      end
+
+      hand_before = cards_in_zone(game.id, "player_1", :hand)
+      deck_before = cards_in_zone(game.id, "player_1", :deck)
+      selected = Enum.take(legal_choices, 2)
+
+      assert {:ok, game} = Mechanics.choose_prompt(game, "player_1", prompt.id, selected)
+
+      for card_id <- selected do
+        assert zone(card_id) == :hand
+      end
+
+      hand_after = cards_in_zone(game.id, "player_1", :hand)
+      deck_after = cards_in_zone(game.id, "player_1", :deck)
+
+      assert length(hand_after) == length(hand_before) + length(selected)
+      assert length(deck_after) == length(deck_before) - length(selected)
+
+      cards_moved_event =
+        game.id
+        |> game_events_by_type("cards_moved")
+        |> Enum.find(&(&1.payload["effect_key"] == "jewel_seeker"))
+
+      assert cards_moved_event.payload["public_reveal"] == true
+      assert length(cards_moved_event.payload["revealed_cards"]) == length(selected)
+
+      assert {:error, {:ability_already_used_this_turn, _, :jewel_seeker}} =
+               Mechanics.use_noctowl_jewel_seeker(game, "player_1", noctowl.id)
+    end
+  end
+
   defp create_game do
     Mechanics.create_game([
       {"player_1", Alakazam27147},
@@ -1287,6 +1390,24 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
     record
     |> Ash.Changeset.for_update(action, attrs)
     |> Ash.update()
+  end
+
+  defp create_custom_owned_card(game_id, player_id, card_id, position) do
+    player =
+      GamePlayer
+      |> Ash.Query.filter(game_id == ^game_id and player_id == ^player_id)
+      |> Ash.read_one!()
+
+    ash_create(CardInstance, :create, %{
+      game_id: game_id,
+      game_player_id: player.id,
+      owner_player_id: player_id,
+      instance_id: Ecto.UUID.generate(),
+      card_id: card_id,
+      position: position,
+      damage: 0,
+      markers: %{}
+    })
   end
 
   defp counts_by_zone(game_id) do

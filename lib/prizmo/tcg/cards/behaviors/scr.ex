@@ -7,6 +7,21 @@ defmodule Prizmo.Tcg.Cards.Behaviors.SCR do
     attack(:spray_fluid, effect: nil)
   end
 
+  card "SCR-114" do
+    attack(:triple_stab,
+      damage: 0,
+      effect: %{type: :bonus_damage_per_coin_heads_count, bonus_damage: 10}
+    )
+  end
+
+  card "SCR-115" do
+    ability(:jewel_seeker,
+      effect: %{type: :search_trainer_cards_when_evolved_with_tera_in_play, max_targets: 2}
+    )
+
+    attack(:speed_wing, effect: nil)
+  end
+
   card "SCR-118" do
     ability(:fan_call,
       effect: %{

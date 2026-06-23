@@ -595,6 +595,32 @@ defmodule Prizmo.TcgEngine.Game.ActionCommands do
       end
     end
 
+    action :use_noctowl_jewel_seeker_command, :struct do
+      description "Use Noctowl's Jewel Seeker Ability after evolving from hand with a Tera Pokémon in play."
+
+      constraints instance_of: Game
+
+      argument :game_id, :uuid do
+        allow_nil? false
+      end
+
+      argument :player_id, :string do
+        allow_nil? false
+      end
+
+      argument :source_card_instance_id, :uuid do
+        allow_nil? false
+      end
+
+      run fn input, _context ->
+        Mechanics.use_noctowl_jewel_seeker(
+          input.arguments.game_id,
+          input.arguments.player_id,
+          input.arguments.source_card_instance_id
+        )
+      end
+    end
+
     action :use_drakloak_recon_directive_command, :struct do
       description "Use Drakloak's Recon Directive Ability to choose 1 of the top 2 deck cards."
 

@@ -48,6 +48,10 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
   @last_ditch_catch_ability_id :last_ditch_catch
   @last_ditch_effect_type :search_supporter_when_benched_from_hand
   @last_ditch_marker_ability_id :last_ditch
+  @jewel_seeker_card_id "SCR-115"
+  @jewel_seeker_ability_id :jewel_seeker
+  @jewel_seeker_effect_type :search_trainer_cards_when_evolved_with_tera_in_play
+  @jewel_seeker_unavailable_reason :jewel_seeker_requires_tera_pokemon_in_play
   @seething_spirit_card_id "JTG-024"
   @seething_spirit_ability_id :seething_spirit
   @seething_spirit_effect_type :attach_basic_energy_from_discard_to_own_pokemon
@@ -75,6 +79,8 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
   def flip_the_script_draw_count, do: @flip_the_script_draw_count
   def last_ditch_catch_card_id, do: @last_ditch_catch_card_id
   def last_ditch_catch_ability_id, do: @last_ditch_catch_ability_id
+  def jewel_seeker_card_id, do: @jewel_seeker_card_id
+  def jewel_seeker_ability_id, do: @jewel_seeker_ability_id
   def seething_spirit_card_id, do: @seething_spirit_card_id
   def seething_spirit_ability_id, do: @seething_spirit_ability_id
   def psychic_draw_ability_id, do: @psychic_draw_ability_id
@@ -96,6 +102,9 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
 
   def last_ditch_catch_source?(%CardInstance{card_id: @last_ditch_catch_card_id}), do: true
   def last_ditch_catch_source?(%CardInstance{}), do: false
+
+  def jewel_seeker_source?(%CardInstance{card_id: @jewel_seeker_card_id}), do: true
+  def jewel_seeker_source?(%CardInstance{}), do: false
 
   def seething_spirit_source?(%CardInstance{} = source) do
     match?({:ok, _effect}, seething_spirit_effect(source))
@@ -193,6 +202,34 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
          :ok <- require_in_play(source) do
       require_last_ditch_unused(game_id, source.owner_player_id, turn)
     end
+  end
+
+  def jewel_seeker_available?(game_id, %CardInstance{} = source, %Turn{} = turn)
+      when is_binary(game_id) do
+    require_jewel_seeker_available(game_id, source, turn) == :ok
+  end
+
+  def require_jewel_seeker_available(game_id, %CardInstance{} = source, %Turn{} = turn)
+      when is_binary(game_id) do
+    with {:ok, _effect} <- jewel_seeker_effect(source),
+         :ok <- require_in_play(source),
+         :ok <- require_evolved_this_turn(source, turn),
+         :ok <- require_own_tera_pokemon_in_play(game_id, source.owner_player_id) do
+      require_ability_unused(source, turn, @jewel_seeker_ability_id)
+    end
+  end
+
+  def jewel_seeker_legal_choice_cards(cards) when is_list(cards) do
+    Enum.filter(cards, &jewel_seeker_target?/1)
+  end
+
+  def jewel_seeker_choice_labels(cards) when is_list(cards) do
+    Enum.map(cards, fn card ->
+      case CardCatalog.fetch(card.card_id) do
+        {:ok, %{name: name}} -> name
+        _ -> card.card_id
+      end
+    end)
   end
 
   def last_ditch_catch_legal_choice_cards(cards) when is_list(cards) do
@@ -302,6 +339,12 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
     end
   end
 
+  def jewel_seeker_max_targets(%CardInstance{} = source) do
+    with {:ok, %{max_targets: max_targets}} <- jewel_seeker_effect(source) do
+      {:ok, max_targets}
+    end
+  end
+
   def cursed_blast_counters(%CardInstance{} = source) do
     with {:ok, %{counters: counters}} <- cursed_blast_effect(source) do
       {:ok, counters}
@@ -404,6 +447,10 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
     put_ability_used_marker(source, turn, @last_ditch_marker_ability_id)
   end
 
+  def put_jewel_seeker_used_marker(%CardInstance{} = source, %Turn{} = turn) do
+    put_ability_used_marker(source, turn, @jewel_seeker_ability_id)
+  end
+
   def put_seething_spirit_used_marker(%CardInstance{} = source, %Turn{} = turn) do
     put_ability_used_marker(source, turn, @seething_spirit_ability_id)
   end
@@ -426,6 +473,48 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
 
   def put_fan_call_used_marker(%CardInstance{} = source, %Turn{} = turn) do
     put_ability_used_marker(source, turn, @fan_call_ability_id)
+  end
+
+  def resume_pending_effect(
+        %Game{} = game,
+        %Prompt{} = prompt,
+        %PendingEffect{source_type: :ability_effect, effect_key: @jewel_seeker_ability_id} =
+          pending_effect,
+        player_id,
+        _choice_key,
+        selected_card_instance_ids
+      )
+      when is_binary(player_id) and is_list(selected_card_instance_ids) do
+    with {:ok, max_targets} <-
+           jewel_seeker_max_targets_from_pending_effect(game.id, pending_effect),
+         :ok <- require_max_target_count(selected_card_instance_ids, max_targets),
+         :ok <- require_unique_ids(selected_card_instance_ids),
+         :ok <- require_prompt_legal_choices(prompt, selected_card_instance_ids),
+         {:ok, target_cards} <- CardStore.get_cards(game.id, selected_card_instance_ids),
+         :ok <- require_all_owned_in_zone(target_cards, player_id, :deck),
+         :ok <- require_all_jewel_seeker_targets(target_cards),
+         {:ok, moved_cards} <- move_deck_targets_to_hand(game.id, player_id, target_cards),
+         moved_cards_payload = EventPayloads.moved_cards(moved_cards, :deck, :hand),
+         {:ok, _event} <-
+           write_event_and_snapshot(game.id, :cards_moved, player_id, %{
+             reason: :ability_effect_resolution,
+             source: pending_effect_source_payload(pending_effect),
+             source_card_id: pending_effect.source_card_id,
+             effect_key: pending_effect.effect_key,
+             cards: moved_cards_payload,
+             public_reveal: true,
+             revealed_cards: moved_cards_payload
+           }),
+         {:ok, _shuffled_deck} <-
+           shuffle_deck_after_ability_search(game, player_id, @jewel_seeker_ability_id),
+         {:ok, _event} <-
+           write_event_and_snapshot(game.id, :deck_shuffled, player_id, %{
+             source: pending_effect_source_payload(pending_effect),
+             effect_key: pending_effect.effect_key
+           }),
+         {:ok, _game} <- complete_pending_effect(pending_effect, selected_card_instance_ids) do
+      GameStore.get_game(game.id)
+    end
   end
 
   def resume_pending_effect(
@@ -722,6 +811,17 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
     {:error, {:ability_requires_cards_in_deck, source.id}}
   end
 
+  defp require_own_tera_pokemon_in_play(game_id, player_id)
+       when is_binary(game_id) and is_binary(player_id) do
+    with {:ok, cards} <- CardStore.list_cards(game_id) do
+      if Enum.any?(cards, &own_tera_pokemon_in_play?(&1, player_id)) do
+        :ok
+      else
+        {:error, @jewel_seeker_unavailable_reason}
+      end
+    end
+  end
+
   defp require_ability_unused(%CardInstance{} = source, %Turn{} = turn, ability_id) do
     if ability_used_this_turn?(source, turn, ability_id) do
       {:error, {:ability_already_used_this_turn, source.id, ability_id}}
@@ -775,6 +875,22 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
         {:error,
          {:unsupported_ability_effect, card_id, @flip_the_script_ability_id,
           @flip_the_script_effect_type}}
+    end
+  end
+
+  defp jewel_seeker_effect(%CardInstance{card_id: card_id}) do
+    with {:ok, %{abilities: abilities}} <- CardCatalog.fetch(card_id),
+         %{effect: effect} <- Map.get(abilities, @jewel_seeker_ability_id),
+         %{
+           type: @jewel_seeker_effect_type,
+           max_targets: max_targets
+         } <- effect do
+      {:ok, %{max_targets: max_targets}}
+    else
+      _other ->
+        {:error,
+         {:unsupported_ability_effect, card_id, @jewel_seeker_ability_id,
+          @jewel_seeker_effect_type}}
     end
   end
 
@@ -881,6 +997,16 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
   defp require_fan_call_first_turn(%Turn{turn_number: turn_number}) when turn_number <= 2, do: :ok
 
   defp require_fan_call_first_turn(%Turn{}), do: {:error, :fan_call_only_available_on_first_turn}
+
+  defp own_tera_pokemon_in_play?(
+         %CardInstance{owner_player_id: player_id, zone: zone} = card,
+         player_id
+       )
+       when zone in [:active, :bench] do
+    CardCatalog.tera_pokemon?(card.card_id)
+  end
+
+  defp own_tera_pokemon_in_play?(%CardInstance{}, _player_id), do: false
 
   defp require_last_ditch_unused(game_id, player_id, %Turn{} = turn)
        when is_binary(game_id) and is_binary(player_id) do
@@ -1060,6 +1186,24 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
     end
   end
 
+  defp require_all_jewel_seeker_targets(cards) when is_list(cards) do
+    results = Enum.map(cards, &require_jewel_seeker_target/1)
+
+    if Enum.all?(results, &(&1 == :ok)) do
+      :ok
+    else
+      first_error = Enum.find(results, &match?({:error, _}, &1))
+      first_error || :ok
+    end
+  end
+
+  defp require_jewel_seeker_target(%CardInstance{} = card) do
+    with {:ok, metadata} <- CardCatalog.fetch(card.card_id),
+         true <- metadata.supertype == :trainer || {:error, {:not_trainer, card.card_id}} do
+      :ok
+    end
+  end
+
   defp colorless_pokemon?(%{supertype: :pokemon, types: types}) when is_list(types) do
     :colorless in types
   end
@@ -1071,6 +1215,20 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
     case CardCatalog.fetch(card.card_id) do
       {:ok, %{supertype: :trainer, trainer_type: :supporter}} -> true
       _other -> false
+    end
+  end
+
+  defp jewel_seeker_target?(%CardInstance{} = card) do
+    case CardCatalog.fetch(card.card_id) do
+      {:ok, %{supertype: :trainer}} -> true
+      _other -> false
+    end
+  end
+
+  defp jewel_seeker_max_targets_from_pending_effect(game_id, %PendingEffect{} = pending_effect)
+       when is_binary(game_id) do
+    with {:ok, source_card} <- CardStore.get_card(game_id, pending_effect.source_card_instance_id) do
+      jewel_seeker_max_targets(source_card)
     end
   end
 

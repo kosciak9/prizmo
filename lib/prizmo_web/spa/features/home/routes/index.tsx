@@ -42,6 +42,7 @@ import {
   runUseTcgEngineCursedBlast,
   runUseTcgEngineFanCall,
   runUseTcgEngineFlipTheScript,
+  runUseTcgEngineJewelSeeker,
   runUseTcgEngineMunkidoriAdrenaBrain,
   runUseTcgEnginePsychicDraw,
   runUseTcgEngineReconDirective,
@@ -539,6 +540,12 @@ type FanCallCommandOption = {
   sourceCard: CardSummary | undefined
 }
 
+type JewelSeekerCommandOption = {
+  key: string
+  sourceCardInstanceId: string
+  sourceCard: CardSummary | undefined
+}
+
 type FlipTheScriptCommandOption = {
   key: string
   sourceCardInstanceId: string
@@ -725,6 +732,17 @@ type FanCallInput = {
 }
 
 type FanCallCommand = {
+  playerId: string
+  sourceCardInstanceId: string
+}
+
+type JewelSeekerInput = {
+  gameId: string
+  playerId: PlayerId
+  sourceCardInstanceId: string
+}
+
+type JewelSeekerCommand = {
   playerId: string
   sourceCardInstanceId: string
 }
@@ -1376,6 +1394,14 @@ export function HomeRoute() {
 
   const fanCallMutation = useMutation({
     mutationFn: (input: FanCallInput) => useFanCall(input),
+    onSuccess: async (_game, input) => {
+      clearUltraBallPostSearchHandoff(input.gameId, input.playerId)
+      await queryClient.invalidateQueries({ queryKey: ['tcg-engine', 'game-state'] })
+    }
+  })
+
+  const jewelSeekerMutation = useMutation({
+    mutationFn: (input: JewelSeekerInput) => useJewelSeeker(input),
     onSuccess: async (_game, input) => {
       clearUltraBallPostSearchHandoff(input.gameId, input.playerId)
       await queryClient.invalidateQueries({ queryKey: ['tcg-engine', 'game-state'] })
@@ -2339,6 +2365,15 @@ export function HomeRoute() {
                     })
                   }
                 }}
+                onUseJewelSeeker={({ playerId, sourceCardInstanceId }) => {
+                  if (isPlayerId(playerId)) {
+                    jewelSeekerMutation.mutate({
+                      gameId: normalisedGameId,
+                      playerId,
+                      sourceCardInstanceId
+                    })
+                  }
+                }}
                 onUseFlipTheScript={({ playerId, sourceCardInstanceId }) => {
                   if (isPlayerId(playerId)) {
                     flipTheScriptMutation.mutate({
@@ -2494,6 +2529,11 @@ export function HomeRoute() {
                 fanCallPendingKey={
                   fanCallMutation.isPending && fanCallMutation.variables
                     ? fanCallKey(fanCallMutation.variables.sourceCardInstanceId)
+                    : null
+                }
+                jewelSeekerPendingKey={
+                  jewelSeekerMutation.isPending && jewelSeekerMutation.variables
+                    ? jewelSeekerKey(jewelSeekerMutation.variables.sourceCardInstanceId)
                     : null
                 }
                 flipTheScriptPendingKey={
@@ -3221,6 +3261,20 @@ async function useFanCall(input: FanCallInput): Promise<CreatedGame> {
   return result.data as CreatedGame
 }
 
+async function useJewelSeeker(input: JewelSeekerInput): Promise<CreatedGame> {
+  const result = await runUseTcgEngineJewelSeeker({
+    input,
+    fields: GAME_RESOURCE_FIELDS,
+    headers: buildAshRpcHeaders()
+  })
+
+  if (!result.success) {
+    throw new Error(rpcErrorMessage(result.errors))
+  }
+
+  return result.data as CreatedGame
+}
+
 async function useFlipTheScript(input: FlipTheScriptInput): Promise<CreatedGame> {
   const result = await runUseTcgEngineFlipTheScript({
     input,
@@ -3478,6 +3532,7 @@ function GameStateWorkbench({
   onUseTealDance,
   onUseSeethingSpirit,
   onUseFanCall,
+  onUseJewelSeeker,
   onUseFlipTheScript,
   onUsePsychicDraw,
   onUseReconDirective,
@@ -3510,6 +3565,7 @@ function GameStateWorkbench({
   tealDancePendingKey,
   seethingSpiritPendingKey,
   fanCallPendingKey,
+  jewelSeekerPendingKey,
   flipTheScriptPendingKey,
   psychicDrawPendingKey,
   reconDirectivePendingKey,
@@ -3550,6 +3606,7 @@ function GameStateWorkbench({
   onUseTealDance: (input: TealDanceCommand) => void
   onUseSeethingSpirit: (input: SeethingSpiritCommand) => void
   onUseFanCall: (input: FanCallCommand) => void
+  onUseJewelSeeker: (input: JewelSeekerCommand) => void
   onUseFlipTheScript: (input: FlipTheScriptCommand) => void
   onUsePsychicDraw: (input: PsychicDrawCommand) => void
   onUseReconDirective: (input: ReconDirectiveCommand) => void
@@ -3582,6 +3639,7 @@ function GameStateWorkbench({
   tealDancePendingKey: string | null
   seethingSpiritPendingKey: string | null
   fanCallPendingKey: string | null
+  jewelSeekerPendingKey: string | null
   flipTheScriptPendingKey: string | null
   psychicDrawPendingKey: string | null
   reconDirectivePendingKey: string | null
@@ -3599,6 +3657,7 @@ function GameStateWorkbench({
       munkidoriAdrenaBrainPendingKey ||
       tealDancePendingKey ||
       seethingSpiritPendingKey ||
+      jewelSeekerPendingKey ||
       flipTheScriptPendingKey ||
       psychicDrawPendingKey ||
       reconDirectivePendingKey ||
@@ -3728,6 +3787,7 @@ function GameStateWorkbench({
             onUseTealDance={onUseTealDance}
             onUseSeethingSpirit={onUseSeethingSpirit}
             onUseFanCall={onUseFanCall}
+            onUseJewelSeeker={onUseJewelSeeker}
             onUseFlipTheScript={onUseFlipTheScript}
             onUsePsychicDraw={onUsePsychicDraw}
             onUseReconDirective={onUseReconDirective}
@@ -3747,6 +3807,7 @@ function GameStateWorkbench({
             tealDancePendingKey={tealDancePendingKey}
             seethingSpiritPendingKey={seethingSpiritPendingKey}
             fanCallPendingKey={fanCallPendingKey}
+            jewelSeekerPendingKey={jewelSeekerPendingKey}
             flipTheScriptPendingKey={flipTheScriptPendingKey}
             psychicDrawPendingKey={psychicDrawPendingKey}
             reconDirectivePendingKey={reconDirectivePendingKey}
@@ -6673,6 +6734,7 @@ function ActionAffordancesPanel({
   onUseTealDance,
   onUseSeethingSpirit,
   onUseFanCall,
+  onUseJewelSeeker,
   onUseFlipTheScript,
   onUsePsychicDraw,
   onUseReconDirective,
@@ -6692,6 +6754,7 @@ function ActionAffordancesPanel({
   tealDancePendingKey,
   seethingSpiritPendingKey,
   fanCallPendingKey,
+  jewelSeekerPendingKey,
   flipTheScriptPendingKey,
   psychicDrawPendingKey,
   reconDirectivePendingKey,
@@ -6720,6 +6783,7 @@ function ActionAffordancesPanel({
   onUseTealDance: (input: TealDanceCommand) => void
   onUseSeethingSpirit: (input: SeethingSpiritCommand) => void
   onUseFanCall: (input: FanCallCommand) => void
+  onUseJewelSeeker: (input: JewelSeekerCommand) => void
   onUseFlipTheScript: (input: FlipTheScriptCommand) => void
   onUsePsychicDraw: (input: PsychicDrawCommand) => void
   onUseReconDirective: (input: ReconDirectiveCommand) => void
@@ -6739,6 +6803,7 @@ function ActionAffordancesPanel({
   tealDancePendingKey: string | null
   seethingSpiritPendingKey: string | null
   fanCallPendingKey: string | null
+  jewelSeekerPendingKey: string | null
   flipTheScriptPendingKey: string | null
   psychicDrawPendingKey: string | null
   reconDirectivePendingKey: string | null
@@ -6757,6 +6822,7 @@ function ActionAffordancesPanel({
       tealDancePendingKey ||
       seethingSpiritPendingKey ||
       fanCallPendingKey ||
+      jewelSeekerPendingKey ||
       flipTheScriptPendingKey ||
       psychicDrawPendingKey ||
       reconDirectivePendingKey ||
@@ -6851,6 +6917,7 @@ function ActionAffordancesPanel({
                     onUseTealDance={onUseTealDance}
                     onUseSeethingSpirit={onUseSeethingSpirit}
                     onUseFanCall={onUseFanCall}
+                    onUseJewelSeeker={onUseJewelSeeker}
                     onUseFlipTheScript={onUseFlipTheScript}
                     onUsePsychicDraw={onUsePsychicDraw}
                     onUseReconDirective={onUseReconDirective}
@@ -6865,6 +6932,7 @@ function ActionAffordancesPanel({
                     tealDancePendingKey={tealDancePendingKey}
                     seethingSpiritPendingKey={seethingSpiritPendingKey}
                     fanCallPendingKey={fanCallPendingKey}
+                    jewelSeekerPendingKey={jewelSeekerPendingKey}
                     flipTheScriptPendingKey={flipTheScriptPendingKey}
                     psychicDrawPendingKey={psychicDrawPendingKey}
                     reconDirectivePendingKey={reconDirectivePendingKey}
@@ -7456,6 +7524,7 @@ function ActionAffordanceCard({
   onUseTealDance,
   onUseSeethingSpirit,
   onUseFanCall,
+  onUseJewelSeeker,
   onUseFlipTheScript,
   onUsePsychicDraw,
   onUseReconDirective,
@@ -7470,6 +7539,7 @@ function ActionAffordanceCard({
   tealDancePendingKey,
   seethingSpiritPendingKey,
   fanCallPendingKey,
+  jewelSeekerPendingKey,
   flipTheScriptPendingKey,
   psychicDrawPendingKey,
   reconDirectivePendingKey,
@@ -7505,6 +7575,7 @@ function ActionAffordanceCard({
   onUseTealDance: (input: TealDanceCommand) => void
   onUseSeethingSpirit: (input: SeethingSpiritCommand) => void
   onUseFanCall: (input: FanCallCommand) => void
+  onUseJewelSeeker: (input: JewelSeekerCommand) => void
   onUseFlipTheScript: (input: FlipTheScriptCommand) => void
   onUsePsychicDraw: (input: PsychicDrawCommand) => void
   onUseReconDirective: (input: ReconDirectiveCommand) => void
@@ -7519,6 +7590,7 @@ function ActionAffordanceCard({
   tealDancePendingKey: string | null
   seethingSpiritPendingKey: string | null
   fanCallPendingKey: string | null
+  jewelSeekerPendingKey: string | null
   flipTheScriptPendingKey: string | null
   psychicDrawPendingKey: string | null
   reconDirectivePendingKey: string | null
@@ -7544,6 +7616,7 @@ function ActionAffordanceCard({
   const tealDanceOptions = tealDanceCommandOptions(action, cardsById)
   const seethingSpiritOptions = seethingSpiritCommandOptions(action, cardsById)
   const fanCallOptions = fanCallCommandOptions(action, cardsById)
+  const jewelSeekerOptions = jewelSeekerCommandOptions(action, cardsById)
   const flipTheScriptOptions = flipTheScriptCommandOptions(action, cardsById)
   const psychicDrawOptions = psychicDrawCommandOptions(action, cardsById)
   const reconDirectiveOptions = reconDirectiveCommandOptions(action, cardsById)
@@ -7774,6 +7847,30 @@ function ActionAffordanceCard({
                 tone="primary"
               >
                 {isPending ? fanCallPendingLabel(option) : fanCallButtonLabel(option)}
+              </ActionCommandButton>
+            )
+          })}
+        </div>
+      ) : null}
+
+      {jewelSeekerOptions.length > 0 ? (
+        <div className="mt-2 space-y-1.5">
+          {jewelSeekerOptions.map(option => {
+            const isPending = jewelSeekerPendingKey === option.key
+
+            return (
+              <ActionCommandButton
+                disabled={!canRunAction}
+                key={option.key}
+                onClick={() =>
+                  onUseJewelSeeker({
+                    playerId: action.playerId,
+                    sourceCardInstanceId: option.sourceCardInstanceId
+                  })
+                }
+                tone="primary"
+              >
+                {isPending ? jewelSeekerPendingLabel(option) : jewelSeekerButtonLabel(option)}
               </ActionCommandButton>
             )
           })}
@@ -8201,6 +8298,7 @@ function actionSurfaceClassName(action: ActionAffordance) {
     case 'teal_dance':
     case 'seething_spirit':
     case 'fan_call':
+    case 'jewel_seeker':
     case 'psychic_draw':
     case 'recon_directive':
     case 'run_away_draw':
@@ -8256,6 +8354,8 @@ function actionSummary(action: ActionAffordance) {
       return 'Attach a Basic Energy from discard to 1 of your Pokémon.'
     case 'fan_call':
       return 'Search your deck for up to 3 Colorless Pokémon with 100 HP or less and put them into your hand. Then, shuffle your deck.'
+    case 'jewel_seeker':
+      return 'If Noctowl evolved from hand this turn and you have a Tera Pokémon in play, search your deck for up to 2 Trainer cards and put them into your hand.'
     case 'psychic_draw':
       return 'Draw cards with a Kadabra or Alakazam that evolved from hand this turn.'
     case 'recon_directive':
@@ -8464,6 +8564,25 @@ function fanCallCommandOptions(action: ActionAffordance, cardsById: Map<string, 
   ]
 }
 
+function jewelSeekerCommandOptions(
+  action: ActionAffordance,
+  cardsById: Map<string, CardSummary>
+): JewelSeekerCommandOption[] {
+  if (action.key !== 'jewel_seeker' || action.sourceCardInstanceIds.length < 1) {
+    return []
+  }
+
+  const sourceCardInstanceId = action.sourceCardInstanceIds[0]!
+
+  return [
+    {
+      key: jewelSeekerKey(sourceCardInstanceId),
+      sourceCardInstanceId,
+      sourceCard: cardsById.get(sourceCardInstanceId)
+    }
+  ]
+}
+
 function psychicDrawCommandOptions(action: ActionAffordance, cardsById: Map<string, CardSummary>): PsychicDrawCommandOption[] {
   if (action.key !== 'psychic_draw' || action.sourceCardInstanceIds.length < 1) {
     return []
@@ -8541,6 +8660,14 @@ function fanCallPendingLabel(option: FanCallCommandOption) {
 
 function fanCallButtonLabel(option: FanCallCommandOption) {
   return `Fan Call with ${option.sourceCard?.name ?? formatCardInstanceId(option.sourceCardInstanceId)}`
+}
+
+function jewelSeekerPendingLabel(option: JewelSeekerCommandOption) {
+  return `Using ${option.sourceCard?.name ?? 'Jewel Seeker'}...`
+}
+
+function jewelSeekerButtonLabel(option: JewelSeekerCommandOption) {
+  return `Jewel Seeker with ${option.sourceCard?.name ?? formatCardInstanceId(option.sourceCardInstanceId)}`
 }
 
 function flipTheScriptPendingLabel(option: FlipTheScriptCommandOption) {
@@ -8936,6 +9063,7 @@ function actionGroupId(action: ActionAffordance): ActionGroupId {
     case 'teal_dance':
     case 'seething_spirit':
     case 'fan_call':
+    case 'jewel_seeker':
     case 'flip_the_script':
     case 'psychic_draw':
     case 'recon_directive':
@@ -11953,6 +12081,10 @@ function seethingSpiritKey(sourceCardInstanceId: string, energyCardInstanceId: s
 }
 
 function fanCallKey(sourceCardInstanceId: string) {
+  return sourceCardInstanceId
+}
+
+function jewelSeekerKey(sourceCardInstanceId: string) {
   return sourceCardInstanceId
 }
 

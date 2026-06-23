@@ -135,6 +135,7 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
       teal_dance_affordances(player, current_turn, cards) ++
       seething_spirit_affordances(player, current_turn, cards) ++
       flip_the_script_affordances(game, player, current_turn, cards) ++
+      jewel_seeker_affordances(game, player, current_turn, cards) ++
       psychic_draw_affordances(player, current_turn, cards) ++
       recon_directive_affordances(player, current_turn, cards) ++
       run_away_draw_affordances(player, current_turn, cards) ++
@@ -460,6 +461,30 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
   end
 
   defp flip_the_script_affordances(_game, _player, _current_turn, _cards), do: []
+
+  defp jewel_seeker_affordances(
+         %Game{} = game,
+         %GamePlayer{} = player,
+         %Turn{} = current_turn,
+         cards
+       ) do
+    cards
+    |> in_play_pokemon_cards()
+    |> Enum.filter(&AbilityEffects.jewel_seeker_available?(game.id, &1, current_turn))
+    |> Enum.map(fn source_card ->
+      affordance(
+        :jewel_seeker,
+        "Use Jewel Seeker",
+        :command,
+        player.player_id,
+        source_card_instance_ids: [source_card.id],
+        note:
+          "If this Noctowl evolved from hand this turn and you have a Tera Pokémon in play, search your deck for up to 2 Trainer cards, reveal them, and put them into your hand. Then, shuffle your deck."
+      )
+    end)
+  end
+
+  defp jewel_seeker_affordances(_game, _player, _current_turn, _cards), do: []
 
   defp psychic_draw_affordances(%GamePlayer{} = player, %Turn{} = current_turn, cards) do
     cards

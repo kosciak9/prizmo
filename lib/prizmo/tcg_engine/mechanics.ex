@@ -1314,6 +1314,84 @@ defmodule Prizmo.TcgEngine.Mechanics do
     end)
   end
 
+  @spec use_noctowl_jewel_seeker(Game.t() | String.t(), String.t(), String.t()) ::
+          {:ok, Game.t()} | {:error, term()}
+  def use_noctowl_jewel_seeker(game_or_id, player_id, source_card_instance_id)
+      when is_binary(player_id) and is_binary(source_card_instance_id) do
+    transaction(fn ->
+      with {:ok, game} <- get_game(game_or_id),
+           {:ok, turn} <- require_action_window_for_player(game, player_id),
+           :ok <- CardPlay.require_no_awaiting_pending_effect(game.id),
+           {:ok, _player} <- get_player(game.id, player_id),
+           {:ok, source_card} <- get_card(game.id, source_card_instance_id),
+           :ok <- require_card_owned_by_player(source_card, player_id),
+           :ok <- AbilityEffects.require_jewel_seeker_available(game.id, source_card, turn),
+           {:ok, max_targets} <- AbilityEffects.jewel_seeker_max_targets(source_card),
+           {:ok, deck_cards} <- cards_in_zone(game.id, player_id, :deck),
+           legal_choice_cards = AbilityEffects.jewel_seeker_legal_choice_cards(deck_cards),
+           legal_choice_ids = Enum.map(legal_choice_cards, & &1.id),
+           {:ok, current_source_card} <- get_card(game.id, source_card.id),
+           {:ok, marked_source_card} <-
+             update(current_source_card, :set_markers, %{
+               markers: AbilityEffects.put_jewel_seeker_used_marker(current_source_card, turn)
+             }),
+           {:ok, pending_effect} <-
+             create(PendingEffect, :create, %{
+               game_id: game.id,
+               source_type: :ability_effect,
+               source_card_instance_id: marked_source_card.id,
+               source_card_id: marked_source_card.card_id,
+               controller_player_id: player_id,
+               current_player_id: player_id,
+               effect_key: AbilityEffects.jewel_seeker_ability_id(),
+               step: "awaiting_choice",
+               state: %{
+                 "version" => 1,
+                 "kind" => "ability_effect",
+                 "effect_type" => Atom.to_string(AbilityEffects.jewel_seeker_ability_id()),
+                 "player_id" => player_id,
+                 "source_card_instance_id" => marked_source_card.id,
+                 "source_card_id" => marked_source_card.card_id,
+                 "legal_choice_ids" => legal_choice_ids
+               }
+             }),
+           {:ok, pending_effect} <-
+             update(pending_effect, :await_prompt, %{
+               current_player_id: player_id,
+               effect_key: AbilityEffects.jewel_seeker_ability_id(),
+               step: "awaiting_choice",
+               state: pending_effect.state || %{}
+             }),
+           {:ok, _prompt} <-
+             create(Prompt, :create, %{
+               game_id: game.id,
+               turn_id: turn.id,
+               pending_effect_id: pending_effect.id,
+               prompt_type: "select_cards",
+               player_id: player_id,
+               payload: %{
+                 "choice_key" => Atom.to_string(AbilityEffects.jewel_seeker_ability_id()),
+                 "legal_choices" => legal_choice_ids,
+                 "legal_choice_labels" =>
+                   AbilityEffects.jewel_seeker_choice_labels(legal_choice_cards),
+                 "min" => 0,
+                 "max" => max_targets,
+                 "source_card_instance_id" => marked_source_card.id,
+                 "source_card_id" => marked_source_card.card_id
+               }
+             }),
+           {:ok, _event} <-
+             write_event_and_snapshot(
+               game.id,
+               :ability_used,
+               player_id,
+               jewel_seeker_event_payload(turn, marked_source_card)
+             ) do
+        get_game(game.id)
+      end
+    end)
+  end
+
   @spec use_drakloak_recon_directive(Game.t() | String.t(), String.t(), String.t(), String.t()) ::
           {:ok, Game.t()} | {:error, term()}
   def use_drakloak_recon_directive(
@@ -1498,6 +1576,18 @@ defmodule Prizmo.TcgEngine.Mechanics do
       "source_card_id" => source_card.id,
       "source_card_card_id" => source_card.card_id,
       "message" => "Fan Rotom used Fan Call."
+    }
+  end
+
+  defp jewel_seeker_event_payload(%Turn{} = turn, %CardInstance{} = source_card) do
+    %{
+      "turn_id" => turn.id,
+      "turn_number" => turn.turn_number,
+      "player_id" => source_card.owner_player_id,
+      "ability_id" => Atom.to_string(AbilityEffects.jewel_seeker_ability_id()),
+      "source_card_id" => source_card.card_id,
+      "source_card_instance_id" => source_card.id,
+      "public_note" => "Noctowl used Jewel Seeker."
     }
   end
 

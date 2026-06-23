@@ -64,10 +64,10 @@ Those reports are the canonical starting point for autonomous Goal 2 implementat
 - Tracked top archetypes: `30`
 - Tracked cards with usage greater than `0.00`: `377`
 - Coverage buckets from `mix prizmo.goal2.corpus`:
-  - `supported=114`
+  - `supported=116`
   - `generic-supported=7`
-  - `partial=12`
-  - `unimplemented=244`
+  - `partial=11`
+  - `unimplemented=243`
 - Metadata buckets:
   - `cached=143`
   - `missing=234`
@@ -82,33 +82,33 @@ Important interpretation:
 
 The strongest current Goal 2 implementation candidates are the incomplete cards shared by the most archetypes and/or the most total metagame share.
 
-The latest Goal 2 engine batch moved `DRI-176` Team Rocket's Petrel and `ASC-212` Tool Scrapper to `supported`, so the broad cached-metadata queue now starts with Brock's Scouting.
+The latest Goal 2 engine batch moved `SCR-114` Hoothoot and `SCR-115` Noctowl to `supported`, so the broad cached-metadata queue now starts with Brock's Scouting and the shared partial queue loses Noctowl.
 
 ### Highest-priority shared `unimplemented` cards from current report
 
 | Card | Archetypes | Total share | Notes |
 | --- | --- | --- | --- |
-| `JTG-146` Brock's Scouting | `11` | `78.46%` | New top cached-metadata blocker after the Petrel/Tool Scrapper batch. |
+| `JTG-146` Brock's Scouting | `11` | `78.46%` | New top cached-metadata blocker after the Hoothoot/Noctowl batch. |
 | `SSP-177` Gravity Mountain | `8` | `22.79%` | Widest remaining metadata-missing blocker by archetype count. |
 | `TEF-157` Prime Catcher | `7` | `76.55%` | Highest-share remaining cached-metadata Trainer/item gap. |
 | `JTG-121` Dudunsparce ex | `7` | `59.97%` | Shared Pokémon gap across Dragapult-adjacent and Dudunsparce shells. |
-| `SCR-114` Hoothoot | `6` | `61.15%` | Common Noctowl line prerequisite in several archetypes. |
 | `SFA-057` Colress's Tenacity | `6` | `13.29%` | Shared Trainer gap with missing metadata. |
 | `ASC-046` Snorunt | `6` | `9.64%` | Shared line across several lower-share archetypes. |
 | `SVI-171` Energy Retrieval | `5` | `11.97%` | Generic recovery Item missing from current classifier support. |
 | `SFA-039` Pecharunt ex | `4` | `63.93%` | Very high weighted share despite fewer archetypes than the broad Trainer gaps. |
 | `TWM-162` Scoop Up Cyclone | `4` | `14.54%` | Shared ACE SPEC gap once the higher-share cached slice is reduced. |
+| `SCR-132` Briar | `4` | `11.84%` | Shared Supporter gap in several Ogerpon/Hydrapple shells once the wider cached slice is reduced. |
 
 ### Shared `partial` cards worth finishing after the broad unimplemented slice
 
 | Card | Archetypes | Total share | Current status |
 | --- | --- | --- | --- |
 | `TEF-152` Hero's Cape | `11` | `77.60%` | `partial` |
-| `SCR-115` Noctowl | `6` | `61.15%` | `partial` |
 | `TWM-064` Wellspring Mask Ogerpon ex | `5` | `58.19%` | `partial` |
 | `TWM-167` Legacy Energy | `6` | `9.34%` | `partial` |
 | `WHT-086` Ignition Energy | `5` | `7.74%` | `partial` |
 | `POR-086` Growing Grass Energy | `4` | `13.34%` | `partial` |
+| `TEF-069` Bronzong | `2` | `49.37%` | `partial` |
 
 ## Relationship to earlier roadmap work
 
@@ -125,8 +125,8 @@ That means prior Goal 1 and six-deck coverage was not wasted; it now acts as see
 
 ## Recommended next implementation order
 
-1. Prefer the remaining cached-metadata broad-share blockers first: `JTG-146`, `TEF-157`, `JTG-121`, and `SCR-114`.
-2. After the cached-metadata follow-up slice, decide whether to keep harvesting cached cards (`JTG-157`, `SSP-189`, `SFA-039`) or fill missing metadata for wide staples like `SSP-177`, `SFA-057`, and `SVI-171`.
+1. Prefer the remaining cached-metadata broad-share blockers first: `JTG-146`, `TEF-157`, and `JTG-121`, then decide whether to keep harvesting cached cards (`JTG-157`, `SSP-189`, `SFA-039`) or switch to the widest metadata-missing blockers (`SSP-177`, `SFA-057`, `SVI-171`).
+2. Finish shared partials only after the broad unimplemented slice unless one of them directly unlocks a currently stalled archetype line.
 3. Keep using `mix prizmo.goal2.corpus` after each batch to re-rank the next blockers by archetype count and weighted share.
 4. Treat one-off low-share cards as later work unless they unblock a shared primitive or a whole still-dead archetype line.
 

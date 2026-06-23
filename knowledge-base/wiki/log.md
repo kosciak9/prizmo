@@ -1,5 +1,12 @@
 # Wiki Log
 
+## [2026-06-23] codebase update | Goal 2 Hoothoot and Noctowl support
+
+- Task attempted: closed the next high-leverage Goal 2 shared Pokémon slice already in progress instead of starting a conflicting new batch. Added `SCR-114` Hoothoot `Triple Stab` attack support and wired `SCR-115` Noctowl `Jewel Seeker` through the canonical engine, read model, RPC, and SPA command surface.
+- Files changed: `lib/prizmo/tcg/cards/behaviors/scr.ex`, `lib/prizmo/tcg_engine.ex`, `lib/prizmo/tcg_engine/ability_effects.ex`, `lib/prizmo/tcg_engine/game.ex`, `lib/prizmo/tcg_engine/game/action_commands.ex`, `lib/prizmo/tcg_engine/game_view.ex`, `lib/prizmo/tcg_engine/game_view/action_affordances.ex`, `lib/prizmo/tcg_engine/mechanics.ex`, `lib/prizmo_web/spa/features/home/routes/index.tsx`, `lib/prizmo_web/spa/lib/ash/client.ts`, `test/prizmo/tcg_engine/mechanics_test.exs`, `knowledge-base/wiki/engine/goal-2-top-30-latest-limitless-coverage-scope.md`, `knowledge-base/wiki/engine/ash-backed-tcg-engine-playtest-handoff.md`, `knowledge-base/wiki/log.md`.
+- Validation: `mix test test/prizmo/tcg_engine/mechanics_test.exs`; `node_modules/.bin/tsc --noEmit`; `mix compile --warnings-as-errors`; `mix ash_typescript.codegen --check`; `mix prizmo.goal2.corpus` confirmed `supported=116` / `partial=11` / `unimplemented=243`; browser validation on `http://localhost:4003` in disposable game `b05cb73f-eb3f-43b6-81ae-5dd4835271f2` showed `Jewel Seeker with Noctowl`, opened the prompt over 29 legal Trainer choices, and resolved back to the action window with 0 Playwright console errors; final `mix check` passed.
+- Remaining/blocking notes: `SCR-114` and `SCR-115` are no longer in the shared incomplete queue. `JTG-146` Brock's Scouting is now the top cached-metadata Goal 2 blocker, followed by `TEF-157` Prime Catcher and `JTG-121` Dudunsparce ex; `SSP-177` Gravity Mountain remains the widest metadata-missing gap.
+
 ## [2026-06-23] codebase update | Goal 2 Petrel and Tool Scrapper support
 
 - Task attempted: closed the first post-bootstrap Goal 2 shared Trainer slice instead of repeating already-finished selection/reporting work. Added `DRI-176` Team Rocket's Petrel as a generic deck-search Supporter over any Trainer card, and added `ASC-212` Tool Scrapper as a real attached-Tool discard Item that can target either player's Tools.

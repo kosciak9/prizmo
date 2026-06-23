@@ -40,6 +40,7 @@ export {
   useTcgEngineCursedBlast as runUseTcgEngineCursedBlast,
   useTcgEngineFanCall as runUseTcgEngineFanCall,
   useTcgEngineFlipTheScript as runUseTcgEngineFlipTheScript,
+  useTcgEngineJewelSeeker as runUseTcgEngineJewelSeeker,
   useTcgEngineMunkidoriAdrenaBrain as runUseTcgEngineMunkidoriAdrenaBrain,
   useTcgEnginePsychicDraw as runUseTcgEnginePsychicDraw,
   useTcgEngineReconDirective as runUseTcgEngineReconDirective,

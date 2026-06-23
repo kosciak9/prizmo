@@ -43,6 +43,7 @@ defmodule Prizmo.TcgEngine do
       rpc_action :use_tcg_engine_cursed_blast, :use_cursed_blast_command
       rpc_action :use_tcg_engine_flip_the_script, :use_fezandipiti_flip_the_script_command
       rpc_action :use_tcg_engine_fan_call, :use_fan_rotom_fan_call_command
+      rpc_action :use_tcg_engine_jewel_seeker, :use_noctowl_jewel_seeker_command
       rpc_action :use_tcg_engine_psychic_draw, :use_psychic_draw_command
       rpc_action :use_tcg_engine_recon_directive, :use_drakloak_recon_directive_command
       rpc_action :use_tcg_engine_run_away_draw, :use_dudunsparce_run_away_draw_command
@@ -177,6 +178,10 @@ defmodule Prizmo.TcgEngine do
 
       define :use_fan_rotom_fan_call_for_game,
         action: :use_fan_rotom_fan_call_command,
+        args: [:game_id, :player_id, :source_card_instance_id]
+
+      define :use_noctowl_jewel_seeker_for_game,
+        action: :use_noctowl_jewel_seeker_command,
         args: [:game_id, :player_id, :source_card_instance_id]
 
       define :use_psychic_draw_for_game,
