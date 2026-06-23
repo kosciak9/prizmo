@@ -4,7 +4,11 @@ defmodule Prizmo.TcgEngine.Game do
   use Ash.Resource,
     otp_app: :prizmo,
     domain: Prizmo.TcgEngine,
-    fragments: [Prizmo.TcgEngine.Game.ActionCommands, Prizmo.TcgEngine.Game.SupportedDeckActions],
+    fragments: [
+      Prizmo.TcgEngine.Game.ActionCommands,
+      Prizmo.TcgEngine.Game.Relationships,
+      Prizmo.TcgEngine.Game.SupportedDeckActions
+    ],
     data_layer: AshPostgres.DataLayer,
     authorizers: [Ash.Policy.Authorizer],
     extensions: [AshStateMachine, AshTypescript.Resource]
@@ -123,6 +127,9 @@ defmodule Prizmo.TcgEngine.Game do
     define :use_noctowl_jewel_seeker_command,
       args: [:game_id, :player_id, :source_card_instance_id]
 
+    define :use_pecharunt_ex_subjugating_chains_command,
+      args: [:game_id, :player_id, :source_card_instance_id, :target_card_instance_id]
+
     define :use_psychic_draw_command, args: [:game_id, :player_id, :source_card_instance_id]
 
     define :use_drakloak_recon_directive_command,
@@ -157,7 +164,6 @@ defmodule Prizmo.TcgEngine.Game do
 
     action :create_from_supported_decks, :struct do
       description "Create a TCG engine game from supported deck fixture keys."
-
       constraints instance_of: Game
 
       argument :players, {:array, :map} do
@@ -180,7 +186,6 @@ defmodule Prizmo.TcgEngine.Game do
 
     action :create_from_decklists, :struct do
       description "Create a TCG engine game from arbitrary catalog-backed deck payloads."
-
       constraints instance_of: Game
 
       argument :players, {:array, :map} do
@@ -383,16 +388,6 @@ defmodule Prizmo.TcgEngine.Game do
 
     create_timestamp :created_at
     update_timestamp :updated_at
-  end
-
-  relationships do
-    has_many :players, Prizmo.TcgEngine.GamePlayer
-    has_many :turns, Prizmo.TcgEngine.Turn
-    has_many :cards, Prizmo.TcgEngine.CardInstance
-    has_many :events, Prizmo.TcgEngine.GameEvent
-    has_many :snapshots, Prizmo.TcgEngine.GameSnapshot
-    has_many :prompts, Prizmo.TcgEngine.Prompt
-    has_one :setup, Prizmo.TcgEngine.Setup
   end
 
   defp maybe_put_opt(opts, _key, nil), do: opts

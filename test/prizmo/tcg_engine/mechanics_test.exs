@@ -1287,6 +1287,115 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
     end
   end
 
+  describe "SFA-039 Pecharunt ex support" do
+    test "Irritated Outburst scales with the number of Prize cards the opponent has taken" do
+      {:ok, game} = create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147)
+      {:ok, attacker} = create_custom_owned_card(game.id, "player_1", "SFA-039", 210)
+      defender = active_card(game.id, "player_2")
+
+      assert {:ok, irritated_outburst} =
+               CardCatalog.fetch_attack(attacker.card_id, :irritated_outburst)
+
+      assert irritated_outburst.damage == 0
+      assert {:ok, 0} = AttackDamage.damage_for(attacker, defender, irritated_outburst)
+
+      reduce_opponent_prize_count_to(game.id, "player_1", 4)
+      assert {:ok, 120} = AttackDamage.damage_for(attacker, defender, irritated_outburst)
+
+      reduce_opponent_prize_count_to(game.id, "player_1", 1)
+      assert {:ok, 300} = AttackDamage.damage_for(attacker, defender, irritated_outburst)
+    end
+
+    test "Subjugating Chains exposes a switch affordance, poisons the promoted target, and is once per turn across copies" do
+      {:ok, game} = create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147)
+
+      current_turn_number = current_turn(game.id).turn_number
+      active_before = active_card(game.id, "player_1")
+
+      {:ok, first_pecharunt} = create_custom_owned_card(game.id, "player_1", "SFA-039", 220)
+      {:ok, first_pecharunt} = ash_update(first_pecharunt, :draw_to_hand, %{position: 20})
+
+      {:ok, first_pecharunt} =
+        ash_update(first_pecharunt, :play_to_bench, %{
+          position: 4,
+          turn_entered_play: current_turn_number
+        })
+
+      {:ok, second_pecharunt} = create_custom_owned_card(game.id, "player_1", "SFA-039", 221)
+      {:ok, second_pecharunt} = ash_update(second_pecharunt, :draw_to_hand, %{position: 21})
+
+      {:ok, second_pecharunt} =
+        ash_update(second_pecharunt, :play_to_bench, %{
+          position: 5,
+          turn_entered_play: current_turn_number
+        })
+
+      {:ok, darkness_target} = create_custom_owned_card(game.id, "player_1", "ASC-142", 222)
+      {:ok, darkness_target} = ash_update(darkness_target, :draw_to_hand, %{position: 22})
+
+      {:ok, darkness_target} =
+        ash_update(darkness_target, :play_to_bench, %{
+          position: 6,
+          turn_entered_play: current_turn_number
+        })
+
+      assert {:ok, view} = GameView.for_player(game.id, "player_1")
+
+      first_affordance =
+        Enum.find(view.action_affordances, fn action ->
+          action.key == "subjugating_chains" and
+            action.source_card_instance_ids == [first_pecharunt.id]
+        end)
+
+      second_affordance =
+        Enum.find(view.action_affordances, fn action ->
+          action.key == "subjugating_chains" and
+            action.source_card_instance_ids == [second_pecharunt.id]
+        end)
+
+      assert is_map(first_affordance)
+      assert is_map(second_affordance)
+      assert first_affordance.target_card_instance_ids == [darkness_target.id]
+      assert second_affordance.target_card_instance_ids == [darkness_target.id]
+
+      assert {:ok, game} =
+               Mechanics.use_pecharunt_ex_subjugating_chains(
+                 game,
+                 "player_1",
+                 first_pecharunt.id,
+                 darkness_target.id
+               )
+
+      promoted_active = active_card(game.id, "player_1")
+      moved_active = card(active_before.id)
+
+      assert promoted_active.id == darkness_target.id
+      assert promoted_active.status == :poisoned
+      assert moved_active.zone == :bench
+      assert moved_active.position == 6
+
+      subjugating_event =
+        game.id
+        |> game_events_by_type("ability_used")
+        |> Enum.find(&(&1.payload["ability_id"] == "subjugating_chains"))
+
+      assert is_map(subjugating_event)
+      assert subjugating_event.payload["bench_card_instance_id"] == darkness_target.id
+      assert subjugating_event.payload["status_applied"] == true
+
+      assert {:error, {:ability_already_used_this_turn, _, :subjugating_chains}} =
+               Mechanics.use_pecharunt_ex_subjugating_chains(
+                 game,
+                 "player_1",
+                 second_pecharunt.id,
+                 darkness_target.id
+               )
+
+      assert {:ok, next_view} = GameView.for_player(game.id, "player_1")
+      refute Enum.any?(next_view.action_affordances, &(&1.key == "subjugating_chains"))
+    end
+  end
+
   defp create_game do
     Mechanics.create_game([
       {"player_1", Alakazam27147},

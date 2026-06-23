@@ -1536,6 +1536,62 @@ defmodule Prizmo.TcgEngine.Mechanics do
     end)
   end
 
+  @spec use_pecharunt_ex_subjugating_chains(
+          Game.t() | String.t(),
+          String.t(),
+          String.t(),
+          String.t()
+        ) :: {:ok, Game.t()} | {:error, term()}
+  def use_pecharunt_ex_subjugating_chains(
+        game_or_id,
+        player_id,
+        source_card_instance_id,
+        target_card_instance_id
+      )
+      when is_binary(player_id) and is_binary(source_card_instance_id) and
+             is_binary(target_card_instance_id) do
+    transaction(fn ->
+      with {:ok, game} <- get_game(game_or_id),
+           {:ok, turn} <- require_action_window_for_player(game, player_id),
+           :ok <- CardPlay.require_no_awaiting_pending_effect(game.id),
+           {:ok, source_card} <- get_card(game.id, source_card_instance_id),
+           :ok <- require_card_owned_by_player(source_card, player_id),
+           :ok <- AbilityEffects.require_subjugating_chains_available(game.id, source_card, turn),
+           {:ok, target_card} <- get_card(game.id, target_card_instance_id),
+           :ok <- require_card_owned_by_player(target_card, player_id),
+           :ok <- require_card_zone(target_card, :bench),
+           :ok <- AbilityEffects.require_subjugating_chains_target(target_card),
+           {:ok, current_source_card} <- get_card(game.id, source_card.id),
+           {:ok, marked_source_card} <-
+             update(current_source_card, :set_markers, %{
+               markers:
+                 AbilityEffects.put_subjugating_chains_used_marker(current_source_card, turn)
+             }),
+           {:ok, active_card} <- active_card(game.id, player_id),
+           bench_position = target_card.position,
+           {:ok, _active_card} <-
+             update(active_card, :move_active_to_bench, %{position: bench_position, status: nil}),
+           {:ok, promoted_card} <-
+             update(target_card, :promote_to_active, %{position: 1, status: nil}),
+           {:ok, poison_result} <- maybe_set_pokemon_status(game.id, promoted_card, :poisoned),
+           {:ok, _event} <-
+             write_event_and_snapshot(
+               game.id,
+               :ability_used,
+               player_id,
+               subjugating_chains_event_payload(
+                 turn,
+                 marked_source_card,
+                 active_card,
+                 promoted_card,
+                 poison_result
+               )
+             ) do
+        get_game(game.id)
+      end
+    end)
+  end
+
   defp fan_call_legal_choice_cards(deck_cards) do
     deck_cards
     |> Enum.filter(fn card ->
@@ -1576,6 +1632,29 @@ defmodule Prizmo.TcgEngine.Mechanics do
       "source_card_id" => source_card.id,
       "source_card_card_id" => source_card.card_id,
       "message" => "Fan Rotom used Fan Call."
+    }
+  end
+
+  defp subjugating_chains_event_payload(
+         %Turn{} = turn,
+         %CardInstance{} = source_card,
+         %CardInstance{} = active_card,
+         %CardInstance{} = promoted_card,
+         poison_result
+       )
+       when is_map(poison_result) do
+    %{
+      "turn_id" => turn.id,
+      "turn_number" => turn.turn_number,
+      "player_id" => source_card.owner_player_id,
+      "ability_id" => Atom.to_string(AbilityEffects.subjugating_chains_ability_id()),
+      "source_card_id" => source_card.card_id,
+      "source_card_instance_id" => source_card.id,
+      "active_card_instance_id" => active_card.id,
+      "bench_card_instance_id" => promoted_card.id,
+      "status" => "poisoned",
+      "status_applied" => Map.get(poison_result, :status_applied?, false),
+      "public_note" => subjugating_chains_public_note(poison_result)
     }
   end
 
@@ -3631,6 +3710,14 @@ defmodule Prizmo.TcgEngine.Mechanics do
 
   defp run_away_draw_public_note(card_count) do
     "Run Away Draw drew #{card_count} cards, then shuffled Dudunsparce and attached cards into the deck."
+  end
+
+  defp subjugating_chains_public_note(%{status_applied?: true}) do
+    "Pecharunt ex used Subjugating Chains and switched a Benched Darkness Pokémon into the Active Spot. The new Active Pokémon is now Poisoned."
+  end
+
+  defp subjugating_chains_public_note(_poison_result) do
+    "Pecharunt ex used Subjugating Chains and switched a Benched Darkness Pokémon into the Active Spot."
   end
 
   defp collect_results(results) do

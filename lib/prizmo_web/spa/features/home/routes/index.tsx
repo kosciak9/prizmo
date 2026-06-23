@@ -48,6 +48,7 @@ import {
   runUseTcgEngineReconDirective,
   runUseTcgEngineRunAwayDraw,
   runUseTcgEngineSeethingSpirit,
+  runUseTcgEngineSubjugatingChains,
   runUseTcgEngineTealDance,
   runUseTcgEngineTeamRocketsFactory,
   type CreateOpenDeckTcgEngineGameFields,
@@ -516,6 +517,14 @@ type CursedBlastCommandOption = {
   targetCard: CardSummary | undefined
 }
 
+type SubjugatingChainsCommandOption = {
+  key: string
+  sourceCardInstanceId: string
+  targetCardInstanceId: string
+  sourceCard: CardSummary | undefined
+  targetCard: CardSummary | undefined
+}
+
 type TealDanceCommandOption = {
   key: string
   sourceCardInstanceId: string
@@ -675,6 +684,19 @@ type CursedBlastInput = {
 }
 
 type CursedBlastCommand = {
+  playerId: string
+  sourceCardInstanceId: string
+  targetCardInstanceId: string
+}
+
+type SubjugatingChainsInput = {
+  gameId: string
+  playerId: PlayerId
+  sourceCardInstanceId: string
+  targetCardInstanceId: string
+}
+
+type SubjugatingChainsCommand = {
   playerId: string
   sourceCardInstanceId: string
   targetCardInstanceId: string
@@ -1362,6 +1384,14 @@ export function HomeRoute() {
 
   const cursedBlastMutation = useMutation({
     mutationFn: (input: CursedBlastInput) => useCursedBlast(input),
+    onSuccess: async (_game, input) => {
+      clearUltraBallPostSearchHandoff(input.gameId, input.playerId)
+      await queryClient.invalidateQueries({ queryKey: ['tcg-engine', 'game-state'] })
+    }
+  })
+
+  const subjugatingChainsMutation = useMutation({
+    mutationFn: (input: SubjugatingChainsInput) => useSubjugatingChains(input),
     onSuccess: async (_game, input) => {
       clearUltraBallPostSearchHandoff(input.gameId, input.playerId)
       await queryClient.invalidateQueries({ queryKey: ['tcg-engine', 'game-state'] })
@@ -2317,6 +2347,16 @@ export function HomeRoute() {
                     })
                   }
                 }}
+                onUseSubjugatingChains={({ playerId, sourceCardInstanceId, targetCardInstanceId }) => {
+                  if (isPlayerId(playerId)) {
+                    subjugatingChainsMutation.mutate({
+                      gameId: normalisedGameId,
+                      playerId,
+                      sourceCardInstanceId,
+                      targetCardInstanceId
+                    })
+                  }
+                }}
                 onUseMunkidoriAdrenaBrain={({
                   playerId,
                   sourceCardInstanceId,
@@ -2496,6 +2536,14 @@ export function HomeRoute() {
                     ? cursedBlastKey(
                         cursedBlastMutation.variables.sourceCardInstanceId,
                         cursedBlastMutation.variables.targetCardInstanceId
+                      )
+                    : null
+                }
+                subjugatingChainsPendingKey={
+                  subjugatingChainsMutation.isPending && subjugatingChainsMutation.variables
+                    ? subjugatingChainsKey(
+                        subjugatingChainsMutation.variables.sourceCardInstanceId,
+                        subjugatingChainsMutation.variables.targetCardInstanceId
                       )
                     : null
                 }
@@ -3205,6 +3253,20 @@ async function useCursedBlast(input: CursedBlastInput): Promise<CreatedGame> {
   return result.data as CreatedGame
 }
 
+async function useSubjugatingChains(input: SubjugatingChainsInput): Promise<CreatedGame> {
+  const result = await runUseTcgEngineSubjugatingChains({
+    input,
+    fields: GAME_RESOURCE_FIELDS,
+    headers: buildAshRpcHeaders()
+  })
+
+  if (!result.success) {
+    throw new Error(rpcErrorMessage(result.errors))
+  }
+
+  return result.data as CreatedGame
+}
+
 async function useMunkidoriAdrenaBrain(input: MunkidoriAdrenaBrainInput): Promise<CreatedGame> {
   const result = await runUseTcgEngineMunkidoriAdrenaBrain({
     input,
@@ -3528,6 +3590,7 @@ function GameStateWorkbench({
   onPlayCard,
   onPlayStadium,
   onUseCursedBlast,
+  onUseSubjugatingChains,
   onUseMunkidoriAdrenaBrain,
   onUseTealDance,
   onUseSeethingSpirit,
@@ -3561,6 +3624,7 @@ function GameStateWorkbench({
   playCardPendingCardId,
   playStadiumPendingCardId,
   cursedBlastPendingKey,
+  subjugatingChainsPendingKey,
   munkidoriAdrenaBrainPendingKey,
   tealDancePendingKey,
   seethingSpiritPendingKey,
@@ -3602,6 +3666,7 @@ function GameStateWorkbench({
   onPlayCard: (input: PlayCardCommand) => void
   onPlayStadium: (input: PlayStadiumCommand) => void
   onUseCursedBlast: (input: CursedBlastCommand) => void
+  onUseSubjugatingChains: (input: SubjugatingChainsCommand) => void
   onUseMunkidoriAdrenaBrain: (input: MunkidoriAdrenaBrainCommand) => void
   onUseTealDance: (input: TealDanceCommand) => void
   onUseSeethingSpirit: (input: SeethingSpiritCommand) => void
@@ -3635,6 +3700,7 @@ function GameStateWorkbench({
   playCardPendingCardId: string | null
   playStadiumPendingCardId: string | null
   cursedBlastPendingKey: string | null
+  subjugatingChainsPendingKey: string | null
   munkidoriAdrenaBrainPendingKey: string | null
   tealDancePendingKey: string | null
   seethingSpiritPendingKey: string | null
@@ -3654,6 +3720,7 @@ function GameStateWorkbench({
       playStadiumPendingCardId ||
       teamRocketsFactoryPendingPlayerId ||
       cursedBlastPendingKey ||
+      subjugatingChainsPendingKey ||
       munkidoriAdrenaBrainPendingKey ||
       tealDancePendingKey ||
       seethingSpiritPendingKey ||
@@ -3783,6 +3850,7 @@ function GameStateWorkbench({
             onPlayCard={onPlayCard}
             onPlayStadium={onPlayStadium}
             onUseCursedBlast={onUseCursedBlast}
+            onUseSubjugatingChains={onUseSubjugatingChains}
             onUseMunkidoriAdrenaBrain={onUseMunkidoriAdrenaBrain}
             onUseTealDance={onUseTealDance}
             onUseSeethingSpirit={onUseSeethingSpirit}
@@ -3803,6 +3871,7 @@ function GameStateWorkbench({
             playCardPendingCardId={playCardPendingCardId}
             playStadiumPendingCardId={playStadiumPendingCardId}
             cursedBlastPendingKey={cursedBlastPendingKey}
+            subjugatingChainsPendingKey={subjugatingChainsPendingKey}
             munkidoriAdrenaBrainPendingKey={munkidoriAdrenaBrainPendingKey}
             tealDancePendingKey={tealDancePendingKey}
             seethingSpiritPendingKey={seethingSpiritPendingKey}
@@ -6730,6 +6799,7 @@ function ActionAffordancesPanel({
   onPlayCard,
   onPlayStadium,
   onUseCursedBlast,
+  onUseSubjugatingChains,
   onUseMunkidoriAdrenaBrain,
   onUseTealDance,
   onUseSeethingSpirit,
@@ -6750,6 +6820,7 @@ function ActionAffordancesPanel({
   playCardPendingCardId,
   playStadiumPendingCardId,
   cursedBlastPendingKey,
+  subjugatingChainsPendingKey,
   munkidoriAdrenaBrainPendingKey,
   tealDancePendingKey,
   seethingSpiritPendingKey,
@@ -6779,6 +6850,7 @@ function ActionAffordancesPanel({
   onPlayCard: (input: PlayCardCommand) => void
   onPlayStadium: (input: PlayStadiumCommand) => void
   onUseCursedBlast: (input: CursedBlastCommand) => void
+  onUseSubjugatingChains: (input: SubjugatingChainsCommand) => void
   onUseMunkidoriAdrenaBrain: (input: MunkidoriAdrenaBrainCommand) => void
   onUseTealDance: (input: TealDanceCommand) => void
   onUseSeethingSpirit: (input: SeethingSpiritCommand) => void
@@ -6799,6 +6871,7 @@ function ActionAffordancesPanel({
   playCardPendingCardId: string | null
   playStadiumPendingCardId: string | null
   cursedBlastPendingKey: string | null
+  subjugatingChainsPendingKey: string | null
   munkidoriAdrenaBrainPendingKey: string | null
   tealDancePendingKey: string | null
   seethingSpiritPendingKey: string | null
@@ -6818,6 +6891,7 @@ function ActionAffordancesPanel({
       playStadiumPendingCardId ||
       teamRocketsFactoryPendingPlayerId ||
       cursedBlastPendingKey ||
+      subjugatingChainsPendingKey ||
       munkidoriAdrenaBrainPendingKey ||
       tealDancePendingKey ||
       seethingSpiritPendingKey ||
@@ -6913,6 +6987,7 @@ function ActionAffordancesPanel({
                     onPlayCard={onPlayCard}
                     onPlayStadium={onPlayStadium}
                     onUseCursedBlast={onUseCursedBlast}
+                    onUseSubjugatingChains={onUseSubjugatingChains}
                     onUseMunkidoriAdrenaBrain={onUseMunkidoriAdrenaBrain}
                     onUseTealDance={onUseTealDance}
                     onUseSeethingSpirit={onUseSeethingSpirit}
@@ -6928,6 +7003,7 @@ function ActionAffordancesPanel({
                     playCardPendingCardId={playCardPendingCardId}
                     playStadiumPendingCardId={playStadiumPendingCardId}
                     cursedBlastPendingKey={cursedBlastPendingKey}
+                    subjugatingChainsPendingKey={subjugatingChainsPendingKey}
                     munkidoriAdrenaBrainPendingKey={munkidoriAdrenaBrainPendingKey}
                     tealDancePendingKey={tealDancePendingKey}
                     seethingSpiritPendingKey={seethingSpiritPendingKey}
@@ -7520,6 +7596,7 @@ function ActionAffordanceCard({
   onPlayCard,
   onPlayStadium,
   onUseCursedBlast,
+  onUseSubjugatingChains,
   onUseMunkidoriAdrenaBrain,
   onUseTealDance,
   onUseSeethingSpirit,
@@ -7535,6 +7612,7 @@ function ActionAffordanceCard({
   playCardPendingCardId,
   playStadiumPendingCardId,
   cursedBlastPendingKey,
+  subjugatingChainsPendingKey,
   munkidoriAdrenaBrainPendingKey,
   tealDancePendingKey,
   seethingSpiritPendingKey,
@@ -7571,6 +7649,7 @@ function ActionAffordanceCard({
   onPlayCard: (input: PlayCardCommand) => void
   onPlayStadium: (input: PlayStadiumCommand) => void
   onUseCursedBlast: (input: CursedBlastCommand) => void
+  onUseSubjugatingChains: (input: SubjugatingChainsCommand) => void
   onUseMunkidoriAdrenaBrain: (input: MunkidoriAdrenaBrainCommand) => void
   onUseTealDance: (input: TealDanceCommand) => void
   onUseSeethingSpirit: (input: SeethingSpiritCommand) => void
@@ -7586,6 +7665,7 @@ function ActionAffordanceCard({
   playCardPendingCardId: string | null
   playStadiumPendingCardId: string | null
   cursedBlastPendingKey: string | null
+  subjugatingChainsPendingKey: string | null
   munkidoriAdrenaBrainPendingKey: string | null
   tealDancePendingKey: string | null
   seethingSpiritPendingKey: string | null
@@ -7612,6 +7692,7 @@ function ActionAffordanceCard({
   const evolutionOptions = providedEvolutionOptions ?? evolutionCommandOptions(action, cardsById)
   const repeatedEvolutionLabels = repeatedEvolutionBaseLabels(evolutionOptions)
   const cursedBlastOptions = cursedBlastCommandOptions(action, cardsById)
+  const subjugatingChainsOptions = subjugatingChainsCommandOptions(action, cardsById)
   const adrenaBrainOptions = adrenaBrainCommandOptions(action, cardsById)
   const tealDanceOptions = tealDanceCommandOptions(action, cardsById)
   const seethingSpiritOptions = seethingSpiritCommandOptions(action, cardsById)
@@ -7745,6 +7826,31 @@ function ActionAffordanceCard({
                 tone="primary"
               >
                 {isPending ? cursedBlastPendingLabel(option) : cursedBlastButtonLabel(option)}
+              </ActionCommandButton>
+            )
+          })}
+        </div>
+      ) : null}
+
+      {subjugatingChainsOptions.length > 0 ? (
+        <div className="mt-2 space-y-1.5">
+          {subjugatingChainsOptions.map(option => {
+            const isPending = subjugatingChainsPendingKey === option.key
+
+            return (
+              <ActionCommandButton
+                disabled={!canRunAction}
+                key={option.key}
+                onClick={() =>
+                  onUseSubjugatingChains({
+                    playerId: action.playerId,
+                    sourceCardInstanceId: option.sourceCardInstanceId,
+                    targetCardInstanceId: option.targetCardInstanceId
+                  })
+                }
+                tone="primary"
+              >
+                {isPending ? subjugatingChainsPendingLabel(option) : subjugatingChainsButtonLabel(option)}
               </ActionCommandButton>
             )
           })}
@@ -8297,6 +8403,7 @@ function actionSurfaceClassName(action: ActionAffordance) {
     case 'cursed_blast':
     case 'teal_dance':
     case 'seething_spirit':
+    case 'subjugating_chains':
     case 'fan_call':
     case 'jewel_seeker':
     case 'psychic_draw':
@@ -8348,6 +8455,8 @@ function actionSummary(action: ActionAffordance) {
       return `Move up to ${action.requiredSourceCount} damage ${action.requiredSourceCount === 1 ? 'counter' : 'counters'} from your damaged Pokémon to an opponent Pokémon.`
     case 'cursed_blast':
       return 'Put damage counters on 1 opponent Pokémon, then Knock Out the Dusclops or Dusknoir using this Ability.'
+    case 'subjugating_chains':
+      return 'Switch 1 of your Benched Darkness Pokémon, except any Pecharunt ex, with your Active Pokémon. If you do, the new Active Pokémon becomes Poisoned.'
     case 'teal_dance':
       return 'Attach a Basic Grass Energy from hand to Teal Mask Ogerpon ex, then draw 1 card.'
     case 'seething_spirit':
@@ -8457,6 +8566,25 @@ function cursedBlastCommandOptions(action: ActionAffordance, cardsById: Map<stri
 
   return action.targetCardInstanceIds.map(targetCardInstanceId => ({
     key: cursedBlastKey(sourceCardInstanceId, targetCardInstanceId),
+    sourceCardInstanceId,
+    targetCardInstanceId,
+    sourceCard: cardsById.get(sourceCardInstanceId),
+    targetCard: cardsById.get(targetCardInstanceId)
+  }))
+}
+
+function subjugatingChainsCommandOptions(
+  action: ActionAffordance,
+  cardsById: Map<string, CardSummary>
+): SubjugatingChainsCommandOption[] {
+  if (action.key !== 'subjugating_chains' || action.sourceCardInstanceIds.length < 1) {
+    return []
+  }
+
+  const sourceCardInstanceId = action.sourceCardInstanceIds[0]!
+
+  return action.targetCardInstanceIds.map(targetCardInstanceId => ({
+    key: subjugatingChainsKey(sourceCardInstanceId, targetCardInstanceId),
     sourceCardInstanceId,
     targetCardInstanceId,
     sourceCard: cardsById.get(sourceCardInstanceId),
@@ -8708,6 +8836,16 @@ function cursedBlastPendingLabel(option: CursedBlastCommandOption) {
 
 function cursedBlastButtonLabel(option: CursedBlastCommandOption) {
   return `Cursed Blast: ${option.sourceCard?.name ?? formatCardInstanceId(option.sourceCardInstanceId)} → ${
+    option.targetCard?.name ?? formatCardInstanceId(option.targetCardInstanceId)
+  }`
+}
+
+function subjugatingChainsPendingLabel(option: SubjugatingChainsCommandOption) {
+  return `Using Subjugating Chains with ${option.sourceCard?.name ?? formatCardInstanceId(option.sourceCardInstanceId)}...`
+}
+
+function subjugatingChainsButtonLabel(option: SubjugatingChainsCommandOption) {
+  return `Subjugating Chains: ${option.sourceCard?.name ?? formatCardInstanceId(option.sourceCardInstanceId)} → ${
     option.targetCard?.name ?? formatCardInstanceId(option.targetCardInstanceId)
   }`
 }
@@ -9071,6 +9209,7 @@ function actionGroupId(action: ActionAffordance): ActionGroupId {
       return 'hand'
     case 'retreat':
     case 'cursed_blast':
+    case 'subjugating_chains':
     case 'adrena_brain':
     case 'declare_attack':
       return 'battle'
@@ -12060,6 +12199,10 @@ function retreatKey(benchCardInstanceId: string, energyCardInstanceIds: string[]
 }
 
 function cursedBlastKey(sourceCardInstanceId: string, targetCardInstanceId: string) {
+  return `${sourceCardInstanceId}:${targetCardInstanceId}`
+}
+
+function subjugatingChainsKey(sourceCardInstanceId: string, targetCardInstanceId: string) {
   return `${sourceCardInstanceId}:${targetCardInstanceId}`
 }
 

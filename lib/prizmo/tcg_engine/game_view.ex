@@ -511,6 +511,15 @@ defmodule Prizmo.TcgEngine.GameView do
           public_revealed_cards: []
         }
 
+      "subjugating_chains" ->
+        %{
+          public_note:
+            payload_value(payload, "public_note") ||
+              "#{payload_card_name(payload, "source_card_instance_id", "Pecharunt ex")} used Subjugating Chains.",
+          public_card_count: 0,
+          public_revealed_cards: []
+        }
+
       _other ->
         default_public_event_details()
     end

@@ -136,6 +136,7 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
       seething_spirit_affordances(player, current_turn, cards) ++
       flip_the_script_affordances(game, player, current_turn, cards) ++
       jewel_seeker_affordances(game, player, current_turn, cards) ++
+      subjugating_chains_affordances(game, player, current_turn, cards) ++
       psychic_draw_affordances(player, current_turn, cards) ++
       recon_directive_affordances(player, current_turn, cards) ++
       run_away_draw_affordances(player, current_turn, cards) ++
@@ -485,6 +486,43 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
   end
 
   defp jewel_seeker_affordances(_game, _player, _current_turn, _cards), do: []
+
+  defp subjugating_chains_affordances(
+         %Game{} = game,
+         %GamePlayer{} = player,
+         %Turn{} = current_turn,
+         cards
+       ) do
+    target_ids =
+      cards
+      |> bench_pokemon_cards()
+      |> AbilityEffects.subjugating_chains_target_cards()
+      |> card_ids()
+
+    cards
+    |> in_play_pokemon_cards()
+    |> Enum.filter(&AbilityEffects.subjugating_chains_available?(game.id, &1, current_turn))
+    |> Enum.flat_map(fn source_card ->
+      if target_ids == [] do
+        []
+      else
+        [
+          affordance(
+            :subjugating_chains,
+            "Use Subjugating Chains",
+            :command,
+            player.player_id,
+            source_card_instance_ids: [source_card.id],
+            target_card_instance_ids: target_ids,
+            note:
+              "Switch 1 of your Benched Darkness Pokémon, except any Pecharunt ex, with your Active Pokémon. If you do, the new Active Pokémon becomes Poisoned. You can't use more than 1 Subjugating Chains Ability each turn."
+          )
+        ]
+      end
+    end)
+  end
+
+  defp subjugating_chains_affordances(_game, _player, _current_turn, _cards), do: []
 
   defp psychic_draw_affordances(%GamePlayer{} = player, %Turn{} = current_turn, cards) do
     cards

@@ -10,6 +10,8 @@ defmodule Prizmo.TcgEngine.AttackDamage do
 
   require Ash.Query
 
+  @starting_prize_count 6
+
   @spec damage_for(CardInstance.t(), CardInstance.t(), map(), map()) ::
           {:ok, non_neg_integer()} | {:error, term()}
   @spec damage_for(CardInstance.t(), CardInstance.t(), map()) ::
@@ -247,6 +249,16 @@ defmodule Prizmo.TcgEngine.AttackDamage do
     with {:ok, opponent_pokemon_ex_count} <-
            opponent_pokemon_ex_in_play_count(attacker_card, defender_card) do
       {:ok, damage + damage_per_pokemon * opponent_pokemon_ex_count}
+    end
+  end
+
+  defp apply_effect(damage, %CardInstance{} = attacker_card, _defender_card, %{
+         type: :damage_per_opponent_prize_taken,
+         damage_per_prize: damage_per_prize
+       })
+       when is_integer(damage_per_prize) and damage_per_prize >= 0 do
+    with {:ok, opponent_prize_taken_count} <- opponent_prize_taken_count(attacker_card) do
+      {:ok, damage + damage_per_prize * opponent_prize_taken_count}
     end
   end
 
@@ -788,6 +800,14 @@ defmodule Prizmo.TcgEngine.AttackDamage do
   end
 
   defp bench_to_active_event?(
+         %GameEvent{type: "ability_used", payload: payload},
+         card_instance_id
+       ) do
+    Map.get(payload, "ability_id") == "subjugating_chains" and
+      Map.get(payload, "bench_card_instance_id") == card_instance_id
+  end
+
+  defp bench_to_active_event?(
          %GameEvent{type: "resolve_declared_attack", payload: payload},
          card_instance_id
        ) do
@@ -796,4 +816,10 @@ defmodule Prizmo.TcgEngine.AttackDamage do
   end
 
   defp bench_to_active_event?(%GameEvent{}, _card_instance_id), do: false
+
+  defp opponent_prize_taken_count(%CardInstance{game_id: game_id, owner_player_id: player_id}) do
+    with {:ok, prizes} <- CardStore.cards_in_zone(game_id, player_id, :prize) do
+      {:ok, max(@starting_prize_count - length(prizes), 0)}
+    end
+  end
 end

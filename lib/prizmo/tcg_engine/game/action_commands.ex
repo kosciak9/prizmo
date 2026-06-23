@@ -621,6 +621,37 @@ defmodule Prizmo.TcgEngine.Game.ActionCommands do
       end
     end
 
+    action :use_pecharunt_ex_subjugating_chains_command, :struct do
+      description "Use Pecharunt ex's Subjugating Chains Ability to switch a Benched Darkness Pokémon into the Active Spot and Poison it."
+
+      constraints instance_of: Game
+
+      argument :game_id, :uuid do
+        allow_nil? false
+      end
+
+      argument :player_id, :string do
+        allow_nil? false
+      end
+
+      argument :source_card_instance_id, :uuid do
+        allow_nil? false
+      end
+
+      argument :target_card_instance_id, :uuid do
+        allow_nil? false
+      end
+
+      run fn input, _context ->
+        Mechanics.use_pecharunt_ex_subjugating_chains(
+          input.arguments.game_id,
+          input.arguments.player_id,
+          input.arguments.source_card_instance_id,
+          input.arguments.target_card_instance_id
+        )
+      end
+    end
+
     action :use_drakloak_recon_directive_command, :struct do
       description "Use Drakloak's Recon Directive Ability to choose 1 of the top 2 deck cards."
 

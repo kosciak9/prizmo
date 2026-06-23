@@ -64,10 +64,10 @@ Those reports are the canonical starting point for autonomous Goal 2 implementat
 - Tracked top archetypes: `30`
 - Tracked cards with usage greater than `0.00`: `377`
 - Coverage buckets from `mix prizmo.goal2.corpus`:
-  - `supported=119`
+  - `supported=120`
   - `generic-supported=7`
   - `partial=11`
-  - `unimplemented=240`
+  - `unimplemented=239`
 - Metadata buckets:
   - `cached=143`
   - `missing=234`
@@ -82,7 +82,7 @@ Important interpretation:
 
 The strongest current Goal 2 implementation candidates are the incomplete cards shared by the most archetypes and/or the most total metagame share.
 
-The latest Goal 2 engine batch moved `JTG-121` Dudunsparce ex to `supported`, so the remaining broad cached-metadata queue now starts with `SFA-039` Pecharunt ex while `SSP-177` Gravity Mountain remains the widest metadata-missing gap.
+The latest Goal 2 engine batch moved `SFA-039` Pecharunt ex to `supported`, so the remaining broad cached-metadata queue now starts with `JTG-157` Ruffian while `SSP-177` Gravity Mountain remains the widest metadata-missing gap.
 
 ### Highest-priority shared `unimplemented` cards from current report
 
@@ -92,12 +92,12 @@ The latest Goal 2 engine batch moved `JTG-121` Dudunsparce ex to `supported`, so
 | `SFA-057` Colress's Tenacity | `6` | `13.29%` | Shared Trainer gap with missing metadata. |
 | `ASC-046` Snorunt | `6` | `9.64%` | Shared line across several lower-share archetypes. |
 | `SVI-171` Energy Retrieval | `5` | `11.97%` | Generic recovery Item missing from current classifier support. |
-| `SFA-039` Pecharunt ex | `4` | `63.93%` | Highest-share remaining cached blocker after Dudunsparce ex. |
+| `JTG-157` Ruffian | `3` | `58.04%` | Highest-share remaining cached blocker after Pecharunt ex. |
+| `SSP-189` Tera Orb | `3` | `55.91%` | Next cached broad-share blocker across Dragapult, Ogerpon Box, and Raging Bolt shells. |
 | `TWM-162` Scoop Up Cyclone | `4` | `14.54%` | Shared ACE SPEC gap once the higher-share cached slice is reduced. |
 | `SCR-132` Briar | `4` | `11.84%` | Shared Supporter gap in several Ogerpon/Hydrapple shells once the wider cached slice is reduced. |
 | `ASC-162` Team Rocket's Kangaskhan ex | `4` | `10.82%` | Shared Rocket shell blocker once the Trainer slice is closed. |
 | `SSP-187` Surfer | `4` | `7.49%` | Shared draw/mobility gap across multiple lower-share archetypes. |
-| `MEE-008` Metal Energy | `4` | `3.95%` | Shared basic-resource gap across several Metal archetypes. |
 
 ### Shared `partial` cards worth finishing after the broad unimplemented slice
 
@@ -125,7 +125,7 @@ That means prior Goal 1 and six-deck coverage was not wasted; it now acts as see
 
 ## Recommended next implementation order
 
-1. Prefer the remaining cached-metadata broad-share blockers first: `SFA-039`, then the still-high-share cached cards (`JTG-157`, `SSP-189`) unless a wider missing-metadata primitive (`SSP-177`, `SFA-057`, `ASC-046`, `SVI-171`) becomes the better unblocker.
+1. Prefer the remaining cached-metadata broad-share blockers first: `JTG-157`, then `SSP-189`, unless a wider missing-metadata primitive (`SSP-177`, `SFA-057`, `ASC-046`, `SVI-171`) becomes the better unblocker.
 2. Finish shared partials only after the broad unimplemented slice unless one of them directly unlocks a currently stalled archetype line.
 3. Keep using `mix prizmo.goal2.corpus` after each batch to re-rank the next blockers by archetype count and weighted share.
 4. Treat one-off low-share cards as later work unless they unblock a shared primitive or a whole still-dead archetype line.

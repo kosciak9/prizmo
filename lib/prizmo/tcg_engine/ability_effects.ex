@@ -48,6 +48,10 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
   @last_ditch_catch_ability_id :last_ditch_catch
   @last_ditch_effect_type :search_supporter_when_benched_from_hand
   @last_ditch_marker_ability_id :last_ditch
+  @subjugating_chains_card_id "SFA-039"
+  @subjugating_chains_ability_id :subjugating_chains
+  @subjugating_chains_effect_type :subjugating_chains_switch_and_poison
+  @subjugating_chains_unavailable_reason :subjugating_chains_requires_benched_darkness_pokemon_except_pecharunt_ex
   @jewel_seeker_card_id "SCR-115"
   @jewel_seeker_ability_id :jewel_seeker
   @jewel_seeker_effect_type :search_trainer_cards_when_evolved_with_tera_in_play
@@ -79,6 +83,8 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
   def flip_the_script_draw_count, do: @flip_the_script_draw_count
   def last_ditch_catch_card_id, do: @last_ditch_catch_card_id
   def last_ditch_catch_ability_id, do: @last_ditch_catch_ability_id
+  def subjugating_chains_card_id, do: @subjugating_chains_card_id
+  def subjugating_chains_ability_id, do: @subjugating_chains_ability_id
   def jewel_seeker_card_id, do: @jewel_seeker_card_id
   def jewel_seeker_ability_id, do: @jewel_seeker_ability_id
   def seething_spirit_card_id, do: @seething_spirit_card_id
@@ -102,6 +108,9 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
 
   def last_ditch_catch_source?(%CardInstance{card_id: @last_ditch_catch_card_id}), do: true
   def last_ditch_catch_source?(%CardInstance{}), do: false
+
+  def subjugating_chains_source?(%CardInstance{card_id: @subjugating_chains_card_id}), do: true
+  def subjugating_chains_source?(%CardInstance{}), do: false
 
   def jewel_seeker_source?(%CardInstance{card_id: @jewel_seeker_card_id}), do: true
   def jewel_seeker_source?(%CardInstance{}), do: false
@@ -204,6 +213,20 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
     end
   end
 
+  def subjugating_chains_available?(game_id, %CardInstance{} = source, %Turn{} = turn)
+      when is_binary(game_id) do
+    require_subjugating_chains_available(game_id, source, turn) == :ok
+  end
+
+  def require_subjugating_chains_available(game_id, %CardInstance{} = source, %Turn{} = turn)
+      when is_binary(game_id) do
+    with {:ok, _effect} <- subjugating_chains_effect(source),
+         :ok <- require_in_play(source),
+         :ok <- require_subjugating_chains_unused(game_id, source.owner_player_id, turn) do
+      require_subjugating_chains_target_available(game_id, source.owner_player_id)
+    end
+  end
+
   def jewel_seeker_available?(game_id, %CardInstance{} = source, %Turn{} = turn)
       when is_binary(game_id) do
     require_jewel_seeker_available(game_id, source, turn) == :ok
@@ -234,6 +257,18 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
 
   def last_ditch_catch_legal_choice_cards(cards) when is_list(cards) do
     Enum.filter(cards, &last_ditch_catch_target?/1)
+  end
+
+  def subjugating_chains_target_cards(cards) when is_list(cards) do
+    Enum.filter(cards, &subjugating_chains_target?/1)
+  end
+
+  def require_subjugating_chains_target(%CardInstance{} = card) do
+    if subjugating_chains_target?(card) do
+      :ok
+    else
+      {:error, {:invalid_subjugating_chains_target, card.id, card.card_id}}
+    end
   end
 
   def last_ditch_catch_choice_labels(cards) when is_list(cards) do
@@ -445,6 +480,10 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
 
   def put_last_ditch_used_marker(%CardInstance{} = source, %Turn{} = turn) do
     put_ability_used_marker(source, turn, @last_ditch_marker_ability_id)
+  end
+
+  def put_subjugating_chains_used_marker(%CardInstance{} = source, %Turn{} = turn) do
+    put_ability_used_marker(source, turn, @subjugating_chains_ability_id)
   end
 
   def put_jewel_seeker_used_marker(%CardInstance{} = source, %Turn{} = turn) do
@@ -994,9 +1033,48 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
     end
   end
 
+  defp subjugating_chains_effect(%CardInstance{card_id: card_id}) do
+    with {:ok, %{abilities: abilities}} <- CardCatalog.fetch(card_id),
+         %{effect: %{type: @subjugating_chains_effect_type}} <-
+           Map.get(abilities, @subjugating_chains_ability_id) do
+      {:ok, %{}}
+    else
+      _other ->
+        {:error,
+         {:unsupported_ability_effect, card_id, @subjugating_chains_ability_id,
+          @subjugating_chains_effect_type}}
+    end
+  end
+
   defp require_fan_call_first_turn(%Turn{turn_number: turn_number}) when turn_number <= 2, do: :ok
 
   defp require_fan_call_first_turn(%Turn{}), do: {:error, :fan_call_only_available_on_first_turn}
+
+  defp require_subjugating_chains_unused(game_id, player_id, %Turn{} = turn)
+       when is_binary(game_id) and is_binary(player_id) do
+    with {:ok, cards} <- CardStore.list_cards(game_id) do
+      player_cards = Enum.filter(cards, &(&1.owner_player_id == player_id))
+
+      if Enum.any?(
+           player_cards,
+           &ability_used_this_turn?(&1, turn, @subjugating_chains_ability_id)
+         ) do
+        {:error, {:ability_already_used_this_turn, player_id, @subjugating_chains_ability_id}}
+      else
+        :ok
+      end
+    end
+  end
+
+  defp require_subjugating_chains_target_available(game_id, player_id)
+       when is_binary(game_id) and is_binary(player_id) do
+    with {:ok, bench_cards} <- CardStore.cards_in_zone(game_id, player_id, :bench) do
+      case subjugating_chains_target_cards(bench_cards) do
+        [] -> {:error, @subjugating_chains_unavailable_reason}
+        _targets -> :ok
+      end
+    end
+  end
 
   defp own_tera_pokemon_in_play?(
          %CardInstance{owner_player_id: player_id, zone: zone} = card,
@@ -1211,12 +1289,29 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
   defp colorless_pokemon?(%{supertype: :pokemon, type: :colorless}), do: true
   defp colorless_pokemon?(_), do: false
 
+  defp darkness_pokemon?(%{supertype: :pokemon, types: types}) when is_list(types),
+    do: :darkness in types
+
+  defp darkness_pokemon?(%{supertype: :pokemon, type: :darkness}), do: true
+  defp darkness_pokemon?(_), do: false
+  defp pecharunt_ex?(%{name: "Pecharunt ex"}), do: true
+  defp pecharunt_ex?(_), do: false
+
   defp last_ditch_catch_target?(%CardInstance{} = card) do
     case CardCatalog.fetch(card.card_id) do
       {:ok, %{supertype: :trainer, trainer_type: :supporter}} -> true
       _other -> false
     end
   end
+
+  defp subjugating_chains_target?(%CardInstance{zone: :bench} = card) do
+    case CardCatalog.fetch(card.card_id) do
+      {:ok, metadata} -> darkness_pokemon?(metadata) and not pecharunt_ex?(metadata)
+      _other -> false
+    end
+  end
+
+  defp subjugating_chains_target?(%CardInstance{}), do: false
 
   defp jewel_seeker_target?(%CardInstance{} = card) do
     case CardCatalog.fetch(card.card_id) do

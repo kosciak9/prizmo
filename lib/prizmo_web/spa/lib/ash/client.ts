@@ -46,6 +46,7 @@ export {
   useTcgEngineReconDirective as runUseTcgEngineReconDirective,
   useTcgEngineRunAwayDraw as runUseTcgEngineRunAwayDraw,
   useTcgEngineSeethingSpirit as runUseTcgEngineSeethingSpirit,
+  useTcgEngineSubjugatingChains as runUseTcgEngineSubjugatingChains,
   useTcgEngineTealDance as runUseTcgEngineTealDance,
   useTcgEngineTeamRocketsFactory as runUseTcgEngineTeamRocketsFactory,
 } from './generated/ash_rpc'
@@ -133,6 +134,8 @@ export type {
   UseTcgEngineFanCallResult,
   UseTcgEngineMunkidoriAdrenaBrainInput,
   UseTcgEngineMunkidoriAdrenaBrainResult,
+  UseTcgEngineSubjugatingChainsInput,
+  UseTcgEngineSubjugatingChainsResult,
   UseTcgEngineSeethingSpiritInput,
   UseTcgEngineSeethingSpiritResult,
   UseTcgEngineTeamRocketsFactoryInput,
