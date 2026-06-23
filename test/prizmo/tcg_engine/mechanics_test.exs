@@ -1219,6 +1219,74 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
     end
   end
 
+  describe "JTG-121 Dudunsparce ex support" do
+    test "Tenacious Tail counts only opponent Pokémon ex in play, and Destructive Drill is executable" do
+      {:ok, game} =
+        create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147,
+          player_2_active_card_id: "JTG-120"
+        )
+
+      {:ok, attacker} = create_custom_owned_card(game.id, "player_1", "JTG-121", 200)
+      assert cards_in_zone(game.id, "player_2", :bench) == []
+
+      current_turn_number = current_turn(game.id).turn_number
+
+      {:ok, opponent_bench_ex} = create_custom_owned_card(game.id, "player_2", "SFA-039", 201)
+      {:ok, opponent_bench_ex} = ash_update(opponent_bench_ex, :draw_to_hand, %{position: 20})
+
+      {:ok, _opponent_bench_ex} =
+        ash_update(opponent_bench_ex, :play_to_bench, %{
+          position: 4,
+          turn_entered_play: current_turn_number
+        })
+
+      {:ok, second_opponent_bench_ex} =
+        create_custom_owned_card(game.id, "player_2", "ASC-142", 202)
+
+      {:ok, second_opponent_bench_ex} =
+        ash_update(second_opponent_bench_ex, :draw_to_hand, %{position: 21})
+
+      {:ok, _second_opponent_bench_ex} =
+        ash_update(second_opponent_bench_ex, :play_to_bench, %{
+          position: 5,
+          turn_entered_play: current_turn_number
+        })
+
+      {:ok, opponent_bench_non_ex} = create_custom_owned_card(game.id, "player_2", "PRE-035", 203)
+
+      {:ok, opponent_bench_non_ex} =
+        ash_update(opponent_bench_non_ex, :draw_to_hand, %{position: 22})
+
+      {:ok, _opponent_bench_non_ex} =
+        ash_update(opponent_bench_non_ex, :play_to_bench, %{
+          position: 6,
+          turn_entered_play: current_turn_number
+        })
+
+      defender = active_card(game.id, "player_2")
+
+      assert {:ok, tenacious_tail} = CardCatalog.fetch_attack(attacker.card_id, :tenacious_tail)
+      assert tenacious_tail.damage == 0
+      assert {:ok, 120} = AttackDamage.damage_for(attacker, defender, tenacious_tail)
+
+      assert {:ok, destructive_drill} =
+               CardCatalog.fetch_attack(attacker.card_id, :destructive_drill)
+
+      assert destructive_drill.damage == 150
+      assert {:ok, 150} = AttackDamage.damage_for(attacker, defender, destructive_drill)
+
+      assert {:ok, %{}} =
+               AttackEffects.resolve_after_damage(
+                 game.id,
+                 "player_1",
+                 attacker,
+                 defender,
+                 destructive_drill,
+                 %{}
+               )
+    end
+  end
+
   defp create_game do
     Mechanics.create_game([
       {"player_1", Alakazam27147},

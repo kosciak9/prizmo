@@ -30,6 +30,18 @@ defmodule Prizmo.Tcg.Cards.Behaviors.JTG do
     attack(:ram, effect: nil)
   end
 
+  card "JTG-121" do
+    attack(:tenacious_tail,
+      damage: 0,
+      effect: %{type: :damage_per_opponent_pokemon_ex_in_play, damage_per_pokemon: 60}
+    )
+
+    attack(:destructive_drill,
+      damage: 150,
+      effect: %{type: :damage_unaffected_by_effects_on_opponent_active}
+    )
+  end
+
   card "JTG-143" do
     card_effect(
       effect: %{

@@ -81,6 +81,7 @@ defmodule Prizmo.TcgEngine.AttackEffects do
     :confuse_defender_active_then_move_opponent_damage_counters,
     @copy_opponent_active_tera_pokemon_attack,
     :damage_unaffected_by_effects_on_opponent_active,
+    :damage_per_opponent_pokemon_ex_in_play,
     :damage_only_if_stadium_in_play,
     :damage_per_discarded_own_basic_energy,
     :discard_defending_energy_on_coin_heads,
@@ -340,6 +341,9 @@ defmodule Prizmo.TcgEngine.AttackEffects do
         discard_own_bench_energy_for_bonus_damage(game_id, player_id, opts, max_discards)
 
       %{type: :damage_unaffected_by_effects_on_opponent_active} ->
+        {:ok, %{}}
+
+      %{type: :damage_per_opponent_pokemon_ex_in_play} ->
         {:ok, %{}}
 
       %{type: :discard_hand_then_draw, count: count} when is_integer(count) and count >= 0 ->

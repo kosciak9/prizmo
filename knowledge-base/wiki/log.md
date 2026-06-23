@@ -1,5 +1,12 @@
 # Wiki Log
 
+## [2026-06-23] codebase update | Goal 2 Dudunsparce ex support
+
+- Task attempted: closed the next broad cached-metadata Goal 2 attacker slice instead of skipping the highest-share shared Pokémon gap. Added `JTG-121` Dudunsparce ex attack support on the canonical Ash path: `Tenacious Tail` now deals `60` damage for each of the opponent's Pokémon ex in play, and `Destructive Drill` now resolves for authored `150` damage with the existing no-op bypass convention for "damage isn't affected by effects on the opponent's Active Pokémon" text.
+- Files changed: `lib/prizmo/tcg/cards/behaviors/jtg.ex`, `lib/prizmo/tcg_engine/attack_damage.ex`, `lib/prizmo/tcg_engine/attack_effects.ex`, `test/prizmo/tcg_engine/mechanics_test.exs`, `knowledge-base/wiki/engine/goal-2-top-30-latest-limitless-coverage-scope.md`, `knowledge-base/wiki/engine/ash-backed-tcg-engine-playtest-handoff.md`, `knowledge-base/wiki/log.md`.
+- Validation: `mix test test/prizmo/tcg_engine/mechanics_test.exs`; `mix compile --warnings-as-errors`; `mix prizmo.goal2.corpus` confirmed `supported=119` / `partial=11` / `unimplemented=240`; Tidewave eval of `Prizmo.Tcg.CardCoverage.summarize("JTG-121")` plus `Prizmo.TcgEngine.CardCatalog.fetch_attack/2` confirmed `coverage_status: :supported` and both executable attacks; final `mix check` passed.
+- Remaining/blocking notes: `JTG-121` is no longer in the shared incomplete queue. `SSP-177` Gravity Mountain remains the widest metadata-missing Goal 2 blocker, while `SFA-039` Pecharunt ex is now the top remaining cached-metadata blocker ahead of `JTG-157` Ruffian and `SSP-189` Tera Orb.
+
 ## [2026-06-23] codebase update | Goal 2 Brock's Scouting and Prime Catcher support
 
 - Task attempted: closed the next broad cached-metadata Goal 2 Trainer slice already in progress instead of starting a conflicting new batch. Added `JTG-146` Brock's Scouting as an engine-defined Supporter on the generic deck-search path with exclusive-group validation for `up to 2 Basic Pokémon or 1 Evolution Pokémon`, and added `TEF-157` Prime Catcher as a real double-switch ACE SPEC Item that chooses one own Benched Pokémon plus one opposing Benched Pokémon through the canonical prompt/resolution path.

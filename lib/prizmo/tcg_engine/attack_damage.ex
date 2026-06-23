@@ -239,6 +239,17 @@ defmodule Prizmo.TcgEngine.AttackDamage do
     end
   end
 
+  defp apply_effect(damage, %CardInstance{} = attacker_card, %CardInstance{} = defender_card, %{
+         type: :damage_per_opponent_pokemon_ex_in_play,
+         damage_per_pokemon: damage_per_pokemon
+       })
+       when is_integer(damage_per_pokemon) and damage_per_pokemon >= 0 do
+    with {:ok, opponent_pokemon_ex_count} <-
+           opponent_pokemon_ex_in_play_count(attacker_card, defender_card) do
+      {:ok, damage + damage_per_pokemon * opponent_pokemon_ex_count}
+    end
+  end
+
   defp apply_effect(damage, %CardInstance{game_id: game_id}, _defender_card, %{
          type: :damage_only_if_stadium_in_play
        }) do
@@ -696,6 +707,33 @@ defmodule Prizmo.TcgEngine.AttackDamage do
   end
 
   defp collect_team_rocket_pokemon_count(results) do
+    Enum.reduce_while(results, {:ok, 0}, fn
+      {:ok, true}, {:ok, count} -> {:cont, {:ok, count + 1}}
+      {:ok, false}, {:ok, count} -> {:cont, {:ok, count}}
+      {:error, reason}, _acc -> {:halt, {:error, reason}}
+    end)
+  end
+
+  defp opponent_pokemon_ex_in_play_count(%CardInstance{game_id: game_id}, %CardInstance{
+         owner_player_id: player_id
+       }) do
+    with {:ok, active_cards} <- CardStore.cards_in_zone(game_id, player_id, :active),
+         {:ok, bench_cards} <- CardStore.cards_in_zone(game_id, player_id, :bench) do
+      [active_cards, bench_cards]
+      |> List.flatten()
+      |> Enum.map(&pokemon_ex_card?/1)
+      |> collect_pokemon_ex_count()
+    end
+  end
+
+  defp pokemon_ex_card?(%CardInstance{card_id: card_id}) do
+    case CardCatalog.fetch(card_id) do
+      {:ok, metadata} -> {:ok, pokemon_ex?(metadata)}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp collect_pokemon_ex_count(results) do
     Enum.reduce_while(results, {:ok, 0}, fn
       {:ok, true}, {:ok, count} -> {:cont, {:ok, count + 1}}
       {:ok, false}, {:ok, count} -> {:cont, {:ok, count}}
