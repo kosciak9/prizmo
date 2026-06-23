@@ -17,6 +17,7 @@ defmodule Prizmo.TcgEngine.EffectRunner do
     :switch_own_active_with_bench,
     :switch_team_rocket_bench_and_opponent_bench_to_active,
     :switch_opponent_bench_to_active,
+    :switch_opponent_bench_to_active_then_switch_own_active_with_bench,
     :damage_any_opponent_pokemon,
     :discard_opponent_special_energy,
     :discard_attached_tools,

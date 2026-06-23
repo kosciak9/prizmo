@@ -400,6 +400,51 @@ defmodule Prizmo.TcgEngine.CardPlay do
          turn,
          player,
          card,
+         %{type: :switch_opponent_bench_to_active_then_switch_own_active_with_bench} = effect,
+         target_ids
+       ) do
+    with {:ok, own_active_card} <- own_active_card(game.id, player.player_id),
+         {:ok, {own_bench_card, opponent_bench_card}} <-
+           validate_prime_catcher_effect(game.id, player.player_id, effect, target_ids),
+         {:ok, opponent_active_card} <- opponent_active_card(game.id, player.player_id),
+         own_bench_position = own_bench_card.position,
+         opponent_bench_position = opponent_bench_card.position,
+         {:ok, moved_opponent_active_card} <-
+           update(opponent_active_card, :move_active_to_bench, %{
+             position: opponent_bench_position,
+             status: nil
+           }),
+         {:ok, moved_opponent_bench_card} <-
+           update(opponent_bench_card, :promote_to_active, %{position: 1, status: nil}),
+         {:ok, moved_own_active_card} <-
+           update(own_active_card, :move_active_to_bench, %{
+             position: own_bench_position,
+             status: nil
+           }),
+         {:ok, moved_own_bench_card} <-
+           update(own_bench_card, :promote_to_active, %{position: 1, status: nil}),
+         {:ok, _event} <-
+           write_event_and_snapshot(game.id, :cards_moved, player.player_id, %{
+             reason: :effect_resolution,
+             source: EventPayloads.card_source(card),
+             effect_key: effect.key,
+             cards:
+               team_rockets_giovanni_switch_payload(
+                 moved_own_active_card,
+                 moved_own_bench_card,
+                 moved_opponent_active_card,
+                 moved_opponent_bench_card
+               )
+           }) do
+      complete_play_card_resolution(game, turn, player, card, effect)
+    end
+  end
+
+  defp complete_play_card_effect(
+         game,
+         turn,
+         player,
+         card,
          %{type: :discard_attached_tools} = effect,
          target_ids
        ) do
@@ -1452,6 +1497,11 @@ defmodule Prizmo.TcgEngine.CardPlay do
          :ok <- require_all_search_filters(target_cards, Map.get(effect.params, :filter)),
          :ok <-
            require_required_search_groups(target_cards, Map.get(effect.params, :required_groups)),
+         :ok <-
+           require_exclusive_search_groups(
+             target_cards,
+             Map.get(effect.params, :exclusive_groups)
+           ),
          :ok <- require_max_search_groups(target_cards, Map.get(effect.params, :max_groups)) do
       {:ok, target_cards}
     end
@@ -1521,6 +1571,13 @@ defmodule Prizmo.TcgEngine.CardPlay do
          {:ok, target_ids} <- EffectRunner.validate_choice_selection(effect, target_ids),
          {:ok, target_cards} <- CardStore.get_cards(game_id, target_ids) do
       selected_team_rockets_giovanni_cards(target_cards, player_id)
+    end
+  end
+
+  defp validate_prime_catcher_effect(game_id, player_id, effect, target_ids) do
+    with {:ok, target_ids} <- EffectRunner.validate_choice_selection(effect, target_ids),
+         {:ok, target_cards} <- CardStore.get_cards(game_id, target_ids) do
+      selected_prime_catcher_cards(target_cards, player_id)
     end
   end
 
@@ -1796,6 +1853,18 @@ defmodule Prizmo.TcgEngine.CardPlay do
        ) do
     cards
     |> team_rockets_giovanni_choice_cards(player_id)
+    |> Enum.map(& &1.id)
+    |> then(&{:ok, &1})
+  end
+
+  defp effect_choice_ids(
+         cards,
+         player_id,
+         %{type: :switch_opponent_bench_to_active_then_switch_own_active_with_bench},
+         _current_turn
+       ) do
+    cards
+    |> prime_catcher_choice_cards(player_id)
     |> Enum.map(& &1.id)
     |> then(&{:ok, &1})
   end
@@ -2121,6 +2190,24 @@ defmodule Prizmo.TcgEngine.CardPlay do
       end
     else
       _other -> []
+    end
+  end
+
+  defp prime_catcher_choice_cards(cards, player_id) do
+    own_bench_cards =
+      cards
+      |> Enum.filter(&prime_catcher_own_bench_card?(&1, player_id))
+      |> Enum.sort_by(&{&1.position, &1.instance_id})
+
+    opponent_bench_cards =
+      cards
+      |> Enum.filter(&prime_catcher_opponent_bench_card?(&1, player_id))
+      |> Enum.sort_by(&{&1.owner_player_id, &1.position, &1.instance_id})
+
+    if Enum.empty?(own_bench_cards) or Enum.empty?(opponent_bench_cards) do
+      []
+    else
+      own_bench_cards ++ opponent_bench_cards
     end
   end
 
@@ -2591,6 +2678,26 @@ defmodule Prizmo.TcgEngine.CardPlay do
     |> collect_ok_results()
   end
 
+  defp require_exclusive_search_groups(_target_cards, nil), do: :ok
+
+  defp require_exclusive_search_groups([], exclusive_groups) when is_list(exclusive_groups),
+    do: :ok
+
+  defp require_exclusive_search_groups(target_cards, exclusive_groups)
+       when is_list(exclusive_groups) do
+    matching_groups =
+      Enum.filter(exclusive_groups, fn group ->
+        Enum.all?(target_cards, &matches_search_filter?(&1, group.filter)) and
+          exclusive_group_count_in_range?(length(target_cards), group)
+      end)
+
+    case matching_groups do
+      [_group] -> :ok
+      [] -> {:error, :invalid_exclusive_search_group_selection}
+      _groups -> {:error, :ambiguous_exclusive_search_group_selection}
+    end
+  end
+
   defp required_search_groups_available?(_choices, nil), do: true
 
   defp required_search_groups_available?(choices, required_groups)
@@ -2599,6 +2706,16 @@ defmodule Prizmo.TcgEngine.CardPlay do
       expected_count = Map.get(group, :count, 1)
       Enum.count(choices, &matches_search_filter?(&1, group.filter)) >= expected_count
     end)
+  end
+
+  defp exclusive_group_count_in_range?(count, %{count: expected_count}) do
+    count == expected_count
+  end
+
+  defp exclusive_group_count_in_range?(count, group) do
+    min_count = Map.get(group, :min_count, 1)
+    max_count = Map.get(group, :max_count, min_count)
+    count >= min_count and count <= max_count
   end
 
   defp special_energy_card?(%CardInstance{card_id: card_id}) do
@@ -2801,6 +2918,34 @@ defmodule Prizmo.TcgEngine.CardPlay do
     end
   end
 
+  defp selected_prime_catcher_cards(cards, player_id) do
+    own_bench_cards = Enum.filter(cards, &prime_catcher_own_bench_card?(&1, player_id))
+    opponent_bench_cards = Enum.filter(cards, &prime_catcher_opponent_bench_card?(&1, player_id))
+
+    case {own_bench_cards, opponent_bench_cards} do
+      {[own_bench_card], [opponent_bench_card]} ->
+        {:ok, {own_bench_card, opponent_bench_card}}
+
+      {[], [_opponent_bench_card]} ->
+        {:error, :missing_prime_catcher_own_bench_choice}
+
+      {[_own_bench_card], []} ->
+        {:error, :missing_prime_catcher_opponent_bench_choice}
+
+      {[], []} ->
+        {:error, :missing_prime_catcher_choices}
+
+      {own_cards, [_opponent_bench_card]} when length(own_cards) > 1 ->
+        {:error, {:too_many_prime_catcher_own_bench_choices, length(own_cards)}}
+
+      {[_own_bench_card], opponent_cards} when length(opponent_cards) > 1 ->
+        {:error, {:too_many_prime_catcher_opponent_bench_choices, length(opponent_cards)}}
+
+      _other ->
+        {:error, :invalid_prime_catcher_choices}
+    end
+  end
+
   defp selected_rare_candy_cards(cards, player_id, turn_number) do
     stage_2_cards = Enum.filter(cards, &rare_candy_stage_2_card?(&1, player_id))
     target_cards = Enum.filter(cards, &rare_candy_target_card?(&1, player_id, turn_number))
@@ -2837,6 +2982,16 @@ defmodule Prizmo.TcgEngine.CardPlay do
   end
 
   defp team_rockets_giovanni_opponent_bench_card?(%CardInstance{} = card, player_id) do
+    card.owner_player_id != player_id and card.zone == :bench and
+      require_pokemon_card(card.card_id) == :ok
+  end
+
+  defp prime_catcher_own_bench_card?(%CardInstance{} = card, player_id) do
+    card.owner_player_id == player_id and card.zone == :bench and
+      require_pokemon_card(card.card_id) == :ok
+  end
+
+  defp prime_catcher_opponent_bench_card?(%CardInstance{} = card, player_id) do
     card.owner_player_id != player_id and card.zone == :bench and
       require_pokemon_card(card.card_id) == :ok
   end
@@ -3409,6 +3564,30 @@ defmodule Prizmo.TcgEngine.CardPlay do
          payload,
          game_id,
          _player_id,
+         :search_deck_for_basic_pokemon_or_evolution_pokemon,
+         legal_choice_ids
+       ) do
+    case CardStore.list_cards(game_id) do
+      {:ok, cards} ->
+        cards_by_id = Map.new(cards, &{&1.id, &1})
+
+        labels =
+          legal_choice_ids
+          |> Enum.map(&Map.get(cards_by_id, &1))
+          |> Enum.reject(&is_nil/1)
+          |> Enum.map(&brocks_scouting_choice_label/1)
+
+        Map.put(payload, :legal_choice_labels, labels)
+
+      {:error, _reason} ->
+        payload
+    end
+  end
+
+  defp maybe_put_prompt_choice_labels(
+         payload,
+         game_id,
+         _player_id,
          :search_deck_for_item_tool_supporter_stadium,
          legal_choice_ids
        ) do
@@ -3421,6 +3600,30 @@ defmodule Prizmo.TcgEngine.CardPlay do
           |> Enum.map(&Map.get(cards_by_id, &1))
           |> Enum.reject(&is_nil/1)
           |> Enum.map(&secret_box_choice_label/1)
+
+        Map.put(payload, :legal_choice_labels, labels)
+
+      {:error, _reason} ->
+        payload
+    end
+  end
+
+  defp maybe_put_prompt_choice_labels(
+         payload,
+         game_id,
+         player_id,
+         :switch_opponent_bench_to_active_then_switch_own_active_with_bench,
+         legal_choice_ids
+       ) do
+    case CardStore.list_cards(game_id) do
+      {:ok, cards} ->
+        cards_by_id = Map.new(cards, &{&1.id, &1})
+
+        labels =
+          legal_choice_ids
+          |> Enum.map(&Map.get(cards_by_id, &1))
+          |> Enum.reject(&is_nil/1)
+          |> Enum.map(&prime_catcher_choice_label(&1, player_id))
 
         Map.put(payload, :legal_choice_labels, labels)
 
@@ -3529,6 +3732,23 @@ defmodule Prizmo.TcgEngine.CardPlay do
     }
   end
 
+  defp prime_catcher_choice_label(%CardInstance{owner_player_id: player_id} = card, player_id) do
+    %{
+      id: card.id,
+      label: card_name(card, card.card_id),
+      detail:
+        "Your Benched Pokémon to switch into the Active Spot after the opponent's switch resolves."
+    }
+  end
+
+  defp prime_catcher_choice_label(%CardInstance{} = card, _player_id) do
+    %{
+      id: card.id,
+      label: card_name(card, card.card_id),
+      detail: "Opponent Benched Pokémon to switch into the Active Spot first."
+    }
+  end
+
   defp xerosics_choice_label(%CardInstance{} = card) do
     %{
       id: card.id,
@@ -3633,6 +3853,26 @@ defmodule Prizmo.TcgEngine.CardPlay do
       id: card.id,
       label: card_name(card, card.card_id),
       detail: "Your Benched Pokémon to switch into the Active Spot."
+    }
+  end
+
+  defp brocks_scouting_choice_label(%CardInstance{} = card) do
+    detail =
+      case CardCatalog.fetch(card.card_id) do
+        {:ok, %{supertype: :pokemon, stage: :basic}} ->
+          "Basic Pokémon in deck. Brock's Scouting can choose up to 2 Basics instead of an Evolution Pokémon."
+
+        {:ok, %{supertype: :pokemon, stage: stage}} when stage in [:stage_1, :stage_2] ->
+          "Evolution Pokémon in deck. Brock's Scouting can choose exactly 1 Evolution Pokémon instead of any Basics."
+
+        _other ->
+          "Pokémon in deck for Brock's Scouting."
+      end
+
+    %{
+      id: card.id,
+      label: card_name(card, card.card_id),
+      detail: detail
     }
   end
 

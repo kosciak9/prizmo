@@ -1,5 +1,12 @@
 # Wiki Log
 
+## [2026-06-23] codebase update | Goal 2 Brock's Scouting and Prime Catcher support
+
+- Task attempted: closed the next broad cached-metadata Goal 2 Trainer slice already in progress instead of starting a conflicting new batch. Added `JTG-146` Brock's Scouting as an engine-defined Supporter on the generic deck-search path with exclusive-group validation for `up to 2 Basic Pokémon or 1 Evolution Pokémon`, and added `TEF-157` Prime Catcher as a real double-switch ACE SPEC Item that chooses one own Benched Pokémon plus one opposing Benched Pokémon through the canonical prompt/resolution path.
+- Files changed: `lib/prizmo/tcg_engine/card_play.ex`, `lib/prizmo/tcg_engine/cards/registry.ex`, `lib/prizmo/tcg_engine/effect_runner.ex`, `lib/prizmo/tcg_engine/game_view.ex`, `test/prizmo/tcg_engine/mechanics_test.exs`, `knowledge-base/wiki/engine/goal-2-top-30-latest-limitless-coverage-scope.md`, `knowledge-base/wiki/engine/ash-backed-tcg-engine-playtest-handoff.md`, `knowledge-base/wiki/log.md`.
+- Validation: `mix format` on changed Elixir files; `mix test test/prizmo/tcg_engine/mechanics_test.exs`; `mix compile --warnings-as-errors`; `mix prizmo.goal2.corpus` confirmed `supported=118` / `partial=11` / `unimplemented=241`; Tidewave eval of `Prizmo.Tcg.CardCoverage.summarize/1` confirmed both `JTG-146` and `TEF-157` are `coverage_status: :supported`; browser validation on `http://localhost:4003` in disposable games `8964e151-9da9-4177-bf26-17d3fbd57963` and `68869e47-9640-48ca-83f2-40140756094e` showed Brock's Scouting resolve a labeled `0-2` deck-search prompt and Prime Catcher resolve its differentiated own-bench/opponent-bench prompt with 0 Playwright console errors; final `mix check` passed.
+- Remaining/blocking notes: `JTG-146` and `TEF-157` are no longer in the shared unimplemented queue. `JTG-121` Dudunsparce ex is now the top cached-metadata Goal 2 blocker, while `SSP-177` Gravity Mountain remains the widest metadata-missing gap and `SFA-057` / `ASC-046` are the next broad missing-metadata lines.
+
 ## [2026-06-23] codebase update | Goal 2 Hoothoot and Noctowl support
 
 - Task attempted: closed the next high-leverage Goal 2 shared Pokémon slice already in progress instead of starting a conflicting new batch. Added `SCR-114` Hoothoot `Triple Stab` attack support and wired `SCR-115` Noctowl `Jewel Seeker` through the canonical engine, read model, RPC, and SPA command surface.

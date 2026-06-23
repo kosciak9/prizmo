@@ -159,6 +159,46 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     ]
   }
 
+  @brocks_scouting %CardDefinition{
+    id: "JTG-146",
+    kind: :trainer,
+    trainer_type: :supporter,
+    play_window: :action_window,
+    effects: [
+      %Effect{
+        key: :search_deck_for_basic_pokemon_or_evolution_pokemon,
+        type: :search_deck,
+        params: %{
+          filter: %{
+            any: [
+              %{kind: :pokemon, stage: :basic},
+              %{kind: :pokemon, stages: [:stage_1, :stage_2]}
+            ]
+          },
+          exclusive_groups: [
+            %{
+              key: :basic_pokemon,
+              filter: %{kind: :pokemon, stage: :basic},
+              min_count: 0,
+              max_count: 2
+            },
+            %{
+              key: :evolution_pokemon,
+              filter: %{kind: :pokemon, stages: [:stage_1, :stage_2]},
+              min_count: 0,
+              max_count: 1
+            }
+          ],
+          min_count: 0,
+          max_count: 2,
+          destination: :hand,
+          reveal: true,
+          shuffle_after: true
+        }
+      }
+    ]
+  }
+
   @lillies_determination %CardDefinition{
     id: "MEG-119",
     kind: :trainer,
@@ -197,6 +237,20 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
         key: :switch_opponent_bench_to_active,
         type: :switch_opponent_bench_to_active,
         params: %{count: 1}
+      }
+    ]
+  }
+
+  @prime_catcher %CardDefinition{
+    id: "TEF-157",
+    kind: :trainer,
+    trainer_type: :item,
+    play_window: :action_window,
+    effects: [
+      %Effect{
+        key: :switch_opponent_bench_to_active_then_switch_own_active_with_bench,
+        type: :switch_opponent_bench_to_active_then_switch_own_active_with_bench,
+        params: %{count: 2}
       }
     ]
   }
@@ -905,6 +959,7 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
 
   @cards %{
     @boss_orders.id => @boss_orders,
+    @brocks_scouting.id => @brocks_scouting,
     @budew.id => @budew,
     @bug_catching_set.id => @bug_catching_set,
     @buddy_buddy_poffin.id => @buddy_buddy_poffin,
@@ -921,6 +976,7 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     @night_stretcher.id => @night_stretcher,
     @poke_pad.id => @poke_pad,
     @pokegear_3_0.id => @pokegear_3_0,
+    @prime_catcher.id => @prime_catcher,
     @rare_candy.id => @rare_candy,
     @sacred_ash.id => @sacred_ash,
     @secret_box.id => @secret_box,

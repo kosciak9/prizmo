@@ -406,6 +406,166 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
       assert length(proton_effect_event.payload["cards"]) == 3
     end
 
+    test "Brock's Scouting opens a prompt and resolves for up to 2 Basic Pokémon" do
+      {:ok, game} = create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147)
+
+      assert {:ok, game} = Mechanics.pass_turn(game, "player_1")
+
+      {:ok, brock} = create_custom_owned_card(game.id, "player_2", "JTG-146", 200)
+      {:ok, brock} = ash_update(brock, :draw_to_hand, %{position: 20})
+
+      {:ok, basic_1} = create_custom_owned_card(game.id, "player_2", "PRE-035", 201)
+      {:ok, basic_2} = create_custom_owned_card(game.id, "player_2", "SCR-114", 202)
+      {:ok, evolution} = create_custom_owned_card(game.id, "player_2", "PRE-036", 203)
+
+      assert {:ok, game} = Mechanics.play_card(game, "player_2", brock.id, %{})
+
+      [prompt] = awaiting_prompts(game.id)
+      assert prompt.player_id == "player_2"
+      assert prompt.payload["choice_key"] == "search_deck_for_basic_pokemon_or_evolution_pokemon"
+      assert prompt.payload["min"] == 0
+      assert prompt.payload["max"] == 2
+      assert basic_1.id in prompt.payload["legal_choices"]
+      assert basic_2.id in prompt.payload["legal_choices"]
+      assert evolution.id in prompt.payload["legal_choices"]
+
+      label_by_id = Map.new(prompt.payload["legal_choice_labels"], &{&1["id"], &1})
+
+      assert label_by_id[basic_1.id]["detail"] =~ "Basic Pokémon"
+      assert label_by_id[basic_2.id]["detail"] =~ "Basic Pokémon"
+      assert label_by_id[evolution.id]["detail"] =~ "Evolution Pokémon"
+
+      assert {:ok, game} =
+               Mechanics.choose_prompt(game, "player_2", prompt.id, [basic_1.id, basic_2.id])
+
+      assert zone(brock.id) == :discard
+      assert zone(basic_1.id) == :hand
+      assert zone(basic_2.id) == :hand
+      assert zone(evolution.id) == :deck
+
+      cards_moved_event =
+        game.id
+        |> game_events_by_type("cards_moved")
+        |> Enum.find(
+          &(&1.payload["effect_key"] == "search_deck_for_basic_pokemon_or_evolution_pokemon")
+        )
+
+      assert cards_moved_event.payload["public_reveal"] == true
+
+      assert Enum.map(cards_moved_event.payload["cards"], & &1["card_id"]) == [
+               basic_1.card_id,
+               basic_2.card_id
+             ]
+
+      assert game_events_by_type(game.id, "deck_shuffled") != []
+    end
+
+    test "Brock's Scouting accepts 1 Evolution Pokémon but rejects mixed Basic and Evolution selections" do
+      {:ok, game} = create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147)
+
+      assert {:ok, game} = Mechanics.pass_turn(game, "player_1")
+
+      {:ok, brock} = create_custom_owned_card(game.id, "player_2", "JTG-146", 200)
+      {:ok, brock} = ash_update(brock, :draw_to_hand, %{position: 20})
+
+      {:ok, basic} = create_custom_owned_card(game.id, "player_2", "PRE-035", 201)
+      {:ok, evolution} = create_custom_owned_card(game.id, "player_2", "PRE-036", 202)
+
+      assert {:error, :invalid_exclusive_search_group_selection} =
+               Mechanics.play_card(game, "player_2", brock.id, %{
+                 choices: %{
+                   search_deck_for_basic_pokemon_or_evolution_pokemon: [basic.id, evolution.id]
+                 }
+               })
+
+      assert zone(brock.id) == :hand
+      assert zone(basic.id) == :deck
+      assert zone(evolution.id) == :deck
+
+      assert {:ok, _game} =
+               Mechanics.play_card(game, "player_2", brock.id, %{
+                 choices: %{
+                   search_deck_for_basic_pokemon_or_evolution_pokemon: [evolution.id]
+                 }
+               })
+
+      assert zone(brock.id) == :discard
+      assert zone(evolution.id) == :hand
+    end
+
+    test "Prime Catcher appears in affordances, opens a bench-choice prompt, and switches both players" do
+      {:ok, game} = create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147)
+
+      {:ok, prime_catcher} = create_custom_owned_card(game.id, "player_1", "TEF-157", 200)
+      {:ok, prime_catcher} = ash_update(prime_catcher, :draw_to_hand, %{position: 20})
+
+      {:ok, own_bench} = create_custom_owned_card(game.id, "player_1", "SCR-114", 201)
+      {:ok, own_bench} = ash_update(own_bench, :draw_to_hand, %{position: 21})
+
+      {:ok, own_bench} =
+        ash_update(own_bench, :play_to_bench, %{position: 1, turn_entered_play: 1})
+
+      {:ok, opponent_bench} = create_custom_owned_card(game.id, "player_2", "PRE-035", 202)
+      {:ok, opponent_bench} = ash_update(opponent_bench, :draw_to_hand, %{position: 21})
+
+      {:ok, opponent_bench} =
+        ash_update(opponent_bench, :play_to_bench, %{position: 1, turn_entered_play: 1})
+
+      original_own_active = active_card(game.id, "player_1")
+      original_opponent_active = active_card(game.id, "player_2")
+
+      assert {:ok, view} = GameView.for_player(game.id, "player_1")
+      play_card = Enum.find(view.action_affordances, &(&1.key == "play_card"))
+      assert is_map(play_card)
+      assert prime_catcher.id in play_card.source_card_instance_ids
+
+      assert {:ok, game} = Mechanics.play_card(game, "player_1", prime_catcher.id, %{})
+
+      [prompt] = awaiting_prompts(game.id)
+      assert prompt.player_id == "player_1"
+
+      assert prompt.payload["choice_key"] ==
+               "switch_opponent_bench_to_active_then_switch_own_active_with_bench"
+
+      assert Enum.sort(prompt.payload["legal_choices"]) ==
+               Enum.sort([own_bench.id, opponent_bench.id])
+
+      label_by_id = Map.new(prompt.payload["legal_choice_labels"], &{&1["id"], &1})
+
+      assert label_by_id[own_bench.id]["detail"] =~ "Your Benched Pokémon"
+      assert label_by_id[opponent_bench.id]["detail"] =~ "Opponent Benched Pokémon"
+
+      assert {:ok, view} = GameView.for_player(game.id, "player_1")
+      [view_prompt] = view.prompts
+
+      assert Enum.sort(Enum.map(view_prompt.payload["legal_choice_cards"], & &1.id)) ==
+               Enum.sort([own_bench.id, opponent_bench.id])
+
+      assert Enum.map(view_prompt.payload["legal_choice_cards"], & &1.zone) == ["bench", "bench"]
+
+      assert {:ok, game} =
+               Mechanics.choose_prompt(game, "player_1", prompt.id, [
+                 own_bench.id,
+                 opponent_bench.id
+               ])
+
+      assert zone(prime_catcher.id) == :discard
+      assert active_card(game.id, "player_1").id == own_bench.id
+      assert active_card(game.id, "player_2").id == opponent_bench.id
+      assert zone(original_own_active.id) == :bench
+      assert zone(original_opponent_active.id) == :bench
+
+      cards_moved_event =
+        game.id
+        |> game_events_by_type("cards_moved")
+        |> Enum.find(
+          &(&1.payload["effect_key"] ==
+              "switch_opponent_bench_to_active_then_switch_own_active_with_bench")
+        )
+
+      assert length(cards_moved_event.payload["cards"]) == 4
+    end
+
     test "SFA-064 Xerosic's Machinations resolves opponent_discards_to_hand_size effect" do
       {:ok, game} = create_flow_action_window_game_with_decks(Alakazam27147, DragapultPlain28256)
 
