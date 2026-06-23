@@ -877,6 +877,238 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
       assert Enum.sort(Enum.map(cards_moved_event.payload["cards"], & &1["instance_id"])) ==
                Enum.sort([basic_energy_1.id, basic_energy_2.id])
     end
+
+    test "TWM-162 Scoop Up Cyclone returns a Benched Pokémon and its attached cards to hand" do
+      {:ok, game} = create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147)
+
+      {:ok, scoop_up} = create_custom_owned_card(game.id, "player_1", "TWM-162", 200)
+      {:ok, scoop_up} = ash_update(scoop_up, :draw_to_hand, %{position: 20})
+
+      {:ok, target} = create_custom_owned_card(game.id, "player_1", "PRE-035", 201)
+      {:ok, target} = ash_update(target, :draw_to_hand, %{position: 21})
+      {:ok, target} = ash_update(target, :play_to_bench, %{position: 1, turn_entered_play: 1})
+
+      {:ok, basic_energy} = create_custom_owned_card(game.id, "player_1", "MEE-005", 202)
+      {:ok, basic_energy} = ash_update(basic_energy, :draw_to_hand, %{position: 22})
+
+      {:ok, special_energy} = create_custom_owned_card(game.id, "player_1", "POR-088", 203)
+      {:ok, special_energy} = ash_update(special_energy, :draw_to_hand, %{position: 23})
+
+      {:ok, basic_energy} =
+        ash_update(basic_energy, :attach, %{attached_to_card_instance_id: target.id, position: 1})
+
+      {:ok, special_energy} =
+        ash_update(special_energy, :attach, %{
+          attached_to_card_instance_id: target.id,
+          position: 2
+        })
+
+      assert {:ok, _game} =
+               Mechanics.play_card(game, "player_1", scoop_up.id, %{
+                 choices: %{return_own_pokemon_with_attached_cards_to_hand: [target.id]}
+               })
+
+      assert zone(scoop_up.id) == :discard
+      assert zone(target.id) == :hand
+      assert zone(basic_energy.id) == :hand
+      assert zone(special_energy.id) == :hand
+
+      cards_moved_event =
+        game.id
+        |> game_events_by_type("cards_moved")
+        |> Enum.find(
+          &(&1.payload["effect_key"] == "return_own_pokemon_with_attached_cards_to_hand")
+        )
+
+      assert Enum.sort(Enum.map(cards_moved_event.payload["cards"], & &1["instance_id"])) ==
+               Enum.sort([target.id, basic_energy.id, special_energy.id])
+    end
+
+    test "TWM-162 Scoop Up Cyclone on the Active Pokémon leaves a replacement-active affordance during the action window" do
+      {:ok, game} = create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147)
+
+      {:ok, scoop_up} = create_custom_owned_card(game.id, "player_1", "TWM-162", 210)
+      {:ok, scoop_up} = ash_update(scoop_up, :draw_to_hand, %{position: 20})
+
+      {:ok, bench_1} = create_custom_owned_card(game.id, "player_1", "PRE-035", 211)
+      {:ok, bench_1} = ash_update(bench_1, :draw_to_hand, %{position: 21})
+      {:ok, bench_1} = ash_update(bench_1, :play_to_bench, %{position: 1, turn_entered_play: 1})
+
+      {:ok, bench_2} = create_custom_owned_card(game.id, "player_1", "PRE-036", 212)
+      {:ok, bench_2} = ash_update(bench_2, :draw_to_hand, %{position: 22})
+      {:ok, bench_2} = ash_update(bench_2, :play_to_bench, %{position: 2, turn_entered_play: 1})
+
+      original_active = active_card(game.id, "player_1")
+
+      assert {:ok, _game} =
+               Mechanics.play_card(game, "player_1", scoop_up.id, %{
+                 choices: %{return_own_pokemon_with_attached_cards_to_hand: [original_active.id]}
+               })
+
+      assert zone(original_active.id) == :hand
+
+      assert {:ok, view} = GameView.for_player(game.id, "player_1")
+
+      [replacement] =
+        Enum.filter(view.action_affordances, &(&1.key == "choose_replacement_active"))
+
+      assert Enum.sort(replacement.target_card_instance_ids) ==
+               Enum.sort([bench_1.id, bench_2.id])
+
+      assert {:ok, _game} = Mechanics.choose_replacement_active(game, "player_1", bench_2.id)
+      assert active_card(game.id, "player_1").id == bench_2.id
+    end
+
+    test "SCR-132 Briar adds an extra Prize when a Tera attack Knocks Out the opponent's Active Pokémon" do
+      {:ok, game} = create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147)
+
+      assert {:ok, game} = Mechanics.pass_turn(game, "player_1")
+      reduce_opponent_prize_count_to(game.id, "player_1", 2)
+
+      current_turn = current_turn(game.id)
+
+      {:ok, briar} = create_custom_owned_card(game.id, "player_2", "SCR-132", 220)
+      {:ok, briar} = ash_update(briar, :draw_to_hand, %{position: 20})
+
+      attacker = active_card(game.id, "player_2")
+
+      {:ok, _moved_attacker} =
+        ash_update(attacker, :move_active_to_bench, %{position: 2, status: nil})
+
+      {:ok, tera_attacker} = create_custom_owned_card(game.id, "player_2", "TWM-025", 221)
+      {:ok, tera_attacker} = ash_update(tera_attacker, :draw_to_hand, %{position: 21})
+
+      {:ok, tera_attacker} =
+        ash_update(tera_attacker, :play_to_bench, %{
+          position: 1,
+          turn_entered_play: current_turn.turn_number
+        })
+
+      {:ok, tera_attacker} =
+        ash_update(tera_attacker, :promote_to_active, %{position: 1, status: nil})
+
+      defender = active_card(game.id, "player_1")
+
+      {:ok, _moved_defender} =
+        ash_update(defender, :move_active_to_bench, %{position: 2, status: nil})
+
+      {:ok, target_active} = create_custom_owned_card(game.id, "player_1", "PRE-035", 222)
+      {:ok, target_active} = ash_update(target_active, :draw_to_hand, %{position: 21})
+
+      {:ok, target_active} =
+        ash_update(target_active, :play_to_bench, %{position: 1, turn_entered_play: 1})
+
+      {:ok, target_active} =
+        ash_update(target_active, :promote_to_active, %{position: 1, status: nil})
+
+      for {card_id, position} <- [{"MEE-001", 223}, {"MEE-001", 224}, {"MEE-001", 225}] do
+        {:ok, energy} = create_custom_owned_card(game.id, "player_2", card_id, position)
+        {:ok, energy} = ash_update(energy, :draw_to_hand, %{position: position})
+
+        {:ok, _energy} =
+          ash_update(energy, :attach, %{
+            attached_to_card_instance_id: tera_attacker.id,
+            position: position - 222
+          })
+      end
+
+      assert {:ok, game} = Mechanics.play_card(game, "player_2", briar.id, %{})
+      assert {:ok, game} = Mechanics.declare_attack(game, "player_2", :myriad_leaf_shower)
+
+      [prompt] = awaiting_prompts(game.id)
+      assert prompt.prompt_type == "choose_knockout_prizes"
+      assert prompt.payload["min"] == 2
+      assert prompt.payload["max"] == 2
+      assert [%{"prize_count" => 2}] = prompt.payload["knockouts"]
+
+      knockout_required = event_by_type(game.id, "knockout_prize_selection_required")
+      assert knockout_required.payload["prize_count"] == 2
+      assert knockout_required.payload["knocked_out_card_instance_id"] == target_active.id
+    end
+
+    test "SSP-187 Surfer switches and then draws up to 5 cards" do
+      {:ok, game} = create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147)
+
+      assert {:ok, game} = Mechanics.pass_turn(game, "player_1")
+
+      {:ok, surfer} = create_custom_owned_card(game.id, "player_2", "SSP-187", 230)
+      {:ok, surfer} = ash_update(surfer, :draw_to_hand, %{position: 20})
+
+      {:ok, bench_target} = create_custom_owned_card(game.id, "player_2", "PRE-035", 231)
+      {:ok, bench_target} = ash_update(bench_target, :draw_to_hand, %{position: 21})
+
+      {:ok, bench_target} =
+        ash_update(bench_target, :play_to_bench, %{
+          position: 1,
+          turn_entered_play: current_turn(game.id).turn_number
+        })
+
+      current_hand = cards_in_zone(game.id, "player_2", :hand)
+
+      current_hand
+      |> Enum.reject(&(&1.id == surfer.id))
+      |> Enum.take(max(length(current_hand) - 3, 0))
+      |> Enum.with_index(card_count_in_zone(game.id, "player_2", :discard) + 1)
+      |> Enum.each(fn {hand_card, position} ->
+        {:ok, _discarded} = ash_update(hand_card, :discard, %{position: position})
+      end)
+
+      original_active = active_card(game.id, "player_2")
+
+      assert {:ok, game} = Mechanics.play_card(game, "player_2", surfer.id, %{})
+
+      [prompt] = awaiting_prompts(game.id)
+
+      assert prompt.payload["choice_key"] ==
+               "switch_own_active_with_bench_then_draw_until_hand_size"
+
+      assert prompt.payload["legal_choices"] == [bench_target.id]
+
+      assert {:ok, _game} =
+               Mechanics.choose_prompt(game, "player_2", prompt.id, [bench_target.id])
+
+      assert zone(surfer.id) == :discard
+      assert active_card(game.id, "player_2").id == bench_target.id
+      assert zone(original_active.id) == :bench
+      assert card_count_in_zone(game.id, "player_2", :hand) == 5
+
+      cards_moved_event =
+        game.id
+        |> game_events_by_type("cards_moved")
+        |> Enum.find(
+          &(&1.payload["effect_key"] == "switch_own_active_with_bench_then_draw_until_hand_size")
+        )
+
+      assert Enum.count(cards_moved_event.payload["cards"], &(&1["to_zone"] == "hand")) == 3
+    end
+
+    test "ASC-162 Team Rocket's Kangaskhan ex uses heads-count damage and gains Wicked Impact bonus after a Team Rocket Supporter" do
+      {:ok, game} = create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147)
+
+      assert {:ok, game} = Mechanics.pass_turn(game, "player_1")
+
+      {:ok, petrel} = create_custom_owned_card(game.id, "player_2", "DRI-176", 240)
+      {:ok, petrel} = ash_update(petrel, :draw_to_hand, %{position: 20})
+
+      {:ok, trainer_target} = create_custom_owned_card(game.id, "player_2", "MEG-130", 241)
+      {:ok, attacker} = create_custom_owned_card(game.id, "player_2", "ASC-162", 242)
+      {:ok, defender} = create_custom_owned_card(game.id, "player_1", "PRE-035", 243)
+
+      assert {:ok, comet_punch} = CardCatalog.fetch_attack(attacker.card_id, :comet_punch)
+      assert {:ok, wicked_impact} = CardCatalog.fetch_attack(attacker.card_id, :wicked_impact)
+
+      assert {:ok, 90} =
+               AttackDamage.damage_for(attacker, defender, comet_punch, %{heads_count: 3})
+
+      assert {:ok, 120} = AttackDamage.damage_for(attacker, defender, wicked_impact)
+
+      assert {:ok, _game} =
+               Mechanics.play_card(game, "player_2", petrel.id, %{
+                 choices: %{search_deck_for_trainer_card: [trainer_target.id]}
+               })
+
+      assert {:ok, 220} = AttackDamage.damage_for(attacker, defender, wicked_impact)
+    end
   end
 
   describe "Goal 1 Dragapult variant validation" do

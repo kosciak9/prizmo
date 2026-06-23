@@ -73,6 +73,7 @@ defmodule Prizmo.TcgEngine.AttackEffects do
     :bonus_damage_per_coin_heads_count,
     :bonus_damage_if_defender_pokemon_ex,
     :bonus_damage_if_attacker_has_team_rocket_energy,
+    :bonus_damage_if_team_rocket_supporter_played_this_turn,
     :bonus_damage_if_moved_from_bench_to_active_this_turn,
     :bonus_damage_per_energy_attached_to_both_active,
     :bonus_damage_per_energy_attached_to_defender,
@@ -262,6 +263,9 @@ defmodule Prizmo.TcgEngine.AttackEffects do
         prevent_damage_and_effects_next_turn_on_coin_heads(game_id, attacker_card, opts)
 
       %{type: :bonus_damage_if_attacker_has_team_rocket_energy} ->
+        {:ok, %{}}
+
+      %{type: :bonus_damage_if_team_rocket_supporter_played_this_turn} ->
         {:ok, %{}}
 
       %{type: :bonus_damage_if_moved_from_bench_to_active_this_turn} ->

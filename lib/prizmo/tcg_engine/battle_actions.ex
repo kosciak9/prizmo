@@ -9,10 +9,13 @@ defmodule Prizmo.TcgEngine.BattleActions do
   alias Prizmo.TcgEngine.CardCatalog
   alias Prizmo.TcgEngine.CardInstance
   alias Prizmo.TcgEngine.CardStore
+  alias Prizmo.TcgEngine.GameEvent
   alias Prizmo.TcgEngine.HpEffects
   alias Prizmo.TcgEngine.TeraBenchProtection
   alias Prizmo.TcgEngine.ToolEffects
   alias Prizmo.TcgEngine.TurnStore
+
+  require Ash.Query
 
   def attached_energy_cards_for_retreat(game_id, active_card_id, energy_card_instance_ids) do
     energy_card_instance_ids
@@ -48,6 +51,21 @@ defmodule Prizmo.TcgEngine.BattleActions do
     with {:ok, base_prize_count} <- knockout_prize_count(target_card) do
       reduction = ToolEffects.knockout_prize_reduction(game_id, target_card)
       {:ok, max(base_prize_count - reduction, 0)}
+    end
+  end
+
+  def knockout_prize_count_for_opponent_attack(
+        game_id,
+        %CardInstance{} = attacker_card,
+        %CardInstance{} = target_card
+      )
+      when is_binary(game_id) do
+    with {:ok, base_prize_count} <- knockout_prize_count(target_card) do
+      reduction = ToolEffects.knockout_prize_reduction(game_id, target_card)
+
+      with {:ok, briar_bonus} <- briar_bonus_prize_count(game_id, attacker_card, target_card) do
+        {:ok, max(base_prize_count - reduction, 0) + briar_bonus}
+      end
     end
   end
 
@@ -87,7 +105,12 @@ defmodule Prizmo.TcgEngine.BattleActions do
 
         with {:ok, knocked_out?} <- HpEffects.damage_knocks_out?(game_id, target_card, new_damage),
              {:ok, knockout_prize_count} <-
-               maybe_attack_knockout_prize_count(game_id, target_card, knocked_out?),
+               maybe_attack_knockout_prize_count(
+                 game_id,
+                 attacking_player_id,
+                 target_card,
+                 knocked_out?
+               ),
              {:ok, _target_card} <- update(target_card, :set_damage, %{damage: new_damage}),
              {:ok, knocked_out?} <-
                maybe_knock_out(game_id, attacking_player_id, target_card, knocked_out?) do
@@ -100,10 +123,19 @@ defmodule Prizmo.TcgEngine.BattleActions do
     end
   end
 
-  defp maybe_attack_knockout_prize_count(_game_id, _target_card, false), do: {:ok, nil}
+  defp maybe_attack_knockout_prize_count(_game_id, _attacking_player_id, _target_card, false),
+    do: {:ok, nil}
 
-  defp maybe_attack_knockout_prize_count(game_id, %CardInstance{} = target_card, true),
-    do: knockout_prize_count_for_opponent_attack(game_id, target_card)
+  defp maybe_attack_knockout_prize_count(
+         game_id,
+         attacking_player_id,
+         %CardInstance{} = target_card,
+         true
+       ) do
+    with {:ok, attacker_card} <- active_attacker_card(game_id, attacking_player_id) do
+      knockout_prize_count_for_opponent_attack(game_id, attacker_card, target_card)
+    end
+  end
 
   defp maybe_put_knockout_prize_count(payload, knockout_prize_count)
        when is_integer(knockout_prize_count) and knockout_prize_count >= 0 do
@@ -193,6 +225,56 @@ defmodule Prizmo.TcgEngine.BattleActions do
        replacement_required?: true
      }}
   end
+
+  defp active_attacker_card(game_id, player_id) do
+    with {:ok, cards} <- CardStore.list_cards(game_id) do
+      case Enum.filter(cards, &(&1.owner_player_id == player_id and &1.zone == :active)) do
+        [active_card] -> {:ok, active_card}
+        [] -> {:error, :missing_active_pokemon}
+        _multiple -> {:error, :ambiguous_active_pokemon}
+      end
+    end
+  end
+
+  defp briar_bonus_prize_count(
+         game_id,
+         %CardInstance{} = attacker_card,
+         %CardInstance{} = target_card
+       ) do
+    cond do
+      attacker_card.owner_player_id == target_card.owner_player_id ->
+        {:ok, 0}
+
+      target_card.zone != :active ->
+        {:ok, 0}
+
+      not CardCatalog.tera_pokemon?(attacker_card.card_id) ->
+        {:ok, 0}
+
+      true ->
+        with {:ok, turn} <- TurnStore.current_turn(game_id),
+             {:ok, events} <-
+               card_play_completed_events_for_turn(
+                 game_id,
+                 turn.id,
+                 attacker_card.owner_player_id
+               ) do
+          {:ok, if(Enum.any?(events, &briar_card_play?/1), do: 1, else: 0)}
+        end
+    end
+  end
+
+  defp card_play_completed_events_for_turn(game_id, turn_id, player_id) do
+    GameEvent
+    |> Ash.Query.filter(
+      game_id == ^game_id and turn_id == ^turn_id and player_id == ^player_id and
+        type == "card_play_completed"
+    )
+    |> Ash.Query.sort(index: :asc)
+    |> Ash.read()
+  end
+
+  defp briar_card_play?(%GameEvent{payload: payload}), do: payload["card_id"] == "SCR-132"
 
   defp prize_count_for_card(%{supertype: :pokemon, suffix: "ex"}), do: 2
 

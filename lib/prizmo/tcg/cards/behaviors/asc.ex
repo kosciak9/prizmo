@@ -20,6 +20,18 @@ defmodule Prizmo.Tcg.Cards.Behaviors.ASC do
     attack(:cruel_arrow, effect: %{type: :damage_any_opponent_pokemon, amount: 20})
   end
 
+  card "ASC-162" do
+    attack(:comet_punch,
+      damage: 0,
+      effect: %{type: :bonus_damage_per_coin_heads_count, bonus_damage: 30}
+    )
+
+    attack(:wicked_impact,
+      damage: 120,
+      effect: %{type: :bonus_damage_if_team_rocket_supporter_played_this_turn, bonus_damage: 100}
+    )
+  end
+
   card "ASC-181" do
     card_effect(
       effect: %{

@@ -136,6 +136,20 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     ]
   }
 
+  @briar %CardDefinition{
+    id: "SCR-132",
+    kind: :trainer,
+    trainer_type: :supporter,
+    play_window: :action_window,
+    effects: [
+      %Effect{
+        key: :take_extra_prize_if_tera_attack_knocks_out_opponent_active,
+        type: :extra_prize_if_tera_attack_knocks_out_opponent_active,
+        params: %{requires_opponent_prize_count: 2}
+      }
+    ]
+  }
+
   @team_rockets_archer %CardDefinition{
     id: "DRI-170",
     kind: :trainer,
@@ -384,6 +398,34 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
         key: :switch_own_active_with_bench,
         type: :switch_own_active_with_bench,
         params: %{count: 1}
+      }
+    ]
+  }
+
+  @scoop_up_cyclone %CardDefinition{
+    id: "TWM-162",
+    kind: :trainer,
+    trainer_type: :item,
+    play_window: :action_window,
+    effects: [
+      %Effect{
+        key: :return_own_pokemon_with_attached_cards_to_hand,
+        type: :return_own_pokemon_with_attached_cards_to_hand,
+        params: %{count: 1}
+      }
+    ]
+  }
+
+  @surfer %CardDefinition{
+    id: "SSP-187",
+    kind: :trainer,
+    trainer_type: :supporter,
+    play_window: :action_window,
+    effects: [
+      %Effect{
+        key: :switch_own_active_with_bench_then_draw_until_hand_size,
+        type: :switch_own_active_with_bench_then_draw_until_hand_size,
+        params: %{count: 1, hand_size: 5}
       }
     ]
   }
@@ -1049,10 +1091,13 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     @crushing_hammer.id => @crushing_hammer,
     @crispin.id => @crispin,
     @dawn.id => @dawn,
+    @briar.id => @briar,
     @enhanced_hammer.id => @enhanced_hammer,
     @energy_retrieval.id => @energy_retrieval,
     @energy_switch.id => @energy_switch,
+    @scoop_up_cyclone.id => @scoop_up_cyclone,
     @switch.id => @switch,
+    @surfer.id => @surfer,
     @hilda.id => @hilda,
     @judge.id => @judge,
     @lanas_aid.id => @lanas_aid,

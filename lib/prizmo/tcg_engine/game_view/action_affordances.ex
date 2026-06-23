@@ -59,7 +59,7 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
 
   defp replacement_active_affordances(
          %Game{status: :in_progress},
-         %Turn{status: :attack_resolving},
+         %Turn{},
          cards,
          viewer_player_id
        ) do
@@ -83,7 +83,7 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
               viewer_player_id,
               target_card_instance_ids: target_ids,
               note:
-                "A knockout left this player without an Active Pokémon. Choose one Benched Pokémon before the attack can finish."
+                "This player has no Active Pokémon. Choose one Benched Pokémon before continuing."
             )
           ]
         end

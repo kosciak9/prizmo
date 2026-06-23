@@ -64,13 +64,13 @@ Those reports are the canonical starting point for autonomous Goal 2 implementat
 - Tracked top archetypes: `30`
 - Tracked cards with usage greater than `0.00`: `377`
 - Coverage buckets from `mix prizmo.goal2.corpus`:
-  - `supported=127`
+  - `supported=131`
   - `generic-supported=7`
   - `partial=10`
-  - `unimplemented=233`
+  - `unimplemented=229`
 - Metadata buckets:
-  - `cached=147`
-  - `missing=230`
+  - `cached=151`
+  - `missing=226`
 
 Important interpretation:
 
@@ -82,21 +82,20 @@ Important interpretation:
 
 The strongest current Goal 2 implementation candidates are the incomplete cards shared by the most archetypes and/or the most total metagame share.
 
-The latest Goal 2 engine batch closed both the widest metadata-missing blocker and the broadest shared partial by adding reusable HP-modifier infrastructure. `SSP-177` Gravity Mountain now resolves as an engine-defined Stadium that lowers every in-play Stage 2 Pokémon's HP by `30` and immediately rechecks state-based KOs when that threshold matters, while `TEF-152` Hero's Cape now grants `+100` HP through the canonical Tool path and correctly falls off under `TWM-153` Jamming Tower or attached-Tool discard. The current HP work is intentionally not complete for every source type yet: attached Special Energy HP modifiers such as `POR-086` Growing Grass Energy remain partial.
+The latest Goal 2 engine batch closed the full unblocked four-card shared metadata-missing queue instead of leaving the next broad Trainer slice half-finished. `TWM-162` Scoop Up Cyclone now returns any own in-play Pokémon plus all attached cards to hand and relies on a generalized replacement-Active affordance when an action-window effect leaves the player with no Active Pokémon. `SCR-132` Briar now resolves as a real Supporter gated on the opponent having exactly 2 Prize cards remaining, then grants `+1` Prize only when a Tera Pokémon's attack damage Knocks Out the opponent's Active Pokémon that turn. `SSP-187` Surfer now switches the Active with a Bench target and then draws until hand size `5`, while `ASC-162` Team Rocket's Kangaskhan ex is now fully catalog-supported through reusable heads-count variable damage plus a current-turn Team Rocket Supporter bonus check for `Wicked Impact`. The HP work remains intentionally incomplete for every modifier source type: attached Special Energy HP modifiers such as `POR-086` Growing Grass Energy are still partial.
 
 ### Highest-priority remaining `unimplemented` cards from current report
 
 | Card | Archetypes | Total share | Notes |
 | --- | --- | --- | --- |
-| `TWM-162` Scoop Up Cyclone | `4` | `14.54%` | New top unblocked shared metadata-missing card after Gravity Mountain moved to supported. |
-| `SCR-132` Briar | `4` | `11.84%` | Shared Supporter gap in several Ogerpon/Hydrapple shells. |
-| `ASC-162` Team Rocket's Kangaskhan ex | `4` | `10.82%` | Shared Rocket shell blocker once the current Trainer recovery/search slice is closed. |
-| `SSP-187` Surfer | `4` | `7.49%` | Shared draw/mobility gap across multiple lower-share archetypes. |
 | `MEE-008` Metal Energy | `4` | `3.95%` | Shared basic Energy metadata gap across several Metal shells. |
 | `MEG-116` Fighting Gong | `4` | `2.54%` | Shared Fighting Tool gap spanning multiple archetypes. |
 | `ASC-047` Mega Froslass ex | `4` | `1.27%` | Shared evolution line after `ASC-046` Snorunt moved to supported. |
-| `TEF-155` Morty's Conviction | `3` | `16.57%` | Highest-share three-archetype missing-metadata Trainer once the four-archetype slice is reduced. |
-| `TWM-112` Cornerstone Mask Ogerpon ex | `3` | `15.62%` | Broad three-archetype Pokémon ex blocker following Morty's Conviction. |
+| `TEF-155` Morty's Conviction | `3` | `16.57%` | New highest-share remaining shared metadata-missing Trainer after Briar moved to supported. |
+| `TWM-112` Cornerstone Mask Ogerpon ex | `3` | `15.62%` | Broad three-archetype Pokémon ex blocker once Morty's Conviction is reduced. |
+| `ASC-216` Prism Energy | `3` | `11.62%` | Shared Special Energy line across N's Zoroark, Ogerpon Box, and Mega Lopunny shells. |
+| `TWM-145` Carmine | `3` | `9.28%` | Shared Supporter discard/draw line across Slowking, Raging Bolt, and Ceruledge. |
+| `ASC-121` Koraidon ex | `3` | `8.88%` | Shared Fighting/Ancient attacker line across Ogerpon Box, Raging Bolt, and Clefairy shells. |
 
 ### Shared `partial` cards worth finishing after the broad unimplemented slice
 
@@ -123,10 +122,10 @@ That means prior Goal 1 and six-deck coverage was not wasted; it now acts as see
 
 ## Recommended next implementation order
 
-1. Take the now-unblocked shared metadata-missing queue `TWM-162`, `SCR-132`, `ASC-162`, and `SSP-187` next.
-2. Keep the remaining Dragapult-only cached pair `TWM-099` / `TWM-100` as deliberate single-archetype cleanup, not the default autonomous queue.
-3. Finish the remaining shared partials only after the broad unimplemented slice unless another batch naturally extends the new HP infrastructure.
-4. If returning to HP work soon, the strongest follow-up is `POR-086` Growing Grass Energy, which still needs attached Special Energy HP handling and removal/recheck coverage.
+1. Take the remaining four-archetype metadata-missing queue `MEE-008`, `MEG-116`, and `ASC-047` next.
+2. After that, move to the highest-share three-archetype queue `TEF-155`, `TWM-112`, `ASC-216`, `TWM-145`, and `ASC-121`.
+3. Keep the remaining Dragapult-only cached pair `TWM-099` / `TWM-100` as deliberate single-archetype cleanup, not the default autonomous queue.
+4. Finish the remaining shared partials only after the broad unimplemented slice unless another batch naturally extends the new HP infrastructure; if returning to HP work soon, `POR-086` Growing Grass Energy remains the strongest follow-up.
 5. Keep using `mix prizmo.goal2.corpus` after each batch to re-rank the next blockers by archetype count and weighted share.
 
 ## See Also

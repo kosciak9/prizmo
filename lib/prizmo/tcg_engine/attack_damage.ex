@@ -308,6 +308,21 @@ defmodule Prizmo.TcgEngine.AttackDamage do
     end
   end
 
+  defp apply_effect(damage, %CardInstance{} = attacker_card, _defender_card, %{
+         type: :bonus_damage_if_team_rocket_supporter_played_this_turn,
+         bonus_damage: bonus_damage
+       })
+       when is_integer(bonus_damage) and bonus_damage >= 0 do
+    with {:ok, team_rocket_supporter_played?} <-
+           team_rocket_supporter_played_this_turn?(attacker_card) do
+      if team_rocket_supporter_played? do
+        {:ok, damage + bonus_damage}
+      else
+        {:ok, damage}
+      end
+    end
+  end
+
   defp apply_effect(damage, _attacker_card, _defender_card, %{type: :switch_self_with_bench}),
     do: {:ok, damage}
 
@@ -531,27 +546,49 @@ defmodule Prizmo.TcgEngine.AttackDamage do
          game_id: game_id,
          owner_player_id: player_id
        }) do
+    with {:ok, events} <- current_turn_card_play_completed_events(game_id, player_id) do
+      {:ok,
+       Enum.any?(events, fn event ->
+         event.payload["card_id"] == "TWM-154" and
+           event.payload["kieran_effect"] == "damage"
+       end)}
+    end
+  end
+
+  defp team_rocket_supporter_played_this_turn?(%CardInstance{
+         game_id: game_id,
+         owner_player_id: player_id
+       }) do
+    with {:ok, events} <- current_turn_card_play_completed_events(game_id, player_id) do
+      {:ok, Enum.any?(events, &team_rocket_supporter_card_play?/1)}
+    end
+  end
+
+  defp current_turn_card_play_completed_events(game_id, player_id)
+       when is_binary(game_id) and is_binary(player_id) do
     with {:ok, turn} <- TurnStore.current_turn(game_id) do
-      events =
-        GameEvent
-        |> Ash.Query.filter(
-          game_id == ^game_id and player_id == ^player_id and type == "card_play_completed" and
-            turn_id == ^turn.id
-        )
-        |> Ash.Query.sort(index: :asc)
-        |> Ash.read()
+      GameEvent
+      |> Ash.Query.filter(
+        game_id == ^game_id and player_id == ^player_id and type == "card_play_completed" and
+          turn_id == ^turn.id
+      )
+      |> Ash.Query.sort(index: :asc)
+      |> Ash.read()
+    end
+  end
 
-      case events do
-        {:ok, events} ->
-          {:ok,
-           Enum.any?(events, fn event ->
-             event.payload["card_id"] == "TWM-154" and
-               event.payload["kieran_effect"] == "damage"
-           end)}
+  defp team_rocket_supporter_card_play?(%GameEvent{payload: payload}) do
+    case payload["card_id"] do
+      card_id when is_binary(card_id) -> team_rocket_supporter_card_id?(card_id)
+      _other -> false
+    end
+  end
 
-        {:error, reason} ->
-          {:error, reason}
-      end
+  defp team_rocket_supporter_card_id?(card_id) when is_binary(card_id) do
+    case CardCatalog.fetch(card_id) do
+      {:ok, %{trainer_type: :supporter, name: "Team Rocket" <> _rest}} -> true
+      {:ok, _card} -> false
+      {:error, _reason} -> false
     end
   end
 

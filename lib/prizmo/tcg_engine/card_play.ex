@@ -402,6 +402,42 @@ defmodule Prizmo.TcgEngine.CardPlay do
          turn,
          player,
          card,
+         %{type: :return_own_pokemon_with_attached_cards_to_hand} = effect,
+         target_ids
+       ) do
+    with {:ok, [target_card]} <-
+           validate_scoop_up_cyclone_effect(game.id, player.player_id, effect, target_ids),
+         original_zone = target_card.zone,
+         {:ok, attached_cards} <- CardStore.attached_cards(game.id, target_card.id),
+         {:ok, returned_target_card} <-
+           CardStore.move_play_card_to_hand(game.id, player.player_id, target_card),
+         {:ok, returned_attached_cards} <-
+           attached_cards
+           |> Enum.map(&CardStore.move_attached_card_to_hand(game.id, player.player_id, &1))
+           |> collect_results(),
+         {:ok, _event} <-
+           write_event_and_snapshot(game.id, :cards_moved, player.player_id, %{
+             reason: :effect_resolution,
+             source: EventPayloads.card_source(card),
+             effect_key: effect.key,
+             affected_player_id: player.player_id,
+             cards:
+               scoop_up_cyclone_returned_payloads(
+                 returned_target_card,
+                 original_zone,
+                 returned_attached_cards,
+                 target_card.id
+               )
+           }) do
+      complete_play_card_resolution(game, turn, player, card, effect)
+    end
+  end
+
+  defp complete_play_card_effect(
+         game,
+         turn,
+         player,
+         card,
          %{type: :switch_opponent_bench_to_active_then_switch_own_active_with_bench} = effect,
          target_ids
        ) do
@@ -461,6 +497,39 @@ defmodule Prizmo.TcgEngine.CardPlay do
              cards: EventPayloads.moved_cards(discarded_tool_cards, :attached, :discard)
            }),
          {:ok, _game} <- Mechanics.resolve_hp_state_based_knockouts(game.id) do
+      complete_play_card_resolution(game, turn, player, card, effect)
+    end
+  end
+
+  defp complete_play_card_effect(
+         game,
+         turn,
+         player,
+         card,
+         %{type: :switch_own_active_with_bench_then_draw_until_hand_size} = effect,
+         target_ids
+       ) do
+    with {:ok, [bench_card]} <-
+           validate_own_bench_switch_effect(game.id, player.player_id, effect, target_ids),
+         {:ok, active_card} <- own_active_card(game.id, player.player_id),
+         bench_position = bench_card.position,
+         {:ok, moved_active_card} <-
+           update(active_card, :move_active_to_bench, %{position: bench_position, status: nil}),
+         {:ok, moved_bench_card} <-
+           update(bench_card, :promote_to_active, %{position: 1, status: nil}),
+         {:ok, drawn_cards} <-
+           draw_until_hand_size_for_effect(game, player, Map.fetch!(effect.params, :hand_size)),
+         {:ok, _event} <-
+           write_event_and_snapshot(game.id, :cards_moved, player.player_id, %{
+             reason: :effect_resolution,
+             source: EventPayloads.card_source(card),
+             effect_key: effect.key,
+             cards:
+               [
+                 switched_card_payload(moved_active_card, :active, :bench),
+                 switched_card_payload(moved_bench_card, :bench, :active)
+               ] ++ EventPayloads.moved_cards(drawn_cards, :deck, :hand)
+           }) do
       complete_play_card_resolution(game, turn, player, card, effect)
     end
   end
@@ -1198,6 +1267,17 @@ defmodule Prizmo.TcgEngine.CardPlay do
     end
   end
 
+  defp complete_play_card_effect(
+         game,
+         turn,
+         player,
+         card,
+         %{type: :extra_prize_if_tera_attack_knocks_out_opponent_active} = effect,
+         _target_ids
+       ) do
+    complete_play_card_resolution(game, turn, player, card, effect)
+  end
+
   defp complete_play_card_effect(_game, _turn, _player, _card, effect, _target_ids) do
     {:error, {:unsupported_card_effect, effect.type}}
   end
@@ -1329,6 +1409,9 @@ defmodule Prizmo.TcgEngine.CardPlay do
       {:ok, %{type: :attach_basic_energy_from_discard_to_stage2_if_more_prizes} = effect} ->
         require_rosa_effect_available(game.id, player.player_id, effect)
 
+      {:ok, %{type: :extra_prize_if_tera_attack_knocks_out_opponent_active} = effect} ->
+        require_opponent_prize_count_exactly(game.id, player.player_id, effect)
+
       {:ok, _effect} ->
         :ok
 
@@ -1410,6 +1493,22 @@ defmodule Prizmo.TcgEngine.CardPlay do
   end
 
   defp require_opponent_prize_count_at_most(_game_id, _player_id, _effect), do: :ok
+
+  defp require_opponent_prize_count_exactly(game_id, player_id, %{
+         params: %{requires_opponent_prize_count: target_prize_count}
+       })
+       when is_binary(game_id) and is_binary(player_id) and is_integer(target_prize_count) do
+    with {:ok, opponent_player} <- CardStore.get_opponent(game_id, player_id),
+         {:ok, prizes} <- CardStore.cards_in_zone(game_id, opponent_player.player_id, :prize) do
+      if length(prizes) == target_prize_count do
+        :ok
+      else
+        {:error, :briar_requires_opponent_exactly_2_prizes_remaining}
+      end
+    end
+  end
+
+  defp require_opponent_prize_count_exactly(_game_id, _player_id, _effect), do: :ok
 
   defp require_more_prizes_than_opponent(game_id, player_id, _effect) do
     with {:ok, player} <- CardStore.get_player(game_id, player_id),
@@ -1582,6 +1681,16 @@ defmodule Prizmo.TcgEngine.CardPlay do
          {:ok, target_cards} <- CardStore.get_cards(game_id, target_ids),
          :ok <- require_all_owned_in_zone(target_cards, player_id, :bench) do
       {:ok, target_cards}
+    end
+  end
+
+  defp validate_scoop_up_cyclone_effect(game_id, player_id, effect, target_ids) do
+    with {:ok, target_ids} <- EffectRunner.validate_choice_selection(effect, target_ids),
+         {:ok, [target_card]} <- CardStore.get_cards(game_id, target_ids),
+         :ok <- require_card_owned_by_player(target_card, player_id),
+         :ok <- require_in_play_pokemon_zone(target_card),
+         :ok <- require_scoop_up_active_target_has_replacement(game_id, player_id, target_card) do
+      {:ok, [target_card]}
     end
   end
 
@@ -1806,6 +1915,18 @@ defmodule Prizmo.TcgEngine.CardPlay do
   defp effect_choice_ids(
          cards,
          player_id,
+         %{type: :return_own_pokemon_with_attached_cards_to_hand},
+         _current_turn
+       ) do
+    cards
+    |> scoop_up_cyclone_choice_cards(player_id)
+    |> Enum.map(& &1.id)
+    |> then(&{:ok, &1})
+  end
+
+  defp effect_choice_ids(
+         cards,
+         player_id,
          %{type: :flip_coin_then_discard_opponent_attached_energy},
          _current_turn
        ) do
@@ -1876,6 +1997,18 @@ defmodule Prizmo.TcgEngine.CardPlay do
   end
 
   defp effect_choice_ids(cards, player_id, %{type: :switch_own_active_with_bench}, _current_turn) do
+    cards
+    |> own_bench_choice_cards(player_id)
+    |> Enum.map(& &1.id)
+    |> then(&{:ok, &1})
+  end
+
+  defp effect_choice_ids(
+         cards,
+         player_id,
+         %{type: :switch_own_active_with_bench_then_draw_until_hand_size},
+         _current_turn
+       ) do
     cards
     |> own_bench_choice_cards(player_id)
     |> Enum.map(& &1.id)
@@ -2216,6 +2349,17 @@ defmodule Prizmo.TcgEngine.CardPlay do
     cards
     |> Enum.filter(&(&1.owner_player_id == player_id and &1.zone == :bench))
     |> Enum.sort_by(&{&1.position, &1.instance_id})
+  end
+
+  defp scoop_up_cyclone_choice_cards(cards, player_id) do
+    bench_cards = own_bench_choice_cards(cards, player_id)
+
+    active_cards =
+      cards
+      |> Enum.filter(&(&1.owner_player_id == player_id and &1.zone == :active))
+      |> Enum.sort_by(&{&1.position, &1.instance_id})
+
+    bench_cards ++ if(bench_cards == [], do: [], else: active_cards)
   end
 
   defp team_rockets_giovanni_choice_cards(cards, player_id) do
@@ -3409,6 +3553,22 @@ defmodule Prizmo.TcgEngine.CardPlay do
     end)
   end
 
+  defp scoop_up_cyclone_returned_payloads(
+         %CardInstance{} = returned_target_card,
+         original_zone,
+         returned_attached_cards,
+         target_card_instance_id
+       ) do
+    [
+      moved_card_payload(returned_target_card, original_zone, :hand)
+      | Enum.map(returned_attached_cards, fn returned_attached_card ->
+          moved_card_payload(returned_attached_card, :attached, :hand,
+            from_attached_to_card_instance_id: target_card_instance_id
+          )
+        end)
+    ]
+  end
+
   defp search_cards_moved_payload(card, effect, moved_targets) do
     moved_cards =
       EventPayloads.moved_cards(moved_targets, :deck, search_effect_destination_zone(effect))
@@ -3596,7 +3756,55 @@ defmodule Prizmo.TcgEngine.CardPlay do
          payload,
          game_id,
          _player_id,
+         :return_own_pokemon_with_attached_cards_to_hand,
+         legal_choice_ids
+       ) do
+    case CardStore.list_cards(game_id) do
+      {:ok, cards} ->
+        cards_by_id = Map.new(cards, &{&1.id, &1})
+
+        labels =
+          legal_choice_ids
+          |> Enum.map(&Map.get(cards_by_id, &1))
+          |> Enum.reject(&is_nil/1)
+          |> Enum.map(&scoop_up_choice_label/1)
+
+        Map.put(payload, :legal_choice_labels, labels)
+
+      {:error, _reason} ->
+        payload
+    end
+  end
+
+  defp maybe_put_prompt_choice_labels(
+         payload,
+         game_id,
+         _player_id,
          :switch_own_active_with_bench,
+         legal_choice_ids
+       ) do
+    case CardStore.list_cards(game_id) do
+      {:ok, cards} ->
+        cards_by_id = Map.new(cards, &{&1.id, &1})
+
+        labels =
+          legal_choice_ids
+          |> Enum.map(&Map.get(cards_by_id, &1))
+          |> Enum.reject(&is_nil/1)
+          |> Enum.map(&switch_choice_label/1)
+
+        Map.put(payload, :legal_choice_labels, labels)
+
+      {:error, _reason} ->
+        payload
+    end
+  end
+
+  defp maybe_put_prompt_choice_labels(
+         payload,
+         game_id,
+         _player_id,
+         :switch_own_active_with_bench_then_draw_until_hand_size,
          legal_choice_ids
        ) do
     case CardStore.list_cards(game_id) do
@@ -3977,6 +4185,23 @@ defmodule Prizmo.TcgEngine.CardPlay do
       label: card_name(card, card.card_id),
       detail:
         "Damaged Mega Evolution Pokémon ex in #{Atom.to_string(card.zone)}. Wally's Compassion heals it, then returns its attached Energy to hand."
+    }
+  end
+
+  defp scoop_up_choice_label(%CardInstance{zone: :active} = card) do
+    %{
+      id: card.id,
+      label: card_name(card, card.card_id),
+      detail:
+        "Your Active Pokémon to return to hand along with all attached cards. Choose a replacement Active afterward."
+    }
+  end
+
+  defp scoop_up_choice_label(%CardInstance{} = card) do
+    %{
+      id: card.id,
+      label: card_name(card, card.card_id),
+      detail: "Your Benched Pokémon to return to hand along with all attached cards."
     }
   end
 
@@ -4584,6 +4809,21 @@ defmodule Prizmo.TcgEngine.CardPlay do
   end
 
   defp require_opponent_card(%CardInstance{}, _player_id), do: :ok
+
+  defp require_scoop_up_active_target_has_replacement(game_id, player_id, %CardInstance{
+         zone: :active
+       }) do
+    with {:ok, bench_cards} <- CardStore.cards_in_zone(game_id, player_id, :bench) do
+      if bench_cards == [] do
+        {:error, :scoop_up_cyclone_requires_other_pokemon_in_play}
+      else
+        :ok
+      end
+    end
+  end
+
+  defp require_scoop_up_active_target_has_replacement(_game_id, _player_id, %CardInstance{}),
+    do: :ok
 
   defp collect_ok_results(results) do
     Enum.reduce_while(results, :ok, fn
