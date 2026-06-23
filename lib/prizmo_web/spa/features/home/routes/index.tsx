@@ -40,6 +40,7 @@ import {
   runStartTcgEngineSetup,
   runUndoTcgEngineGame,
   runUseTcgEngineCursedBlast,
+  runUseTcgEngineFanCall,
   runUseTcgEngineFlipTheScript,
   runUseTcgEngineMunkidoriAdrenaBrain,
   runUseTcgEnginePsychicDraw,
@@ -532,6 +533,12 @@ type SeethingSpiritCommandOption = {
   targetCard: CardSummary | undefined
 }
 
+type FanCallCommandOption = {
+  key: string
+  sourceCardInstanceId: string
+  sourceCard: CardSummary | undefined
+}
+
 type FlipTheScriptCommandOption = {
   key: string
   sourceCardInstanceId: string
@@ -709,6 +716,17 @@ type SeethingSpiritCommand = {
   sourceCardInstanceId: string
   energyCardInstanceId: string
   targetCardInstanceId: string
+}
+
+type FanCallInput = {
+  gameId: string
+  playerId: PlayerId
+  sourceCardInstanceId: string
+}
+
+type FanCallCommand = {
+  playerId: string
+  sourceCardInstanceId: string
 }
 
 type FlipTheScriptInput = {
@@ -1350,6 +1368,14 @@ export function HomeRoute() {
 
   const seethingSpiritMutation = useMutation({
     mutationFn: (input: SeethingSpiritInput) => useSeethingSpirit(input),
+    onSuccess: async (_game, input) => {
+      clearUltraBallPostSearchHandoff(input.gameId, input.playerId)
+      await queryClient.invalidateQueries({ queryKey: ['tcg-engine', 'game-state'] })
+    }
+  })
+
+  const fanCallMutation = useMutation({
+    mutationFn: (input: FanCallInput) => useFanCall(input),
     onSuccess: async (_game, input) => {
       clearUltraBallPostSearchHandoff(input.gameId, input.playerId)
       await queryClient.invalidateQueries({ queryKey: ['tcg-engine', 'game-state'] })
@@ -2304,6 +2330,15 @@ export function HomeRoute() {
                     })
                   }
                 }}
+                onUseFanCall={({ playerId, sourceCardInstanceId }) => {
+                  if (isPlayerId(playerId)) {
+                    fanCallMutation.mutate({
+                      gameId: normalisedGameId,
+                      playerId,
+                      sourceCardInstanceId
+                    })
+                  }
+                }}
                 onUseFlipTheScript={({ playerId, sourceCardInstanceId }) => {
                   if (isPlayerId(playerId)) {
                     flipTheScriptMutation.mutate({
@@ -2454,6 +2489,11 @@ export function HomeRoute() {
                         seethingSpiritMutation.variables.energyCardInstanceId,
                         seethingSpiritMutation.variables.targetCardInstanceId
                       )
+                    : null
+                }
+                fanCallPendingKey={
+                  fanCallMutation.isPending && fanCallMutation.variables
+                    ? fanCallKey(fanCallMutation.variables.sourceCardInstanceId)
                     : null
                 }
                 flipTheScriptPendingKey={
@@ -3167,6 +3207,20 @@ async function useSeethingSpirit(input: SeethingSpiritInput): Promise<CreatedGam
   return result.data as CreatedGame
 }
 
+async function useFanCall(input: FanCallInput): Promise<CreatedGame> {
+  const result = await runUseTcgEngineFanCall({
+    input,
+    fields: GAME_RESOURCE_FIELDS,
+    headers: buildAshRpcHeaders()
+  })
+
+  if (!result.success) {
+    throw new Error(rpcErrorMessage(result.errors))
+  }
+
+  return result.data as CreatedGame
+}
+
 async function useFlipTheScript(input: FlipTheScriptInput): Promise<CreatedGame> {
   const result = await runUseTcgEngineFlipTheScript({
     input,
@@ -3423,6 +3477,7 @@ function GameStateWorkbench({
   onUseMunkidoriAdrenaBrain,
   onUseTealDance,
   onUseSeethingSpirit,
+  onUseFanCall,
   onUseFlipTheScript,
   onUsePsychicDraw,
   onUseReconDirective,
@@ -3454,6 +3509,7 @@ function GameStateWorkbench({
   munkidoriAdrenaBrainPendingKey,
   tealDancePendingKey,
   seethingSpiritPendingKey,
+  fanCallPendingKey,
   flipTheScriptPendingKey,
   psychicDrawPendingKey,
   reconDirectivePendingKey,
@@ -3493,6 +3549,7 @@ function GameStateWorkbench({
   onUseMunkidoriAdrenaBrain: (input: MunkidoriAdrenaBrainCommand) => void
   onUseTealDance: (input: TealDanceCommand) => void
   onUseSeethingSpirit: (input: SeethingSpiritCommand) => void
+  onUseFanCall: (input: FanCallCommand) => void
   onUseFlipTheScript: (input: FlipTheScriptCommand) => void
   onUsePsychicDraw: (input: PsychicDrawCommand) => void
   onUseReconDirective: (input: ReconDirectiveCommand) => void
@@ -3524,6 +3581,7 @@ function GameStateWorkbench({
   munkidoriAdrenaBrainPendingKey: string | null
   tealDancePendingKey: string | null
   seethingSpiritPendingKey: string | null
+  fanCallPendingKey: string | null
   flipTheScriptPendingKey: string | null
   psychicDrawPendingKey: string | null
   reconDirectivePendingKey: string | null
@@ -3669,6 +3727,7 @@ function GameStateWorkbench({
             onUseMunkidoriAdrenaBrain={onUseMunkidoriAdrenaBrain}
             onUseTealDance={onUseTealDance}
             onUseSeethingSpirit={onUseSeethingSpirit}
+            onUseFanCall={onUseFanCall}
             onUseFlipTheScript={onUseFlipTheScript}
             onUsePsychicDraw={onUsePsychicDraw}
             onUseReconDirective={onUseReconDirective}
@@ -3687,6 +3746,7 @@ function GameStateWorkbench({
             munkidoriAdrenaBrainPendingKey={munkidoriAdrenaBrainPendingKey}
             tealDancePendingKey={tealDancePendingKey}
             seethingSpiritPendingKey={seethingSpiritPendingKey}
+            fanCallPendingKey={fanCallPendingKey}
             flipTheScriptPendingKey={flipTheScriptPendingKey}
             psychicDrawPendingKey={psychicDrawPendingKey}
             reconDirectivePendingKey={reconDirectivePendingKey}
@@ -6612,6 +6672,7 @@ function ActionAffordancesPanel({
   onUseMunkidoriAdrenaBrain,
   onUseTealDance,
   onUseSeethingSpirit,
+  onUseFanCall,
   onUseFlipTheScript,
   onUsePsychicDraw,
   onUseReconDirective,
@@ -6630,6 +6691,7 @@ function ActionAffordancesPanel({
   munkidoriAdrenaBrainPendingKey,
   tealDancePendingKey,
   seethingSpiritPendingKey,
+  fanCallPendingKey,
   flipTheScriptPendingKey,
   psychicDrawPendingKey,
   reconDirectivePendingKey,
@@ -6657,6 +6719,7 @@ function ActionAffordancesPanel({
   onUseMunkidoriAdrenaBrain: (input: MunkidoriAdrenaBrainCommand) => void
   onUseTealDance: (input: TealDanceCommand) => void
   onUseSeethingSpirit: (input: SeethingSpiritCommand) => void
+  onUseFanCall: (input: FanCallCommand) => void
   onUseFlipTheScript: (input: FlipTheScriptCommand) => void
   onUsePsychicDraw: (input: PsychicDrawCommand) => void
   onUseReconDirective: (input: ReconDirectiveCommand) => void
@@ -6675,6 +6738,7 @@ function ActionAffordancesPanel({
   munkidoriAdrenaBrainPendingKey: string | null
   tealDancePendingKey: string | null
   seethingSpiritPendingKey: string | null
+  fanCallPendingKey: string | null
   flipTheScriptPendingKey: string | null
   psychicDrawPendingKey: string | null
   reconDirectivePendingKey: string | null
@@ -6692,6 +6756,7 @@ function ActionAffordancesPanel({
       munkidoriAdrenaBrainPendingKey ||
       tealDancePendingKey ||
       seethingSpiritPendingKey ||
+      fanCallPendingKey ||
       flipTheScriptPendingKey ||
       psychicDrawPendingKey ||
       reconDirectivePendingKey ||
@@ -6785,6 +6850,7 @@ function ActionAffordancesPanel({
                     onUseMunkidoriAdrenaBrain={onUseMunkidoriAdrenaBrain}
                     onUseTealDance={onUseTealDance}
                     onUseSeethingSpirit={onUseSeethingSpirit}
+                    onUseFanCall={onUseFanCall}
                     onUseFlipTheScript={onUseFlipTheScript}
                     onUsePsychicDraw={onUsePsychicDraw}
                     onUseReconDirective={onUseReconDirective}
@@ -6798,6 +6864,7 @@ function ActionAffordancesPanel({
                     munkidoriAdrenaBrainPendingKey={munkidoriAdrenaBrainPendingKey}
                     tealDancePendingKey={tealDancePendingKey}
                     seethingSpiritPendingKey={seethingSpiritPendingKey}
+                    fanCallPendingKey={fanCallPendingKey}
                     flipTheScriptPendingKey={flipTheScriptPendingKey}
                     psychicDrawPendingKey={psychicDrawPendingKey}
                     reconDirectivePendingKey={reconDirectivePendingKey}
@@ -7388,6 +7455,7 @@ function ActionAffordanceCard({
   onUseMunkidoriAdrenaBrain,
   onUseTealDance,
   onUseSeethingSpirit,
+  onUseFanCall,
   onUseFlipTheScript,
   onUsePsychicDraw,
   onUseReconDirective,
@@ -7401,6 +7469,7 @@ function ActionAffordanceCard({
   munkidoriAdrenaBrainPendingKey,
   tealDancePendingKey,
   seethingSpiritPendingKey,
+  fanCallPendingKey,
   flipTheScriptPendingKey,
   psychicDrawPendingKey,
   reconDirectivePendingKey,
@@ -7435,6 +7504,7 @@ function ActionAffordanceCard({
   onUseMunkidoriAdrenaBrain: (input: MunkidoriAdrenaBrainCommand) => void
   onUseTealDance: (input: TealDanceCommand) => void
   onUseSeethingSpirit: (input: SeethingSpiritCommand) => void
+  onUseFanCall: (input: FanCallCommand) => void
   onUseFlipTheScript: (input: FlipTheScriptCommand) => void
   onUsePsychicDraw: (input: PsychicDrawCommand) => void
   onUseReconDirective: (input: ReconDirectiveCommand) => void
@@ -7448,6 +7518,7 @@ function ActionAffordanceCard({
   munkidoriAdrenaBrainPendingKey: string | null
   tealDancePendingKey: string | null
   seethingSpiritPendingKey: string | null
+  fanCallPendingKey: string | null
   flipTheScriptPendingKey: string | null
   psychicDrawPendingKey: string | null
   reconDirectivePendingKey: string | null
@@ -7472,6 +7543,7 @@ function ActionAffordanceCard({
   const adrenaBrainOptions = adrenaBrainCommandOptions(action, cardsById)
   const tealDanceOptions = tealDanceCommandOptions(action, cardsById)
   const seethingSpiritOptions = seethingSpiritCommandOptions(action, cardsById)
+  const fanCallOptions = fanCallCommandOptions(action, cardsById)
   const flipTheScriptOptions = flipTheScriptCommandOptions(action, cardsById)
   const psychicDrawOptions = psychicDrawCommandOptions(action, cardsById)
   const reconDirectiveOptions = reconDirectiveCommandOptions(action, cardsById)
@@ -7678,6 +7750,30 @@ function ActionAffordanceCard({
                 tone="primary"
               >
                 {isPending ? seethingSpiritPendingLabel(option) : seethingSpiritButtonLabel(option)}
+              </ActionCommandButton>
+            )
+          })}
+        </div>
+      ) : null}
+
+      {fanCallOptions.length > 0 ? (
+        <div className="mt-2 space-y-1.5">
+          {fanCallOptions.map(option => {
+            const isPending = fanCallPendingKey === option.key
+
+            return (
+              <ActionCommandButton
+                disabled={!canRunAction}
+                key={option.key}
+                onClick={() =>
+                  onUseFanCall({
+                    playerId: action.playerId,
+                    sourceCardInstanceId: option.sourceCardInstanceId
+                  })
+                }
+                tone="primary"
+              >
+                {isPending ? fanCallPendingLabel(option) : fanCallButtonLabel(option)}
               </ActionCommandButton>
             )
           })}
@@ -8104,6 +8200,7 @@ function actionSurfaceClassName(action: ActionAffordance) {
     case 'cursed_blast':
     case 'teal_dance':
     case 'seething_spirit':
+    case 'fan_call':
     case 'psychic_draw':
     case 'recon_directive':
     case 'run_away_draw':
@@ -8157,6 +8254,8 @@ function actionSummary(action: ActionAffordance) {
       return 'Attach a Basic Grass Energy from hand to Teal Mask Ogerpon ex, then draw 1 card.'
     case 'seething_spirit':
       return 'Attach a Basic Energy from discard to 1 of your Pokémon.'
+    case 'fan_call':
+      return 'Search your deck for up to 3 Colorless Pokémon with 100 HP or less and put them into your hand. Then, shuffle your deck.'
     case 'psychic_draw':
       return 'Draw cards with a Kadabra or Alakazam that evolved from hand this turn.'
     case 'recon_directive':
@@ -8349,6 +8448,22 @@ function flipTheScriptCommandOptions(
   ]
 }
 
+function fanCallCommandOptions(action: ActionAffordance, cardsById: Map<string, CardSummary>): FanCallCommandOption[] {
+  if (action.key !== 'fan_call' || action.sourceCardInstanceIds.length < 1) {
+    return []
+  }
+
+  const sourceCardInstanceId = action.sourceCardInstanceIds[0]!
+
+  return [
+    {
+      key: fanCallKey(sourceCardInstanceId),
+      sourceCardInstanceId,
+      sourceCard: cardsById.get(sourceCardInstanceId)
+    }
+  ]
+}
+
 function psychicDrawCommandOptions(action: ActionAffordance, cardsById: Map<string, CardSummary>): PsychicDrawCommandOption[] {
   if (action.key !== 'psychic_draw' || action.sourceCardInstanceIds.length < 1) {
     return []
@@ -8418,6 +8533,14 @@ function seethingSpiritButtonLabel(option: SeethingSpiritCommandOption) {
   return `Seething Spirit: attach ${option.energyCard?.name ?? formatCardInstanceId(option.energyCardInstanceId)} to ${
     option.targetCard?.name ?? formatCardInstanceId(option.targetCardInstanceId)
   }`
+}
+
+function fanCallPendingLabel(option: FanCallCommandOption) {
+  return `Using ${option.sourceCard?.name ?? 'Fan Call'}...`
+}
+
+function fanCallButtonLabel(option: FanCallCommandOption) {
+  return `Fan Call with ${option.sourceCard?.name ?? formatCardInstanceId(option.sourceCardInstanceId)}`
 }
 
 function flipTheScriptPendingLabel(option: FlipTheScriptCommandOption) {
@@ -8812,6 +8935,7 @@ function actionGroupId(action: ActionAffordance): ActionGroupId {
     case 'attach_tool':
     case 'teal_dance':
     case 'seething_spirit':
+    case 'fan_call':
     case 'flip_the_script':
     case 'psychic_draw':
     case 'recon_directive':
@@ -11826,6 +11950,10 @@ function tealDanceKey(sourceCardInstanceId: string, energyCardInstanceId: string
 
 function seethingSpiritKey(sourceCardInstanceId: string, energyCardInstanceId: string, targetCardInstanceId: string) {
   return `${sourceCardInstanceId}:${energyCardInstanceId}:${targetCardInstanceId}`
+}
+
+function fanCallKey(sourceCardInstanceId: string) {
+  return sourceCardInstanceId
 }
 
 function flipTheScriptKey(sourceCardInstanceId: string) {

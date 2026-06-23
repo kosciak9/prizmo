@@ -254,7 +254,8 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
 
   def require_fan_call_available(%CardInstance{} = source, %Turn{} = turn) do
     with {:ok, _effect} <- fan_call_effect(source),
-         :ok <- require_in_play(source) do
+         :ok <- require_in_play(source),
+         :ok <- require_fan_call_first_turn(turn) do
       require_ability_unused(source, turn, @fan_call_ability_id)
     end
   end
@@ -774,6 +775,10 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
           :search_colorless_pokemon_with_100_hp_or_less_to_hand_on_first_turn}}
     end
   end
+
+  defp require_fan_call_first_turn(%Turn{turn_number: turn_number}) when turn_number <= 2, do: :ok
+
+  defp require_fan_call_first_turn(%Turn{}), do: {:error, :fan_call_only_available_on_first_turn}
 
   defp adrena_brain_marker(markers) when is_map(markers) do
     Map.get(markers, @adrena_brain_marker_key) || Map.get(markers, @adrena_brain_marker_atom_key)

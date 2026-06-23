@@ -1,6 +1,6 @@
 # Dragapult and Alakazam Latest-Limitless Coverage Scope
 
-- Updated: 2026-06-17
+- Updated: 2026-06-23
 - Sources: Project codebase; local validation; wiki log; Limitless TCG; user direction
 - Raw: [NAIC 2026 Dragapult and Alakazam Deck Cards](../../raw/meta/2026-06-16-naic-2026-dragapult-and-alakazam-deck-cards.md)
 
@@ -58,7 +58,7 @@ The older one-matchup framing is superseded. The target is not just one Dragapul
 
 - Current live latest-result cards and committed fixtures for both Dragapult and Alakazam are now aligned on the canonical Ash path, and the explicit mechanics-test gap for Fairy Zone/Weakness, Ground Melter Stadium discard, Come and Get You, Cursed Blast prize/replacement/Damp interactions, and Jamming Tower is now closed.
 - Representative two-seat browser validation is now complete for the important Dragapult trio (`28236`, `28253`, `28256`) against Alakazam `28275`.
-- `SCR-118` Fan Rotom `Fan Call` Ability is now fully implemented on the canonical Ash engine path. The ability is available as a first-turn, once-per-turn command (`use_fan_rotom_fan_call_command`), creates a `select_cards` prompt over legal Colorless Pokémon with 100 HP or less from the player's deck, moves chosen targets to hand on prompt resolution, shuffles the deck with persisted RNG metadata, and appears in `GameView.ActionAffordances` as a `fan_call` command affordance. Focused mechanics tests verify prompt creation, legal-choice filtering, card movement, deck shuffling, and once-per-turn blocking.
+- `SCR-118` Fan Rotom `Fan Call` is now closed on the canonical engine + play-surface path, but only after a second follow-up batch corrected two defects that the first implementation left behind. The Ash engine batch added the `use_fan_rotom_fan_call_command` action, pending-effect prompt flow, and `GameView.ActionAffordances` metadata, but the replayed `28271` versus `28438` browser run proved the SPA still lacked an executable `Fan Call` button because `Prizmo.TcgEngine` had not exposed the new action through `typescript_rpc` / code-interface wiring and `index.tsx` had no `fan_call` action renderer. The follow-up batch added the RPC/client/SPA command path, replayed the same seeded matchup in supported game `3f8b85eb-c0c9-4e04-81fa-79667e01a80f`, confirmed Turn 2 `Fan Call` button visibility and prompt resolution over the three legal `Dunsparce` deck copies, and then fixed a second correctness bug from the same replay: `AbilityEffects.require_fan_call_available/2` previously allowed `Fan Call` again on later turns. The engine now rejects later-turn reuse with `:fan_call_only_available_on_first_turn`, and the browser-confirmed Turn 4 state no longer shows a `Fan Call` affordance.
 - Remaining live validation work is broader and deeper: continue two-seat play-surface runs across more of the latest-result Goal 1 fixture pool and keep pushing beyond setup/pass into additional mid-game turn lines when those runs provide new coverage signal. The fixture launcher now supports explicit RNG seeds, and `mix prizmo.goal1.seed_search` can now preselect promising fixture seeds before opening the browser. Prefer regression-fixture mode when reproducing seed-search hits, because regular premade/open-deck creation uses different synthetic deck-key shuffle context.
 
 ## Historical seed variant pool
