@@ -1,6 +1,7 @@
 defmodule Prizmo.TcgEngine.MechanicsTest do
   use Prizmo.DataCase, async: true
 
+  alias Prizmo.Tcg.CardCoverage
   alias Prizmo.Tcg.Decks.Alakazam27147
   alias Prizmo.Tcg.Decks.Dragapult27431
   alias Prizmo.Tcg.Decks.DragapultBlaziken28253
@@ -773,6 +774,15 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
   end
 
   describe "Goal 2 metadata-backed support slice" do
+    test "MEE-008 Metal Energy metadata makes the card generic-supported" do
+      assert {:ok, metal_energy} = CardCatalog.fetch("MEE-008")
+      assert metal_energy.supertype == :energy
+      assert metal_energy.energy_type == :basic
+      assert metal_energy.provides == [:metal]
+
+      assert %{coverage_status: :generic_supported} = CardCoverage.summarize("MEE-008")
+    end
+
     test "ASC-046 Snorunt metadata makes Chilly executable" do
       {:ok, game} = create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147)
 
@@ -876,6 +886,89 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
 
       assert Enum.sort(Enum.map(cards_moved_event.payload["cards"], & &1["instance_id"])) ==
                Enum.sort([basic_energy_1.id, basic_energy_2.id])
+    end
+
+    test "MEG-116 Fighting Gong searches for a Basic Fighting Energy or a Basic Fighting Pokémon" do
+      {:ok, game} = create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147)
+
+      {:ok, fighting_gong} = create_custom_owned_card(game.id, "player_1", "MEG-116", 210)
+      {:ok, fighting_gong} = ash_update(fighting_gong, :draw_to_hand, %{position: 20})
+
+      {:ok, fighting_energy} = create_custom_owned_card(game.id, "player_1", "MEE-006", 211)
+      {:ok, basic_fighting} = create_custom_owned_card(game.id, "player_1", "SSP-111", 212)
+      {:ok, stage_1_fighting} = create_custom_owned_card(game.id, "player_1", "TWM-100", 213)
+      {:ok, basic_non_fighting} = create_custom_owned_card(game.id, "player_1", "PRE-035", 214)
+
+      assert {:ok, game} = Mechanics.play_card(game, "player_1", fighting_gong.id, %{})
+
+      [prompt] = awaiting_prompts(game.id)
+      assert prompt.player_id == "player_1"
+
+      assert prompt.payload["choice_key"] ==
+               "search_deck_for_basic_fighting_energy_or_basic_fighting_pokemon"
+
+      assert prompt.payload["min"] == 1
+      assert prompt.payload["max"] == 1
+      assert fighting_energy.id in prompt.payload["legal_choices"]
+      assert basic_fighting.id in prompt.payload["legal_choices"]
+      refute stage_1_fighting.id in prompt.payload["legal_choices"]
+      refute basic_non_fighting.id in prompt.payload["legal_choices"]
+
+      assert {:ok, game} =
+               Mechanics.choose_prompt(game, "player_1", prompt.id, [basic_fighting.id])
+
+      assert zone(fighting_gong.id) == :discard
+      assert zone(basic_fighting.id) == :hand
+      assert zone(fighting_energy.id) == :deck
+
+      cards_moved_event =
+        game.id
+        |> game_events_by_type("cards_moved")
+        |> Enum.find(
+          &(&1.payload["effect_key"] ==
+              "search_deck_for_basic_fighting_energy_or_basic_fighting_pokemon")
+        )
+
+      assert cards_moved_event.payload["public_reveal"] == true
+
+      assert Enum.map(cards_moved_event.payload["cards"], & &1["instance_id"]) == [
+               basic_fighting.id
+             ]
+    end
+
+    test "ASC-047 Mega Froslass ex scales with opponent hand size and puts the Active Pokémon Asleep" do
+      {:ok, game} = create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147)
+
+      {:ok, attacker} = create_custom_owned_card(game.id, "player_1", "ASC-047", 220)
+      defender = active_card(game.id, "player_2")
+      opponent_hand_count = card_count_in_zone(game.id, "player_2", :hand)
+      expected_damage = opponent_hand_count * 50
+
+      assert {:ok, resentful_refrain} =
+               CardCatalog.fetch_attack(attacker.card_id, :resentful_refrain)
+
+      assert resentful_refrain.damage == 0
+
+      assert {:ok, ^expected_damage} =
+               AttackDamage.damage_for(attacker, defender, resentful_refrain)
+
+      assert {:ok, absolute_snow} = CardCatalog.fetch_attack(attacker.card_id, :absolute_snow)
+      assert absolute_snow.damage == 150
+
+      assert {:ok, effect_payload} =
+               AttackEffects.resolve_after_damage(
+                 game.id,
+                 "player_1",
+                 attacker,
+                 defender,
+                 absolute_snow,
+                 %{}
+               )
+
+      assert effect_payload.effect_type == "sleep_defender_active"
+      assert effect_payload.defender_status == "asleep"
+      assert effect_payload.defender_status_applied?
+      assert card(defender.id).status == :asleep
     end
 
     test "TWM-162 Scoop Up Cyclone returns a Benched Pokémon and its attached cards to hand" do

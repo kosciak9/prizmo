@@ -2693,6 +2693,12 @@ defmodule Prizmo.TcgEngine.CardPlay do
 
   defp require_search_filter(%CardInstance{}, nil), do: :ok
 
+  defp require_search_filter(%CardInstance{} = card, %{kind: :pokemon, stage: stage, type: type}) do
+    with :ok <- require_search_filter(card, %{kind: :pokemon, stage: stage}) do
+      require_search_filter(card, %{kind: :pokemon, type: type})
+    end
+  end
+
   defp require_search_filter(%CardInstance{} = card, %{kind: :pokemon, tera?: true}) do
     require_tera_pokemon_card(card.card_id)
   end

@@ -46,6 +46,14 @@ defmodule Prizmo.Tcg.Cards.Behaviors.MEG do
     card_effect(effect: %{type: :move_basic_energy_between_own_pokemon})
   end
 
+  card "MEG-116" do
+    card_effect(
+      effect: %{
+        type: :search_deck_for_basic_fighting_energy_or_basic_fighting_pokemon
+      }
+    )
+  end
+
   card "MEG-127" do
     card_effect(effect: %{type: :damage_on_bench_for_basic_non_darkness})
   end

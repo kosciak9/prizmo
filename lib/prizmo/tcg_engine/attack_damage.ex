@@ -281,6 +281,17 @@ defmodule Prizmo.TcgEngine.AttackDamage do
     end
   end
 
+  defp apply_effect(damage, %CardInstance{game_id: game_id}, %CardInstance{} = defender_card, %{
+         type: :damage_per_opponent_hand_card,
+         damage_per_card: damage_per_card
+       })
+       when is_integer(damage_per_card) and damage_per_card >= 0 do
+    with {:ok, hand_cards} <-
+           CardStore.cards_in_zone(game_id, defender_card.owner_player_id, :hand) do
+      {:ok, damage + length(hand_cards) * damage_per_card}
+    end
+  end
+
   defp apply_effect(damage, _attacker_card, _defender_card, nil), do: {:ok, damage}
 
   defp apply_effect(
@@ -368,6 +379,9 @@ defmodule Prizmo.TcgEngine.AttackDamage do
        }), do: {:ok, damage}
 
   defp apply_effect(damage, _attacker_card, _defender_card, %{type: :confuse_defender_active}),
+    do: {:ok, damage}
+
+  defp apply_effect(damage, _attacker_card, _defender_card, %{type: :sleep_defender_active}),
     do: {:ok, damage}
 
   defp apply_effect(damage, _attacker_card, _defender_card, %{

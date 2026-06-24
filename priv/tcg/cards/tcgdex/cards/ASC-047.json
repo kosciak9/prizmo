@@ -1,0 +1,79 @@
+{
+  "prizmo_id": "ASC-047",
+  "source": {
+    "base_url": "https://api.tcgdex.net/v2/en",
+    "dynamic_fields_removed": [
+      "pricing"
+    ],
+    "language": "en",
+    "provider": "TCGdex"
+  },
+  "tcgdex": {
+    "attacks": [
+      {
+        "cost": [
+          "Water"
+        ],
+        "damage": "50×",
+        "effect": "This attack does 50 damage for each card in your opponent's hand.",
+        "name": "Resentful Refrain"
+      },
+      {
+        "cost": [
+          "Water",
+          "Colorless",
+          "Colorless"
+        ],
+        "damage": 150,
+        "effect": "Your opponent's Active Pokémon is now Asleep.",
+        "name": "Absolute Snow"
+      }
+    ],
+    "category": "Pokemon",
+    "evolveFrom": "Snorunt",
+    "hp": 310,
+    "id": "me02.5-047",
+    "illustrator": "5ban Graphics",
+    "image": "https://assets.tcgdex.net/en/me/me02.5/047",
+    "legal": {
+      "expanded": true,
+      "standard": true
+    },
+    "localId": "047",
+    "name": "Mega Froslass ex",
+    "rarity": "Double rare",
+    "regulationMark": "I",
+    "retreat": 1,
+    "set": {
+      "cardCount": {
+        "official": 217,
+        "total": 295
+      },
+      "id": "me02.5",
+      "logo": "https://assets.tcgdex.net/en/me/me02.5/logo",
+      "name": "Ascended Heroes",
+      "symbol": "https://assets.tcgdex.net/univ/me/me02.5/symbol"
+    },
+    "stage": "Stage1",
+    "suffix": "ex",
+    "types": [
+      "Water"
+    ],
+    "updated": "2026-04-25T21:46:36+01:00",
+    "variants": {
+      "firstEdition": false,
+      "holo": true,
+      "normal": false,
+      "reverse": false,
+      "wPromo": false
+    },
+    "variants_detailed": [
+      {
+        "size": "standard",
+        "type": "holo",
+        "variantId": "jr7oetx1mqug9"
+      }
+    ]
+  },
+  "tcgdex_id": "me02.5-047"
+}

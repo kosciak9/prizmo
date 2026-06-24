@@ -79,8 +79,10 @@ defmodule Prizmo.TcgEngine.AttackEffects do
     :bonus_damage_per_energy_attached_to_defender,
     :attacker_cannot_attack_next_turn,
     :confuse_defender_active,
+    :sleep_defender_active,
     :confuse_defender_active_then_move_opponent_damage_counters,
     @copy_opponent_active_tera_pokemon_attack,
+    :damage_per_opponent_hand_card,
     :damage_unaffected_by_effects_on_opponent_active,
     :damage_per_opponent_pokemon_ex_in_play,
     :damage_per_opponent_prize_taken,
@@ -289,6 +291,9 @@ defmodule Prizmo.TcgEngine.AttackEffects do
       %{type: :confuse_defender_active} ->
         set_defender_status(game_id, player_id, defender_card, :confused)
 
+      %{type: :sleep_defender_active} ->
+        set_defender_status(game_id, player_id, defender_card, :asleep)
+
       %{type: :confuse_defender_active_then_move_opponent_damage_counters} ->
         confuse_defender_active_then_move_opponent_damage_counters(
           game_id,
@@ -349,6 +354,9 @@ defmodule Prizmo.TcgEngine.AttackEffects do
         {:ok, %{}}
 
       %{type: :damage_per_opponent_pokemon_ex_in_play} ->
+        {:ok, %{}}
+
+      %{type: :damage_per_opponent_hand_card} ->
         {:ok, %{}}
 
       %{type: :damage_per_opponent_prize_taken} ->
@@ -1139,6 +1147,8 @@ defmodule Prizmo.TcgEngine.AttackEffects do
 
   defp set_defender_status(game_id, attacking_player_id, %CardInstance{} = defender_card, status) do
     with {:ok, current_defender_card} <- get_card(game_id, defender_card.id) do
+      effect_type = special_condition_effect_type(status)
+
       case status_condition_prevention_payload(
              game_id,
              attacking_player_id,
@@ -1149,7 +1159,7 @@ defmodule Prizmo.TcgEngine.AttackEffects do
           {:ok,
            Map.merge(
              %{
-               effect_type: "confuse_defender_active",
+               effect_type: effect_type,
                defender_status: Atom.to_string(status),
                defender_status_applied?: false,
                defender_status_card_instance_id: current_defender_card.id,
@@ -1165,7 +1175,7 @@ defmodule Prizmo.TcgEngine.AttackEffects do
                      update(current_defender_card, :set_status, %{status: status}) do
                 {:ok,
                  %{
-                   effect_type: "confuse_defender_active",
+                   effect_type: effect_type,
                    defender_status: Atom.to_string(status),
                    defender_status_applied?: true,
                    defender_status_card_instance_id: current_defender_card.id
@@ -1175,7 +1185,7 @@ defmodule Prizmo.TcgEngine.AttackEffects do
             _other_zone ->
               {:ok,
                %{
-                 effect_type: "confuse_defender_active",
+                 effect_type: effect_type,
                  defender_status: Atom.to_string(status),
                  defender_status_applied?: false,
                  defender_status_card_instance_id: defender_card.id
@@ -1983,6 +1993,9 @@ defmodule Prizmo.TcgEngine.AttackEffects do
 
   defp pluralize_damage_counter(1), do: "damage counter"
   defp pluralize_damage_counter(_count), do: "damage counters"
+
+  defp special_condition_effect_type(:asleep), do: "sleep_defender_active"
+  defp special_condition_effect_type(:confused), do: "confuse_defender_active"
 
   defp move_opponent_attached_energy_between_pokemon(game_id, player_id, opts) do
     with {:ok, move_option} <- opponent_energy_move_option(game_id, player_id, opts) do

@@ -388,6 +388,31 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     ]
   }
 
+  @fighting_gong %CardDefinition{
+    id: "MEG-116",
+    kind: :trainer,
+    trainer_type: :item,
+    play_window: :action_window,
+    effects: [
+      %Effect{
+        key: :search_deck_for_basic_fighting_energy_or_basic_fighting_pokemon,
+        type: :search_deck,
+        params: %{
+          filter: %{
+            any: [
+              %{kind: :energy, energy_type: :basic, provides: :fighting},
+              %{kind: :pokemon, stage: :basic, type: :fighting}
+            ]
+          },
+          count: 1,
+          destination: :hand,
+          reveal: true,
+          shuffle_after: true
+        }
+      }
+    ]
+  }
+
   @switch %CardDefinition{
     id: "MEG-130",
     kind: :trainer,
@@ -1095,6 +1120,7 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     @enhanced_hammer.id => @enhanced_hammer,
     @energy_retrieval.id => @energy_retrieval,
     @energy_switch.id => @energy_switch,
+    @fighting_gong.id => @fighting_gong,
     @scoop_up_cyclone.id => @scoop_up_cyclone,
     @switch.id => @switch,
     @surfer.id => @surfer,

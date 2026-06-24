@@ -12,6 +12,18 @@ defmodule Prizmo.Tcg.Cards.Behaviors.ASC do
     attack(:ram, effect: nil)
   end
 
+  card "ASC-047" do
+    attack(:resentful_refrain,
+      damage: 0,
+      effect: %{type: :damage_per_opponent_hand_card, damage_per_card: 50}
+    )
+
+    attack(:absolute_snow,
+      damage: 150,
+      effect: %{type: :sleep_defender_active}
+    )
+  end
+
   card "ASC-142" do
     ability(:flip_the_script,
       effect: %{type: :draw_if_own_pokemon_knocked_out_last_turn, count: 3}
