@@ -64,13 +64,13 @@ Those reports are the canonical starting point for autonomous Goal 2 implementat
 - Tracked top archetypes: `30`
 - Tracked cards with usage greater than `0.00`: `377`
 - Coverage buckets from `mix prizmo.goal2.corpus`:
-  - `supported=138`
+  - `supported=139`
   - `generic-supported=8`
   - `partial=10`
-  - `unimplemented=221`
+  - `unimplemented=220`
 - Metadata buckets:
-  - `cached=159`
-  - `missing=218`
+  - `cached=160`
+  - `missing=217`
 
 Important interpretation:
 
@@ -82,17 +82,17 @@ Important interpretation:
 
 The strongest current Goal 2 implementation candidates are the incomplete cards shared by the most archetypes and/or the most total metagame share.
 
-The latest Goal 2 engine batch closed `ASC-216` Prism Energy instead of leaving the top shared Special Energy blocker as a metadata-only gap. `ASC-216` now has committed TCGdex metadata plus authored engine support for its conditional provider rule: it still provides only `{C}` while attached to non-Basics, but it now provides every colored Energy type while attached to a Basic Pokémon. The reusable engine effect is instance-aware Special Energy provider resolution, so attack-cost payment and attached-Energy type checks now see the same dynamic Basic-versus-evolution Prism state.
+The latest Goal 2 engine batch closed `TWM-053` Froslass instead of treating the top remaining three-archetype evolution line as metadata-only cleanup. `TWM-053` now has committed TCGdex metadata plus authored Pokémon Checkup support for `Freezing Shroud`: each in-play Froslass contributes `1` damage counter to every Pokémon that has an Ability except any Froslass, the effect stacks across multiple Froslass copies, and the same checkup pass now feeds public event notes plus the existing HP/prize/replacement pipeline so checkup KOs resolve like other canonical Ash knockouts.
 
 ### Highest-priority remaining `unimplemented` cards from current report
 
 | Card | Archetypes | Total share | Notes |
 | --- | --- | --- | --- |
-| `TWM-053` Froslass | `3` | `8.72%` | Shared follow-on evolution line after Mega Froslass ex moved to supported. |
 | `POR-087` Rocky Fighting Energy | `3` | `8.15%` | Shared Fighting Special Energy line across Crustle, Cynthia, and Mega Lucario shells. |
 | `POR-072` Energy Search | `3` | `4.31%` | Lower-share shared Item cleanup once the remaining higher-share three-archetype blockers fall. |
 | `TEF-154` Maximum Belt | `3` | `4.11%` | Shared ACE SPEC Tool line after the broader Pokémon/Special Energy blockers. |
 | `SSP-185` Precious Trolley | `3` | `4.06%` | Shared bench-filling ACE SPEC once the simpler search/Energy slice is reduced. |
+| `CRI-080` Prism Tower | `3` | `3.45%` | Shared Stadium follow-up once the current three-archetype Item/Energy slice is reduced. |
 
 ### Shared `partial` cards worth finishing after the broad unimplemented slice
 
@@ -119,8 +119,8 @@ That means prior Goal 1 and six-deck coverage was not wasted; it now acts as see
 
 ## Recommended next implementation order
 
-1. Take `TWM-053` Froslass next as the highest-share remaining three-archetype blocker and the next shared evolution line.
-2. After that, continue the same three-archetype metadata-missing slice with `POR-087`, `POR-072`, and `TEF-154` before dropping into lower-archetype blockers.
+1. Take `POR-087` Rocky Fighting Energy next as the highest-share remaining three-archetype blocker and the top shared Special Energy line.
+2. After that, continue the same three-archetype metadata-missing slice with `POR-072`, `TEF-154`, `SSP-185`, and `CRI-080` before dropping into lower-archetype blockers.
 3. Keep the remaining Dragapult-only cached pair `TWM-099` / `TWM-100` as deliberate single-archetype cleanup, not the default autonomous queue.
 4. Finish the remaining shared partials only after the broad unimplemented slice unless another batch naturally extends the new HP infrastructure; if returning to HP work soon, `POR-086` Growing Grass Energy remains the strongest follow-up.
 5. Keep using `mix prizmo.goal2.corpus` after each batch to re-rank the next blockers by archetype count and weighted share.

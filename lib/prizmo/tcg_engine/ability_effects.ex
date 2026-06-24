@@ -53,6 +53,7 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
   @subjugating_chains_ability_id :subjugating_chains
   @subjugating_chains_effect_type :subjugating_chains_switch_and_poison
   @subjugating_chains_unavailable_reason :subjugating_chains_requires_benched_darkness_pokemon_except_pecharunt_ex
+  @pokemon_checkup_damage_effect_type :pokemon_checkup_damage_to_pokemon_with_abilities_except_names
   @jewel_seeker_card_id "SCR-115"
   @jewel_seeker_ability_id :jewel_seeker
   @jewel_seeker_effect_type :search_trainer_cards_when_evolved_with_tera_in_play
@@ -145,6 +146,29 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
 
   def fan_call_source?(%CardInstance{card_id: @fan_call_card_id}), do: true
   def fan_call_source?(%CardInstance{}), do: false
+
+  def card_has_ability?(%CardInstance{card_id: card_id}) do
+    case CardCatalog.fetch(card_id) do
+      {:ok, %{abilities: abilities}} when is_map(abilities) and map_size(abilities) > 0 -> true
+      _other -> false
+    end
+  end
+
+  def pokemon_checkup_damage_effect(%CardInstance{card_id: card_id}) do
+    with {:ok, %{abilities: abilities}} <- CardCatalog.fetch(card_id),
+         {_ability_id, %{effect: effect}} <-
+           Enum.find(abilities, &pokemon_checkup_damage_ability?/1),
+         %{type: @pokemon_checkup_damage_effect_type, damage_counters: damage_counters} <- effect,
+         except_names when is_list(except_names) <- Map.get(effect, :except_names),
+         true <- damage_counters > 0 do
+      {:ok, %{damage_counters: damage_counters, except_names: except_names}}
+    else
+      _other ->
+        {:error,
+         {:unsupported_pokemon_checkup_ability_effect, card_id,
+          @pokemon_checkup_damage_effect_type}}
+    end
+  end
 
   def require_self_knock_out_ability_not_blocked(game_id) when is_binary(game_id) do
     if damp_active?(game_id) do
@@ -857,6 +881,20 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
       :ok
     end
   end
+
+  defp pokemon_checkup_damage_ability?({_ability_id, %{effect: effect}}) when is_map(effect) do
+    match?(
+      %{
+        type: @pokemon_checkup_damage_effect_type,
+        damage_counters: damage_counters,
+        except_names: except_names
+      }
+      when is_integer(damage_counters) and damage_counters > 0 and is_list(except_names),
+      effect
+    )
+  end
+
+  defp pokemon_checkup_damage_ability?(_other), do: false
 
   defp adrena_brain_effect(%CardInstance{card_id: card_id}) do
     with {:ok, %{abilities: abilities}} <- CardCatalog.fetch(card_id),

@@ -402,6 +402,16 @@ defmodule Prizmo.TcgEngine.GameView do
     }
   end
 
+  defp public_event_details(%GameEvent{type: "pokemon_checkup_effect_resolved", payload: payload}) do
+    %{
+      public_note:
+        payload_value(payload, "public_note") ||
+          "Pokémon Checkup resolved supported Ability effects.",
+      public_card_count: 0,
+      public_revealed_cards: []
+    }
+  end
+
   defp public_event_details(%GameEvent{type: "resolve_declared_attack", payload: payload}) do
     case payload_value(payload, "effect_type") do
       "lock_opponent_items_next_turn" ->

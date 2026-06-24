@@ -437,11 +437,11 @@ defmodule Prizmo.TcgEngine.Flow.Actions do
     with {:ok, turn} <- current_turn(game.id),
          :ok <- require_turn_status(turn, :action_window),
          {:ok, turn} <- update(turn, :pass, %{}),
-         {:ok, game} <- update(game, :set_flow_state, %{flow_state: :turn_starting_turn}),
          {:ok, event} <-
            write_event(game, :turn_ended, turn.active_player_id, %{turn_id: turn.id}),
-         {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do
-      {:ok, game}
+         {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index),
+         {:ok, game} <- Mechanics.process_pokemon_checkup(game) do
+      update(game, :set_flow_state, %{flow_state: :turn_starting_turn})
     end
   end
 
@@ -464,11 +464,11 @@ defmodule Prizmo.TcgEngine.Flow.Actions do
   def finish_attack(%Context{game: %Game{} = game}, _attrs) do
     with {:ok, turn} <- current_turn(game.id),
          {:ok, game} <- Mechanics.finish_attack(game, turn.active_player_id),
-         {:ok, game} <- update(game, :set_flow_state, %{flow_state: :turn_starting_turn}),
          {:ok, event} <-
            write_event(game, :turn_ended, turn.active_player_id, %{turn_id: turn.id}),
-         {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do
-      {:ok, game}
+         {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index),
+         {:ok, game} <- Mechanics.process_pokemon_checkup(game) do
+      update(game, :set_flow_state, %{flow_state: :turn_starting_turn})
     end
   end
 

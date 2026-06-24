@@ -3213,6 +3213,159 @@ defmodule Prizmo.TcgEngine.Mechanics do
     end)
   end
 
+  defp apply_pokemon_checkup_effects(game_id) when is_binary(game_id) do
+    with {:ok, cards} <- CardStore.list_cards(game_id) do
+      in_play_cards = Enum.filter(cards, &(&1.zone in [:active, :bench]))
+      source_effects = pokemon_checkup_source_effects(in_play_cards)
+
+      with {:ok, target_results} <-
+             apply_pokemon_checkup_damage_targets(game_id, in_play_cards, source_effects) do
+        {:ok, %{source_effects: source_effects, target_results: target_results}}
+      end
+    end
+  end
+
+  defp pokemon_checkup_source_effects(cards) when is_list(cards) do
+    Enum.flat_map(cards, fn source_card ->
+      case AbilityEffects.pokemon_checkup_damage_effect(source_card) do
+        {:ok, effect} -> [%{source_card: source_card, effect: effect}]
+        {:error, _reason} -> []
+      end
+    end)
+  end
+
+  defp apply_pokemon_checkup_damage_targets(_game_id, _in_play_cards, []) do
+    {:ok, []}
+  end
+
+  defp apply_pokemon_checkup_damage_targets(game_id, in_play_cards, source_effects)
+       when is_binary(game_id) and is_list(in_play_cards) and is_list(source_effects) do
+    in_play_cards
+    |> Enum.reduce_while({:ok, []}, fn card, {:ok, results} ->
+      case pokemon_checkup_damage_target_result(game_id, card, source_effects) do
+        {:ok, nil} -> {:cont, {:ok, results}}
+        {:ok, result} -> {:cont, {:ok, [result | results]}}
+        {:error, reason} -> {:halt, {:error, reason}}
+      end
+    end)
+    |> case do
+      {:ok, results} -> {:ok, Enum.reverse(results)}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp pokemon_checkup_damage_target_result(game_id, %CardInstance{} = card, source_effects)
+       when is_binary(game_id) and is_list(source_effects) do
+    if AbilityEffects.card_has_ability?(card) do
+      damage_counters =
+        Enum.reduce(source_effects, 0, fn %{effect: effect}, total_damage_counters ->
+          if pokemon_checkup_damage_exempt?(card, effect.except_names) do
+            total_damage_counters
+          else
+            total_damage_counters + effect.damage_counters
+          end
+        end)
+
+      if damage_counters > 0 do
+        damage = AbilityEffects.damage_for_counters(damage_counters)
+        resulting_damage = card.damage + damage
+
+        with {:ok, knocked_out?} <- HpEffects.damage_knocks_out?(game_id, card, resulting_damage),
+             {:ok, _updated_card} <- update(card, :set_damage, %{damage: resulting_damage}) do
+          {:ok,
+           %{
+             card_instance_id: card.id,
+             card_id: card.card_id,
+             owner_player_id: card.owner_player_id,
+             starting_damage: card.damage,
+             damage_counters: damage_counters,
+             applied_damage: damage,
+             resulting_damage: resulting_damage,
+             knocked_out?: knocked_out?
+           }}
+        end
+      else
+        {:ok, nil}
+      end
+    else
+      {:ok, nil}
+    end
+  end
+
+  defp pokemon_checkup_damage_exempt?(%CardInstance{card_id: card_id}, except_names)
+       when is_list(except_names) do
+    case CardCatalog.fetch(card_id) do
+      {:ok, %{name: name}} when is_binary(name) -> name in except_names
+      _other -> false
+    end
+  end
+
+  defp maybe_write_pokemon_checkup_event(_game, %{target_results: []}) do
+    {:ok, nil}
+  end
+
+  defp maybe_write_pokemon_checkup_event(
+         %Game{} = game,
+         %{source_effects: source_effects} = result
+       ) do
+    write_event_and_snapshot(game.id, :pokemon_checkup_effect_resolved, nil, %{
+      turn_id: current_turn_id(game.id),
+      source_card_ids: Enum.map(source_effects, & &1.source_card.card_id),
+      source_card_instance_ids: Enum.map(source_effects, & &1.source_card.id),
+      targets: Enum.map(result.target_results, &pokemon_checkup_target_payload/1),
+      public_note: pokemon_checkup_public_note(result)
+    })
+  end
+
+  defp pokemon_checkup_target_payload(result) do
+    %{
+      card_instance_id: result.card_instance_id,
+      card_id: result.card_id,
+      owner_player_id: result.owner_player_id,
+      starting_damage: result.starting_damage,
+      damage_counters: result.damage_counters,
+      applied_damage: result.applied_damage,
+      resulting_damage: result.resulting_damage,
+      knocked_out?: result.knocked_out?
+    }
+  end
+
+  defp pokemon_checkup_public_note(%{
+         source_effects: source_effects,
+         target_results: target_results
+       }) do
+    total_damage_counters =
+      target_results
+      |> Enum.map(&Map.get(&1, :damage_counters, 0))
+      |> Enum.max(fn -> 0 end)
+
+    except_names =
+      source_effects
+      |> Enum.flat_map(fn %{effect: effect} -> Map.get(effect, :except_names, []) end)
+      |> Enum.uniq()
+
+    case except_names do
+      [except_name] ->
+        "Pokémon Checkup placed #{total_damage_counters} #{pluralize_damage_counter(total_damage_counters)} on each Pokémon with an Ability except #{except_name}."
+
+      _other ->
+        "Pokémon Checkup resolved supported Ability effects."
+    end
+  end
+
+  defp resolve_pokemon_checkup_knockouts(%Game{} = game, %{target_results: []}) do
+    {:ok, game}
+  end
+
+  defp resolve_pokemon_checkup_knockouts(%Game{} = game, _result) do
+    game.id
+    |> hp_state_based_knockout_targets()
+    |> then(&resolve_hp_state_based_knockout_targets(game, &1))
+  end
+
+  defp pluralize_damage_counter(1), do: "damage counter"
+  defp pluralize_damage_counter(_count), do: "damage counters"
+
   defp cursed_blast_event_payload(
          %Turn{} = turn,
          %CardInstance{} = source_card,
@@ -3949,6 +4102,19 @@ defmodule Prizmo.TcgEngine.Mechanics do
            {:ok, turn} <- update(turn, :end_turn, %{}),
            {:ok, event} <- write_event(game, :end_turn, player_id, %{turn_id: turn.id}),
            {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index) do
+        get_game(game.id)
+      end
+    end)
+  end
+
+  @spec process_pokemon_checkup(Game.t() | String.t()) :: {:ok, Game.t()} | {:error, term()}
+  def process_pokemon_checkup(game_or_id) do
+    transaction(fn ->
+      with {:ok, game} <- get_game(game_or_id),
+           :ok <- require_game_status(game, :in_progress),
+           {:ok, result} <- apply_pokemon_checkup_effects(game.id),
+           {:ok, _event} <- maybe_write_pokemon_checkup_event(game, result),
+           {:ok, game} <- resolve_pokemon_checkup_knockouts(game, result) do
         get_game(game.id)
       end
     end)

@@ -66,6 +66,18 @@ defmodule Prizmo.Tcg.Cards.Behaviors.TWM do
     )
   end
 
+  card "TWM-053" do
+    ability(:freezing_shroud,
+      effect: %{
+        type: :pokemon_checkup_damage_to_pokemon_with_abilities_except_names,
+        damage_counters: 1,
+        except_names: ["Froslass"]
+      }
+    )
+
+    attack(:frost_smash, effect: nil)
+  end
+
   card "TWM-064" do
     tag(:tera)
 
