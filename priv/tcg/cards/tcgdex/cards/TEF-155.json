@@ -1,0 +1,65 @@
+{
+  "prizmo_id": "TEF-155",
+  "source": {
+    "base_url": "https://api.tcgdex.net/v2/en",
+    "dynamic_fields_removed": [
+      "pricing"
+    ],
+    "language": "en",
+    "provider": "TCGdex"
+  },
+  "tcgdex": {
+    "category": "Trainer",
+    "effect": "You can use this card only if you discard another card from your hand.\n\nDraw a card for each of your opponent's Benched Pokémon.",
+    "id": "sv05-155",
+    "illustrator": "GIDORA",
+    "image": "https://assets.tcgdex.net/en/sv/sv05/155",
+    "legal": {
+      "expanded": true,
+      "standard": true
+    },
+    "localId": "155",
+    "name": "Morty's Conviction",
+    "rarity": "Uncommon",
+    "regulationMark": "H",
+    "set": {
+      "cardCount": {
+        "official": 162,
+        "total": 218
+      },
+      "id": "sv05",
+      "name": "Temporal Forces",
+      "symbol": "https://assets.tcgdex.net/univ/sv/sv05/symbol"
+    },
+    "trainerType": "Supporter",
+    "updated": "2026-05-06T18:45:51Z",
+    "variants": {
+      "firstEdition": false,
+      "holo": false,
+      "normal": true,
+      "reverse": true,
+      "wPromo": false
+    },
+    "variants_detailed": [
+      {
+        "size": "standard",
+        "type": "normal",
+        "variantId": "endfynwn4n10gzq"
+      },
+      {
+        "size": "standard",
+        "type": "reverse",
+        "variantId": "cm4kqul3x1bwlz1f"
+      },
+      {
+        "size": "standard",
+        "stamp": [
+          "player-rewards-program"
+        ],
+        "type": "normal",
+        "variantId": "gx8bq2hegum3q6irsxlvqxm955ikw9gd1h311"
+      }
+    ]
+  },
+  "tcgdex_id": "sv05-155"
+}

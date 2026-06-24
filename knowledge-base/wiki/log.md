@@ -1,5 +1,12 @@
 # Wiki Log
 
+## [2026-06-24] codebase update | Goal 2 Morty's Conviction and Carmine support
+
+- Task attempted: closed the two highest-share shared Supporter blockers from the active three-archetype Goal 2 queue instead of skipping directly to the more complex Pokémon ex and Special Energy lines. Added committed TCGdex metadata for `TEF-155` Morty's Conviction and `TWM-145` Carmine; authored Morty's as a discard-1-cost Supporter that draws `1` card for each of the opponent's Benched Pokémon; authored Carmine as a first-turn-legal Supporter that discards the player's remaining hand and draws `5`; and generalized trainer-side dynamic draw-count plus partial-draw discard-hand-then-draw handling for these Supporters.
+- Files changed: `lib/prizmo/tcg_engine/card_play.ex`, `lib/prizmo/tcg_engine/cards/registry.ex`, `test/prizmo/tcg_engine/mechanics_test.exs`, `priv/tcg/cards/tcgdex/cards/TEF-155.json`, `priv/tcg/cards/tcgdex/cards/TWM-145.json`, `knowledge-base/wiki/engine/goal-2-top-30-latest-limitless-coverage-scope.md`, `knowledge-base/wiki/engine/ash-backed-tcg-engine-playtest-handoff.md`, `knowledge-base/wiki/log.md`.
+- Validation: `mix test test/prizmo/tcg_engine/mechanics_test.exs`; `mix format`; `mix compile --warnings-as-errors`; `mix prizmo.goal2.corpus` confirmed `supported=135` / `generic-supported=8` / `partial=10` / `unimplemented=224` and `cached=156` / `missing=221`; final `mix check` passed.
+- Remaining/blocking notes: `TEF-155` and `TWM-145` are no longer in the shared incomplete queue. The default next Goal 2 priority is now `TWM-112`, `ASC-216`, and `ASC-121`, followed by `TWM-053` and `POR-087`; if another simpler Trainer/Item cleanup batch is preferred first, `POR-072` and `TEF-154` are the next shared lower-share options.
+
 ## [2026-06-24] codebase update | Goal 2 Metal Energy, Fighting Gong, and Mega Froslass ex support
 
 - Task attempted: closed the remaining four-archetype metadata-missing Goal 2 queue instead of skipping ahead to newer three-archetype blockers. Added committed TCGdex metadata for `MEE-008` Metal Energy, `MEG-116` Fighting Gong, and `ASC-047` Mega Froslass ex; wired `MEG-116` through the generic deck-search path as an Item that finds exactly `1` Basic Fighting Energy or Basic Fighting Pokémon; added reusable stage-plus-type search filtering in `CardPlay`; and added `ASC-047` attack support via new opponent-hand-count damage and Asleep status hooks.

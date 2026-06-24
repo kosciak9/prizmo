@@ -242,6 +242,27 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     ]
   }
 
+  @mortys_conviction %CardDefinition{
+    id: "TEF-155",
+    kind: :trainer,
+    trainer_type: :supporter,
+    play_window: :action_window,
+    costs: [
+      %Cost{
+        key: :discard_one_from_hand,
+        type: :discard_from_hand,
+        params: %{count: 1}
+      }
+    ],
+    effects: [
+      %Effect{
+        key: :draw_cards_per_opponent_benched_pokemon,
+        type: :draw_cards,
+        params: %{count_per_opponent_benched_pokemon: 1}
+      }
+    ]
+  }
+
   @ruffian %CardDefinition{
     id: "JTG-157",
     kind: :trainer,
@@ -801,6 +822,21 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     ]
   }
 
+  @carmine %CardDefinition{
+    id: "TWM-145",
+    kind: :trainer,
+    trainer_type: :supporter,
+    play_window: :action_window,
+    first_turn_supporter_allowed_when_going_first?: true,
+    effects: [
+      %Effect{
+        key: :discard_hand_then_draw,
+        type: :discard_hand_then_draw,
+        params: %{count: 5}
+      }
+    ]
+  }
+
   @black_belts_training %CardDefinition{
     id: "JTG-143",
     kind: :trainer,
@@ -1166,8 +1202,10 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     @mega_lopunny_ex_twm.id => @mega_lopunny_ex_twm,
     @munkidori.id => @munkidori,
     @cyrano.id => @cyrano,
+    @carmine.id => @carmine,
     @ciphermaniacs_codebreaking.id => @ciphermaniacs_codebreaking,
     @eri.id => @eri,
+    @mortys_conviction.id => @mortys_conviction,
     @wondrous_patch.id => @wondrous_patch,
     @fan_rotom.id => @fan_rotom
   }

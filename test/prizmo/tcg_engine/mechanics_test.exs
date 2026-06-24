@@ -408,6 +408,116 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
       assert length(proton_effect_event.payload["cards"]) == 3
     end
 
+    test "Morty's Conviction is unavailable without an opponent Benched Pokémon" do
+      {:ok, game} = create_flow_action_window_game()
+      assert {:ok, game} = Mechanics.pass_turn(game, "player_1")
+
+      {:ok, morty} = create_custom_owned_card(game.id, "player_2", "TEF-155", 200)
+      {:ok, morty} = ash_update(morty, :draw_to_hand, %{position: 20})
+
+      {:ok, discard_card} = create_custom_owned_card(game.id, "player_2", "MEE-005", 201)
+      {:ok, discard_card} = ash_update(discard_card, :draw_to_hand, %{position: 21})
+
+      assert cards_in_zone(game.id, "player_1", :bench) == []
+
+      assert {:ok, view} = GameView.for_player(game.id, "player_2")
+      play_card = Enum.find(view.action_affordances, &(&1.key == "play_card"))
+      assert is_map(play_card)
+      refute morty.id in play_card.source_card_instance_ids
+
+      assert {:error, :draw_card_effect_has_no_effect} =
+               Mechanics.play_card(game, "player_2", morty.id, %{
+                 choices: %{discard_one_from_hand: [discard_card.id]}
+               })
+
+      assert zone(morty.id) == :hand
+      assert zone(discard_card.id) == :hand
+    end
+
+    test "Morty's Conviction discards 1 card and draws per opponent Benched Pokémon" do
+      {:ok, game} = create_flow_action_window_game()
+      assert {:ok, game} = Mechanics.pass_turn(game, "player_1")
+
+      {:ok, morty} = create_custom_owned_card(game.id, "player_2", "TEF-155", 210)
+      {:ok, morty} = ash_update(morty, :draw_to_hand, %{position: 20})
+
+      {:ok, discard_card} = create_custom_owned_card(game.id, "player_2", "MEE-005", 211)
+      {:ok, discard_card} = ash_update(discard_card, :draw_to_hand, %{position: 21})
+
+      current_turn_number = current_turn(game.id).turn_number
+
+      for {card_id, instance_position, hand_position, bench_position} <- [
+            {"PRE-035", 212, 22, 4},
+            {"SCR-114", 213, 23, 5},
+            {"JTG-120", 214, 24, 6}
+          ] do
+        {:ok, bench_card} =
+          create_custom_owned_card(game.id, "player_1", card_id, instance_position)
+
+        {:ok, bench_card} = ash_update(bench_card, :draw_to_hand, %{position: hand_position})
+
+        assert {:ok, _bench_card} =
+                 ash_update(bench_card, :play_to_bench, %{
+                   position: bench_position,
+                   turn_entered_play: current_turn_number
+                 })
+      end
+
+      draw_targets = game.id |> deck_cards_except("player_2", []) |> Enum.take(3)
+
+      assert {:ok, game} =
+               Mechanics.play_card(game, "player_2", morty.id, %{
+                 choices: %{discard_one_from_hand: [discard_card.id]}
+               })
+
+      assert zone(morty.id) == :discard
+      assert zone(discard_card.id) == :discard
+      assert Enum.map(draw_targets, &zone(&1.id)) == [:hand, :hand, :hand]
+
+      effect_event = game.id |> game_events_by_type("cards_moved") |> List.last()
+      assert effect_event.payload["effect_key"] == "draw_cards_per_opponent_benched_pokemon"
+      assert length(effect_event.payload["cards"]) == 3
+
+      assert Enum.all?(effect_event.payload["cards"], fn card_payload ->
+               card_payload["from_zone"] == "deck" and card_payload["to_zone"] == "hand"
+             end)
+    end
+
+    test "Carmine can be played on the first turn and discards hand before drawing 5" do
+      {:ok, game} = create_flow_action_window_game()
+
+      {:ok, carmine} = create_custom_owned_card(game.id, "player_1", "TWM-145", 220)
+      {:ok, carmine} = ash_update(carmine, :draw_to_hand, %{position: 20})
+
+      {:ok, discard_card_1} = create_custom_owned_card(game.id, "player_1", "MEE-005", 221)
+      {:ok, discard_card_1} = ash_update(discard_card_1, :draw_to_hand, %{position: 21})
+
+      {:ok, discard_card_2} = create_custom_owned_card(game.id, "player_1", "PRE-035", 222)
+      {:ok, discard_card_2} = ash_update(discard_card_2, :draw_to_hand, %{position: 22})
+
+      draw_targets = game.id |> deck_cards_except("player_1", []) |> Enum.take(5)
+
+      assert {:ok, view} = GameView.for_player(game.id, "player_1")
+      play_card = Enum.find(view.action_affordances, &(&1.key == "play_card"))
+      assert is_map(play_card)
+      assert carmine.id in play_card.source_card_instance_ids
+
+      assert {:ok, game} = Mechanics.play_card(game, "player_1", carmine.id, %{})
+
+      assert zone(carmine.id) == :discard
+      assert zone(discard_card_1.id) == :discard
+      assert zone(discard_card_2.id) == :discard
+      assert card_count_in_zone(game.id, "player_1", :hand) == 5
+      assert Enum.map(draw_targets, &zone(&1.id)) == [:hand, :hand, :hand, :hand, :hand]
+
+      effect_event = game.id |> game_events_by_type("cards_moved") |> List.last()
+      assert effect_event.payload["effect_key"] == "discard_hand_then_draw"
+
+      assert Enum.count(effect_event.payload["cards"], fn card_payload ->
+               card_payload["from_zone"] == "deck" and card_payload["to_zone"] == "hand"
+             end) == 5
+    end
+
     test "Brock's Scouting opens a prompt and resolves for up to 2 Basic Pokémon" do
       {:ok, game} = create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147)
 

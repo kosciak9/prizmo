@@ -675,6 +675,55 @@ defmodule Prizmo.TcgEngine.CardPlay do
          turn,
          player,
          card,
+         %{type: :draw_cards} = effect,
+         _target_ids
+       ) do
+    with {:ok, draw_count} <- draw_count_for_effect(game.id, player.player_id, effect),
+         {:ok, drawn_cards} <- draw_up_to_count_for_effect(game, player, draw_count),
+         {:ok, _event} <-
+           write_event_and_snapshot(game.id, :cards_moved, player.player_id, %{
+             reason: :effect_resolution,
+             source: EventPayloads.card_source(card),
+             effect_key: effect.key,
+             affected_player_id: player.player_id,
+             cards: EventPayloads.moved_cards(drawn_cards, :deck, :hand)
+           }) do
+      complete_play_card_resolution(game, turn, player, card, effect)
+    end
+  end
+
+  defp complete_play_card_effect(
+         game,
+         turn,
+         player,
+         card,
+         %{type: :discard_hand_then_draw} = effect,
+         _target_ids
+       ) do
+    with {:ok, hand_cards} <- CardStore.cards_in_zone(game.id, player.player_id, :hand),
+         {:ok, discarded_cards} <-
+           CardStore.discard_cards_from_hand(game.id, player.player_id, hand_cards),
+         {:ok, draw_count} <- draw_count_for_effect(game.id, player.player_id, effect),
+         {:ok, drawn_cards} <- draw_up_to_count_for_effect(game, player, draw_count),
+         {:ok, _event} <-
+           write_event_and_snapshot(game.id, :cards_moved, player.player_id, %{
+             reason: :effect_resolution,
+             source: EventPayloads.card_source(card),
+             effect_key: effect.key,
+             affected_player_id: player.player_id,
+             cards:
+               EventPayloads.moved_cards(discarded_cards, :hand, :discard) ++
+                 EventPayloads.moved_cards(drawn_cards, :deck, :hand)
+           }) do
+      complete_play_card_resolution(game, turn, player, card, effect)
+    end
+  end
+
+  defp complete_play_card_effect(
+         game,
+         turn,
+         player,
+         card,
          %{type: :search_deck} = effect,
          target_ids
        ) do
@@ -1385,6 +1434,12 @@ defmodule Prizmo.TcgEngine.CardPlay do
          definition
        ) do
     case EffectRunner.first_effect(definition) do
+      {:ok, %{type: :draw_cards} = effect} ->
+        require_draw_cards_effect_available(game.id, player.player_id, effect)
+
+      {:ok, %{type: :discard_hand_then_draw} = effect} ->
+        require_discard_hand_then_draw_effect_available(game.id, player.player_id, effect)
+
       {:ok, %{type: :draw_until_hand_size} = effect} ->
         require_draw_until_hand_size_effect(game.id, player.player_id, effect)
 
@@ -1434,6 +1489,30 @@ defmodule Prizmo.TcgEngine.CardPlay do
         :ok
       else
         {:error, :draw_until_hand_size_has_no_effect}
+      end
+    end
+  end
+
+  defp require_draw_cards_effect_available(game_id, player_id, effect) do
+    with {:ok, draw_count} <- draw_count_for_effect(game_id, player_id, effect),
+         {:ok, deck_count} <- CardStore.deck_count(game_id, player_id) do
+      if draw_count > 0 and deck_count > 0 do
+        :ok
+      else
+        {:error, :draw_card_effect_has_no_effect}
+      end
+    end
+  end
+
+  defp require_discard_hand_then_draw_effect_available(game_id, player_id, _effect) do
+    with {:ok, hand_cards} <- CardStore.cards_in_zone(game_id, player_id, :hand),
+         {:ok, deck_count} <- CardStore.deck_count(game_id, player_id) do
+      remaining_hand_size_after_play = max(length(hand_cards) - 1, 0)
+
+      if remaining_hand_size_after_play > 0 or deck_count > 0 do
+        :ok
+      else
+        {:error, :discard_hand_then_draw_has_no_effect}
       end
     end
   end
@@ -4663,12 +4742,36 @@ defmodule Prizmo.TcgEngine.CardPlay do
     end
   end
 
+  defp draw_count_for_effect(game_id, player_id, %{
+         params: %{count_per_opponent_benched_pokemon: count_per_opponent_benched_pokemon}
+       })
+       when is_integer(count_per_opponent_benched_pokemon) and
+              count_per_opponent_benched_pokemon >= 0 do
+    with {:ok, opponent_player} <- CardStore.get_opponent(game_id, player_id),
+         {:ok, opponent_bench_cards} <-
+           CardStore.cards_in_zone(game_id, opponent_player.player_id, :bench) do
+      {:ok, length(opponent_bench_cards) * count_per_opponent_benched_pokemon}
+    end
+  end
+
+  defp draw_count_for_effect(_game_id, _player_id, %{params: %{count: count}}), do: {:ok, count}
+
   defp draw_count_for_effect(_game_id, _player_id, %{params: %{draw_count: draw_count}}),
     do: {:ok, draw_count}
 
   defp draw_cards_for_effect(%Game{} = game, %GamePlayer{} = player, draw_count) do
     with {:ok, cards} <- CardStore.deck_cards_for_player(player.id, draw_count),
          :ok <- require_enough_deck_cards(cards, draw_count),
+         {:ok, starting_position} <-
+           CardStore.next_hand_position_result(game.id, player.player_id) do
+      draw_cards_to_hand(cards, starting_position)
+    end
+  end
+
+  defp draw_up_to_count_for_effect(_game, _player, count) when count <= 0, do: {:ok, []}
+
+  defp draw_up_to_count_for_effect(%Game{} = game, %GamePlayer{} = player, draw_count) do
+    with {:ok, cards} <- CardStore.deck_cards_for_player(player.id, draw_count),
          {:ok, starting_position} <-
            CardStore.next_hand_position_result(game.id, player.player_id) do
       draw_cards_to_hand(cards, starting_position)
