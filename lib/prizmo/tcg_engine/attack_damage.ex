@@ -31,7 +31,11 @@ defmodule Prizmo.TcgEngine.AttackDamage do
          {:ok, damage} <-
            apply_black_belts_training_bonus(damage, attacker_card, defender_card),
          {:ok, damage} <- apply_kieran_damage_bonus(damage, attacker_card, defender_card) do
-      apply_weakness_and_resistance(damage, attacker_card, defender_card)
+      if weakness_and_resistance_ignored?(attack) do
+        {:ok, max(damage, 0)}
+      else
+        apply_weakness_and_resistance(damage, attacker_card, defender_card)
+      end
     end
   end
 
@@ -262,6 +266,21 @@ defmodule Prizmo.TcgEngine.AttackDamage do
     end
   end
 
+  defp apply_effect(damage, %CardInstance{} = attacker_card, _defender_card, %{
+         type: :bonus_damage_if_own_pokemon_knocked_out_last_turn,
+         bonus_damage: bonus_damage
+       })
+       when is_integer(bonus_damage) and bonus_damage >= 0 do
+    with {:ok, own_pokemon_knocked_out_last_turn?} <-
+           own_pokemon_knocked_out_last_turn?(attacker_card) do
+      if own_pokemon_knocked_out_last_turn? do
+        {:ok, damage + bonus_damage}
+      else
+        {:ok, damage}
+      end
+    end
+  end
+
   defp apply_effect(damage, %CardInstance{game_id: game_id}, _defender_card, %{
          type: :damage_only_if_stadium_in_play
        }) do
@@ -339,6 +358,11 @@ defmodule Prizmo.TcgEngine.AttackDamage do
 
   defp apply_effect(damage, _attacker_card, _defender_card, %{
          type: :damage_unaffected_by_effects_on_opponent_active
+       }),
+       do: {:ok, damage}
+
+  defp apply_effect(damage, _attacker_card, _defender_card, %{
+         type: :damage_unaffected_by_weakness_resistance_and_effects_on_opponent_active
        }),
        do: {:ok, damage}
 
@@ -470,6 +494,13 @@ defmodule Prizmo.TcgEngine.AttackDamage do
   end
 
   defp apply_resistance(damage, _attacker_metadata, _defender_metadata), do: damage
+
+  defp weakness_and_resistance_ignored?(%{
+         effect: %{type: :damage_unaffected_by_weakness_resistance_and_effects_on_opponent_active}
+       }),
+       do: true
+
+  defp weakness_and_resistance_ignored?(_attack), do: false
 
   defp opponent_fairy_zone_active?(
          %CardInstance{owner_player_id: owner_player_id, zone: zone, card_id: card_id},
@@ -873,4 +904,63 @@ defmodule Prizmo.TcgEngine.AttackDamage do
       {:ok, max(@starting_prize_count - length(prizes), 0)}
     end
   end
+
+  defp own_pokemon_knocked_out_last_turn?(%CardInstance{
+         game_id: game_id,
+         owner_player_id: player_id
+       }) do
+    with {:ok, current_turn} <- TurnStore.current_turn(game_id),
+         {:ok, turns} <- TurnStore.list_all_turns(game_id),
+         previous_turn when not is_nil(previous_turn) <-
+           Enum.find(turns, &(&1.turn_number == current_turn.turn_number - 1)),
+         true <- previous_turn.active_player_id != player_id,
+         {:ok, events} <-
+           turn_player_events(game_id, previous_turn.id, previous_turn.active_player_id) do
+      {:ok, Enum.any?(events, &knocked_out_own_pokemon_by_attack_damage?(&1, player_id, game_id))}
+    else
+      nil -> {:ok, false}
+      false -> {:ok, false}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp knocked_out_own_pokemon_by_attack_damage?(
+         %GameEvent{type: type, payload: payload},
+         player_id,
+         game_id
+       )
+       when type in ["resolve_attack_damage", "resolve_declared_attack"] do
+    if payload["knocked_out?"] do
+      card_instance_id =
+        payload["target_card_instance_id"] || payload["defender_card_instance_id"]
+
+      case card_instance_id do
+        id when is_binary(id) ->
+          case CardStore.get_card(game_id, id) do
+            {:ok, %CardInstance{owner_player_id: ^player_id}} -> true
+            _other -> false
+          end
+
+        _other ->
+          false
+      end
+    else
+      false
+    end
+  end
+
+  defp knocked_out_own_pokemon_by_attack_damage?(
+         %GameEvent{type: "take_knockout_prizes", payload: payload},
+         player_id,
+         _game_id
+       ) do
+    payload
+    |> Map.get("knockouts", [])
+    |> Enum.any?(fn
+      %{"knocked_out_player_id" => ^player_id} -> true
+      _other -> false
+    end)
+  end
+
+  defp knocked_out_own_pokemon_by_attack_damage?(%GameEvent{}, _player_id, _game_id), do: false
 end

@@ -1859,6 +1859,151 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
     end
   end
 
+  describe "TWM-112 Cornerstone Mask Ogerpon ex support" do
+    test "Tera bench protection and Cornerstone Stance prevent attack damage only when appropriate" do
+      {:ok, game} = create_flow_action_window_game()
+      current_turn_number = current_turn(game.id).turn_number
+
+      {:ok, target} = create_custom_owned_card(game.id, "player_2", "TWM-112", 200)
+      {:ok, target} = ash_update(target, :draw_to_hand, %{position: 20})
+
+      {:ok, target} =
+        ash_update(target, :play_to_bench, %{position: 4, turn_entered_play: current_turn_number})
+
+      assert {:ok, _game} = Mechanics.resolve_attack_damage(game, "player_1", target.id, 120)
+      assert card(target.id).damage == 0
+
+      player_2_active = active_card(game.id, "player_2")
+
+      assert {:ok, _player_2_active} =
+               ash_update(player_2_active, :move_active_to_bench, %{position: 2, status: nil})
+
+      assert {:ok, _target} =
+               ash_update(card(target.id), :promote_to_active, %{position: 1, status: nil})
+
+      player_1_active = active_card(game.id, "player_1")
+
+      assert {:ok, _player_1_active} =
+               ash_update(player_1_active, :move_active_to_bench, %{position: 2, status: nil})
+
+      {:ok, no_ability_attacker} = create_custom_owned_card(game.id, "player_1", "PRE-035", 201)
+      {:ok, no_ability_attacker} = ash_update(no_ability_attacker, :draw_to_hand, %{position: 21})
+
+      {:ok, no_ability_attacker} =
+        ash_update(no_ability_attacker, :play_to_bench, %{
+          position: 4,
+          turn_entered_play: current_turn_number
+        })
+
+      assert {:ok, _no_ability_attacker} =
+               ash_update(no_ability_attacker, :promote_to_active, %{position: 1, status: nil})
+
+      assert {:ok, %{abilities: abilities}} = CardCatalog.fetch(no_ability_attacker.card_id)
+      assert abilities == %{}
+
+      assert {:ok, _game} = Mechanics.resolve_attack_damage(game, "player_1", target.id, 50)
+      assert card(target.id).damage == 50
+
+      assert {:ok, _target} = ash_update(card(target.id), :set_damage, %{damage: 0})
+
+      assert {:ok, _no_ability_attacker} =
+               ash_update(active_card(game.id, "player_1"), :move_active_to_bench, %{
+                 position: 5,
+                 status: nil
+               })
+
+      {:ok, ability_attacker} = create_custom_owned_card(game.id, "player_1", "TWM-025", 202)
+      {:ok, ability_attacker} = ash_update(ability_attacker, :draw_to_hand, %{position: 22})
+
+      {:ok, ability_attacker} =
+        ash_update(ability_attacker, :play_to_bench, %{
+          position: 6,
+          turn_entered_play: current_turn_number
+        })
+
+      assert {:ok, _ability_attacker} =
+               ash_update(ability_attacker, :promote_to_active, %{position: 1, status: nil})
+
+      assert {:ok, %{abilities: abilities}} = CardCatalog.fetch(ability_attacker.card_id)
+      assert map_size(abilities) > 0
+
+      assert {:ok, _game} = Mechanics.resolve_attack_damage(game, "player_1", target.id, 140)
+      assert card(target.id).damage == 0
+
+      prevention_event = game.id |> game_events_by_type("resolve_attack_damage") |> List.last()
+      assert prevention_event.payload["damage_prevented?"] == true
+
+      assert prevention_event.payload["attack_prevention_source_effect_id"] ==
+               "cornerstone_stance"
+    end
+  end
+
+  describe "ASC-121 Koraidon ex support" do
+    test "Orichalcum Fang checks the opponent's previous-turn knockout and Impact Blow sets its lock marker" do
+      {:ok, game} = create_flow_action_window_game()
+
+      {:ok, attacker} = create_custom_owned_card(game.id, "player_1", "ASC-121", 210)
+      defender = active_card(game.id, "player_2")
+
+      assert {:ok, orichalcum_fang} = CardCatalog.fetch_attack(attacker.card_id, :orichalcum_fang)
+      assert {:ok, impact_blow} = CardCatalog.fetch_attack(attacker.card_id, :impact_blow)
+
+      assert orichalcum_fang.damage == 50
+      assert {:ok, 50} = AttackDamage.damage_for(attacker, defender, orichalcum_fang)
+      assert impact_blow.damage == 200
+      assert {:ok, 200} = AttackDamage.damage_for(attacker, defender, impact_blow)
+
+      assert {:ok, game} = Mechanics.pass_turn(game, "player_1")
+
+      current_turn_number = current_turn(game.id).turn_number
+
+      {:ok, knocked_out_target} = create_custom_owned_card(game.id, "player_1", "PRE-035", 211)
+      {:ok, knocked_out_target} = ash_update(knocked_out_target, :draw_to_hand, %{position: 20})
+
+      {:ok, knocked_out_target} =
+        ash_update(knocked_out_target, :play_to_bench, %{
+          position: 4,
+          turn_entered_play: current_turn_number
+        })
+
+      assert {:ok, %{hp: hp}} = CardCatalog.fetch(knocked_out_target.card_id)
+      assert is_integer(hp) and hp > 10
+
+      assert {:ok, _knocked_out_target} =
+               ash_update(knocked_out_target, :set_damage, %{damage: hp - 10})
+
+      assert {:ok, game} =
+               Mechanics.resolve_attack_damage(game, "player_2", knocked_out_target.id, 10)
+
+      assert [prize_prompt] = awaiting_prompts(game.id)
+      prize_choice = List.first(prize_prompt.payload["legal_choices"])
+
+      assert {:ok, game} =
+               Mechanics.choose_prompt(game, "player_2", prize_prompt.id, [prize_choice])
+
+      assert {:ok, game} = Mechanics.pass_turn(game, "player_2")
+
+      assert {:ok, 170} = AttackDamage.damage_for(attacker, defender, orichalcum_fang)
+
+      assert {:ok, %{effect_type: "attacker_cannot_attack_next_turn"}} =
+               AttackEffects.resolve_after_damage(
+                 game.id,
+                 "player_1",
+                 attacker,
+                 defender,
+                 impact_blow,
+                 %{}
+               )
+
+      updated_attacker = card(attacker.id)
+
+      assert is_map(
+               Map.get(updated_attacker.markers, "cannot_attack_next_turn") ||
+                 Map.get(updated_attacker.markers, :cannot_attack_next_turn)
+             )
+    end
+  end
+
   describe "JTG-121 Dudunsparce ex support" do
     test "Tenacious Tail counts only opponent Pokémon ex in play, and Destructive Drill is executable" do
       {:ok, game} =

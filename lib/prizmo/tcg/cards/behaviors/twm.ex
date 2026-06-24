@@ -87,6 +87,19 @@ defmodule Prizmo.Tcg.Cards.Behaviors.TWM do
     attack(:beam, effect: nil)
   end
 
+  card "TWM-112" do
+    tag(:tera)
+
+    ability(:cornerstone_stance,
+      effect: %{type: :prevent_attack_damage_from_opponent_pokemon_with_abilities}
+    )
+
+    attack(:demolish,
+      damage: 140,
+      effect: %{type: :damage_unaffected_by_weakness_resistance_and_effects_on_opponent_active}
+    )
+  end
+
   card "TWM-082" do
     attack(:strange_hacking,
       effect: %{type: :confuse_defender_active_then_move_opponent_damage_counters}

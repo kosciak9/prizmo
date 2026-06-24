@@ -24,6 +24,20 @@ defmodule Prizmo.Tcg.Cards.Behaviors.ASC do
     )
   end
 
+  card "ASC-121" do
+    tag(:tera)
+
+    attack(:orichalcum_fang,
+      damage: 50,
+      effect: %{type: :bonus_damage_if_own_pokemon_knocked_out_last_turn, bonus_damage: 120}
+    )
+
+    attack(:impact_blow,
+      damage: 200,
+      effect: %{type: :attacker_cannot_attack_next_turn}
+    )
+  end
+
   card "ASC-142" do
     ability(:flip_the_script,
       effect: %{type: :draw_if_own_pokemon_knocked_out_last_turn, count: 3}

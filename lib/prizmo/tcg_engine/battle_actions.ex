@@ -17,6 +17,9 @@ defmodule Prizmo.TcgEngine.BattleActions do
 
   require Ash.Query
 
+  @cornerstone_mask_ogerpon_ex_card_id "TWM-112"
+  @cornerstone_stance_effect_id "cornerstone_stance"
+
   def attached_energy_cards_for_retreat(game_id, active_card_id, energy_card_instance_ids) do
     energy_card_instance_ids
     |> Enum.map(fn energy_card_instance_id ->
@@ -148,7 +151,72 @@ defmodule Prizmo.TcgEngine.BattleActions do
     if TeraBenchProtection.prevents_attack_damage?(target_card) do
       {:ok, TeraBenchProtection.prevented_attack_damage_result(target_card, damage)}
     else
-      prevented_attack_damage_by_marker_result(game_id, attacking_player_id, target_card, damage)
+      case cornerstone_stance_prevention_result(
+             game_id,
+             attacking_player_id,
+             target_card,
+             damage
+           ) do
+        {:ok, _result} = ok ->
+          ok
+
+        :not_prevented ->
+          prevented_attack_damage_by_marker_result(
+            game_id,
+            attacking_player_id,
+            target_card,
+            damage
+          )
+      end
+    end
+  end
+
+  defp cornerstone_stance_prevention_result(
+         game_id,
+         attacking_player_id,
+         %CardInstance{
+           card_id: @cornerstone_mask_ogerpon_ex_card_id,
+           owner_player_id: owner_player_id,
+           zone: :active
+         } =
+           target_card,
+         damage
+       )
+       when owner_player_id != attacking_player_id do
+    with {:ok, attacker_card} <- active_attacker_card(game_id, attacking_player_id),
+         true <- attacker_has_ability?(attacker_card) do
+      {:ok,
+       %{
+         damage: 0,
+         prevented_damage: damage,
+         resulting_damage: target_card.damage,
+         knocked_out?: false,
+         damage_prevented?: true,
+         damage_prevention: @cornerstone_stance_effect_id,
+         attack_prevention_source_card_id: target_card.card_id,
+         attack_prevention_source_card_instance_id: target_card.id,
+         attack_prevention_source_effect_id: @cornerstone_stance_effect_id,
+         attack_prevention_source_player_id: owner_player_id,
+         protected_card_instance_id: target_card.id
+       }}
+    else
+      false -> :not_prevented
+      {:error, _reason} -> :not_prevented
+    end
+  end
+
+  defp cornerstone_stance_prevention_result(
+         _game_id,
+         _attacking_player_id,
+         %CardInstance{},
+         _damage
+       ), do: :not_prevented
+
+  defp attacker_has_ability?(%CardInstance{card_id: card_id}) do
+    case CardCatalog.fetch(card_id) do
+      {:ok, %{abilities: abilities}} when map_size(abilities) > 0 -> true
+      {:ok, _card} -> false
+      {:error, _reason} -> false
     end
   end
 

@@ -74,6 +74,7 @@ defmodule Prizmo.TcgEngine.AttackEffects do
     :bonus_damage_if_defender_pokemon_ex,
     :bonus_damage_if_attacker_has_team_rocket_energy,
     :bonus_damage_if_team_rocket_supporter_played_this_turn,
+    :bonus_damage_if_own_pokemon_knocked_out_last_turn,
     :bonus_damage_if_moved_from_bench_to_active_this_turn,
     :bonus_damage_per_energy_attached_to_both_active,
     :bonus_damage_per_energy_attached_to_defender,
@@ -84,6 +85,7 @@ defmodule Prizmo.TcgEngine.AttackEffects do
     @copy_opponent_active_tera_pokemon_attack,
     :damage_per_opponent_hand_card,
     :damage_unaffected_by_effects_on_opponent_active,
+    :damage_unaffected_by_weakness_resistance_and_effects_on_opponent_active,
     :damage_per_opponent_pokemon_ex_in_play,
     :damage_per_opponent_prize_taken,
     :damage_only_if_stadium_in_play,
@@ -270,6 +272,9 @@ defmodule Prizmo.TcgEngine.AttackEffects do
       %{type: :bonus_damage_if_team_rocket_supporter_played_this_turn} ->
         {:ok, %{}}
 
+      %{type: :bonus_damage_if_own_pokemon_knocked_out_last_turn} ->
+        {:ok, %{}}
+
       %{type: :bonus_damage_if_moved_from_bench_to_active_this_turn} ->
         {:ok, %{}}
 
@@ -351,6 +356,9 @@ defmodule Prizmo.TcgEngine.AttackEffects do
         discard_own_bench_energy_for_bonus_damage(game_id, player_id, opts, max_discards)
 
       %{type: :damage_unaffected_by_effects_on_opponent_active} ->
+        {:ok, %{}}
+
+      %{type: :damage_unaffected_by_weakness_resistance_and_effects_on_opponent_active} ->
         {:ok, %{}}
 
       %{type: :damage_per_opponent_pokemon_ex_in_play} ->

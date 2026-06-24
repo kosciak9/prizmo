@@ -3844,6 +3844,10 @@ defmodule Prizmo.TcgEngine.Mechanics do
       Map.get(damage_result, :attack_prevention_source_turn_number)
     )
     |> maybe_put(
+      :attack_prevention_source_effect_id,
+      Map.get(damage_result, :attack_prevention_source_effect_id)
+    )
+    |> maybe_put(
       :attack_prevention_blocked_turn_number,
       Map.get(damage_result, :attack_prevention_blocked_turn_number)
     )

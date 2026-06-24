@@ -64,13 +64,13 @@ Those reports are the canonical starting point for autonomous Goal 2 implementat
 - Tracked top archetypes: `30`
 - Tracked cards with usage greater than `0.00`: `377`
 - Coverage buckets from `mix prizmo.goal2.corpus`:
-  - `supported=135`
+  - `supported=137`
   - `generic-supported=8`
   - `partial=10`
-  - `unimplemented=224`
+  - `unimplemented=222`
 - Metadata buckets:
-  - `cached=156`
-  - `missing=221`
+  - `cached=158`
+  - `missing=219`
 
 Important interpretation:
 
@@ -82,19 +82,18 @@ Important interpretation:
 
 The strongest current Goal 2 implementation candidates are the incomplete cards shared by the most archetypes and/or the most total metagame share.
 
-The latest Goal 2 engine batch closed the two highest-share shared Supporter blockers from the three-archetype queue before dropping into harder Pokémon ex and Special Energy work. `TEF-155` Morty's Conviction now has committed TCGdex metadata plus a real discard-1-cost Supporter path that draws `1` card for each of the opponent's Benched Pokémon. `TWM-145` Carmine now has committed TCGdex metadata plus a real first-turn-legal Supporter path that discards the player's remaining hand and draws `5`. The reusable addition is trainer-side dynamic draw-count handling alongside partial-draw discard-hand-then-draw resolution, which should help later non-search Supporters without reopening Goal 1.
+The latest Goal 2 engine batch closed the remaining high-share Tera Fighting Pokémon ex pair instead of deferring them behind later Special Energy work. `TWM-112` Cornerstone Mask Ogerpon ex now has committed TCGdex metadata, a Tera tag that activates the existing generic bench protection, a real `Cornerstone Stance` active-spot prevention rule against opposing Pokémon that have any Ability, and executable `Demolish` support through a new weakness/resistance bypass attack effect. `ASC-121` Koraidon ex now has committed TCGdex metadata, a Tera tag, executable `Orichalcum Fang` bonus damage when one of your Pokémon was Knocked Out by attack damage during the opponent's previous turn, and executable `Impact Blow` through the existing next-turn attack-lock path.
 
 ### Highest-priority remaining `unimplemented` cards from current report
 
 | Card | Archetypes | Total share | Notes |
 | --- | --- | --- | --- |
-| `TWM-112` Cornerstone Mask Ogerpon ex | `3` | `15.62%` | Broad three-archetype Pokémon ex blocker now that the shared Supporter pair is closed. |
-| `ASC-216` Prism Energy | `3` | `11.62%` | Shared Special Energy line across N's Zoroark, Ogerpon Box, and Mega Lopunny shells. |
-| `ASC-121` Koraidon ex | `3` | `8.88%` | Shared Fighting/Ancient attacker line across Ogerpon Box, Raging Bolt, and Clefairy shells. |
+| `ASC-216` Prism Energy | `3` | `11.62%` | New highest-share remaining shared blocker and the broadest remaining Special Energy line. |
 | `TWM-053` Froslass | `3` | `8.72%` | Shared follow-on evolution line after Mega Froslass ex moved to supported. |
 | `POR-087` Rocky Fighting Energy | `3` | `8.15%` | Shared Fighting Special Energy line across Crustle, Cynthia, and Mega Lucario shells. |
 | `POR-072` Energy Search | `3` | `4.31%` | Lower-share shared Item cleanup once the remaining higher-share three-archetype blockers fall. |
 | `TEF-154` Maximum Belt | `3` | `4.11%` | Shared ACE SPEC Tool line after the broader Pokémon/Special Energy blockers. |
+| `SSP-185` Precious Trolley | `3` | `4.06%` | Shared bench-filling ACE SPEC once the simpler search/Energy slice is reduced. |
 
 ### Shared `partial` cards worth finishing after the broad unimplemented slice
 
@@ -121,8 +120,8 @@ That means prior Goal 1 and six-deck coverage was not wasted; it now acts as see
 
 ## Recommended next implementation order
 
-1. Take the remaining highest-share three-archetype blockers `TWM-112`, `ASC-216`, and `ASC-121` next.
-2. After that, continue the remaining three-archetype metadata-missing slice with `TWM-053`, `POR-087`, `POR-072`, and `TEF-154` before dropping into lower-archetype blockers.
+1. Take `ASC-216` Prism Energy next as the remaining highest-share three-archetype blocker and the strongest shared Special Energy line.
+2. After that, continue the same three-archetype metadata-missing slice with `TWM-053`, `POR-087`, `POR-072`, and `TEF-154` before dropping into lower-archetype blockers.
 3. Keep the remaining Dragapult-only cached pair `TWM-099` / `TWM-100` as deliberate single-archetype cleanup, not the default autonomous queue.
 4. Finish the remaining shared partials only after the broad unimplemented slice unless another batch naturally extends the new HP infrastructure; if returning to HP work soon, `POR-086` Growing Grass Energy remains the strongest follow-up.
 5. Keep using `mix prizmo.goal2.corpus` after each batch to re-rank the next blockers by archetype count and weighted share.
