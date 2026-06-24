@@ -1183,6 +1183,14 @@ defmodule Prizmo.TcgEngine.GameView do
   end
 
   defp supported_special_energy?(%{
+         effect: %{type: :provides_every_type_when_attached_to_basic},
+         provides: provides
+       })
+       when is_list(provides) do
+    :colorless in provides
+  end
+
+  defp supported_special_energy?(%{
          effect: %{
            type: :bench_basic_psychic_from_deck_when_attached_to_psychic,
            max_targets: max_targets

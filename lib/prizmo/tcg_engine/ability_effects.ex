@@ -11,6 +11,7 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
   alias Prizmo.TcgEngine.CardCatalog
   alias Prizmo.TcgEngine.CardInstance
   alias Prizmo.TcgEngine.CardStore
+  alias Prizmo.TcgEngine.EnergyEffects
   alias Prizmo.TcgEngine.EventPayloads
   alias Prizmo.TcgEngine.Game
   alias Prizmo.TcgEngine.GameEvent
@@ -735,19 +736,7 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
   def damage_for_counters(counters) when is_integer(counters), do: counters * 10
 
   def darkness_energy?(%CardInstance{} = card) do
-    case CardCatalog.fetch(card.card_id) do
-      {:ok, %{supertype: :energy, name: "Team Rocket's Energy"}} ->
-        true
-
-      {:ok, %{supertype: :energy, provides: provides}} when is_list(provides) ->
-        @adrena_brain_required_type in provides
-
-      {:ok, _metadata} ->
-        false
-
-      {:error, _reason} ->
-        false
-    end
+    EnergyEffects.provides_type?(card, @adrena_brain_required_type)
   end
 
   def basic_grass_energy?(%CardInstance{} = card) do

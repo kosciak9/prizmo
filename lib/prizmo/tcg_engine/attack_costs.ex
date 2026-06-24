@@ -4,6 +4,7 @@ defmodule Prizmo.TcgEngine.AttackCosts do
   alias Prizmo.TcgEngine.CardCatalog
   alias Prizmo.TcgEngine.CardInstance
   alias Prizmo.TcgEngine.CardStore
+  alias Prizmo.TcgEngine.EnergyEffects
   alias Prizmo.TcgEngine.StadiumEffects
 
   def require_attack_cost_paid(game_id, %CardInstance{} = attacker_card, attack)
@@ -143,12 +144,13 @@ defmodule Prizmo.TcgEngine.AttackCosts do
   end
 
   defp energy_providers(%CardInstance{} = card) do
-    case CardCatalog.fetch(card.card_id) do
-      {:ok, %{supertype: :energy, name: "Team Rocket's Energy"}} ->
-        List.duplicate(%{card_instance_id: card.id, provides: [:psychic, :darkness]}, 2)
+    provides = EnergyEffects.provided_types(card)
 
-      {:ok, %{supertype: :energy, provides: provides}}
-      when is_list(provides) and provides != [] ->
+    case CardCatalog.fetch(card.card_id) do
+      {:ok, %{supertype: :energy, name: "Team Rocket's Energy"}} when provides != [] ->
+        List.duplicate(%{card_instance_id: card.id, provides: provides}, 2)
+
+      {:ok, %{supertype: :energy}} when provides != [] ->
         [%{card_instance_id: card.id, provides: provides}]
 
       {:ok, %{supertype: :energy}} ->

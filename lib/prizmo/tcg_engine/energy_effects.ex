@@ -18,8 +18,56 @@ defmodule Prizmo.TcgEngine.EnergyEffects do
   alias Prizmo.TcgEngine.TurnStore
 
   @telepathic_psychic_choice_key :bench_basic_psychic_from_deck_when_attached_to_psychic
+  @prism_energy_basic_types [
+    :grass,
+    :fire,
+    :water,
+    :lightning,
+    :psychic,
+    :fighting,
+    :darkness,
+    :metal
+  ]
 
   @type effect_event :: %{type: atom(), payload: map()}
+
+  @spec provided_types(CardInstance.t(), CardInstance.t() | nil) :: [atom()]
+  def provided_types(%CardInstance{} = energy_card, attached_target_card \\ nil) do
+    case CardCatalog.fetch(energy_card.card_id) do
+      {:ok,
+       %{
+         supertype: :energy,
+         effect: %{type: :provides_every_type_when_attached_to_basic},
+         provides: provides
+       }} ->
+        if attached_to_basic_pokemon?(energy_card, attached_target_card) do
+          @prism_energy_basic_types
+        else
+          normalize_provides(provides)
+        end
+
+      {:ok, %{supertype: :energy, name: "Team Rocket's Energy"}} ->
+        [:psychic, :darkness]
+
+      {:ok, %{supertype: :energy, provides: provides}} when is_list(provides) ->
+        provides
+
+      {:ok, %{supertype: :energy}} ->
+        []
+
+      {:ok, _other} ->
+        []
+
+      {:error, _reason} ->
+        []
+    end
+  end
+
+  @spec provides_type?(CardInstance.t(), atom(), CardInstance.t() | nil) :: boolean()
+  def provides_type?(%CardInstance{} = energy_card, type, attached_target_card \\ nil)
+      when is_atom(type) do
+    type in provided_types(energy_card, attached_target_card)
+  end
 
   @spec after_attach_from_hand(
           Game.t(),
@@ -165,6 +213,36 @@ defmodule Prizmo.TcgEngine.EnergyEffects do
 
   defp team_rocket_pokemon?(%{supertype: :pokemon, name: "Team Rocket's " <> _name}), do: true
   defp team_rocket_pokemon?(_card), do: false
+
+  defp attached_to_basic_pokemon?(
+         %CardInstance{
+           game_id: game_id,
+           attached_to_card_instance_id: attached_to_card_instance_id
+         },
+         nil
+       )
+       when is_binary(game_id) and is_binary(attached_to_card_instance_id) do
+    case CardStore.get_card(game_id, attached_to_card_instance_id) do
+      {:ok, attached_target_card} -> basic_pokemon?(attached_target_card)
+      _other -> false
+    end
+  end
+
+  defp attached_to_basic_pokemon?(_energy_card, %CardInstance{} = attached_target_card) do
+    basic_pokemon?(attached_target_card)
+  end
+
+  defp attached_to_basic_pokemon?(_energy_card, _attached_target_card), do: false
+
+  defp basic_pokemon?(%CardInstance{card_id: card_id}) do
+    case CardCatalog.fetch(card_id) do
+      {:ok, %{supertype: :pokemon, stage: :basic}} -> true
+      _other -> false
+    end
+  end
+
+  defp normalize_provides(provides) when is_list(provides), do: provides
+  defp normalize_provides(_provides), do: []
 
   defp bench_basic_psychic_from_deck_when_attached_to_psychic(
          %Game{} = game,
