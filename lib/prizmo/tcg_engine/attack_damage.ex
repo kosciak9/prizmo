@@ -11,6 +11,9 @@ defmodule Prizmo.TcgEngine.AttackDamage do
 
   require Ash.Query
 
+  @cobalt_command_bonus_damage 20
+  @cobalt_command_effect_type :future_pokemon_attack_damage_bonus_to_opponent_active
+  @iron_crown_ex_card_id "TEF-081"
   @starting_prize_count 6
 
   @spec damage_for(CardInstance.t(), CardInstance.t(), map(), map()) ::
@@ -31,7 +34,8 @@ defmodule Prizmo.TcgEngine.AttackDamage do
            apply_tool_attack_damage_bonus(damage, attacker_card, defender_card),
          {:ok, damage} <-
            apply_black_belts_training_bonus(damage, attacker_card, defender_card),
-         {:ok, damage} <- apply_kieran_damage_bonus(damage, attacker_card, defender_card) do
+         {:ok, damage} <- apply_kieran_damage_bonus(damage, attacker_card, defender_card),
+         {:ok, damage} <- apply_cobalt_command_bonus(damage, attacker_card, defender_card) do
       if weakness_and_resistance_ignored?(attack) do
         {:ok, max(damage, 0)}
       else
@@ -446,6 +450,11 @@ defmodule Prizmo.TcgEngine.AttackDamage do
     do: {:ok, damage}
 
   defp apply_effect(damage, _attacker_card, _defender_card, %{
+         type: :damage_two_opponent_pokemon_unaffected_by_weakness_resistance_or_effects
+       }),
+       do: {:ok, damage}
+
+  defp apply_effect(damage, _attacker_card, _defender_card, %{
          type: :opponent_bench_damage_counters
        }), do: {:ok, damage}
 
@@ -678,6 +687,90 @@ defmodule Prizmo.TcgEngine.AttackDamage do
       end
     end
   end
+
+  defp apply_cobalt_command_bonus(
+         damage,
+         %CardInstance{} = attacker_card,
+         %CardInstance{} = defender_card
+       ) do
+    with {:ok, true} <- future_pokemon_card?(attacker_card),
+         false <- attacker_card.card_id == @iron_crown_ex_card_id,
+         true <- opponent_active_defender?(attacker_card, defender_card),
+         {:ok, source_count} <- cobalt_command_source_count(attacker_card) do
+      {:ok, damage + source_count * @cobalt_command_bonus_damage}
+    else
+      {:ok, false} -> {:ok, damage}
+      true -> {:ok, damage}
+      false -> {:ok, damage}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp future_pokemon_card?(%CardInstance{card_id: card_id}) do
+    with {:ok, metadata} <- CardCatalog.fetch(card_id) do
+      {:ok, future_pokemon?(metadata)}
+    end
+  end
+
+  defp future_pokemon?(%{supertype: :pokemon, tags: tags} = metadata) when is_list(tags) do
+    :future in tags or future_pokemon_name?(metadata)
+  end
+
+  defp future_pokemon?(%{supertype: :pokemon} = metadata), do: future_pokemon_name?(metadata)
+  defp future_pokemon?(_metadata), do: false
+
+  defp future_pokemon_name?(%{name: name}) when is_binary(name) do
+    String.starts_with?(name, ["Iron ", "Miraidon"])
+  end
+
+  defp future_pokemon_name?(_metadata), do: false
+
+  defp opponent_active_defender?(
+         %CardInstance{owner_player_id: attacking_player_id},
+         %CardInstance{
+           owner_player_id: defending_player_id,
+           zone: :active
+         }
+       ) do
+    attacking_player_id != defending_player_id
+  end
+
+  defp opponent_active_defender?(%CardInstance{}, %CardInstance{}), do: false
+
+  defp cobalt_command_source_count(%CardInstance{game_id: game_id, owner_player_id: player_id}) do
+    with {:ok, cards} <- CardStore.list_cards(game_id) do
+      {:ok, Enum.count(cards, &cobalt_command_source?(&1, player_id))}
+    end
+  end
+
+  defp cobalt_command_source?(
+         %CardInstance{card_id: @iron_crown_ex_card_id, owner_player_id: player_id, zone: zone},
+         player_id
+       )
+       when zone in [:active, :bench] do
+    case CardCatalog.fetch(@iron_crown_ex_card_id) do
+      {:ok,
+       %{
+         abilities: %{
+           cobalt_command: %{
+             effect: %{
+               type: @cobalt_command_effect_type,
+               bonus_damage: @cobalt_command_bonus_damage
+             }
+           }
+         }
+       }} ->
+        true
+
+      {:ok, _metadata} ->
+        false
+
+      {:error, _reason} ->
+        false
+    end
+  end
+
+  defp cobalt_command_source?(%CardInstance{}, _player_id), do: false
 
   defp kieran_damage_played_this_turn?(%CardInstance{
          game_id: game_id,

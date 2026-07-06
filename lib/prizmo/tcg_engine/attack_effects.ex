@@ -95,6 +95,7 @@ defmodule Prizmo.TcgEngine.AttackEffects do
     :knock_out_defender_if_exact_damage_counters,
     :damage_only_if_stadium_in_play,
     :damage_only_if_own_bench_has_card_id_unaffected_by_weakness_resistance,
+    :damage_two_opponent_pokemon_unaffected_by_weakness_resistance_or_effects,
     :damage_per_discarded_own_basic_energy,
     :self_damage_then_paralyze_and_poison_defender_active,
     :poison_defender_active_and_prevent_retreat_next_turn,
@@ -151,6 +152,16 @@ defmodule Prizmo.TcgEngine.AttackEffects do
       %{type: :discard_one_card_from_opponent_hand} ->
         case opponent_hand_cards(game_id, player_id) do
           {:ok, opponent_hand_cards} -> length(opponent_hand_cards) <= 1
+          _error -> true
+        end
+
+      %{
+        type: :damage_two_opponent_pokemon_unaffected_by_weakness_resistance_or_effects,
+        target_count: target_count
+      }
+      when is_integer(target_count) and target_count > 0 ->
+        case opponent_in_play_pokemon_cards(game_id, player_id) do
+          {:ok, opponent_cards} -> length(opponent_cards) <= target_count
           _error -> true
         end
 
@@ -413,6 +424,14 @@ defmodule Prizmo.TcgEngine.AttackEffects do
       %{type: :damage_opponent_bench, bench_damage: bench_damage}
       when is_integer(bench_damage) and bench_damage >= 0 ->
         damage_opponent_bench(game_id, player_id, opts, bench_damage)
+
+      %{
+        type: :damage_two_opponent_pokemon_unaffected_by_weakness_resistance_or_effects,
+        damage: damage,
+        target_count: target_count
+      }
+      when is_integer(damage) and damage >= 0 and is_integer(target_count) and target_count > 0 ->
+        damage_two_opponent_pokemon_unaffected(game_id, player_id, opts, damage, target_count)
 
       %{type: :discard_hand_then_draw, count: count} when is_integer(count) and count >= 0 ->
         discard_hand_then_draw(game_id, player_id, count)
@@ -2117,6 +2136,103 @@ defmodule Prizmo.TcgEngine.AttackEffects do
     end
   end
 
+  defp damage_two_opponent_pokemon_unaffected(game_id, player_id, opts, damage, target_count) do
+    with {:ok, targets} <- opponent_pokemon_damage_targets(game_id, player_id, opts, target_count),
+         {:ok, damage_results} <-
+           apply_unprevented_opponent_pokemon_damage(game_id, player_id, targets, damage) do
+      {:ok,
+       %{
+         effect_type: "damage_two_opponent_pokemon_unaffected_by_weakness_resistance_or_effects",
+         requested_opponent_pokemon_damage: damage,
+         opponent_pokemon_damage_target_count: target_count,
+         opponent_pokemon_damage_target_card_instance_ids: Enum.map(targets, & &1.id),
+         opponent_pokemon_damage_results: damage_results,
+         opponent_pokemon_damage_applied?: damage_results != [],
+         effect_knockout_card_instance_ids:
+           damage_results
+           |> Enum.filter(&Map.get(&1, :knocked_out?, false))
+           |> Enum.map(&Map.fetch!(&1, :card_instance_id))
+       }}
+    end
+  end
+
+  defp opponent_pokemon_damage_targets(game_id, player_id, opts, target_count) do
+    with {:ok, opponent_cards} <- opponent_in_play_pokemon_cards(game_id, player_id) do
+      required_count = min(target_count, length(opponent_cards))
+
+      case opponent_pokemon_damage_target_card_instance_ids(opts) do
+        nil ->
+          implicit_opponent_pokemon_damage_targets(opponent_cards, required_count, target_count)
+
+        target_ids when is_list(target_ids) ->
+          explicit_opponent_pokemon_damage_targets(opponent_cards, target_ids, required_count)
+
+        _invalid ->
+          {:error, :invalid_opponent_pokemon_damage_target_card_instance_ids}
+      end
+    end
+  end
+
+  defp implicit_opponent_pokemon_damage_targets(opponent_cards, required_count, target_count) do
+    if length(opponent_cards) <= target_count do
+      {:ok, opponent_cards}
+    else
+      {:error, {:opponent_pokemon_damage_requires_targets, required_count}}
+    end
+  end
+
+  defp explicit_opponent_pokemon_damage_targets(opponent_cards, target_ids, required_count) do
+    cards_by_id = Map.new(opponent_cards, &{&1.id, &1})
+
+    with :ok <-
+           require_exact_count(
+             target_ids,
+             required_count,
+             :wrong_opponent_pokemon_damage_target_count
+           ),
+         :ok <- require_unique_ids(target_ids) do
+      target_ids
+      |> Enum.map(fn target_id ->
+        case Map.fetch(cards_by_id, target_id) do
+          {:ok, target_card} -> {:ok, target_card}
+          :error -> {:error, :invalid_opponent_pokemon_damage_target}
+        end
+      end)
+      |> collect_results()
+    end
+  end
+
+  defp apply_unprevented_opponent_pokemon_damage(_game_id, _player_id, [], _damage), do: {:ok, []}
+
+  defp apply_unprevented_opponent_pokemon_damage(game_id, player_id, targets, damage) do
+    targets
+    |> Enum.map(fn target_card ->
+      with {:ok, damage_result} <-
+             BattleActions.apply_attack_damage(
+               game_id,
+               player_id,
+               target_card,
+               damage,
+               ignore_effects_on_target?: true
+             ) do
+        {:ok,
+         %{
+           card_instance_id: target_card.id,
+           card_id: target_card.card_id,
+           zone: Atom.to_string(target_card.zone),
+           damage: damage_result.damage,
+           prevented_damage: Map.get(damage_result, :prevented_damage, 0),
+           resulting_damage: damage_result.resulting_damage,
+           knocked_out?: damage_result.knocked_out?,
+           knockout_prize_count: Map.get(damage_result, :knockout_prize_count),
+           damage_prevented?: Map.get(damage_result, :damage_prevented?, false),
+           damage_ignored_effects_on_target?: true
+         }}
+      end
+    end)
+    |> collect_results()
+  end
+
   defp damage_opponent_bench_counters(game_id, player_id, opts, total_counters) do
     with {:ok, opponent_player_id} <- opponent_player_id(game_id, player_id),
          {:ok, opponent_bench_cards} <- cards_in_zone(game_id, opponent_player_id, :bench),
@@ -2712,6 +2828,13 @@ defmodule Prizmo.TcgEngine.AttackEffects do
   defp bench_damage_target_card_instance_id(opts) do
     Map.get(opts, :bench_damage_target_card_instance_id) ||
       Map.get(opts, "bench_damage_target_card_instance_id")
+  end
+
+  defp opponent_pokemon_damage_target_card_instance_ids(opts) do
+    Map.get(opts, :opponent_pokemon_damage_target_card_instance_ids) ||
+      Map.get(opts, "opponent_pokemon_damage_target_card_instance_ids") ||
+      Map.get(opts, :opponentPokemonDamageTargetCardInstanceIds) ||
+      Map.get(opts, "opponentPokemonDamageTargetCardInstanceIds")
   end
 
   defp moved_opponent_energy_card_instance_id(opts) do

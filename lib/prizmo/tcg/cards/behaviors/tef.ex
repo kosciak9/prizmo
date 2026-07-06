@@ -36,6 +36,27 @@ defmodule Prizmo.Tcg.Cards.Behaviors.TEF do
     )
   end
 
+  card "TEF-081" do
+    tag(:future)
+
+    ability(:cobalt_command,
+      effect: %{
+        type: :future_pokemon_attack_damage_bonus_to_opponent_active,
+        bonus_damage: 20,
+        excluded_card_id: "TEF-081"
+      }
+    )
+
+    attack(:twin_shotels,
+      damage: 0,
+      effect: %{
+        type: :damage_two_opponent_pokemon_unaffected_by_weakness_resistance_or_effects,
+        damage: 50,
+        target_count: 2
+      }
+    )
+  end
+
   card "TEF-123" do
     attack(:bellowing_thunder,
       damage: 0,

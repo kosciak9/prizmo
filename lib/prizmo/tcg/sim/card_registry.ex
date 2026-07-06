@@ -608,6 +608,27 @@ defmodule Prizmo.Tcg.Sim.CardRegistry do
         ram: %{name: "Ram", cost: [:colorless, :colorless], damage: 20, effect: nil}
       }
     },
+    "TEF-081" => %{
+      abilities: %{
+        cobalt_command: %{
+          effect: %{
+            type: :future_pokemon_attack_damage_bonus_to_opponent_active,
+            bonus_damage: 20,
+            excluded_card_id: "TEF-081"
+          }
+        }
+      },
+      attacks: %{
+        twin_shotels: %{
+          damage: 0,
+          effect: %{
+            type: :damage_two_opponent_pokemon_unaffected_by_weakness_resistance_or_effects,
+            damage: 50,
+            target_count: 2
+          }
+        }
+      }
+    },
     "TEF-123" => %{
       attacks: %{
         bellowing_thunder: %{

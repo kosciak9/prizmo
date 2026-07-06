@@ -96,10 +96,16 @@ defmodule Prizmo.TcgEngine.BattleActions do
     end
   end
 
-  def apply_attack_damage(game_id, attacking_player_id, target_card, damage) do
+  def apply_attack_damage(game_id, attacking_player_id, target_card, damage, opts \\ []) do
     damage = damage || 0
 
-    case prevented_attack_damage_result(game_id, attacking_player_id, target_card, damage) do
+    case maybe_prevented_attack_damage_result(
+           game_id,
+           attacking_player_id,
+           target_card,
+           damage,
+           opts
+         ) do
       {:ok, damage_result} ->
         {:ok, damage_result}
 
@@ -123,6 +129,20 @@ defmodule Prizmo.TcgEngine.BattleActions do
              knockout_prize_count
            )}
         end
+    end
+  end
+
+  defp maybe_prevented_attack_damage_result(
+         game_id,
+         attacking_player_id,
+         %CardInstance{} = target_card,
+         damage,
+         opts
+       ) do
+    if Keyword.get(opts, :ignore_effects_on_target?, false) do
+      :not_prevented
+    else
+      prevented_attack_damage_result(game_id, attacking_player_id, target_card, damage)
     end
   end
 

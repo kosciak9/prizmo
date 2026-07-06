@@ -2514,6 +2514,100 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
     end
   end
 
+  describe "TEF-081 Iron Crown ex" do
+    test "Cobalt Command boosts Future Pokémon except Iron Crown ex" do
+      {:ok, game} = create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147)
+      iron_leaves = promote_custom_basic_to_active(game.id, "player_1", "TEF-025")
+      defender = active_card(game.id, "player_2")
+
+      attack = %{
+        damage: 100,
+        effect: %{type: :damage_unaffected_by_weakness_resistance_and_effects_on_opponent_active}
+      }
+
+      assert {:ok, 100} = AttackDamage.damage_for(iron_leaves, defender, attack)
+
+      iron_crown = play_direct_basic_to_bench(game.id, "player_1", "TEF-081", 2)
+
+      assert {:ok, 120} = AttackDamage.damage_for(iron_leaves, defender, attack)
+      assert {:ok, 100} = AttackDamage.damage_for(iron_crown, defender, attack)
+    end
+
+    test "Twin Shotels damages two chosen opponent Pokémon and ignores target effects" do
+      {:ok, game} =
+        create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147,
+          player_2_active_card_id: "ASC-142"
+        )
+
+      attacker = promote_custom_basic_to_active(game.id, "player_1", "TEF-081")
+      attach_direct_basic_energy(game.id, "player_1", attacker, 1)
+      attach_direct_basic_energy(game.id, "player_1", attacker, 2)
+      attach_direct_basic_energy(game.id, "player_1", attacker, 3)
+
+      defender = active_card(game.id, "player_2")
+      tera_bench = play_direct_basic_to_bench(game.id, "player_2", "TEF-025", 1)
+      unselected_bench = play_direct_basic_to_bench(game.id, "player_2", "PRE-035", 2)
+
+      assert {:ok, game} = Mechanics.declare_attack(game, "player_1", :twin_shotels)
+      assert game.flow_state == :turn_attack_declared
+
+      assert {:ok, view} = GameView.for_player(game.id, "player_1")
+      assert view.current_turn.pending_attack_requires_opponent_pokemon_damage_targets
+
+      assert Enum.sort(
+               Enum.map(view.current_turn.pending_attack_opponent_pokemon_damage_choices, & &1.id)
+             ) ==
+               Enum.sort([defender.id, tera_bench.id, unselected_bench.id])
+
+      assert {:error, {:opponent_pokemon_damage_requires_targets, 2}} =
+               Mechanics.resolve_declared_attack(game, "player_1", %{})
+
+      assert {:ok, _game} =
+               Mechanics.resolve_declared_attack(game, "player_1", %{
+                 opponent_pokemon_damage_target_card_instance_ids: [defender.id, tera_bench.id]
+               })
+
+      assert card(defender.id).damage == 50
+      assert card(tera_bench.id).damage == 50
+      assert card(unselected_bench.id).damage == 0
+
+      resolve_event = game.id |> game_events_by_type("resolve_declared_attack") |> List.last()
+
+      assert resolve_event.payload["effect_type"] ==
+               "damage_two_opponent_pokemon_unaffected_by_weakness_resistance_or_effects"
+
+      assert Enum.sort(resolve_event.payload["opponent_pokemon_damage_target_card_instance_ids"]) ==
+               Enum.sort([defender.id, tera_bench.id])
+
+      assert Enum.all?(resolve_event.payload["opponent_pokemon_damage_results"], fn result ->
+               result["damage"] == 50 and result["damage_prevented?"] == false and
+                 result["damage_ignored_effects_on_target?"] == true
+             end)
+    end
+
+    test "Twin Shotels auto-targets when the opponent has at most two Pokémon in play" do
+      {:ok, game} =
+        create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147,
+          player_2_active_card_id: "ASC-142"
+        )
+
+      attacker = promote_custom_basic_to_active(game.id, "player_1", "TEF-081")
+      attach_direct_basic_energy(game.id, "player_1", attacker, 1)
+      attach_direct_basic_energy(game.id, "player_1", attacker, 2)
+      attach_direct_basic_energy(game.id, "player_1", attacker, 3)
+
+      defender = active_card(game.id, "player_2")
+      bench = play_direct_basic_to_bench(game.id, "player_2", "PRE-035", 1)
+
+      assert {:ok, game} = Mechanics.declare_attack(game, "player_1", :twin_shotels)
+
+      assert game.flow_state == :turn_action_window
+      assert game.active_player_id == "player_2"
+      assert card(defender.id).damage == 50
+      assert card(bench.id).damage == 50
+    end
+  end
+
   describe "SSP-175 Dusk Ball" do
     test "creates a bottom-seven Pokémon prompt and resolves the selected Pokémon to hand" do
       {:ok, game} = create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147)
@@ -3357,6 +3451,23 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
 
     {:ok, tatsugiri} = ash_update(tatsugiri, :promote_to_active, %{position: 1, status: nil})
     tatsugiri
+  end
+
+  defp promote_custom_basic_to_active(game_id, player_id, card_id) do
+    existing_active = active_card(game_id, player_id)
+    {:ok, _existing_active} = ash_update(existing_active, :move_active_to_bench, %{position: 5})
+
+    {:ok, card} = create_custom_owned_card(game_id, player_id, card_id, 250)
+    {:ok, card} = ash_update(card, :draw_to_hand, %{position: 50})
+
+    {:ok, card} =
+      ash_update(card, :play_to_bench, %{
+        position: 4,
+        turn_entered_play: current_turn(game_id).turn_number
+      })
+
+    {:ok, card} = ash_update(card, :promote_to_active, %{position: 1, status: nil})
+    card
   end
 
   defp stage_top_deck_cards(game_id, player_id, card_ids) when is_list(card_ids) do

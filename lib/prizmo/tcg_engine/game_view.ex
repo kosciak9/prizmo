@@ -149,6 +149,13 @@ defmodule Prizmo.TcgEngine.GameView do
         viewer_player_id
       )
 
+    pending_attack_opponent_pokemon_damage_choices =
+      pending_attack_opponent_pokemon_damage_choices(
+        turn,
+        cards,
+        pending_attack_effect_type
+      )
+
     %{
       id: turn.id,
       turn_number: turn.turn_number,
@@ -177,6 +184,11 @@ defmodule Prizmo.TcgEngine.GameView do
         ],
       pending_attack_requires_bench_damage_counters:
         pending_attack_effect_type == :opponent_bench_damage_counters,
+      pending_attack_requires_opponent_pokemon_damage_targets:
+        pending_attack_effect_type ==
+          :damage_two_opponent_pokemon_unaffected_by_weakness_resistance_or_effects,
+      pending_attack_opponent_pokemon_damage_choices:
+        pending_attack_opponent_pokemon_damage_choices,
       pending_attack_requires_coin_result:
         pending_attack_effect_type in [
           :bonus_damage_on_coin_heads,
@@ -247,6 +259,27 @@ defmodule Prizmo.TcgEngine.GameView do
          _viewer_player_id
        ),
        do: []
+
+  defp pending_attack_opponent_pokemon_damage_choices(
+         %Turn{active_player_id: active_player_id},
+         cards,
+         :damage_two_opponent_pokemon_unaffected_by_weakness_resistance_or_effects
+       ) do
+    cards
+    |> Enum.filter(&(&1.owner_player_id != active_player_id and &1.zone in [:active, :bench]))
+    |> Enum.sort_by(&{in_play_zone_sort(&1.zone), &1.position, &1.instance_id})
+    |> Enum.map(&pending_attack_card_choice/1)
+  end
+
+  defp pending_attack_opponent_pokemon_damage_choices(
+         %Turn{},
+         _cards,
+         _pending_attack_effect_type
+       ), do: []
+
+  defp in_play_zone_sort(:active), do: 0
+  defp in_play_zone_sort(:bench), do: 1
+  defp in_play_zone_sort(_zone), do: 2
 
   defp pending_attack_card_choice(%CardInstance{} = card) do
     catalog = catalog_card(card.card_id)

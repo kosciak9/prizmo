@@ -1075,6 +1075,11 @@ defmodule Prizmo.TcgEngine.Game.ActionCommands do
         allow_nil? true
       end
 
+      argument :opponent_pokemon_damage_target_card_instance_ids, {:array, :uuid} do
+        allow_nil? false
+        default []
+      end
+
       argument :bench_damage_counter_allocations, :map do
         allow_nil? false
         default %{}
@@ -1126,6 +1131,11 @@ defmodule Prizmo.TcgEngine.Game.ActionCommands do
           shuffled_energy_card_instance_ids: input.arguments.shuffled_energy_card_instance_ids,
           bench_damage_target_card_instance_id:
             Map.get(input.arguments, :bench_damage_target_card_instance_id),
+          opponent_pokemon_damage_target_card_instance_ids:
+            case input.arguments.opponent_pokemon_damage_target_card_instance_ids do
+              [] -> nil
+              target_ids -> target_ids
+            end,
           bench_damage_counter_allocations: input.arguments.bench_damage_counter_allocations,
           damage_counter_move_selections: input.arguments.damage_counter_move_selections,
           coin_result: Map.get(input.arguments, :coin_result),

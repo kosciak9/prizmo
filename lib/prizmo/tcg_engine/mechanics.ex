@@ -2781,6 +2781,29 @@ defmodule Prizmo.TcgEngine.Mechanics do
     end
   end
 
+  defp effect_knockout_prize_records(game_id, %{opponent_pokemon_damage_results: damage_results})
+       when is_list(damage_results) do
+    damage_results
+    |> Enum.filter(&Map.get(&1, :knocked_out?, false))
+    |> Enum.map(fn damage_result ->
+      with card_instance_id when is_binary(card_instance_id) <-
+             Map.get(damage_result, :card_instance_id),
+           {:ok, target_card} <- get_card(game_id, card_instance_id),
+           :ok <- require_card_zone(target_card, :discard) do
+        knockout_prize_record(
+          target_card.owner_player_id,
+          target_card,
+          prize_count: Map.get(damage_result, :knockout_prize_count)
+        )
+      else
+        nil -> {:error, :missing_effect_knockout_card_instance_id}
+        {:error, reason} -> {:error, reason}
+        _invalid -> {:error, :missing_effect_knockout_card_instance_id}
+      end
+    end)
+    |> collect_results()
+  end
+
   defp effect_knockout_prize_records(game_id, effect_payload) do
     effect_payload
     |> effect_knockout_card_instance_ids()

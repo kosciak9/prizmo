@@ -73,6 +73,8 @@ const DISCARD_DEFENDING_ENERGY_ON_COIN_HEADS_EFFECT = 'discard_defending_energy_
 const MOVE_OPPONENT_ATTACHED_ENERGY_BETWEEN_POKEMON_EFFECT = 'move_opponent_attached_energy_between_pokemon'
 const STRANGE_HACKING_EFFECT = 'confuse_defender_active_then_move_opponent_damage_counters'
 const DAMAGE_OPPONENT_BENCH_EFFECT = 'damage_opponent_bench'
+const DAMAGE_TWO_OPPONENT_POKEMON_UNAFFECTED_EFFECT =
+  'damage_two_opponent_pokemon_unaffected_by_weakness_resistance_or_effects'
 const SHUFFLE_ATTACHED_ENERGY_INTO_DECK_THEN_DAMAGE_OPPONENT_BENCH_EFFECT =
   'shuffle_attached_energy_into_deck_then_damage_opponent_bench'
 const COPY_OPPONENT_ACTIVE_TERA_POKEMON_ATTACK_EFFECT = 'copy_opponent_active_tera_pokemon_attack'
@@ -217,6 +219,8 @@ const GAME_STATE_FIELDS = [
       'pendingAttackRequiresShuffledEnergy',
       'pendingAttackRequiresBenchDamageTarget',
       'pendingAttackRequiresBenchDamageCounters',
+      'pendingAttackRequiresOpponentPokemonDamageTargets',
+      { pendingAttackOpponentPokemonDamageChoices: ['id', 'cardId', 'name', 'image', 'category', 'stage'] },
       'pendingAttackRequiresCoinResult',
       'pendingAttackRequiresHeadsCount',
       'pendingAttackRequiresCopiedAttack',
@@ -1008,6 +1012,7 @@ type ResolveDeclaredAttackInput = {
   returnedEnergyCardInstanceId?: string | null
   shuffledEnergyCardInstanceIds?: string[]
   benchDamageTargetCardInstanceId?: string | null
+  opponentPokemonDamageTargetCardInstanceIds?: string[]
   benchDamageCounterAllocations?: Record<string, number>
   damageCounterMoveSelections?: DamageCounterMoveSelection[]
   coinResult?: CoinResult | null
@@ -1031,6 +1036,7 @@ type ResolveDeclaredAttackCommand = {
   returnedEnergyCardInstanceId?: string | null
   shuffledEnergyCardInstanceIds?: string[]
   benchDamageTargetCardInstanceId?: string | null
+  opponentPokemonDamageTargetCardInstanceIds?: string[]
   benchDamageCounterAllocations?: Record<string, number>
   damageCounterMoveSelections?: DamageCounterMoveSelection[]
   coinResult?: CoinResult | null
@@ -1131,6 +1137,8 @@ type GameState = {
     pendingAttackRequiresShuffledEnergy: boolean
     pendingAttackRequiresBenchDamageTarget: boolean
     pendingAttackRequiresBenchDamageCounters: boolean
+    pendingAttackRequiresOpponentPokemonDamageTargets: boolean
+    pendingAttackOpponentPokemonDamageChoices: PendingAttackCardChoice[]
     pendingAttackRequiresCoinResult: boolean
     pendingAttackRequiresHeadsCount: boolean
     pendingAttackRequiresCopiedAttack: boolean
@@ -2408,6 +2416,7 @@ export function HomeRoute() {
                   returnedEnergyCardInstanceId,
                   shuffledEnergyCardInstanceIds,
                   benchDamageTargetCardInstanceId,
+                  opponentPokemonDamageTargetCardInstanceIds,
                   benchDamageCounterAllocations,
                   damageCounterMoveSelections,
                   coinResult,
@@ -2426,6 +2435,7 @@ export function HomeRoute() {
                       returnedEnergyCardInstanceId,
                       shuffledEnergyCardInstanceIds,
                       benchDamageTargetCardInstanceId,
+                      opponentPokemonDamageTargetCardInstanceIds,
                       benchDamageCounterAllocations,
                       damageCounterMoveSelections,
                       coinResult,
@@ -5601,6 +5611,8 @@ function AttackProgressPanel({
   const [selectedReturnedEnergyCardInstanceId, setSelectedReturnedEnergyCardInstanceId] = useState('')
   const [selectedShuffledEnergyCardInstanceIds, setSelectedShuffledEnergyCardInstanceIds] = useState<string[]>([])
   const [selectedBenchDamageTargetCardInstanceId, setSelectedBenchDamageTargetCardInstanceId] = useState('')
+  const [selectedOpponentPokemonDamageTargetCardInstanceIds, setSelectedOpponentPokemonDamageTargetCardInstanceIds] =
+    useState<string[]>([])
   const [selectedBenchDamageCounterAllocations, setSelectedBenchDamageCounterAllocations] = useState<
     Record<string, number>
   >({})
@@ -5646,6 +5658,10 @@ function AttackProgressPanel({
   )
   const pendingAttackRequiresBenchDamageCounters = Boolean(
     turn?.pendingAttackRequiresBenchDamageCounters || resolutionEffectType === 'opponent_bench_damage_counters'
+  )
+  const pendingAttackRequiresOpponentPokemonDamageTargets = Boolean(
+    turn?.pendingAttackRequiresOpponentPokemonDamageTargets ||
+      resolutionEffectType === DAMAGE_TWO_OPPONENT_POKEMON_UNAFFECTED_EFFECT
   )
   const pendingAttackRequiresDamageCounterMoves = resolutionEffectType === STRANGE_HACKING_EFFECT
   const pendingAttackRequiresCoinResult = Boolean(
@@ -5787,6 +5803,32 @@ function AttackProgressPanel({
     : benchDamageTargetOptions.length === 1
       ? (benchDamageTargetOptions[0]?.id ?? null)
       : null
+  const opponentPokemonDamageTargetOptions = useMemo(
+    () =>
+      pendingAttackRequiresOpponentPokemonDamageTargets
+        ? [opponentPlayer?.active, ...(opponentPlayer?.bench ?? [])].filter((card): card is CardSummary =>
+            Boolean(card)
+          )
+        : [],
+    [opponentPlayer?.active, opponentPlayer?.bench, pendingAttackRequiresOpponentPokemonDamageTargets]
+  )
+  const opponentPokemonDamageRequiredCount = Math.min(2, opponentPokemonDamageTargetOptions.length)
+  const opponentPokemonDamageTargetOptionIds = useMemo(
+    () => new Set(opponentPokemonDamageTargetOptions.map(card => card.id)),
+    [opponentPokemonDamageTargetOptions]
+  )
+  const selectedOpponentPokemonDamageTargetIdsForResolve = pendingAttackRequiresOpponentPokemonDamageTargets
+    ? selectedOpponentPokemonDamageTargetCardInstanceIds.filter(id => opponentPokemonDamageTargetOptionIds.has(id))
+    : []
+  const opponentPokemonDamageTargetSelectionRequired =
+    pendingAttackRequiresOpponentPokemonDamageTargets &&
+    opponentPokemonDamageTargetOptions.length > opponentPokemonDamageRequiredCount
+  const opponentPokemonDamageTargetSelectionIncomplete =
+    opponentPokemonDamageTargetSelectionRequired &&
+    selectedOpponentPokemonDamageTargetIdsForResolve.length !== opponentPokemonDamageRequiredCount
+  const opponentPokemonDamageTargetIdsForResolve = opponentPokemonDamageTargetSelectionRequired
+    ? selectedOpponentPokemonDamageTargetIdsForResolve
+    : []
   const benchDamageCounterOptions = pendingAttackRequiresBenchDamageCounters ? (opponentPlayer?.bench ?? []) : []
   const benchDamageCounterOptionIds = useMemo(
     () => new Set(benchDamageCounterOptions.map(card => card.id)),
@@ -5914,6 +5956,7 @@ function AttackProgressPanel({
     setSelectedReturnedEnergyCardInstanceId('')
     setSelectedShuffledEnergyCardInstanceIds([])
     setSelectedBenchDamageTargetCardInstanceId('')
+    setSelectedOpponentPokemonDamageTargetCardInstanceIds([])
     setSelectedBenchDamageCounterAllocations({})
     setSelectedDamageCounterMoveAllocations({})
     setSelectedCoinResult('')
@@ -5973,6 +6016,14 @@ function AttackProgressPanel({
       setSelectedBenchDamageTargetCardInstanceId('')
     }
   }, [selectedBenchDamageTargetCardInstanceId, selectedBenchDamageTargetIsValid])
+
+  useEffect(() => {
+    setSelectedOpponentPokemonDamageTargetCardInstanceIds(previousSelectedIds => {
+      const filteredSelectedIds = previousSelectedIds.filter(id => opponentPokemonDamageTargetOptionIds.has(id))
+
+      return filteredSelectedIds.length === previousSelectedIds.length ? previousSelectedIds : filteredSelectedIds
+    })
+  }, [opponentPokemonDamageTargetOptionIds])
 
   useEffect(() => {
     setSelectedBenchDamageCounterAllocations(previousAllocations => {
@@ -6082,6 +6133,7 @@ function AttackProgressPanel({
     !selectedOpponentHandCardIsValid
   const manualResolveNeededInFlowManagedState =
     (pendingAttackRequiresDamageCounterMoves && damageCounterMoveSourceOptions.length > 0) ||
+    opponentPokemonDamageTargetSelectionRequired ||
     opponentHandDiscardRequiresChoice
   const missingActivePlayers = gameState.players.filter(player => !player.active)
   const awaitingPromptPlayerIds = gameState.awaitingPromptPlayerIds
@@ -6111,6 +6163,7 @@ function AttackProgressPanel({
     shuffledEnergyPartialSelection ||
     benchDamageTargetUnavailable ||
     (benchDamageTargetRequired && !selectedBenchDamageTargetIsValid) ||
+    opponentPokemonDamageTargetSelectionIncomplete ||
     benchDamageCounterAllocationIncomplete ||
     Boolean(damageCounterMoveOverallocationSource) ||
     coinResultRequired ||
@@ -6139,12 +6192,14 @@ function AttackProgressPanel({
                 ? `Select exactly ${shuffledEnergyRequiredCount} Energy or none for ${attackLabel}`
                 : benchDamageTargetUnavailable
                   ? `No opponent Bench target for ${attackLabel}`
-                  : benchDamageTargetRequired && !selectedBenchDamageTargetIsValid
+                : benchDamageTargetRequired && !selectedBenchDamageTargetIsValid
                    ? `Choose a Bench damage target for ${attackLabel}`
-                    : benchDamageCounterAllocationIncomplete
-                      ? `Allocate exactly ${benchDamageCounterRequiredCount} Bench damage counters for ${attackLabel}`
-                      : damageCounterMoveOverallocationSource
-                        ? `Reduce moved damage counters for ${attackLabel}`
+                    : opponentPokemonDamageTargetSelectionIncomplete
+                      ? `Choose ${opponentPokemonDamageRequiredCount} opponent Pokémon for ${attackLabel}`
+                      : benchDamageCounterAllocationIncomplete
+                        ? `Allocate exactly ${benchDamageCounterRequiredCount} Bench damage counters for ${attackLabel}`
+                        : damageCounterMoveOverallocationSource
+                          ? `Reduce moved damage counters for ${attackLabel}`
                       : coinResultRequired
                         ? `Choose a coin result for ${attackLabel}`
                         : defendingEnergyDiscardRequiresChoice
@@ -6328,6 +6383,18 @@ function AttackProgressPanel({
     })
   }
 
+  if (pendingAttackRequiresOpponentPokemonDamageTargets) {
+    resolutionChecklistItems.push({
+      label: 'Opponent Pokémon damage',
+      tone: opponentPokemonDamageTargetSelectionIncomplete ? 'waiting' : 'ready',
+      value: opponentPokemonDamageTargetSelectionRequired
+        ? `${selectedOpponentPokemonDamageTargetIdsForResolve.length} / ${opponentPokemonDamageRequiredCount} selected`
+        : opponentPokemonDamageTargetOptions.length > 0
+          ? `Auto: ${opponentPokemonDamageTargetOptions.map(card => card.name).join(', ')}`
+          : 'No opponent Pokémon available'
+    })
+  }
+
   if (pendingAttackRequiresBenchDamageCounters) {
     resolutionChecklistItems.push({
       label: 'Bench counters',
@@ -6377,6 +6444,20 @@ function AttackProgressPanel({
       }
 
       return [...previousSelectedIds, energyCardInstanceId]
+    })
+  }
+
+  const toggleOpponentPokemonDamageTarget = (cardInstanceId: string) => {
+    setSelectedOpponentPokemonDamageTargetCardInstanceIds(previousSelectedIds => {
+      if (previousSelectedIds.includes(cardInstanceId)) {
+        return previousSelectedIds.filter(id => id !== cardInstanceId)
+      }
+
+      if (previousSelectedIds.length >= opponentPokemonDamageRequiredCount) {
+        return previousSelectedIds
+      }
+
+      return [...previousSelectedIds, cardInstanceId]
     })
   }
 
@@ -7023,6 +7104,72 @@ function AttackProgressPanel({
           </div>
         ) : null}
 
+        {pendingAttackRequiresOpponentPokemonDamageTargets ? (
+          <div className="rounded-xl border border-teal-200 bg-teal-50/70 p-3">
+            <div className="space-y-1">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-teal-900">
+                Opponent Pokémon damage
+              </p>
+              <p className="text-xs leading-5 text-teal-900/80">
+                Twin Shotels does 50 damage to up to 2 of the opponent&apos;s Pokémon. This damage ignores Weakness,
+                Resistance, and effects on those Pokémon. If there are only one or two choices, resolution selects them
+                automatically.
+              </p>
+            </div>
+
+            {opponentPokemonDamageTargetSelectionRequired ? (
+              <div className="mt-3 space-y-3">
+                <div className="rounded-lg border border-teal-200 bg-stone-50 px-3 py-2 text-xs text-teal-900">
+                  Selected {selectedOpponentPokemonDamageTargetIdsForResolve.length} /{' '}
+                  {opponentPokemonDamageRequiredCount} opponent Pokémon.
+                </div>
+
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {opponentPokemonDamageTargetOptions.map(card => {
+                    const selected = selectedOpponentPokemonDamageTargetCardInstanceIds.includes(card.id)
+                    const maxSelectionReached =
+                      selectedOpponentPokemonDamageTargetCardInstanceIds.length >= opponentPokemonDamageRequiredCount
+
+                    return (
+                      <label
+                        className={`flex cursor-pointer items-start gap-2 rounded-lg border px-3 py-2 text-xs transition ${
+                          selected
+                            ? 'border-teal-700 bg-teal-100 text-teal-950'
+                            : 'border-teal-200 bg-stone-50 text-stone-700 hover:border-teal-400'
+                        }`}
+                        key={card.id}
+                      >
+                        <input
+                          checked={selected}
+                          className="mt-0.5"
+                          disabled={!viewerCanAdvanceAttack || commandPending || (!selected && maxSelectionReached)}
+                          onChange={() => toggleOpponentPokemonDamageTarget(card.id)}
+                          type="checkbox"
+                        />
+                        <span className="min-w-0">
+                          <span className="block font-medium">{card.name}</span>
+                          <span className="mt-0.5 block font-mono text-[0.68rem] opacity-70">
+                            {card.zone} · {card.damage} damage · {card.cardId}
+                          </span>
+                        </span>
+                      </label>
+                    )
+                  })}
+                </div>
+              </div>
+            ) : opponentPokemonDamageTargetOptions.length > 0 ? (
+              <p className="mt-3 rounded-lg border border-teal-200 bg-stone-50 px-3 py-2 text-xs text-teal-900">
+                Resolution will automatically damage{' '}
+                {opponentPokemonDamageTargetOptions.map(card => card.name).join(', ')}.
+              </p>
+            ) : (
+              <p className="mt-3 rounded-lg border border-teal-200 bg-stone-50 px-3 py-2 text-xs text-teal-900">
+                No opponent Pokémon are available for this damage effect.
+              </p>
+            )}
+          </div>
+        ) : null}
+
         {pendingAttackRequiresBenchDamageCounters ? (
           <div className="rounded-xl border border-fuchsia-200 bg-fuchsia-50/70 p-3">
             <div className="space-y-1">
@@ -7207,6 +7354,7 @@ function AttackProgressPanel({
                 returnedEnergyCardInstanceId: returnedEnergyIdForResolve,
                 shuffledEnergyCardInstanceIds: selectedShuffledEnergyIdsForResolve,
                 benchDamageTargetCardInstanceId: benchDamageTargetIdForResolve,
+                opponentPokemonDamageTargetCardInstanceIds: opponentPokemonDamageTargetIdsForResolve,
                 benchDamageCounterAllocations: selectedBenchDamageCounterAllocationsForResolve,
                 damageCounterMoveSelections: selectedDamageCounterMoveSelectionsForResolve,
                 coinResult: coinResultForResolve,

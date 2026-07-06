@@ -9,7 +9,7 @@ defmodule Prizmo.Tcg.Cards.DSL do
 
   alias Prizmo.Tcg.Cards.Metadata
 
-  @supported_tags [:tera]
+  @supported_tags [:future, :tera]
 
   defmacro __using__(_opts) do
     quote do

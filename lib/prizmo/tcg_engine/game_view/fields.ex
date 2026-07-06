@@ -88,6 +88,12 @@ defmodule Prizmo.TcgEngine.GameView.Fields do
     pending_attack_requires_shuffled_energy: [type: :boolean, allow_nil?: false],
     pending_attack_requires_bench_damage_target: [type: :boolean, allow_nil?: false],
     pending_attack_requires_bench_damage_counters: [type: :boolean, allow_nil?: false],
+    pending_attack_requires_opponent_pokemon_damage_targets: [type: :boolean, allow_nil?: false],
+    pending_attack_opponent_pokemon_damage_choices: [
+      type: {:array, :map},
+      allow_nil?: false,
+      constraints: [items: [fields: @pending_attack_card_choice_fields]]
+    ],
     pending_attack_requires_coin_result: [type: :boolean, allow_nil?: false],
     pending_attack_requires_heads_count: [type: :boolean, allow_nil?: false],
     pending_attack_requires_copied_attack: [type: :boolean, allow_nil?: false],
