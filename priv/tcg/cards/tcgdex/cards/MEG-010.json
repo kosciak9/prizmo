@@ -1,0 +1,96 @@
+{
+  "prizmo_id": "MEG-010",
+  "source": {
+    "base_url": "https://api.tcgdex.net/v2/en",
+    "dynamic_fields_removed": [
+      "pricing"
+    ],
+    "language": "en",
+    "provider": "TCGdex"
+  },
+  "tcgdex": {
+    "abilities": [
+      {
+        "effect": "Each Basic {G} Energy attached to all of your Pokémon provides {G}{G} Energy. The effect of Wild Growth doesn't stack.",
+        "name": "Wild Growth",
+        "type": "Ability"
+      }
+    ],
+    "attacks": [
+      {
+        "cost": [
+          "Grass",
+          "Grass",
+          "Colorless",
+          "Colorless"
+        ],
+        "damage": 140,
+        "name": "Solar Beam"
+      }
+    ],
+    "category": "Pokemon",
+    "dexId": [
+      154
+    ],
+    "evolveFrom": "Bayleef",
+    "hp": 160,
+    "id": "me01-010",
+    "illustrator": "Yoriyuki Ikegami",
+    "image": "https://assets.tcgdex.net/en/me/me01/010",
+    "legal": {
+      "expanded": true,
+      "standard": true
+    },
+    "localId": "010",
+    "name": "Meganium",
+    "rarity": "Rare",
+    "regulationMark": "I",
+    "retreat": 2,
+    "set": {
+      "cardCount": {
+        "official": 132,
+        "total": 188
+      },
+      "id": "me01",
+      "logo": "https://assets.tcgdex.net/en/me/me01/logo",
+      "name": "Mega Evolution",
+      "symbol": "https://assets.tcgdex.net/univ/me/me01/symbol"
+    },
+    "stage": "Stage2",
+    "types": [
+      "Grass"
+    ],
+    "updated": "2026-06-14T19:07:08+01:00",
+    "variants": {
+      "firstEdition": false,
+      "holo": true,
+      "normal": true,
+      "reverse": true,
+      "wPromo": false
+    },
+    "variants_detailed": [
+      {
+        "size": "standard",
+        "type": "holo",
+        "variantId": "jr7oetx1mqug9"
+      },
+      {
+        "size": "standard",
+        "type": "reverse",
+        "variantId": "cm4kqul3x1bwlz1f"
+      },
+      {
+        "size": "standard",
+        "type": "normal",
+        "variantId": "endfynwn4n10gzq"
+      }
+    ],
+    "weaknesses": [
+      {
+        "type": "Fire",
+        "value": "×2"
+      }
+    ]
+  },
+  "tcgdex_id": "me01-010"
+}

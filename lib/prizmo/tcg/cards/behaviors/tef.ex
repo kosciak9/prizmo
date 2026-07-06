@@ -3,6 +3,10 @@ defmodule Prizmo.Tcg.Cards.Behaviors.TEF do
 
   use Prizmo.Tcg.Cards.DSL
 
+  card "TEF-126" do
+    attack(:silent_wing, effect: %{type: :reveal_opponent_hand})
+  end
+
   card "TEF-023" do
     attack(:slight_intrusion,
       damage: 30,

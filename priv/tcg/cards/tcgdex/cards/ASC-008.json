@@ -1,0 +1,93 @@
+{
+  "prizmo_id": "ASC-008",
+  "source": {
+    "base_url": "https://api.tcgdex.net/v2/en",
+    "dynamic_fields_removed": [
+      "pricing"
+    ],
+    "language": "en",
+    "provider": "TCGdex"
+  },
+  "tcgdex": {
+    "attacks": [
+      {
+        "cost": [
+          "Colorless"
+        ],
+        "effect": "During your opponent's next turn, attacks used by the Defending Pokémon do 20 less damage (before applying Weakness and Resistance).",
+        "name": "Growl"
+      },
+      {
+        "cost": [
+          "Grass",
+          "Grass"
+        ],
+        "damage": 30,
+        "name": "Seed Bomb"
+      }
+    ],
+    "category": "Pokemon",
+    "description": "A sweet aroma gently wafts from the leaf on its head. It is docile and loves to soak up sun rays.",
+    "hp": 70,
+    "id": "me02.5-008",
+    "illustrator": "Kariya",
+    "image": "https://assets.tcgdex.net/en/me/me02.5/008",
+    "legal": {
+      "expanded": true,
+      "standard": true
+    },
+    "localId": "008",
+    "name": "Chikorita",
+    "rarity": "Common",
+    "regulationMark": "J",
+    "retreat": 1,
+    "set": {
+      "cardCount": {
+        "official": 217,
+        "total": 295
+      },
+      "id": "me02.5",
+      "logo": "https://assets.tcgdex.net/en/me/me02.5/logo",
+      "name": "Ascended Heroes",
+      "symbol": "https://assets.tcgdex.net/univ/me/me02.5/symbol"
+    },
+    "stage": "Basic",
+    "types": [
+      "Grass"
+    ],
+    "updated": "2026-06-14T19:06:22+01:00",
+    "variants": {
+      "firstEdition": false,
+      "holo": false,
+      "normal": true,
+      "reverse": true,
+      "wPromo": false
+    },
+    "variants_detailed": [
+      {
+        "size": "standard",
+        "type": "normal",
+        "variantId": "endfynwn4n10gzq"
+      },
+      {
+        "foil": "friendball",
+        "size": "standard",
+        "type": "reverse",
+        "variantId": "2618rzb14ro3mef8iltahk1chlu"
+      },
+      {
+        "foil": "energy",
+        "size": "standard",
+        "type": "reverse",
+        "variantId": "3wehmjjju11cdaad92gj82f"
+      }
+    ],
+    "weaknesses": [
+      {
+        "type": "Fire",
+        "value": "×2"
+      }
+    ]
+  },
+  "tcgdex_id": "me02.5-008"
+}

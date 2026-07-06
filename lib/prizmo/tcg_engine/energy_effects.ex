@@ -21,6 +21,8 @@ defmodule Prizmo.TcgEngine.EnergyEffects do
 
   @telepathic_psychic_choice_key :bench_basic_psychic_from_deck_when_attached_to_psychic
   @bubbly_water_energy_effect :water_pokemon_special_condition_immunity_energy
+  @wild_growth_card_id "MEG-010"
+  @wild_growth_effect_type :basic_grass_energy_provides_double_grass_non_stacking
   @special_conditions [:asleep, :burned, :confused, :paralyzed, :poisoned]
   @prism_energy_basic_types [
     :grass,
@@ -71,6 +73,25 @@ defmodule Prizmo.TcgEngine.EnergyEffects do
   def provides_type?(%CardInstance{} = energy_card, type, attached_target_card \\ nil)
       when is_atom(type) do
     type in provided_types(energy_card, attached_target_card)
+  end
+
+  @spec provider_count(CardInstance.t(), CardInstance.t() | nil) :: pos_integer()
+  def provider_count(%CardInstance{} = energy_card, attached_target_card \\ nil) do
+    case CardCatalog.fetch(energy_card.card_id) do
+      {:ok, %{supertype: :energy, energy_type: :basic, provides: provides}}
+      when is_list(provides) ->
+        if :grass in provides and wild_growth_applies?(energy_card, attached_target_card) do
+          2
+        else
+          1
+        end
+
+      {:ok, %{supertype: :energy}} ->
+        1
+
+      _other ->
+        1
+    end
   end
 
   @spec after_attach_from_hand(
@@ -448,6 +469,53 @@ defmodule Prizmo.TcgEngine.EnergyEffects do
 
   defp in_play_pokemon?(%CardInstance{zone: zone}) when zone in [:active, :bench], do: true
   defp in_play_pokemon?(_card), do: false
+
+  defp wild_growth_applies?(%CardInstance{} = energy_card, attached_target_card) do
+    with true <- attached_to_own_pokemon?(energy_card, attached_target_card),
+         {:ok, cards} <- CardStore.list_cards(energy_card.game_id) do
+      Enum.any?(cards, &wild_growth_source_for_player?(&1, energy_card.owner_player_id))
+    else
+      _other -> false
+    end
+  end
+
+  defp attached_to_own_pokemon?(
+         %CardInstance{owner_player_id: owner_player_id},
+         %CardInstance{owner_player_id: owner_player_id} = attached_target_card
+       ) do
+    in_play_pokemon?(attached_target_card)
+  end
+
+  defp attached_to_own_pokemon?(
+         %CardInstance{attached_to_card_instance_id: attached_to_card_instance_id} = energy_card,
+         nil
+       )
+       when is_binary(attached_to_card_instance_id) do
+    case CardStore.get_card(energy_card.game_id, energy_card.attached_to_card_instance_id) do
+      {:ok, attached_target_card} -> attached_to_own_pokemon?(energy_card, attached_target_card)
+      _other -> false
+    end
+  end
+
+  defp attached_to_own_pokemon?(%CardInstance{}, nil), do: false
+
+  defp attached_to_own_pokemon?(%CardInstance{}, _attached_target_card), do: false
+
+  defp wild_growth_source_for_player?(
+         %CardInstance{owner_player_id: player_id, card_id: @wild_growth_card_id} = card,
+         player_id
+       ) do
+    in_play_pokemon?(card) and wild_growth_supported?(card.card_id)
+  end
+
+  defp wild_growth_source_for_player?(%CardInstance{}, _player_id), do: false
+
+  defp wild_growth_supported?(card_id) do
+    match?(
+      {:ok, %{abilities: %{wild_growth: %{effect: %{type: @wild_growth_effect_type}}}}},
+      CardCatalog.fetch(card_id)
+    )
+  end
 
   defp total_reactive_damage_counter_count(sources) do
     Enum.reduce(sources, 0, &(&2 + &1.damage_counter_count))

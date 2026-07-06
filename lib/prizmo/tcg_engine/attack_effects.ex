@@ -45,6 +45,7 @@ defmodule Prizmo.TcgEngine.AttackEffects do
     ]
 
   alias Prizmo.TcgEngine.AbilityEffects
+  alias Prizmo.TcgEngine.AttackDamageReductions
   alias Prizmo.TcgEngine.AttackLocks
   alias Prizmo.TcgEngine.AttackPrevention
   alias Prizmo.TcgEngine.BattleActions
@@ -103,6 +104,8 @@ defmodule Prizmo.TcgEngine.AttackEffects do
     :poison_defender_active_and_prevent_retreat_next_turn,
     :discard_defending_energy_on_coin_heads,
     :discard_one_card_from_opponent_hand,
+    :reveal_opponent_hand,
+    :defending_pokemon_attacks_do_less_damage_next_turn,
     :discard_energy_from_own_bench_for_bonus_damage,
     :defending_pokemon_cannot_retreat_next_turn,
     :discard_hand_then_draw,
@@ -118,6 +121,7 @@ defmodule Prizmo.TcgEngine.AttackEffects do
     :move_opponent_attached_energy_between_pokemon,
     :recover_trainer_from_discard_to_hand,
     :return_attached_energy_to_hand,
+    :self_damage,
     :opponent_bench_damage_counters,
     :discard_attached_energy_for_bonus_damage,
     :switch_opponent_active_with_bench_chosen_by_opponent,
@@ -403,6 +407,20 @@ defmodule Prizmo.TcgEngine.AttackEffects do
 
       %{type: :discard_one_card_from_opponent_hand} ->
         discard_one_card_from_opponent_hand(game_id, player_id, opts)
+
+      %{type: :reveal_opponent_hand} ->
+        reveal_opponent_hand(game_id, player_id)
+
+      %{type: :defending_pokemon_attacks_do_less_damage_next_turn, reduction: reduction}
+      when is_integer(reduction) and reduction >= 0 ->
+        reduce_defending_pokemon_damage_next_turn(
+          game_id,
+          player_id,
+          attacker_card,
+          defender_card,
+          attack,
+          reduction
+        )
 
       %{type: :move_opponent_attached_energy_between_pokemon} ->
         move_opponent_attached_energy_between_pokemon(game_id, player_id, opts)
@@ -1240,6 +1258,85 @@ defmodule Prizmo.TcgEngine.AttackEffects do
          self_resulting_damage: damage_result.resulting_damage,
          self_knocked_out?: damage_result.knocked_out?
        }}
+    end
+  end
+
+  defp reveal_opponent_hand(game_id, player_id) do
+    with {:ok, opponent} <- CardStore.get_opponent(game_id, player_id),
+         {:ok, hand_cards} <- cards_in_zone(game_id, opponent.player_id, :hand) do
+      {:ok,
+       %{
+         effect_type: "reveal_opponent_hand",
+         opponent_player_id: opponent.player_id,
+         revealed_card_count: length(hand_cards),
+         revealed_cards: EventPayloads.moved_cards(hand_cards, :hand, :hand),
+         public_note: "The opponent revealed #{length(hand_cards)} cards in hand."
+       }}
+    end
+  end
+
+  defp reduce_defending_pokemon_damage_next_turn(
+         game_id,
+         attacking_player_id,
+         %CardInstance{} = attacker_card,
+         %CardInstance{} = defender_card,
+         attack,
+         reduction
+       ) do
+    with {:ok, turn} <- TurnStore.current_turn(game_id),
+         {:ok, current_defender_card} <- get_card(game_id, defender_card.id) do
+      case attack_effect_prevention_payload(game_id, attacking_player_id, current_defender_card) do
+        {:prevented, prevention_payload} ->
+          {:ok,
+           Map.merge(
+             %{
+               effect_type: "defending_pokemon_attacks_do_less_damage_next_turn",
+               damage_reduction_card_instance_id: current_defender_card.id,
+               damage_reduction_amount: reduction,
+               damage_reduction_turn_number: turn.turn_number + 1,
+               damage_reduction_applied?: false,
+               attack_effect_prevented?: true
+             },
+             prevention_payload
+           )}
+
+        :not_prevented ->
+          case current_defender_card.zone do
+            :active ->
+              markers =
+                AttackDamageReductions.put_outgoing_reduction_next_turn_marker(
+                  current_defender_card,
+                  turn,
+                  reduction,
+                  attacker_card,
+                  Map.fetch!(attack, :id)
+                )
+
+              with {:ok, _defender_card} <-
+                     update(current_defender_card, :set_markers, %{markers: markers}) do
+                {:ok,
+                 %{
+                   effect_type: "defending_pokemon_attacks_do_less_damage_next_turn",
+                   damage_reduction_card_instance_id: current_defender_card.id,
+                   damage_reduction_amount: reduction,
+                   damage_reduction_turn_number: turn.turn_number + 1,
+                   damage_reduction_applied?: true,
+                   public_note:
+                     "During the opponent's next turn, attacks from the Defending Pokémon do #{reduction} less damage."
+                 }}
+              end
+
+            _other_zone ->
+              {:ok,
+               %{
+                 effect_type: "defending_pokemon_attacks_do_less_damage_next_turn",
+                 damage_reduction_card_instance_id: defender_card.id,
+                 damage_reduction_amount: reduction,
+                 damage_reduction_turn_number: turn.turn_number + 1,
+                 damage_reduction_applied?: false
+               }}
+          end
+      end
     end
   end
 

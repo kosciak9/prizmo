@@ -3,6 +3,7 @@ defmodule Prizmo.TcgEngine.AttackDamage do
 
   import Prizmo.TcgEngine.Requirements, only: [require_unique_ids: 1]
 
+  alias Prizmo.TcgEngine.AttackDamageReductions
   alias Prizmo.TcgEngine.AttackEffects
   alias Prizmo.TcgEngine.CardCatalog
   alias Prizmo.TcgEngine.CardInstance
@@ -38,7 +39,8 @@ defmodule Prizmo.TcgEngine.AttackDamage do
          {:ok, damage} <-
            apply_black_belts_training_bonus(damage, attacker_card, defender_card),
          {:ok, damage} <- apply_kieran_damage_bonus(damage, attacker_card, defender_card),
-         {:ok, damage} <- apply_cobalt_command_bonus(damage, attacker_card, defender_card) do
+         {:ok, damage} <- apply_cobalt_command_bonus(damage, attacker_card, defender_card),
+         {:ok, damage} <- apply_outgoing_damage_reduction(damage, attacker_card) do
       if weakness_and_resistance_ignored?(attack) do
         {:ok, max(damage, 0)}
       else
@@ -563,6 +565,14 @@ defmodule Prizmo.TcgEngine.AttackDamage do
        }),
        do: {:ok, damage}
 
+  defp apply_effect(damage, _attacker_card, _defender_card, %{type: :reveal_opponent_hand}),
+    do: {:ok, damage}
+
+  defp apply_effect(damage, _attacker_card, _defender_card, %{
+         type: :defending_pokemon_attacks_do_less_damage_next_turn
+       }),
+       do: {:ok, damage}
+
   defp apply_effect(damage, _attacker_card, _defender_card, %{
          type: :prevent_damage_and_effects_from_attacks_next_turn_on_coin_heads
        }),
@@ -587,6 +597,20 @@ defmodule Prizmo.TcgEngine.AttackDamage do
   defp apply_effect(_damage, _attacker_card, _defender_card, effect) do
     {:error, {:unsupported_attack_effect, AttackEffects.type(effect)}}
   end
+
+  defp apply_outgoing_damage_reduction(damage, %CardInstance{game_id: game_id} = attacker_card)
+       when is_integer(damage) and damage >= 0 and is_binary(game_id) do
+    case TurnStore.current_turn(game_id) do
+      {:ok, turn} ->
+        reduction = AttackDamageReductions.outgoing_reduction_this_turn(attacker_card, turn)
+        {:ok, max(damage - reduction, 0)}
+
+      {:error, _reason} ->
+        {:ok, damage}
+    end
+  end
+
+  defp apply_outgoing_damage_reduction(damage, %CardInstance{}), do: {:ok, damage}
 
   defp apply_weakness_and_resistance(0, %CardInstance{}, %CardInstance{}), do: {:ok, 0}
 

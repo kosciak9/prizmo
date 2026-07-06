@@ -3,6 +3,17 @@ defmodule Prizmo.Tcg.Cards.Behaviors.ASC do
 
   use Prizmo.Tcg.Cards.DSL
 
+  card "ASC-008" do
+    attack(:growl,
+      effect: %{
+        type: :defending_pokemon_attacks_do_less_damage_next_turn,
+        reduction: 20
+      }
+    )
+
+    attack(:seed_bomb, effect: nil)
+  end
+
   card "ASC-016" do
     attack(:itchy_pollen, effect: %{type: :lock_opponent_items_next_turn})
   end

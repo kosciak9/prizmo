@@ -145,13 +145,14 @@ defmodule Prizmo.TcgEngine.AttackCosts do
 
   defp energy_providers(%CardInstance{} = card) do
     provides = EnergyEffects.provided_types(card)
+    provider_count = EnergyEffects.provider_count(card)
 
     case CardCatalog.fetch(card.card_id) do
       {:ok, %{supertype: :energy, name: "Team Rocket's Energy"}} when provides != [] ->
         List.duplicate(%{card_instance_id: card.id, provides: provides}, 2)
 
       {:ok, %{supertype: :energy}} when provides != [] ->
-        [%{card_instance_id: card.id, provides: provides}]
+        List.duplicate(%{card_instance_id: card.id, provides: provides}, provider_count)
 
       {:ok, %{supertype: :energy}} ->
         []

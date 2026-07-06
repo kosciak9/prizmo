@@ -3,6 +3,22 @@ defmodule Prizmo.Tcg.Cards.Behaviors.MEG do
 
   use Prizmo.Tcg.Cards.DSL
 
+  card "MEG-008" do
+    attack(:razor_leaf, effect: nil)
+  end
+
+  card "MEG-009" do
+    attack(:push_down, effect: %{type: :switch_opponent_active_with_bench_chosen_by_opponent})
+  end
+
+  card "MEG-010" do
+    ability(:wild_growth,
+      effect: %{type: :basic_grass_energy_provides_double_grass_non_stacking}
+    )
+
+    attack(:solar_beam, effect: nil)
+  end
+
   card "MEG-074" do
     ability(:lunar_cycle,
       effect: %{

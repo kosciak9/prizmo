@@ -535,6 +535,17 @@ defmodule Prizmo.TcgEngine.GameView do
           public_revealed_cards: revealed_cards
         }
 
+      "reveal_opponent_hand" ->
+        revealed_cards = public_revealed_cards(payload, "revealed_cards")
+
+        %{
+          public_note:
+            payload_value(payload, "public_note") ||
+              "The opponent revealed #{length(revealed_cards)} #{pluralize("card", length(revealed_cards))} in hand.",
+          public_card_count: length(revealed_cards),
+          public_revealed_cards: revealed_cards
+        }
+
       _other ->
         case payload_value(payload, "public_note") do
           note when is_binary(note) and note != "" ->

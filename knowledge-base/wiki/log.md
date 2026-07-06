@@ -1,5 +1,12 @@
 # Wiki Log
 
+## [2026-07-07] codebase update | Goal 2 Hydrapple/Ogerpon Grass cluster support
+
+- Task attempted: closed the shared Hydrapple/Ogerpon Grass-line Goal 2 queue after Regigigas. Added committed TCGdex metadata and executable Ash engine behavior for `ASC-008`, `MEG-008`, `MEG-009`, `MEG-010`, `SFA-006`, and `TEF-126`, including Growl-style next-turn damage reduction, Meganium Wild Growth Basic Grass Energy doubling, Tapu Bulu self-damage, and Hoothoot opponent-hand reveal.
+- Files changed: `lib/prizmo/tcg/cards/behaviors/asc.ex`, `lib/prizmo/tcg/cards/behaviors/meg.ex`, `lib/prizmo/tcg/cards/behaviors/sfa.ex`, `lib/prizmo/tcg/cards/behaviors/tef.ex`, `lib/prizmo/tcg_engine/attack_damage_reductions.ex`, `lib/prizmo/tcg_engine/attack_costs.ex`, `lib/prizmo/tcg_engine/attack_damage.ex`, `lib/prizmo/tcg_engine/attack_effects.ex`, `lib/prizmo/tcg_engine/energy_effects.ex`, `lib/prizmo/tcg_engine/game_view.ex`, `priv/tcg/cards/tcgdex/cards/ASC-008.json`, `priv/tcg/cards/tcgdex/cards/MEG-008.json`, `priv/tcg/cards/tcgdex/cards/MEG-009.json`, `priv/tcg/cards/tcgdex/cards/MEG-010.json`, `priv/tcg/cards/tcgdex/cards/SFA-006.json`, `priv/tcg/cards/tcgdex/cards/TEF-126.json`, `knowledge-base/wiki/engine/goal-2-top-30-latest-limitless-coverage-scope.md`, `knowledge-base/wiki/engine/ash-backed-tcg-engine-playtest-handoff.md`, `knowledge-base/wiki/log.md`.
+- Validation: `mix format`; `mix compile --warnings-as-errors`; `mix test test/prizmo/tcg/cards/metadata_test.exs`; `mix test test/prizmo/tcg_engine/mechanics_test.exs`; Tidewave runtime validation confirmed all six target cards are supported and the new primitives resolve as expected; `mix prizmo.goal2.corpus` confirmed `supported=177` / `generic-supported=8` / `partial=10` / `unimplemented=182` and `cached=197` / `missing=180`; final `mix check` passed.
+- Remaining/blocking notes: the Hydrapple/Ogerpon shared queue is no longer in the shared incomplete list. The default next Goal 2 priority is now `DRI-127` Team Rocket's Murkrow, followed by `SSP-174` Drayton and `MEG-124` Premium Power Pro unless the live corpus re-ranks the queue.
+
 ## [2026-07-07] codebase update | Goal 2 Regigigas support
 
 - Task attempted: closed `PRE-086` Regigigas as the default highest-share remaining shared Goal 2 Pokémon blocker after Max Rod. Added committed TCGdex metadata and authored `Jewel Breaker` as an engine-defined attack that deals 100 base damage and adds 230 damage when the opponent's Active Pokémon is a server-tagged Tera Pokémon.

@@ -64,13 +64,13 @@ Those reports are the canonical starting point for autonomous Goal 2 implementat
 - Tracked top archetypes: `30`
 - Tracked cards with usage greater than `0.00`: `377`
 - Coverage buckets from `mix prizmo.goal2.corpus`:
-  - `supported=170`
+  - `supported=177`
   - `generic-supported=8`
   - `partial=10`
-  - `unimplemented=189`
+  - `unimplemented=182`
 - Metadata buckets:
-  - `cached=191`
-  - `missing=186`
+  - `cached=197`
+  - `missing=180`
 
 Important interpretation:
 
@@ -82,13 +82,15 @@ Important interpretation:
 
 The strongest current Goal 2 implementation candidates are the incomplete cards shared by the most archetypes and/or the most total metagame share.
 
-The latest Goal 2 engine batch closed `PRE-086` Regigigas after Max Rod. Regigigas now has committed TCGdex metadata and executable `Jewel Breaker` attack behavior: it exposes the Colorless/Colorless/Colorless/Colorless attack as 100 base damage and adds 230 damage before Weakness/Resistance when the opponent's Active Pokémon is tagged as Tera in the server-side card catalog.
+The latest Goal 2 engine batch closed the Hydrapple/Ogerpon Grass-line shared queue after Regigigas. `ASC-008`, `MEG-008`, `MEG-009`, `MEG-010`, `SFA-006`, and `TEF-126` now have committed TCGdex metadata and executable Ash engine behavior: Chikorita `Growl` next-turn damage reduction plus `Seed Bomb`, Chikorita `Razor Leaf`, Bayleef `Push Down`, Meganium `Wild Growth` Basic Grass Energy doubling plus `Solar Beam`, Tapu Bulu `Wood Hammer` self-damage, and Hoothoot `Silent Wing` opponent-hand reveal.
 
 ### Highest-priority remaining `unimplemented` cards from current report
 
 | Card | Archetypes | Total share | Notes |
 | --- | --- | --- | --- |
-| Hydrapple/Ogerpon Grass line cluster (`ASC-008`, `MEG-008`, `MEG-009`, `MEG-010`, `SFA-006`, `TEF-126`) | `2` | `5.15%` | Shared cluster behind Regigigas; split into coherent card batches after confirming metadata/text. |
+| `DRI-127` Team Rocket's Murkrow | `2` | `3.18%` | New highest-share shared unimplemented card after closing the Hydrapple/Ogerpon Grass-line queue; confirm metadata/text before selecting the exact Rocket batch. |
+| `SSP-174` Drayton | `2` | `2.41%` | Shared Festival Lead / Hop's Trevenant Supporter behind Murkrow. |
+| `MEG-124` Premium Power Pro | `2` | `2.01%` | Shared Cynthia's Garchomp / Mega Lucario Tool/Trainer candidate behind Drayton. |
 
 ### Shared `partial` cards worth finishing after the broad unimplemented slice
 
@@ -115,10 +117,11 @@ That means prior Goal 1 and six-deck coverage was not wasted; it now acts as see
 
 ## Recommended next implementation order
 
-1. Treat the Hydrapple/Ogerpon Grass line cluster as the next 5.15% shared queue now that Regigigas is closed, splitting it into coherent card batches instead of trying to close all tied cards at once by default.
-2. Keep the remaining Dragapult-only cached pair `TWM-099` / `TWM-100` as deliberate single-archetype cleanup, not the default autonomous queue.
-3. Finish the remaining shared partials only after the broad unimplemented slice unless another batch naturally extends the new HP infrastructure; if returning to HP work soon, `POR-086` Growing Grass Energy remains the strongest follow-up.
-4. Keep using `mix prizmo.goal2.corpus` after each batch to re-rank the next blockers by archetype count and weighted share.
+1. Treat `DRI-127` Team Rocket's Murkrow as the next default shared unimplemented card unless the live corpus re-ranks the queue; confirm metadata/text and consider whether it should pair with a nearby Rocket's Honchkrow/Mewtwo primitive.
+2. Keep `SSP-174` Drayton and `MEG-124` Premium Power Pro behind Murkrow as the next shared metadata-missing candidates by weighted share.
+3. Keep the remaining Dragapult-only cached pair `TWM-099` / `TWM-100` as deliberate single-archetype cleanup, not the default autonomous queue.
+4. Finish the remaining shared partials only after the broad unimplemented slice unless another batch naturally extends the new HP infrastructure; if returning to HP work soon, `POR-086` Growing Grass Energy remains the strongest follow-up.
+5. Keep using `mix prizmo.goal2.corpus` after each batch to re-rank the next blockers by archetype count and weighted share.
 
 ## See Also
 

@@ -1,0 +1,83 @@
+{
+  "prizmo_id": "MEG-009",
+  "source": {
+    "base_url": "https://api.tcgdex.net/v2/en",
+    "dynamic_fields_removed": [
+      "pricing"
+    ],
+    "language": "en",
+    "provider": "TCGdex"
+  },
+  "tcgdex": {
+    "attacks": [
+      {
+        "cost": [
+          "Grass",
+          "Colorless"
+        ],
+        "damage": 50,
+        "effect": "Switch out your opponent's Active Pokémon to the Bench. (Your opponent chooses the new Active Pokémon.)",
+        "name": "Push Down"
+      }
+    ],
+    "category": "Pokemon",
+    "dexId": [
+      153
+    ],
+    "evolveFrom": "Chikorita",
+    "hp": 110,
+    "id": "me01-009",
+    "illustrator": "nisimono",
+    "image": "https://assets.tcgdex.net/en/me/me01/009",
+    "legal": {
+      "expanded": true,
+      "standard": true
+    },
+    "localId": "009",
+    "name": "Bayleef",
+    "rarity": "Common",
+    "regulationMark": "I",
+    "retreat": 2,
+    "set": {
+      "cardCount": {
+        "official": 132,
+        "total": 188
+      },
+      "id": "me01",
+      "logo": "https://assets.tcgdex.net/en/me/me01/logo",
+      "name": "Mega Evolution",
+      "symbol": "https://assets.tcgdex.net/univ/me/me01/symbol"
+    },
+    "stage": "Stage1",
+    "types": [
+      "Grass"
+    ],
+    "updated": "2026-06-14T19:07:08+01:00",
+    "variants": {
+      "firstEdition": false,
+      "holo": false,
+      "normal": true,
+      "reverse": true,
+      "wPromo": false
+    },
+    "variants_detailed": [
+      {
+        "size": "standard",
+        "type": "normal",
+        "variantId": "endfynwn4n10gzq"
+      },
+      {
+        "size": "standard",
+        "type": "reverse",
+        "variantId": "cm4kqul3x1bwlz1f"
+      }
+    ],
+    "weaknesses": [
+      {
+        "type": "Fire",
+        "value": "×2"
+      }
+    ]
+  },
+  "tcgdex_id": "me01-009"
+}

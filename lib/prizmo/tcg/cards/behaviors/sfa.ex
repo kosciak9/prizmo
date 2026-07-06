@@ -3,6 +3,10 @@ defmodule Prizmo.Tcg.Cards.Behaviors.SFA do
 
   use Prizmo.Tcg.Cards.DSL
 
+  card "SFA-006" do
+    attack(:wood_hammer, effect: %{type: :self_damage, damage: 30})
+  end
+
   card "SFA-039" do
     ability(:subjugating_chains,
       effect: %{type: :subjugating_chains_switch_and_poison}
