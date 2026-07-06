@@ -76,6 +76,10 @@ defmodule Prizmo.Tcg.Cards.Behaviors.TEF do
     card_effect(effect: %{type: :attached_pokemon_hp_modifier, amount: 100})
   end
 
+  card "TEF-154" do
+    card_effect(effect: %{type: :bonus_attack_damage_to_pokemon_ex, bonus_damage: 50})
+  end
+
   card "TEF-159" do
     card_effect(
       effect: %{

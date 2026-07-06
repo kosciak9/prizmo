@@ -64,13 +64,13 @@ Those reports are the canonical starting point for autonomous Goal 2 implementat
 - Tracked top archetypes: `30`
 - Tracked cards with usage greater than `0.00`: `377`
 - Coverage buckets from `mix prizmo.goal2.corpus`:
-  - `supported=141`
+  - `supported=142`
   - `generic-supported=8`
   - `partial=10`
-  - `unimplemented=218`
+  - `unimplemented=217`
 - Metadata buckets:
-  - `cached=162`
-  - `missing=215`
+  - `cached=163`
+  - `missing=214`
 
 Important interpretation:
 
@@ -82,17 +82,17 @@ Important interpretation:
 
 The strongest current Goal 2 implementation candidates are the incomplete cards shared by the most archetypes and/or the most total metagame share.
 
-The latest Goal 2 engine batch closed `POR-072` Energy Search as the highest-share remaining three-archetype Item blocker. `POR-072` now has committed TCGdex metadata and an engine-defined Item effect that searches exactly 1 true Basic Energy from deck, reveals it, moves it to hand, and shuffles. The reusable filter fix from this batch makes `%{kind: :energy, energy_type: :basic}` strict, so Special Energy cards with printed text no longer leak into Basic Energy search prompts through the broad Energy fallback.
+The latest Goal 2 engine batch closed `TEF-154` Maximum Belt as the highest-share remaining three-archetype ACE SPEC Tool blocker. `TEF-154` now has committed TCGdex metadata and an engine-defined Tool effect that adds `50` damage to attacks used against the opponent's Active Pokémon ex before Weakness and Resistance. The reusable Tool damage refactor also moved `WHT-080` Brave Bangle off the old hard-coded card-ID path, keeps Tool damage scoped to Active Pokémon ex targets, and suppresses those bonuses under `TWM-153` Jamming Tower.
 
 ### Highest-priority remaining `unimplemented` cards from current report
 
 | Card | Archetypes | Total share | Notes |
 | --- | --- | --- | --- |
-| `TEF-154` Maximum Belt | `3` | `4.11%` | Shared ACE SPEC Tool line and the new top three-archetype blocker after Energy Search. |
-| `SSP-185` Precious Trolley | `3` | `4.06%` | Shared bench-filling ACE SPEC once Maximum Belt is reduced. |
+| `SSP-185` Precious Trolley | `3` | `4.06%` | Shared bench-filling ACE SPEC and the new top three-archetype blocker after Maximum Belt. |
 | `CRI-080` Prism Tower | `3` | `3.45%` | Shared Stadium follow-up after the current ACE SPEC slice. |
-| `CRI-070` Patrat | `3` | `2.76%` | Three-archetype Pokémon metadata/behavior cleanup after the Item/ACE SPEC/Stadium slice. |
+| `CRI-070` Patrat | `3` | `2.76%` | Three-archetype Pokémon metadata/behavior cleanup after the ACE SPEC/Stadium slice. |
 | `MEG-074` Lunatone | `3` | `1.99%` | Lower-share three-archetype Pokémon cleanup shared by Ceruledge, Mega Greninja, and Mega Lucario. |
+| `MEG-075` Solrock | `3` | `1.99%` | Paired lower-share three-archetype Pokémon cleanup alongside Lunatone. |
 
 ### Shared `partial` cards worth finishing after the broad unimplemented slice
 
@@ -119,9 +119,9 @@ That means prior Goal 1 and six-deck coverage was not wasted; it now acts as see
 
 ## Recommended next implementation order
 
-1. Take `TEF-154` Maximum Belt next as the highest-share remaining three-archetype blocker and the clearest shared ACE SPEC Tool cleanup.
-2. After that, continue the same three-archetype metadata-missing slice with `SSP-185` Precious Trolley and `CRI-080` Prism Tower before dropping into lower-share three-archetype blockers.
-3. Use `CRI-070` Patrat and `MEG-074` Lunatone as the next lower-share shared Pokémon cleanup candidates once the Item/ACE SPEC/Stadium slice is reduced.
+1. Take `SSP-185` Precious Trolley next as the highest-share remaining three-archetype blocker and the next shared ACE SPEC cleanup.
+2. After that, continue the same three-archetype metadata-missing slice with `CRI-080` Prism Tower before dropping into lower-share three-archetype blockers.
+3. Use `CRI-070` Patrat plus the `MEG-074` Lunatone / `MEG-075` Solrock pair as the next lower-share shared Pokémon cleanup candidates once the ACE SPEC/Stadium slice is reduced.
 4. Keep the remaining Dragapult-only cached pair `TWM-099` / `TWM-100` as deliberate single-archetype cleanup, not the default autonomous queue.
 5. Finish the remaining shared partials only after the broad unimplemented slice unless another batch naturally extends the new HP infrastructure; if returning to HP work soon, `POR-086` Growing Grass Energy remains the strongest follow-up.
 6. Keep using `mix prizmo.goal2.corpus` after each batch to re-rank the next blockers by archetype count and weighted share.

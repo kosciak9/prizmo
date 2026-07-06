@@ -1,5 +1,12 @@
 # Wiki Log
 
+## [2026-07-06] codebase update | Goal 2 Maximum Belt support
+
+- Task attempted: closed `TEF-154` Maximum Belt as the highest-priority remaining three-archetype Goal 2 ACE SPEC Tool blocker. Added committed TCGdex metadata, authored Maximum Belt as an engine-defined Tool that adds `50` damage to attacks used against the opponent's Active Pokémon ex before Weakness and Resistance, and generalized the Tool attack-damage path so Brave Bangle no longer depends on a hard-coded card ID while Jamming Tower suppresses Tool damage bonuses.
+- Files changed: `lib/prizmo/tcg/cards/behaviors/tef.ex`, `lib/prizmo/tcg_engine/attack_damage.ex`, `lib/prizmo/tcg_engine/tool_effects.ex`, `priv/tcg/cards/tcgdex/cards/TEF-154.json`, `knowledge-base/wiki/engine/goal-2-top-30-latest-limitless-coverage-scope.md`, `knowledge-base/wiki/engine/ash-backed-tcg-engine-playtest-handoff.md`, `knowledge-base/wiki/log.md`.
+- Validation: `mix compile --warnings-as-errors`; Tidewave runtime check confirmed `TEF-154` reports `coverage_status: :supported`, Maximum Belt contributes `{:ok, 50}` against a Pokémon ex, contributes `{:ok, 0}` against a non-ex, Jamming Tower suppresses the bonus to `{:ok, 0}`, and Brave Bangle still contributes `{:ok, 30}` through the generalized path; `mix test test/prizmo/tcg/cards/metadata_test.exs`; `mix test test/prizmo/tcg_engine/mechanics_test.exs`; `mix prizmo.goal2.corpus` confirmed `supported=142` / `generic-supported=8` / `partial=10` / `unimplemented=217` and `cached=163` / `missing=214`; final `mix check` passed.
+- Remaining/blocking notes: `TEF-154` is no longer in the shared incomplete queue. The default next Goal 2 priority is now `SSP-185` Precious Trolley, followed by `CRI-080` Prism Tower, `CRI-070` Patrat, `MEG-074` Lunatone, and `MEG-075` Solrock; if the next batch deliberately returns to attached Special Energy/HP partials, `POR-086` Growing Grass Energy remains the strongest follow-up.
+
 ## [2026-07-06] codebase update | Goal 2 Energy Search support
 
 - Task attempted: closed `POR-072` Energy Search as the highest-priority remaining three-archetype Goal 2 Item blocker. Added committed TCGdex metadata, authored Energy Search as an engine-defined Item that searches exactly 1 true Basic Energy from deck to hand with public reveal and shuffle, and tightened the generic Energy search filter so Special Energy no longer leaks into Basic Energy-only prompts.

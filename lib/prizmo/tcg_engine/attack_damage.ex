@@ -6,6 +6,7 @@ defmodule Prizmo.TcgEngine.AttackDamage do
   alias Prizmo.TcgEngine.CardInstance
   alias Prizmo.TcgEngine.CardStore
   alias Prizmo.TcgEngine.GameEvent
+  alias Prizmo.TcgEngine.ToolEffects
   alias Prizmo.TcgEngine.TurnStore
 
   require Ash.Query
@@ -27,7 +28,7 @@ defmodule Prizmo.TcgEngine.AttackDamage do
          {:ok, damage} <-
            apply_effect(damage, attacker_card, defender_card, Map.get(attack, :effect), opts),
          {:ok, damage} <-
-           apply_brave_bangle_bonus(damage, attacker_card, defender_card),
+           apply_tool_attack_damage_bonus(damage, attacker_card, defender_card),
          {:ok, damage} <-
            apply_black_belts_training_bonus(damage, attacker_card, defender_card),
          {:ok, damage} <- apply_kieran_damage_bonus(damage, attacker_card, defender_card) do
@@ -647,31 +648,15 @@ defmodule Prizmo.TcgEngine.AttackDamage do
 
   defp pokemon_ex_or_v?(_metadata), do: false
 
-  defp apply_brave_bangle_bonus(
+  defp apply_tool_attack_damage_bonus(
          damage,
          %CardInstance{} = attacker_card,
          %CardInstance{} = defender_card
        ) do
-    with {:ok, attacker_metadata} <- CardCatalog.fetch(attacker_card.card_id),
-         {:ok, defender_metadata} <- CardCatalog.fetch(defender_card.card_id),
-         {:ok, attached_cards} <-
-           CardStore.attached_cards(attacker_card.game_id, attacker_card.id) do
-      if brave_bangle_active?(attacker_metadata, defender_metadata, attached_cards) do
-        {:ok, damage + 30}
-      else
-        {:ok, damage}
-      end
+    with {:ok, bonus_damage} <-
+           ToolEffects.attack_damage_bonus(attacker_card.game_id, attacker_card, defender_card) do
+      {:ok, damage + bonus_damage}
     end
-  end
-
-  defp brave_bangle_active?(attacker_metadata, defender_metadata, attached_cards) do
-    not Map.get(attacker_metadata, :rule_box?, false) and
-      pokemon_ex?(defender_metadata) and
-      has_brave_bangle?(attached_cards)
-  end
-
-  defp has_brave_bangle?(attached_cards) do
-    Enum.any?(attached_cards, &(&1.card_id == "WHT-080"))
   end
 
   defp pokemon_ex?(%{supertype: :pokemon, suffix: "ex"}), do: true

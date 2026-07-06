@@ -16,6 +16,7 @@ defmodule Prizmo.TcgEngine.ToolEffects do
   @supported_tool_effect_types [
     :retreat_cost_reduction,
     :retreat_cost_reduction_with_low_hp_free_retreat,
+    :bonus_attack_damage_to_pokemon_ex,
     :bonus_attack_damage_to_pokemon_ex_if_attacker_has_no_rule_box,
     :move_energy_from_attacker_to_defender_bench_on_damage,
     :bench_limit_8_with_tera_in_play_else_discard_to_5,
@@ -34,6 +35,42 @@ defmodule Prizmo.TcgEngine.ToolEffects do
     case CardCatalog.fetch(card_id) do
       {:ok, card} -> supported_tool?(card)
       {:error, _reason} -> false
+    end
+  end
+
+  @doc """
+  Returns additive attack damage from active Tool effects attached to the attacker.
+
+  Tool damage text is applied before Weakness and Resistance by `AttackDamage`.
+  """
+  def attack_damage_bonus(
+        game_id,
+        %CardInstance{} = attacker_card,
+        %CardInstance{} = defender_card
+      )
+      when is_binary(game_id) do
+    cond do
+      StadiumEffects.tools_have_no_effect?(game_id) ->
+        {:ok, 0}
+
+      defender_card.zone != :active ->
+        {:ok, 0}
+
+      true ->
+        with {:ok, attacker_metadata} <- CardCatalog.fetch(attacker_card.card_id),
+             {:ok, defender_metadata} <- CardCatalog.fetch(defender_card.card_id),
+             true <- pokemon_ex?(defender_metadata),
+             {:ok, attachments} <- CardStore.attached_cards(game_id, attacker_card.id) do
+          bonus_damage =
+            Enum.reduce(attachments, 0, fn attached_card, total ->
+              total + attack_damage_bonus_from_tool(attached_card, attacker_metadata)
+            end)
+
+          {:ok, bonus_damage}
+        else
+          false -> {:ok, 0}
+          {:error, _reason} = error -> error
+        end
     end
   end
 
@@ -223,6 +260,43 @@ defmodule Prizmo.TcgEngine.ToolEffects do
   end
 
   defp knockout_prize_reduction_from_tool(%CardInstance{}, _target_card), do: 0
+
+  defp attack_damage_bonus_from_tool(%CardInstance{card_id: card_id}, attacker_metadata)
+       when is_binary(card_id) do
+    case CardCatalog.fetch(card_id) do
+      {:ok,
+       %{
+         supertype: :trainer,
+         trainer_type: :tool,
+         effect: %{type: :bonus_attack_damage_to_pokemon_ex, bonus_damage: bonus_damage}
+       }}
+      when is_integer(bonus_damage) and bonus_damage > 0 ->
+        bonus_damage
+
+      {:ok,
+       %{
+         supertype: :trainer,
+         trainer_type: :tool,
+         effect: %{
+           type: :bonus_attack_damage_to_pokemon_ex_if_attacker_has_no_rule_box,
+           bonus_damage: bonus_damage
+         }
+       }}
+      when is_integer(bonus_damage) and bonus_damage > 0 ->
+        if Map.get(attacker_metadata, :rule_box?, false), do: 0, else: bonus_damage
+
+      _other ->
+        0
+    end
+  end
+
+  defp pokemon_ex?(%{supertype: :pokemon, suffix: "ex"}), do: true
+
+  defp pokemon_ex?(%{supertype: :pokemon, name: name}) when is_binary(name) do
+    String.ends_with?(name, " ex")
+  end
+
+  defp pokemon_ex?(_metadata), do: false
 
   defp attached_pokemon_matches_prize_reduction?(target_name, %{
          required_attached_pokemon_name_prefix: prefix
