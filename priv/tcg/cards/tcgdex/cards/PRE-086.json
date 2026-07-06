@@ -1,0 +1,95 @@
+{
+  "prizmo_id": "PRE-086",
+  "source": {
+    "base_url": "https://api.tcgdex.net/v2/en",
+    "dynamic_fields_removed": [
+      "pricing"
+    ],
+    "language": "en",
+    "provider": "TCGdex"
+  },
+  "tcgdex": {
+    "attacks": [
+      {
+        "cost": [
+          "Colorless",
+          "Colorless",
+          "Colorless",
+          "Colorless"
+        ],
+        "damage": "100+",
+        "effect": "If your opponent's Active Pokémon is a Tera Pokémon, this attack does 230 more damage.",
+        "name": "Jewel Breaker"
+      }
+    ],
+    "category": "Pokemon",
+    "dexId": [
+      486
+    ],
+    "hp": 160,
+    "id": "sv08.5-086",
+    "illustrator": "chibi",
+    "image": "https://assets.tcgdex.net/en/sv/sv08.5/086",
+    "legal": {
+      "expanded": true,
+      "standard": true
+    },
+    "localId": "086",
+    "name": "Regigigas",
+    "rarity": "Uncommon",
+    "regulationMark": "H",
+    "retreat": 4,
+    "set": {
+      "cardCount": {
+        "official": 131,
+        "total": 180
+      },
+      "id": "sv08.5",
+      "logo": "https://assets.tcgdex.net/en/sv/sv08.5/logo",
+      "name": "Prismatic Evolutions"
+    },
+    "stage": "Basic",
+    "types": [
+      "Colorless"
+    ],
+    "updated": "2026-06-14T19:08:43+01:00",
+    "variants": {
+      "firstEdition": false,
+      "holo": false,
+      "normal": true,
+      "reverse": true,
+      "wPromo": false
+    },
+    "variants_detailed": [
+      {
+        "size": "standard",
+        "type": "normal",
+        "variantId": "endfynwn4n10gzq"
+      },
+      {
+        "size": "standard",
+        "type": "reverse",
+        "variantId": "cm4kqul3x1bwlz1f"
+      },
+      {
+        "foil": "pokeball",
+        "size": "standard",
+        "type": "reverse",
+        "variantId": "3739bbtj3i910y5ynn9xc6ryf"
+      },
+      {
+        "foil": "masterball",
+        "size": "standard",
+        "type": "reverse",
+        "variantId": "2asus05yghmpd1ud1sdmlq3as4e"
+      }
+    ],
+    "weaknesses": [
+      {
+        "type": "Fighting",
+        "value": "×2"
+      }
+    ]
+  },
+  "tcgdex_id": "sv08.5-086"
+}

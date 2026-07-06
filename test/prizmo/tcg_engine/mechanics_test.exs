@@ -3679,6 +3679,41 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
     end
   end
 
+  describe "PRE-086 Regigigas support" do
+    test "Jewel Breaker adds damage against the opponent's Active Tera Pokemon" do
+      assert CardCoverage.summarize("PRE-086").coverage_status == :supported
+
+      assert {:ok, jewel_breaker} = CardCatalog.fetch_attack("PRE-086", :jewel_breaker)
+      assert jewel_breaker.damage == 100
+      assert jewel_breaker.cost == [:colorless, :colorless, :colorless, :colorless]
+
+      assert jewel_breaker.effect == %{
+               type: :bonus_damage_if_defender_tera_pokemon,
+               bonus_damage: 230
+             }
+
+      {:ok, tera_game} = create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147)
+      {:ok, tera_attacker} = create_custom_owned_card(tera_game.id, "player_1", "PRE-086", 245)
+      tera_defender = promote_custom_basic_to_active(tera_game.id, "player_2", "TWM-112")
+
+      assert CardCatalog.tera_pokemon?(tera_defender.card_id)
+      assert {:ok, 330} = AttackDamage.damage_for(tera_attacker, tera_defender, jewel_breaker)
+
+      {:ok, non_tera_game} =
+        create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147)
+
+      {:ok, non_tera_attacker} =
+        create_custom_owned_card(non_tera_game.id, "player_1", "PRE-086", 246)
+
+      non_tera_defender = promote_custom_basic_to_active(non_tera_game.id, "player_2", "JTG-120")
+
+      refute CardCatalog.tera_pokemon?(non_tera_defender.card_id)
+
+      assert {:ok, 100} =
+               AttackDamage.damage_for(non_tera_attacker, non_tera_defender, jewel_breaker)
+    end
+  end
+
   describe "SFA-039 Pecharunt ex support" do
     test "Irritated Outburst scales with the number of Prize cards the opponent has taken" do
       {:ok, game} = create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147)

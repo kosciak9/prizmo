@@ -206,6 +206,18 @@ defmodule Prizmo.TcgEngine.AttackDamage do
     end
   end
 
+  defp apply_effect(damage, _attacker_card, %CardInstance{} = defender_card, %{
+         type: :bonus_damage_if_defender_tera_pokemon,
+         bonus_damage: bonus_damage
+       })
+       when is_integer(bonus_damage) and bonus_damage >= 0 do
+    if CardCatalog.tera_pokemon?(defender_card.card_id) do
+      {:ok, damage + bonus_damage}
+    else
+      {:ok, damage}
+    end
+  end
+
   defp apply_effect(damage, %CardInstance{} = attacker_card, _defender_card, %{
          type: :bonus_damage_if_attacker_has_team_rocket_energy,
          bonus_damage: bonus_damage
@@ -451,6 +463,11 @@ defmodule Prizmo.TcgEngine.AttackDamage do
 
   defp apply_effect(damage, _attacker_card, _defender_card, %{type: :draw_after_attack}),
     do: {:ok, damage}
+
+  defp apply_effect(damage, _attacker_card, _defender_card, %{
+         type: :bonus_damage_if_defender_tera_pokemon
+       }),
+       do: {:ok, damage}
 
   defp apply_effect(damage, _attacker_card, _defender_card, %{type: :damage_per_own_prize_taken}),
     do: {:ok, damage}

@@ -37,4 +37,11 @@ defmodule Prizmo.Tcg.Cards.Behaviors.PRE do
 
     attack(:shadow_bind, effect: %{type: :defending_pokemon_cannot_retreat_next_turn})
   end
+
+  card "PRE-086" do
+    attack(:jewel_breaker,
+      damage: 100,
+      effect: %{type: :bonus_damage_if_defender_tera_pokemon, bonus_damage: 230}
+    )
+  end
 end

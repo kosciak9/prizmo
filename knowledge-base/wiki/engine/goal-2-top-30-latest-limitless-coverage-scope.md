@@ -64,13 +64,13 @@ Those reports are the canonical starting point for autonomous Goal 2 implementat
 - Tracked top archetypes: `30`
 - Tracked cards with usage greater than `0.00`: `377`
 - Coverage buckets from `mix prizmo.goal2.corpus`:
-  - `supported=169`
+  - `supported=170`
   - `generic-supported=8`
   - `partial=10`
-  - `unimplemented=190`
+  - `unimplemented=189`
 - Metadata buckets:
-  - `cached=190`
-  - `missing=187`
+  - `cached=191`
+  - `missing=186`
 
 Important interpretation:
 
@@ -82,13 +82,12 @@ Important interpretation:
 
 The strongest current Goal 2 implementation candidates are the incomplete cards shared by the most archetypes and/or the most total metagame share.
 
-The latest Goal 2 engine batch closed `PRE-116` Max Rod after Powerglass. Max Rod now has committed TCGdex metadata and executable ACE SPEC Item behavior: during the action window, it prompts over owned discard-pile Pokémon and Basic Energy cards, returns up to five selected cards to hand, filters out Trainers and Special Energy, and marks the player's once-per-game ACE SPEC flag through the generic Trainer play path.
+The latest Goal 2 engine batch closed `PRE-086` Regigigas after Max Rod. Regigigas now has committed TCGdex metadata and executable `Jewel Breaker` attack behavior: it exposes the Colorless/Colorless/Colorless/Colorless attack as 100 base damage and adds 230 damage before Weakness/Resistance when the opponent's Active Pokémon is tagged as Tera in the server-side card catalog.
 
 ### Highest-priority remaining `unimplemented` cards from current report
 
 | Card | Archetypes | Total share | Notes |
 | --- | --- | --- | --- |
-| `PRE-086` Regigigas | `2` | `5.30%` | Shared Pokémon blocker in the Hydrapple/Metagross overlap. |
 | Hydrapple/Ogerpon Grass line cluster (`ASC-008`, `MEG-008`, `MEG-009`, `MEG-010`, `SFA-006`, `TEF-126`) | `2` | `5.15%` | Shared cluster behind Regigigas; split into coherent card batches after confirming metadata/text. |
 
 ### Shared `partial` cards worth finishing after the broad unimplemented slice
@@ -116,11 +115,10 @@ That means prior Goal 1 and six-deck coverage was not wasted; it now acts as see
 
 ## Recommended next implementation order
 
-1. Take `PRE-086` Regigigas next as the default highest-share remaining shared Pokémon blocker unless a broader primitive re-ranks above it.
-2. Treat the Hydrapple/Ogerpon Grass line cluster as the next 5.15% shared queue after Regigigas, splitting it into coherent card batches instead of trying to close all tied cards at once by default.
-3. Keep the remaining Dragapult-only cached pair `TWM-099` / `TWM-100` as deliberate single-archetype cleanup, not the default autonomous queue.
-4. Finish the remaining shared partials only after the broad unimplemented slice unless another batch naturally extends the new HP infrastructure; if returning to HP work soon, `POR-086` Growing Grass Energy remains the strongest follow-up.
-5. Keep using `mix prizmo.goal2.corpus` after each batch to re-rank the next blockers by archetype count and weighted share.
+1. Treat the Hydrapple/Ogerpon Grass line cluster as the next 5.15% shared queue now that Regigigas is closed, splitting it into coherent card batches instead of trying to close all tied cards at once by default.
+2. Keep the remaining Dragapult-only cached pair `TWM-099` / `TWM-100` as deliberate single-archetype cleanup, not the default autonomous queue.
+3. Finish the remaining shared partials only after the broad unimplemented slice unless another batch naturally extends the new HP infrastructure; if returning to HP work soon, `POR-086` Growing Grass Energy remains the strongest follow-up.
+4. Keep using `mix prizmo.goal2.corpus` after each batch to re-rank the next blockers by archetype count and weighted share.
 
 ## See Also
 

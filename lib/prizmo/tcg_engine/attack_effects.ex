@@ -75,6 +75,7 @@ defmodule Prizmo.TcgEngine.AttackEffects do
     :bonus_damage_on_coin_heads,
     :bonus_damage_per_coin_heads_count,
     :bonus_damage_if_defender_pokemon_ex,
+    :bonus_damage_if_defender_tera_pokemon,
     :bonus_damage_if_attacker_has_team_rocket_energy,
     :bonus_damage_if_team_rocket_supporter_played_this_turn,
     :bonus_damage_if_own_pokemon_knocked_out_last_turn,
@@ -298,6 +299,9 @@ defmodule Prizmo.TcgEngine.AttackEffects do
         switch_self_with_bench(game_id, player_id, attacker_card, opts)
 
       %{type: :bonus_damage_if_defender_pokemon_ex} ->
+        {:ok, %{}}
+
+      %{type: :bonus_damage_if_defender_tera_pokemon} ->
         {:ok, %{}}
 
       %{type: :bonus_damage_on_coin_heads, bonus_damage: bonus_damage}
