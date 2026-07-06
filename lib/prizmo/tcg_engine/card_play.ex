@@ -2885,6 +2885,22 @@ defmodule Prizmo.TcgEngine.CardPlay do
     end
   end
 
+  defp require_search_filter(%CardInstance{} = card, %{kind: :energy, energy_type: energy_type}) do
+    case CardCatalog.fetch(card.card_id) do
+      {:ok, %{supertype: :energy, energy_type: ^energy_type}} ->
+        :ok
+
+      {:ok, %{supertype: :energy, energy_type: actual_type}} ->
+        {:error, {:wrong_energy_type, card.card_id, actual_type, energy_type}}
+
+      {:ok, metadata} ->
+        {:error, {:not_energy, metadata.id}}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
   defp require_search_filter(%CardInstance{} = card, %{
          kind: :trainer,
          trainer_type: trainer_type,

@@ -476,6 +476,26 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     ]
   }
 
+  @energy_search %CardDefinition{
+    id: "POR-072",
+    kind: :trainer,
+    trainer_type: :item,
+    play_window: :action_window,
+    effects: [
+      %Effect{
+        key: :search_deck_for_basic_energy,
+        type: :search_deck,
+        params: %{
+          filter: %{kind: :energy, energy_type: :basic},
+          count: 1,
+          destination: :hand,
+          reveal: true,
+          shuffle_after: true
+        }
+      }
+    ]
+  }
+
   @energy_retrieval %CardDefinition{
     id: "SVI-171",
     kind: :trainer,
@@ -1154,6 +1174,7 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     @dawn.id => @dawn,
     @briar.id => @briar,
     @enhanced_hammer.id => @enhanced_hammer,
+    @energy_search.id => @energy_search,
     @energy_retrieval.id => @energy_retrieval,
     @energy_switch.id => @energy_switch,
     @fighting_gong.id => @fighting_gong,

@@ -1,5 +1,12 @@
 # Wiki Log
 
+## [2026-07-06] codebase update | Goal 2 Energy Search support
+
+- Task attempted: closed `POR-072` Energy Search as the highest-priority remaining three-archetype Goal 2 Item blocker. Added committed TCGdex metadata, authored Energy Search as an engine-defined Item that searches exactly 1 true Basic Energy from deck to hand with public reveal and shuffle, and tightened the generic Energy search filter so Special Energy no longer leaks into Basic Energy-only prompts.
+- Files changed: `lib/prizmo/tcg_engine/card_play.ex`, `lib/prizmo/tcg_engine/cards/registry.ex`, `test/prizmo/tcg_engine/mechanics_test.exs`, `priv/tcg/cards/tcgdex/cards/POR-072.json`, `knowledge-base/wiki/engine/goal-2-top-30-latest-limitless-coverage-scope.md`, `knowledge-base/wiki/engine/ash-backed-tcg-engine-playtest-handoff.md`, `knowledge-base/wiki/log.md`.
+- Validation: `mix test test/prizmo/tcg_engine/mechanics_test.exs -n "Energy Search"`; `mix test test/prizmo/tcg/cards/metadata_test.exs`; `mix format`; `mix test test/prizmo/tcg_engine/mechanics_test.exs`; `mix compile --warnings-as-errors`; `mix prizmo.goal2.corpus` confirmed `supported=141` / `generic-supported=8` / `partial=10` / `unimplemented=218` and `cached=162` / `missing=215`; final `mix check` passed.
+- Remaining/blocking notes: `POR-072` is no longer in the shared incomplete queue. The default next Goal 2 priority is now `TEF-154` Maximum Belt, followed by `SSP-185` Precious Trolley, `CRI-080` Prism Tower, `CRI-070` Patrat, and `MEG-074` Lunatone; if the next batch deliberately returns to attached Special Energy/HP partials, `POR-086` Growing Grass Energy remains the strongest follow-up.
+
 ## [2026-07-06] codebase update | Goal 2 Rocky Fighting Energy support
 
 - Task attempted: closed `POR-087` Rocky Fighting Energy as the highest-priority remaining shared Goal 2 Special Energy blocker. Added committed TCGdex metadata, authored its `{F}` provider plus conditional attack-effect prevention overlay, and generalized the attack-prevention energy path so Rocky prevents effects of attacks used by the opponent only for the attached Fighting Pokémon while leaving normal attack damage unprevented.

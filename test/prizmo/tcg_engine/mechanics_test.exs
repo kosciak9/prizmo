@@ -518,6 +518,52 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
              end) == 5
     end
 
+    test "Energy Search opens a Basic Energy-only prompt and resolves to hand" do
+      {:ok, game} = create_flow_action_window_game()
+
+      {:ok, energy_search} = create_custom_owned_card(game.id, "player_1", "POR-072", 220)
+      {:ok, energy_search} = ash_update(energy_search, :draw_to_hand, %{position: 20})
+
+      {:ok, basic_energy} = create_custom_owned_card(game.id, "player_1", "MEE-005", 221)
+      {:ok, special_energy} = create_custom_owned_card(game.id, "player_1", "ASC-216", 222)
+      {:ok, pokemon} = create_custom_owned_card(game.id, "player_1", "PRE-035", 223)
+
+      assert CardCoverage.summarize("POR-072").coverage_status == :supported
+
+      assert {:ok, view} = GameView.for_player(game.id, "player_1")
+      play_card = Enum.find(view.action_affordances, &(&1.key == "play_card"))
+      assert is_map(play_card)
+      assert energy_search.id in play_card.source_card_instance_ids
+
+      assert {:ok, game} = Mechanics.play_card(game, "player_1", energy_search.id, %{})
+
+      [prompt] = awaiting_prompts(game.id)
+      assert prompt.player_id == "player_1"
+      assert prompt.payload["choice_key"] == "search_deck_for_basic_energy"
+      assert prompt.payload["min"] == 1
+      assert prompt.payload["max"] == 1
+      assert basic_energy.id in prompt.payload["legal_choices"]
+      refute special_energy.id in prompt.payload["legal_choices"]
+      refute pokemon.id in prompt.payload["legal_choices"]
+
+      assert {:ok, game} =
+               Mechanics.choose_prompt(game, "player_1", prompt.id, [basic_energy.id])
+
+      assert zone(energy_search.id) == :discard
+      assert zone(basic_energy.id) == :hand
+      assert zone(special_energy.id) == :deck
+      assert zone(pokemon.id) == :deck
+
+      cards_moved_event =
+        game.id
+        |> game_events_by_type("cards_moved")
+        |> Enum.find(&(&1.payload["effect_key"] == "search_deck_for_basic_energy"))
+
+      assert cards_moved_event.payload["public_reveal"] == true
+      assert Enum.map(cards_moved_event.payload["cards"], & &1["card_id"]) == ["MEE-005"]
+      assert game_events_by_type(game.id, "deck_shuffled") != []
+    end
+
     test "Brock's Scouting opens a prompt and resolves for up to 2 Basic Pokémon" do
       {:ok, game} = create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147)
 

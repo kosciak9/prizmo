@@ -1,0 +1,58 @@
+{
+  "prizmo_id": "POR-072",
+  "source": {
+    "base_url": "https://api.tcgdex.net/v2/en",
+    "dynamic_fields_removed": [
+      "pricing"
+    ],
+    "language": "en",
+    "provider": "TCGdex"
+  },
+  "tcgdex": {
+    "category": "Trainer",
+    "effect": "Search your deck for a Basic Energy card, reveal it, and put it into your hand. Then, shuffle your deck.",
+    "id": "me03-072",
+    "illustrator": "Toyste Beach",
+    "image": "https://assets.tcgdex.net/en/me/me03/072",
+    "legal": {
+      "expanded": true,
+      "standard": true
+    },
+    "localId": "072",
+    "name": "Energy Search",
+    "rarity": "Common",
+    "regulationMark": "J",
+    "set": {
+      "cardCount": {
+        "official": 88,
+        "total": 124
+      },
+      "id": "me03",
+      "logo": "https://assets.tcgdex.net/en/me/me03/logo",
+      "name": "Perfect Order",
+      "symbol": "https://assets.tcgdex.net/univ/me/me03/symbol"
+    },
+    "trainerType": "Item",
+    "updated": "2026-04-02T18:17:13+01:00",
+    "variants": {
+      "firstEdition": false,
+      "holo": false,
+      "normal": true,
+      "reverse": true,
+      "wPromo": false
+    },
+    "variants_detailed": [
+      {
+        "size": "standard",
+        "type": "normal",
+        "variantId": "endfynwn4n10gzq"
+      },
+      {
+        "size": "standard",
+        "type": "reverse",
+        "variantId": "cm4kqul3x1bwlz1f"
+      }
+    ]
+  },
+  "tcgdex_id": "me03-072"
+}
