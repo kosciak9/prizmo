@@ -1,5 +1,12 @@
 # Wiki Log
 
+## [2026-07-06] codebase update | Goal 2 Hand Trimmer support
+
+- Task attempted: closed `TEF-150` Hand Trimmer as the default highest-share remaining two-archetype Goal 2 Trainer blocker after the Darkness pair. Added committed TCGdex metadata, authored Hand Trimmer as an engine-defined Item using a reusable `:each_player_discards_to_hand_size` prompt effect, preserved opponent-first discard ordering, added a second acting-player prompt when needed, and rejected no-effect play when both players would already have 5 or fewer cards after the Item leaves hand.
+- Files changed: `lib/prizmo/tcg_engine/effect_runner.ex`, `lib/prizmo/tcg_engine/cards/registry.ex`, `lib/prizmo/tcg_engine/card_play.ex`, `priv/tcg/cards/tcgdex/cards/TEF-150.json`, `knowledge-base/wiki/engine/goal-2-top-30-latest-limitless-coverage-scope.md`, `knowledge-base/wiki/engine/ash-backed-tcg-engine-playtest-handoff.md`, `knowledge-base/wiki/log.md`.
+- Validation: `mix format`; `mix compile --warnings-as-errors`; `mix test test/prizmo/tcg/cards/metadata_test.exs test/prizmo/tcg_engine/card_catalog_test.exs`; `mix test test/prizmo/tcg_engine/mechanics_test.exs`; Tidewave runtime check on disposable game `27882cc1-f977-4574-8919-663f6da9918a` confirmed `TEF-150` coverage, opponent-first prompt (`player_2`, discard 1), acting-player follow-up prompt (`player_1`, discard 2), both hands ending at 5, Hand Trimmer in discard, and completed pending effect; `mix prizmo.goal2.corpus` confirmed `supported=157` / `generic-supported=8` / `partial=10` / `unimplemented=202` and `cached=178` / `missing=199`; final `mix check` passed.
+- Remaining/blocking notes: `TEF-150` is no longer in the shared incomplete queue. The default next Goal 2 priority is now `PFL-092` Punk Helmet, followed by `TWM-131` Tatsugiri, `SSP-175` Dusk Ball, and `TEF-081` Iron Crown ex unless the live corpus re-ranks the queue.
+
 ## [2026-07-06] codebase update | Goal 2 Mega Absol ex / Pecharunt support
 
 - Task attempted: closed the `MEG-086` Mega Absol ex / `SVP-149` Pecharunt Darkness pair as the default highest-share two-archetype Goal 2 blockers after Drapion. Added committed TCGdex metadata, authored Mega Absol ex `Terminal Period` and `Claw of Darkness`, added explicit opponent-hand reveal/discard attack choice plumbing through `GameView`, Ash RPC input, and the temporary React SPA, authored Pecharunt `Poison Chain` and active-spot `Toxic Subjugation`, added reusable poison-bonus Pokémon Checkup support, and fixed Mega Evolution ex Prize awards for `Mega ... ex` names.

@@ -685,6 +685,20 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     ]
   }
 
+  @hand_trimmer %CardDefinition{
+    id: "TEF-150",
+    kind: :trainer,
+    trainer_type: :item,
+    play_window: :action_window,
+    effects: [
+      %Effect{
+        key: :each_player_discards_to_five_cards,
+        type: :each_player_discards_to_hand_size,
+        params: %{target_hand_size: 5}
+      }
+    ]
+  }
+
   @rosas_encouragement %CardDefinition{
     id: "POR-084",
     kind: :trainer,
@@ -1248,6 +1262,7 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     @scoop_up_cyclone.id => @scoop_up_cyclone,
     @switch.id => @switch,
     @surfer.id => @surfer,
+    @hand_trimmer.id => @hand_trimmer,
     @hilda.id => @hilda,
     @judge.id => @judge,
     @larrys_skill.id => @larrys_skill,

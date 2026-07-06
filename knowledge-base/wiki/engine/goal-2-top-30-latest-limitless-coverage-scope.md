@@ -64,13 +64,13 @@ Those reports are the canonical starting point for autonomous Goal 2 implementat
 - Tracked top archetypes: `30`
 - Tracked cards with usage greater than `0.00`: `377`
 - Coverage buckets from `mix prizmo.goal2.corpus`:
-  - `supported=156`
+  - `supported=157`
   - `generic-supported=8`
   - `partial=10`
-  - `unimplemented=203`
+  - `unimplemented=202`
 - Metadata buckets:
-  - `cached=177`
-  - `missing=200`
+  - `cached=178`
+  - `missing=199`
 
 Important interpretation:
 
@@ -82,16 +82,16 @@ Important interpretation:
 
 The strongest current Goal 2 implementation candidates are the incomplete cards shared by the most archetypes and/or the most total metagame share.
 
-The latest Goal 2 engine batch closed the `MEG-086` Mega Absol ex / `SVP-149` Pecharunt Darkness pair as the highest-share remaining two-archetype blockers after Drapion. Mega Absol ex now has committed metadata and executable `Terminal Period` / `Claw of Darkness` attacks, including exact-six-damage-counter Active knockout and explicit opponent-hand reveal/discard selection through `GameView` and the temporary React SPA. Pecharunt now has committed metadata and executable `Poison Chain` plus active-spot `Toxic Subjugation`, adding a reusable Pokémon Checkup poison-bonus path while preserving the canonical retreat-prevention marker. The batch also fixes Mega Evolution ex Prize handling so `Mega ... ex` names award 3 Prize cards.
+The latest Goal 2 engine batch closed `TEF-150` Hand Trimmer as the default highest-share remaining two-archetype Trainer blocker after the Darkness pair. Hand Trimmer now has committed TCGdex metadata and an engine-defined Item effect that prompts the opponent first, then the acting player if still required, discarding each prompted player's chosen hand cards until they have 5 cards. The effect remains hidden/rejected when neither player would discard after the Item leaves the acting player's hand.
 
 ### Highest-priority remaining `unimplemented` cards from current report
 
 | Card | Archetypes | Total share | Notes |
 | --- | --- | --- | --- |
-| `TEF-150` Hand Trimmer | `2` | `10.98%` | Next high-share two-archetype Trainer cleanup after the Darkness pair unless a broader primitive re-ranks above it. |
-| `PFL-092` Punk Helmet | `2` | `10.16%` | Next high-share two-archetype Tool cleanup behind Hand Trimmer in the live report. |
+| `PFL-092` Punk Helmet | `2` | `10.16%` | Next highest-share two-archetype Tool blocker after Hand Trimmer unless a broader primitive re-ranks above it. |
 | `TWM-131` Tatsugiri | `2` | `8.37%` | Next shared two-archetype Pokémon blocker after the top Trainer/Tool pair. |
 | `SSP-175` Dusk Ball | `2` | `7.78%` | Shared Item blocker behind Tatsugiri in the live report. |
+| `TEF-081` Iron Crown ex | `2` | `6.69%` | Next shared two-archetype Pokémon ex blocker behind the current Tool/Pokémon/Item queue. |
 
 ### Shared `partial` cards worth finishing after the broad unimplemented slice
 
@@ -118,9 +118,9 @@ That means prior Goal 1 and six-deck coverage was not wasted; it now acts as see
 
 ## Recommended next implementation order
 
-1. Take `TEF-150` Hand Trimmer next as the default highest-share remaining two-archetype blocker unless a broader primitive re-ranks above it.
-2. Keep `PFL-092` Punk Helmet as the immediate Tool follow-up behind Hand Trimmer.
-3. Keep `TWM-131` Tatsugiri and `SSP-175` Dusk Ball as the next shared two-archetype blockers after the top Trainer/Tool pair.
+1. Take `PFL-092` Punk Helmet next as the default highest-share remaining two-archetype blocker unless a broader primitive re-ranks above it.
+2. Keep `TWM-131` Tatsugiri and `SSP-175` Dusk Ball as the next shared two-archetype blockers behind Punk Helmet.
+3. Keep `TEF-081` Iron Crown ex as the next shared two-archetype Pokémon ex follow-up after the top Tool/Pokémon/Item queue.
 4. Keep the remaining Dragapult-only cached pair `TWM-099` / `TWM-100` as deliberate single-archetype cleanup, not the default autonomous queue.
 5. Finish the remaining shared partials only after the broad unimplemented slice unless another batch naturally extends the new HP infrastructure; if returning to HP work soon, `POR-086` Growing Grass Energy remains the strongest follow-up.
 6. Keep using `mix prizmo.goal2.corpus` after each batch to re-rank the next blockers by archetype count and weighted share.

@@ -1,0 +1,57 @@
+{
+  "prizmo_id": "TEF-150",
+  "source": {
+    "base_url": "https://api.tcgdex.net/v2/en",
+    "dynamic_fields_removed": [
+      "pricing"
+    ],
+    "language": "en",
+    "provider": "TCGdex"
+  },
+  "tcgdex": {
+    "category": "Trainer",
+    "effect": "Each player discards cards from their hand until they have 5 cards in their hand. Your opponent discards first. (If a player has 5 or fewer cards in their hand, they do not discard.)",
+    "id": "sv05-150",
+    "illustrator": "Ayaka Yoshida",
+    "image": "https://assets.tcgdex.net/en/sv/sv05/150",
+    "legal": {
+      "expanded": true,
+      "standard": true
+    },
+    "localId": "150",
+    "name": "Hand Trimmer",
+    "rarity": "Uncommon",
+    "regulationMark": "H",
+    "set": {
+      "cardCount": {
+        "official": 162,
+        "total": 218
+      },
+      "id": "sv05",
+      "name": "Temporal Forces",
+      "symbol": "https://assets.tcgdex.net/univ/sv/sv05/symbol"
+    },
+    "trainerType": "Item",
+    "updated": "2026-05-06T18:45:51Z",
+    "variants": {
+      "firstEdition": false,
+      "holo": false,
+      "normal": true,
+      "reverse": true,
+      "wPromo": false
+    },
+    "variants_detailed": [
+      {
+        "size": "standard",
+        "type": "normal",
+        "variantId": "endfynwn4n10gzq"
+      },
+      {
+        "size": "standard",
+        "type": "reverse",
+        "variantId": "cm4kqul3x1bwlz1f"
+      }
+    ]
+  },
+  "tcgdex_id": "sv05-150"
+}

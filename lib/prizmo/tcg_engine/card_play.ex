@@ -1257,6 +1257,43 @@ defmodule Prizmo.TcgEngine.CardPlay do
          turn,
          player,
          card,
+         %{type: :each_player_discards_to_hand_size} = effect,
+         target_ids
+       ) do
+    with {:ok, {discarding_player_id, to_discard}} <-
+           validate_each_player_discards_to_hand_size_effect(
+             game.id,
+             player.player_id,
+             effect,
+             target_ids
+           ),
+         {:ok, _discarded} <-
+           CardStore.discard_cards_from_hand(game.id, discarding_player_id, to_discard),
+         {:ok, _event} <-
+           write_event_and_snapshot(game.id, :cards_moved, discarding_player_id, %{
+             reason: :effect_resolution,
+             source: EventPayloads.card_source(card),
+             effect_key: effect.key,
+             action_player_id: player.player_id,
+             affected_player_id: discarding_player_id,
+             cards: EventPayloads.moved_cards(to_discard, :hand, :discard)
+           }) do
+      maybe_continue_each_player_discards_to_hand_size(
+        game,
+        turn,
+        player,
+        card,
+        effect,
+        discarding_player_id
+      )
+    end
+  end
+
+  defp complete_play_card_effect(
+         game,
+         turn,
+         player,
+         card,
          %{type: :attach_basic_energy_from_discard_to_stage2_if_more_prizes} = effect,
          target_ids
        ) do
@@ -1525,6 +1562,13 @@ defmodule Prizmo.TcgEngine.CardPlay do
       {:ok, %{type: :opponent_discards_to_hand_size} = effect} ->
         require_xerosics_effect_available(game.id, player.player_id, effect)
 
+      {:ok, %{type: :each_player_discards_to_hand_size} = effect} ->
+        require_each_player_discards_to_hand_size_effect_available(
+          game.id,
+          player.player_id,
+          effect
+        )
+
       {:ok, %{type: :attach_basic_energy_from_discard_to_stage2_if_more_prizes} = effect} ->
         require_rosa_effect_available(game.id, player.player_id, effect)
 
@@ -1677,6 +1721,25 @@ defmodule Prizmo.TcgEngine.CardPlay do
         :ok
       else
         {:error, :xerosics_machinations_has_no_effect}
+      end
+    end
+  end
+
+  defp require_each_player_discards_to_hand_size_effect_available(game_id, player_id, effect) do
+    with {:ok, opponent_player} <- CardStore.get_opponent(game_id, player_id),
+         {:ok, player_hand_cards} <- CardStore.cards_in_zone(game_id, player_id, :hand),
+         {:ok, opponent_hand_cards} <-
+           CardStore.cards_in_zone(game_id, opponent_player.player_id, :hand) do
+      player_discard_count =
+        each_player_discards_to_hand_size_preplay_count(player_hand_cards, effect)
+
+      opponent_discard_count =
+        each_player_discards_to_hand_size_count(opponent_hand_cards, effect)
+
+      if player_discard_count > 0 or opponent_discard_count > 0 do
+        :ok
+      else
+        {:error, :each_player_discards_to_hand_size_has_no_effect}
       end
     end
   end
@@ -1952,6 +2015,27 @@ defmodule Prizmo.TcgEngine.CardPlay do
     end
   end
 
+  defp validate_each_player_discards_to_hand_size_effect(game_id, player_id, effect, target_ids) do
+    with {:ok, target_ids} <-
+           EffectRunner.validate_choice_selection(
+             %{params: %{min_count: 1, max_count: 60}},
+             target_ids,
+             :wrong_each_player_discards_to_hand_size_count
+           ),
+         {:ok, target_cards} <- CardStore.get_cards(game_id, target_ids),
+         {:ok, discard_player_id} <- selected_hand_owner_player_id(target_cards),
+         {:ok, expected_player_id} <-
+           each_player_discards_to_hand_size_expected_player_id(game_id, player_id, effect),
+         :ok <- require_matching_discard_player(discard_player_id, expected_player_id),
+         {:ok, hand_cards} <- CardStore.cards_in_zone(game_id, discard_player_id, :hand),
+         discard_count = each_player_discards_to_hand_size_count(hand_cards, effect),
+         :ok <-
+           require_each_player_discards_to_hand_size_count(length(target_cards), discard_count),
+         :ok <- require_all_owned_in_zone(target_cards, discard_player_id, :hand) do
+      {:ok, {discard_player_id, target_cards}}
+    end
+  end
+
   defp validate_eri_effect(game_id, player_id, effect, target_ids) do
     with {:ok, target_ids} <- EffectRunner.validate_choice_selection(effect, target_ids),
          {:ok, target_cards} <- CardStore.get_cards(game_id, target_ids),
@@ -2088,6 +2172,18 @@ defmodule Prizmo.TcgEngine.CardPlay do
        ) do
     cards
     |> xerosics_opponent_hand_choice_cards(player_id, choice_step)
+    |> Enum.map(& &1.id)
+    |> then(&{:ok, &1})
+  end
+
+  defp effect_choice_ids(
+         cards,
+         player_id,
+         %{type: :each_player_discards_to_hand_size} = choice_step,
+         _current_turn
+       ) do
+    cards
+    |> each_player_discards_to_hand_size_choice_cards(player_id, choice_step)
     |> Enum.map(& &1.id)
     |> then(&{:ok, &1})
   end
@@ -2395,6 +2491,17 @@ defmodule Prizmo.TcgEngine.CardPlay do
           _other -> :error
         end
 
+      %{type: :each_player_discards_to_hand_size} = effect ->
+        with {:ok, cards} <- CardStore.list_cards(game_id),
+             {:ok, target_player_id} <-
+               each_player_discards_to_hand_size_target_player_id(cards, player_id, effect) do
+          hand_cards = hand_cards_for_player(cards, target_player_id)
+          discard_count = each_player_discards_to_hand_size_count(hand_cards, effect)
+          {:ok, {discard_count, discard_count}}
+        else
+          _other -> :error
+        end
+
       %{type: :attach_basic_energy_from_discard_to_stage2_if_more_prizes} = effect ->
         case CardStore.list_cards(game_id) do
           {:ok, cards} ->
@@ -2581,6 +2688,18 @@ defmodule Prizmo.TcgEngine.CardPlay do
       hand_cards
     else
       []
+    end
+  end
+
+  defp each_player_discards_to_hand_size_choice_cards(cards, player_id, choice_step) do
+    case each_player_discards_to_hand_size_target_player_id(cards, player_id, choice_step) do
+      {:ok, target_player_id} ->
+        cards
+        |> hand_cards_for_player(target_player_id)
+        |> Enum.sort_by(&{&1.position, &1.instance_id})
+
+      {:error, _reason} ->
+        []
     end
   end
 
@@ -3843,6 +3962,30 @@ defmodule Prizmo.TcgEngine.CardPlay do
          payload,
          game_id,
          _player_id,
+         :each_player_discards_to_five_cards,
+         legal_choice_ids
+       ) do
+    case CardStore.list_cards(game_id) do
+      {:ok, cards} ->
+        cards_by_id = Map.new(cards, &{&1.id, &1})
+
+        labels =
+          legal_choice_ids
+          |> Enum.map(&Map.get(cards_by_id, &1))
+          |> Enum.reject(&is_nil/1)
+          |> Enum.map(&hand_trimmer_choice_label/1)
+
+        Map.put(payload, :legal_choice_labels, labels)
+
+      {:error, _reason} ->
+        payload
+    end
+  end
+
+  defp maybe_put_prompt_choice_labels(
+         payload,
+         game_id,
+         _player_id,
          :discard_opponent_item_cards_from_hand,
          legal_choice_ids
        ) do
@@ -4276,6 +4419,15 @@ defmodule Prizmo.TcgEngine.CardPlay do
     }
   end
 
+  defp hand_trimmer_choice_label(%CardInstance{} = card) do
+    %{
+      id: card.id,
+      label: card_name(card, card.card_id),
+      detail:
+        "Card in your hand. Hand Trimmer discards chosen cards until you have 5 cards remaining."
+    }
+  end
+
   defp eri_choice_label(%CardInstance{} = card) do
     %{
       id: card.id,
@@ -4510,6 +4662,11 @@ defmodule Prizmo.TcgEngine.CardPlay do
       %{type: :opponent_discards_to_hand_size} ->
         with {:ok, opponent_player} <- CardStore.get_opponent(game_id, player_id) do
           {:ok, opponent_player.player_id}
+        end
+
+      %{type: :each_player_discards_to_hand_size} = effect ->
+        with {:ok, cards} <- CardStore.list_cards(game_id) do
+          each_player_discards_to_hand_size_target_player_id(cards, player_id, effect)
         end
 
       _other ->
@@ -5060,6 +5217,120 @@ defmodule Prizmo.TcgEngine.CardPlay do
 
   defp xerosics_discard_count(hand_cards, %{params: %{target_hand_size: target_hand_size}}) do
     max(length(hand_cards) - target_hand_size, 0)
+  end
+
+  defp each_player_discards_to_hand_size_preplay_count(hand_cards, effect) do
+    hand_cards
+    |> length()
+    |> max(1)
+    |> Kernel.-(1)
+    |> Kernel.max(0)
+    |> each_player_discards_to_hand_size_count(effect)
+  end
+
+  defp each_player_discards_to_hand_size_count(hand_cards, %{
+         params: %{target_hand_size: target_hand_size}
+       })
+       when is_list(hand_cards) do
+    max(length(hand_cards) - target_hand_size, 0)
+  end
+
+  defp each_player_discards_to_hand_size_count(hand_count, %{
+         params: %{target_hand_size: target_hand_size}
+       })
+       when is_integer(hand_count) do
+    max(hand_count - target_hand_size, 0)
+  end
+
+  defp each_player_discards_to_hand_size_expected_player_id(game_id, player_id, effect) do
+    with {:ok, cards} <- CardStore.list_cards(game_id) do
+      each_player_discards_to_hand_size_target_player_id(cards, player_id, effect)
+    end
+  end
+
+  defp each_player_discards_to_hand_size_target_player_id(cards, player_id, effect) do
+    with {:ok, opponent_player_id} <- opponent_player_id_from_cards(cards, player_id) do
+      opponent_hand_cards = hand_cards_for_player(cards, opponent_player_id)
+      player_hand_cards = hand_cards_for_player(cards, player_id)
+
+      cond do
+        each_player_discards_to_hand_size_count(opponent_hand_cards, effect) > 0 ->
+          {:ok, opponent_player_id}
+
+        each_player_discards_to_hand_size_count(player_hand_cards, effect) > 0 ->
+          {:ok, player_id}
+
+        true ->
+          {:error, :each_player_discards_to_hand_size_has_no_effect}
+      end
+    end
+  end
+
+  defp opponent_player_id_from_cards(cards, player_id) do
+    cards
+    |> Enum.reject(&(&1.owner_player_id == player_id))
+    |> Enum.map(& &1.owner_player_id)
+    |> Enum.uniq()
+    |> case do
+      [opponent_player_id] -> {:ok, opponent_player_id}
+      [] -> {:error, :missing_opponent_player}
+      _multiple -> {:error, :ambiguous_opponent_player}
+    end
+  end
+
+  defp hand_cards_for_player(cards, player_id) do
+    Enum.filter(cards, &(&1.owner_player_id == player_id and &1.zone == :hand))
+  end
+
+  defp selected_hand_owner_player_id([%CardInstance{owner_player_id: owner_player_id} | rest]) do
+    if Enum.all?(rest, &(&1.owner_player_id == owner_player_id)) do
+      {:ok, owner_player_id}
+    else
+      {:error, :each_player_discards_to_hand_size_mixed_owners}
+    end
+  end
+
+  defp selected_hand_owner_player_id([]), do: {:error, :missing_hand_trimmer_discard_targets}
+
+  defp require_matching_discard_player(player_id, player_id), do: :ok
+
+  defp require_matching_discard_player(discard_player_id, expected_player_id) do
+    {:error,
+     {:wrong_each_player_discards_to_hand_size_player, discard_player_id, expected_player_id}}
+  end
+
+  defp require_each_player_discards_to_hand_size_count(count, count), do: :ok
+
+  defp require_each_player_discards_to_hand_size_count(count, expected_count) do
+    {:error, {:wrong_each_player_discards_to_hand_size_count, count, expected_count}}
+  end
+
+  defp maybe_continue_each_player_discards_to_hand_size(
+         %Game{} = game,
+         %Turn{} = turn,
+         %GamePlayer{} = player,
+         %CardInstance{} = card,
+         effect,
+         discarding_player_id
+       ) do
+    with {:ok, definition} <- EngineCardRegistry.fetch(card.card_id),
+         {:ok, player_hand_cards} <- CardStore.cards_in_zone(game.id, player.player_id, :hand) do
+      if discarding_player_id != player.player_id and
+           each_player_discards_to_hand_size_count(player_hand_cards, effect) > 0 do
+        suspend_play_card_for_choice(
+          game,
+          turn,
+          player,
+          card,
+          definition,
+          %{},
+          :resolving_effect,
+          effect.key
+        )
+      else
+        complete_play_card_resolution(game, turn, player, card, effect)
+      end
+    end
   end
 
   defp resolve_attack_damage_to_target(game_id, target_pokemon, amount, source_card, effect) do
