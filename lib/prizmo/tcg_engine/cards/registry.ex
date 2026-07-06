@@ -579,6 +579,20 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     ]
   }
 
+  @jumbo_ice_cream %CardDefinition{
+    id: "PFL-091",
+    kind: :trainer,
+    trainer_type: :item,
+    play_window: :action_window,
+    effects: [
+      %Effect{
+        key: :heal_active_with_three_or_more_energy,
+        type: :heal_own_active_with_min_attached_energy,
+        params: %{heal_damage: 80, min_energy_count: 3}
+      }
+    ]
+  }
+
   @energy_retrieval %CardDefinition{
     id: "SVI-171",
     kind: :trainer,
@@ -1304,6 +1318,7 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     @hand_trimmer.id => @hand_trimmer,
     @hilda.id => @hilda,
     @judge.id => @judge,
+    @jumbo_ice_cream.id => @jumbo_ice_cream,
     @larrys_skill.id => @larrys_skill,
     @lanas_aid.id => @lanas_aid,
     @lillies_determination.id => @lillies_determination,

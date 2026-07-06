@@ -269,6 +269,17 @@ defmodule Prizmo.Tcg.CardCoverage do
 
   defp supported_special_energy?(%{
          effect: %{
+           type: :place_damage_counters_on_attacker_if_damaged_as_active_by_attack,
+           count: count
+         },
+         provides: provides
+       })
+       when is_integer(count) and count > 0 and is_list(provides) do
+    :colorless in provides
+  end
+
+  defp supported_special_energy?(%{
+         effect: %{
            type: :prevent_opponent_attack_effects_to_attached_pokemon,
            required_attached_pokemon_type: :fighting
          },

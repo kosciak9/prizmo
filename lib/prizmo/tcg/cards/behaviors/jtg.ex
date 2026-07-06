@@ -60,4 +60,13 @@ defmodule Prizmo.Tcg.Cards.Behaviors.JTG do
       }
     )
   end
+
+  card "JTG-159" do
+    card_effect(
+      effect: %{
+        type: :place_damage_counters_on_attacker_if_damaged_as_active_by_attack,
+        count: 2
+      }
+    )
+  end
 end

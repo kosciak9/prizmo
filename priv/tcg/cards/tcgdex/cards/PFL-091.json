@@ -1,0 +1,57 @@
+{
+  "prizmo_id": "PFL-091",
+  "source": {
+    "base_url": "https://api.tcgdex.net/v2/en",
+    "dynamic_fields_removed": [
+      "pricing"
+    ],
+    "language": "en",
+    "provider": "TCGdex"
+  },
+  "tcgdex": {
+    "category": "Trainer",
+    "effect": "Heal 80 damage from your Active Pokémon that has 3 or more Energy attached.",
+    "id": "me02-091",
+    "illustrator": "AYUMI ODASHIMA",
+    "image": "https://assets.tcgdex.net/en/me/me02/091",
+    "legal": {
+      "expanded": true,
+      "standard": true
+    },
+    "localId": "091",
+    "name": "Jumbo Ice Cream",
+    "rarity": "Uncommon",
+    "regulationMark": "I",
+    "set": {
+      "cardCount": {
+        "official": 94,
+        "total": 130
+      },
+      "id": "me02",
+      "logo": "https://assets.tcgdex.net/en/me/me02/logo",
+      "name": "Phantasmal Flames"
+    },
+    "trainerType": "Item",
+    "updated": "2026-06-08T12:40:11Z",
+    "variants": {
+      "firstEdition": false,
+      "holo": false,
+      "normal": true,
+      "reverse": true,
+      "wPromo": false
+    },
+    "variants_detailed": [
+      {
+        "size": "standard",
+        "type": "normal",
+        "variantId": "endfynwn4n10gzq"
+      },
+      {
+        "size": "standard",
+        "type": "reverse",
+        "variantId": "cm4kqul3x1bwlz1f"
+      }
+    ]
+  },
+  "tcgdex_id": "me02-091"
+}

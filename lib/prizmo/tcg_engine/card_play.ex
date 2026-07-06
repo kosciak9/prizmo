@@ -375,6 +375,35 @@ defmodule Prizmo.TcgEngine.CardPlay do
          turn,
          player,
          card,
+         %{type: :heal_own_active_with_min_attached_energy} = effect,
+         _target_ids
+       ) do
+    with {:ok, active_card} <- own_active_card(game.id, player.player_id),
+         :ok <- require_active_has_min_attached_energy(game.id, active_card, effect),
+         {:ok, healed_damage} <- healable_damage(active_card, effect),
+         {:ok, healed_card} <-
+           update(active_card, :set_damage, %{damage: active_card.damage - healed_damage}),
+         {:ok, _event} <-
+           write_event_and_snapshot(game.id, :cards_moved, player.player_id, %{
+             reason: :effect_resolution,
+             source: EventPayloads.card_source(card),
+             effect_key: effect.key,
+             affected_player_id: player.player_id,
+             healed_card_instance_id: healed_card.id,
+             healed_damage: healed_damage,
+             source_card_id: card.card_id,
+             public_note: heal_active_public_note(card, healed_card, healed_damage),
+             cards: []
+           }) do
+      complete_play_card_resolution(game, turn, player, card, effect)
+    end
+  end
+
+  defp complete_play_card_effect(
+         game,
+         turn,
+         player,
+         card,
          %{type: :flip_coin_then_discard_opponent_attached_energy} = effect,
          target_ids
        ) do
@@ -1620,6 +1649,13 @@ defmodule Prizmo.TcgEngine.CardPlay do
           effect
         )
 
+      {:ok, %{type: :heal_own_active_with_min_attached_energy} = effect} ->
+        require_heal_own_active_with_min_attached_energy_effect_available(
+          game.id,
+          player.player_id,
+          effect
+        )
+
       {:ok, %{type: :attach_basic_energy_from_discard_to_stage2_if_more_prizes} = effect} ->
         require_rosa_effect_available(game.id, player.player_id, effect)
 
@@ -1672,6 +1708,20 @@ defmodule Prizmo.TcgEngine.CardPlay do
         :ok
       else
         {:error, :discard_hand_then_draw_has_no_effect}
+      end
+    end
+  end
+
+  defp require_heal_own_active_with_min_attached_energy_effect_available(
+         game_id,
+         player_id,
+         effect
+       ) do
+    with {:ok, active_card} <- own_active_card(game_id, player_id),
+         :ok <- require_active_has_min_attached_energy(game_id, active_card, effect) do
+      case healable_damage(active_card, effect) do
+        {:ok, _healed_damage} -> :ok
+        {:error, reason} -> {:error, reason}
       end
     end
   end
@@ -3383,6 +3433,40 @@ defmodule Prizmo.TcgEngine.CardPlay do
 
   defp energy_card?(%CardInstance{card_id: card_id}), do: require_energy(card_id) == :ok
 
+  defp attached_energy_count(game_id, %CardInstance{} = target_card) do
+    with {:ok, attached_cards} <- CardStore.attached_cards(game_id, target_card.id) do
+      {:ok, Enum.count(attached_cards, &energy_card?/1)}
+    end
+  end
+
+  defp require_active_has_min_attached_energy(game_id, %CardInstance{} = active_card, %{
+         params: %{min_energy_count: min_energy_count}
+       })
+       when is_integer(min_energy_count) and min_energy_count > 0 do
+    with {:ok, energy_count} <- attached_energy_count(game_id, active_card) do
+      if energy_count >= min_energy_count do
+        :ok
+      else
+        {:error, {:not_enough_attached_energy, energy_count, min_energy_count}}
+      end
+    end
+  end
+
+  defp require_active_has_min_attached_energy(_game_id, _active_card, _effect), do: :ok
+
+  defp healable_damage(%CardInstance{} = card, %{params: %{heal_damage: heal_damage}})
+       when is_integer(heal_damage) and heal_damage > 0 do
+    healed_damage = min(card.damage, heal_damage)
+
+    if healed_damage > 0 do
+      {:ok, healed_damage}
+    else
+      {:error, :heal_active_has_no_damage}
+    end
+  end
+
+  defp healable_damage(_card, _effect), do: {:error, :invalid_heal_active_effect}
+
   defp tool_card?(%CardInstance{card_id: card_id}) do
     match?({:ok, _metadata}, require_trainer_type(card_id, [:tool]))
   end
@@ -4099,6 +4183,14 @@ defmodule Prizmo.TcgEngine.CardPlay do
 
   defp azs_tranquility_public_note(%CardInstance{} = healed_card, healed_damage) do
     "AZ's Tranquility healed #{healed_damage} damage from #{card_name(healed_card, healed_card.card_id)}."
+  end
+
+  defp heal_active_public_note(
+         %CardInstance{} = source_card,
+         %CardInstance{} = healed_card,
+         healed_damage
+       ) do
+    "#{card_name(source_card, source_card.card_id)} healed #{healed_damage} damage from #{card_name(healed_card, healed_card.card_id)}."
   end
 
   defp maybe_put(map, _key, nil), do: map

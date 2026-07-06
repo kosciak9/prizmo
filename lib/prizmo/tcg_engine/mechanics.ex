@@ -2527,6 +2527,16 @@ defmodule Prizmo.TcgEngine.Mechanics do
                damage_result
              ),
            effect_payload = Map.merge(effect_payload, punk_helmet_payload),
+           {:ok, spiky_energy_payload} <-
+             EnergyEffects.apply_reactive_damage_counter_energy_if_needed(
+               game.id,
+               player_id,
+               attacker_card,
+               defender_card,
+               defender_attached_cards,
+               damage_result
+             ),
+           effect_payload = Map.merge(effect_payload, spiky_energy_payload),
            {:ok, handheld_fan_payload} <-
              ToolEffects.apply_handheld_fan_if_needed(
                game.id,
