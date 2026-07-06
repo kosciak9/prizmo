@@ -520,6 +520,9 @@ defmodule Prizmo.TcgEngine.AttackDamage do
   defp apply_effect(damage, _attacker_card, _defender_card, %{type: :self_damage}),
     do: {:ok, damage}
 
+  defp apply_effect(damage, _attacker_card, _defender_card, %{type: :heal_self_after_damage}),
+    do: {:ok, damage}
+
   defp apply_effect(damage, _attacker_card, _defender_card, %{
          type: :self_damage_then_paralyze_and_poison_defender_active
        }),

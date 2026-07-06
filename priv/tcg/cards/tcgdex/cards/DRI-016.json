@@ -1,0 +1,81 @@
+{
+  "prizmo_id": "DRI-016",
+  "source": {
+    "base_url": "https://api.tcgdex.net/v2/en",
+    "dynamic_fields_removed": [
+      "pricing"
+    ],
+    "language": "en",
+    "provider": "TCGdex"
+  },
+  "tcgdex": {
+    "attacks": [
+      {
+        "cost": [
+          "Grass"
+        ],
+        "damage": 10,
+        "effect": "Heal 10 damage from this Pokémon.",
+        "name": "Mini Drain"
+      }
+    ],
+    "category": "Pokemon",
+    "dexId": [
+      840
+    ],
+    "hp": 40,
+    "id": "sv10-016",
+    "illustrator": "Tetsu Kayama",
+    "image": "https://assets.tcgdex.net/en/sv/sv10/016",
+    "legal": {
+      "expanded": true,
+      "standard": true
+    },
+    "localId": "016",
+    "name": "Applin",
+    "rarity": "Common",
+    "regulationMark": "I",
+    "retreat": 1,
+    "set": {
+      "cardCount": {
+        "official": 182,
+        "total": 244
+      },
+      "id": "sv10",
+      "logo": "https://assets.tcgdex.net/en/sv/sv10/logo",
+      "name": "Destined Rivals",
+      "symbol": "https://assets.tcgdex.net/univ/sv/sv10/symbol"
+    },
+    "stage": "Basic",
+    "types": [
+      "Grass"
+    ],
+    "updated": "2026-06-14T19:10:29+01:00",
+    "variants": {
+      "firstEdition": false,
+      "holo": false,
+      "normal": true,
+      "reverse": true,
+      "wPromo": false
+    },
+    "variants_detailed": [
+      {
+        "size": "standard",
+        "type": "normal",
+        "variantId": "endfynwn4n10gzq"
+      },
+      {
+        "size": "standard",
+        "type": "reverse",
+        "variantId": "cm4kqul3x1bwlz1f"
+      }
+    ],
+    "weaknesses": [
+      {
+        "type": "Fire",
+        "value": "×2"
+      }
+    ]
+  },
+  "tcgdex_id": "sv10-016"
+}

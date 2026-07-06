@@ -11,6 +11,13 @@ defmodule Prizmo.Tcg.Cards.Behaviors.DRI do
     attack(:smash_kick, effect: nil)
   end
 
+  card "DRI-016" do
+    attack(:mini_drain,
+      damage: 10,
+      effect: %{type: :heal_self_after_damage, heal_damage: 10}
+    )
+  end
+
   card "DRI-019" do
     attack(:take_down, effect: %{type: :self_damage, damage: 10})
   end

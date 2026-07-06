@@ -3171,6 +3171,46 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
     end
   end
 
+  describe "DRI-016 Applin support" do
+    test "DRI-016 Applin Mini Drain heals itself after dealing damage" do
+      assert CardCoverage.summarize("DRI-016").coverage_status == :supported
+
+      assert {:ok, mini_drain} = CardCatalog.fetch_attack("DRI-016", :mini_drain)
+      assert mini_drain.damage == 10
+      assert mini_drain.cost == [:grass]
+
+      assert mini_drain.effect == %{
+               type: :heal_self_after_damage,
+               heal_damage: 10
+             }
+
+      {:ok, game} = create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147)
+      attacker = promote_custom_basic_to_active(game.id, "player_1", "DRI-016")
+      {:ok, attacker} = ash_update(attacker, :set_damage, %{damage: 30})
+
+      {:ok, grass_energy} = create_custom_owned_card(game.id, "player_1", "MEE-001", 260)
+      {:ok, grass_energy} = ash_update(grass_energy, :draw_to_hand, %{position: 60})
+
+      {:ok, _grass_energy} =
+        ash_update(grass_energy, :attach, %{
+          attached_to_card_instance_id: attacker.id,
+          position: 1
+        })
+
+      assert {:ok, game} = Mechanics.declare_attack(game, "player_1", :mini_drain)
+
+      assert card(attacker.id).damage == 20
+
+      resolve_event = game.id |> game_events_by_type("resolve_declared_attack") |> List.last()
+      assert resolve_event.payload["effect_type"] == "heal_self_after_damage"
+      assert resolve_event.payload["self_healed_card_instance_id"] == attacker.id
+      assert resolve_event.payload["requested_self_heal"] == 10
+      assert resolve_event.payload["self_healed_damage"] == 10
+      assert resolve_event.payload["self_resulting_damage"] == 20
+      assert resolve_event.payload["self_heal_applied?"]
+    end
+  end
+
   describe "POR-020 Staryu and POR-021 Mega Starmie ex support" do
     test "Staryu Water Gun and Mega Starmie ex attacks are executable" do
       assert CardCoverage.summarize("POR-020").coverage_status == :supported

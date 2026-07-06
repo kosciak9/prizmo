@@ -64,13 +64,13 @@ Those reports are the canonical starting point for autonomous Goal 2 implementat
 - Tracked top archetypes: `30`
 - Tracked cards with usage greater than `0.00`: `377`
 - Coverage buckets from `mix prizmo.goal2.corpus`:
-  - `supported=162`
+  - `supported=163`
   - `generic-supported=8`
   - `partial=10`
-  - `unimplemented=197`
+  - `unimplemented=196`
 - Metadata buckets:
-  - `cached=183`
-  - `missing=194`
+  - `cached=184`
+  - `missing=193`
 
 Important interpretation:
 
@@ -82,16 +82,16 @@ Important interpretation:
 
 The strongest current Goal 2 implementation candidates are the incomplete cards shared by the most archetypes and/or the most total metagame share.
 
-The latest Goal 2 engine batch closed `CRI-076` AZ's Tranquility as the default highest-share remaining two-archetype Supporter blocker after Iron Crown ex. AZ's Tranquility now has committed TCGdex metadata and an executable server-side Supporter effect that switches the player's Active Pokémon with a chosen Benched Pokémon, then heals up to 80 damage from the Pokémon ex moved to the Bench. The effect reuses the explicit own-Bench switch prompt path, preserves no-heal behavior for non-ex Pokémon, and records public heal details only when damage is actually healed.
+The latest Goal 2 engine batch closed `DRI-016` Applin as the default highest-share remaining two-archetype Pokémon blocker after AZ's Tranquility. Applin now has committed TCGdex metadata and executable `Mini Drain` behavior on the canonical attack path: it deals 10 Grass attack damage and uses a reusable post-damage self-heal primitive to heal up to 10 damage from the attacking Pokémon.
 
 ### Highest-priority remaining `unimplemented` cards from current report
 
 | Card | Archetypes | Total share | Notes |
 | --- | --- | --- | --- |
-| `DRI-016` Applin | `2` | `6.45%` | Default next shared two-archetype Pokémon blocker after AZ's Tranquility unless a broader primitive re-ranks above it. |
-| `JTG-159` Spiky Energy | `2` | `6.38%` | Next shared two-archetype Special Energy blocker, tied in share with `PFL-091` Jumbo Ice Cream. |
-| `PFL-091` Jumbo Ice Cream | `2` | `6.38%` | Tied high-share two-archetype follow-up after Applin and Spiky Energy. |
+| `JTG-159` Spiky Energy | `2` | `6.38%` | Default next shared two-archetype Special Energy blocker after Applin; tied in share with `PFL-091` Jumbo Ice Cream. |
+| `PFL-091` Jumbo Ice Cream | `2` | `6.38%` | Tied high-share two-archetype follow-up and likely same Crustle/Sylveon blocker slice as Spiky Energy. |
 | `CRI-084` Bubbly Water Energy | `2` | `6.29%` | Next two-archetype Special Energy line after the Spiky Energy / Jumbo Ice Cream pair. |
+| `CRI-061` Metagross | `2` | `6.05%` | Next shared two-archetype Pokémon blocker after the immediate Energy/Item pair unless a broader primitive re-ranks above it. |
 
 ### Shared `partial` cards worth finishing after the broad unimplemented slice
 
@@ -118,12 +118,13 @@ That means prior Goal 1 and six-deck coverage was not wasted; it now acts as see
 
 ## Recommended next implementation order
 
-1. Take `DRI-016` Applin next as the default highest-share remaining two-archetype blocker unless a broader primitive re-ranks above it.
-2. Keep `JTG-159` Spiky Energy and `PFL-091` Jumbo Ice Cream as the next high-share two-archetype follow-ups after Applin.
+1. Take `JTG-159` Spiky Energy next as the default highest-share remaining two-archetype blocker unless a broader primitive re-ranks above it; consider pairing with `PFL-091` Jumbo Ice Cream only if the batch stays coherent.
+2. Keep `PFL-091` Jumbo Ice Cream as the tied high-share two-archetype follow-up after Spiky Energy.
 3. Keep `CRI-084` Bubbly Water Energy as the next two-archetype Special Energy line behind the Spiky Energy / Jumbo Ice Cream pair.
-4. Keep the remaining Dragapult-only cached pair `TWM-099` / `TWM-100` as deliberate single-archetype cleanup, not the default autonomous queue.
-5. Finish the remaining shared partials only after the broad unimplemented slice unless another batch naturally extends the new HP infrastructure; if returning to HP work soon, `POR-086` Growing Grass Energy remains the strongest follow-up.
-6. Keep using `mix prizmo.goal2.corpus` after each batch to re-rank the next blockers by archetype count and weighted share.
+4. Keep `CRI-061` Metagross as the next shared Pokémon blocker after the immediate Energy/Item queue.
+5. Keep the remaining Dragapult-only cached pair `TWM-099` / `TWM-100` as deliberate single-archetype cleanup, not the default autonomous queue.
+6. Finish the remaining shared partials only after the broad unimplemented slice unless another batch naturally extends the new HP infrastructure; if returning to HP work soon, `POR-086` Growing Grass Energy remains the strongest follow-up.
+7. Keep using `mix prizmo.goal2.corpus` after each batch to re-rank the next blockers by archetype count and weighted share.
 
 ## See Also
 

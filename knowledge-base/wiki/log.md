@@ -1,5 +1,12 @@
 # Wiki Log
 
+## [2026-07-06] codebase update | Goal 2 Applin support
+
+- Task attempted: closed `DRI-016` Applin as the default highest-share remaining two-archetype Goal 2 Pokémon blocker after AZ's Tranquility. Added committed TCGdex metadata, authored `Mini Drain` as an engine-defined 10-damage Grass attack, and introduced a reusable `:heal_self_after_damage` attack-effect primitive so post-damage attack effects can heal the attacker through the persisted attack resolver.
+- Files changed: `lib/prizmo/tcg/cards/behaviors/dri.ex`, `lib/prizmo/tcg_engine/attack_damage.ex`, `lib/prizmo/tcg_engine/attack_effects.ex`, `test/prizmo/tcg_engine/mechanics_test.exs`, `priv/tcg/cards/tcgdex/cards/DRI-016.json`, `knowledge-base/wiki/engine/goal-2-top-30-latest-limitless-coverage-scope.md`, `knowledge-base/wiki/engine/ash-backed-tcg-engine-playtest-handoff.md`, `knowledge-base/wiki/log.md`.
+- Validation: `mix test test/prizmo/tcg_engine/mechanics_test.exs -n "DRI-016"`; `mix test test/prizmo/tcg/cards/metadata_test.exs test/prizmo/tcg_engine/mechanics_test.exs`; `mix compile --warnings-as-errors`; `mix prizmo.goal2.corpus` confirmed `supported=163` / `generic-supported=8` / `partial=10` / `unimplemented=196` and `cached=184` / `missing=193`; final `mix check` passed.
+- Remaining/blocking notes: `DRI-016` is no longer in the shared incomplete queue. The default next Goal 2 priority is now `JTG-159` Spiky Energy, tied with `PFL-091` Jumbo Ice Cream, followed by `CRI-084` Bubbly Water Energy and `CRI-061` Metagross unless the live corpus re-ranks the queue.
+
 ## [2026-07-06] codebase update | Goal 2 AZ's Tranquility support
 
 - Task attempted: closed `CRI-076` AZ's Tranquility as the default highest-share remaining two-archetype Goal 2 Supporter blocker after Iron Crown ex. Added committed TCGdex metadata, authored AZ's Tranquility as an engine-defined Supporter that switches the player's Active Pokémon with a chosen Benched Pokémon and heals up to 80 damage from the moved Active Pokémon ex, shared existing own-Bench switch prompt labels, and preserved no-heal behavior for moved non-ex Pokémon.

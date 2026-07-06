@@ -105,6 +105,7 @@ defmodule Prizmo.TcgEngine.AttackEffects do
     :defending_pokemon_cannot_retreat_next_turn,
     :discard_hand_then_draw,
     :draw_after_attack,
+    :heal_self_after_damage,
     :active_damage_counters_per_hand_card,
     :damage_any_opponent_pokemon,
     :damage_opponent_bench,
@@ -438,6 +439,10 @@ defmodule Prizmo.TcgEngine.AttackEffects do
 
       %{type: :draw_after_attack, count: count} when is_integer(count) and count >= 0 ->
         draw_after_attack(game_id, player_id, count)
+
+      %{type: :heal_self_after_damage, heal_damage: heal_damage}
+      when is_integer(heal_damage) and heal_damage >= 0 ->
+        heal_self_after_damage(game_id, attacker_card, heal_damage)
 
       %{type: :self_damage, damage: damage} when is_integer(damage) and damage >= 0 ->
         self_damage(game_id, player_id, attacker_card, damage)
@@ -1135,6 +1140,30 @@ defmodule Prizmo.TcgEngine.AttackEffects do
        }}
     end
   end
+
+  defp heal_self_after_damage(game_id, %CardInstance{} = attacker_card, heal_damage) do
+    with {:ok, current_attacker_card} <- get_card(game_id, attacker_card.id) do
+      healed_damage = min(current_attacker_card.damage, heal_damage)
+
+      with {:ok, healed_attacker_card} <- maybe_heal_card(current_attacker_card, healed_damage) do
+        {:ok,
+         %{
+           effect_type: "heal_self_after_damage",
+           self_healed_card_instance_id: healed_attacker_card.id,
+           requested_self_heal: heal_damage,
+           self_healed_damage: healed_damage,
+           self_resulting_damage: healed_attacker_card.damage,
+           self_heal_applied?: healed_damage > 0
+         }}
+      end
+    end
+  end
+
+  defp maybe_heal_card(%CardInstance{} = card, healed_damage) when healed_damage > 0 do
+    update(card, :set_damage, %{damage: card.damage - healed_damage})
+  end
+
+  defp maybe_heal_card(%CardInstance{} = card, _healed_damage), do: {:ok, card}
 
   defp self_damage_then_paralyze_and_poison_defender_active(
          game_id,
