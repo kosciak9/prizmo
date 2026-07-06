@@ -1,5 +1,12 @@
 # Wiki Log
 
+## [2026-07-06] codebase update | Goal 2 Dusk Ball support
+
+- Task attempted: closed `SSP-175` Dusk Ball as the default highest-share remaining two-archetype Goal 2 Item blocker after Tatsugiri. Added committed TCGdex metadata, authored Dusk Ball as a bottom-seven deck-slice Item search that privately exposes inspected cards, lets the player choose up to 1 Pokémon or none, publicly reveals only selected Pokémon, moves it to hand, and shuffles afterward; generalized the existing top-deck search primitive to support bottom-deck slices and inspected-card prompt payloads.
+- Files changed: `lib/prizmo/tcg_engine/cards/registry.ex`, `lib/prizmo/tcg_engine/card_play.ex`, `test/prizmo/tcg_engine/mechanics_test.exs`, `priv/tcg/cards/tcgdex/cards/SSP-175.json`, `knowledge-base/wiki/engine/goal-2-top-30-latest-limitless-coverage-scope.md`, `knowledge-base/wiki/engine/ash-backed-tcg-engine-playtest-handoff.md`, `knowledge-base/wiki/log.md`.
+- Validation: `mix test test/prizmo/tcg_engine/mechanics_test.exs --only describe:"SSP-175 Dusk Ball"`; `mix test test/prizmo/tcg/cards/metadata_test.exs test/prizmo/tcg_engine/card_catalog_test.exs`; `mix test test/prizmo/tcg_engine/mechanics_test.exs`; `mix compile --warnings-as-errors`; `mix prizmo.goal2.corpus` confirmed `supported=160` / `generic-supported=8` / `partial=10` / `unimplemented=199` and `cached=181` / `missing=196`; final `mix check` passed.
+- Remaining/blocking notes: `SSP-175` is no longer in the shared incomplete queue. The default next Goal 2 priority is now `TEF-081` Iron Crown ex, followed by `CRI-076` AZ's Tranquility, `DRI-016` Applin, and `JTG-159` Spiky Energy unless the live corpus re-ranks the queue.
+
 ## [2026-07-06] codebase update | Goal 2 Tatsugiri support
 
 - Task attempted: closed `TWM-131` Tatsugiri as the default highest-share remaining two-archetype Goal 2 Pokémon blocker after Punk Helmet. Added committed TCGdex metadata, authored `Attract Customers` as an Active-only once-per-turn Ability that privately exposes the inspected top 6 deck cards, moves and publicly reveals up to 1 selected Supporter to hand, allows selecting none, shuffles the remaining deck cards after resolution, and exposed the command through Ash RPC, `GameView`, and the temporary React SPA.

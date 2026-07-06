@@ -2514,6 +2514,120 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
     end
   end
 
+  describe "SSP-175 Dusk Ball" do
+    test "creates a bottom-seven Pokémon prompt and resolves the selected Pokémon to hand" do
+      {:ok, game} = create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147)
+      dusk_ball = move_owned_or_custom_card_to_hand(game.id, "player_1", "SSP-175", 1)
+
+      bottom_cards =
+        stage_bottom_deck_cards(game.id, "player_1", [
+          "SCR-133",
+          "TWM-143",
+          "TWM-129",
+          "POR-071",
+          "TWM-128",
+          "MEG-131",
+          "SCR-133"
+        ])
+
+      pokemon_ids =
+        bottom_cards
+        |> Enum.filter(&(&1.card_id in ["TWM-129", "TWM-128"]))
+        |> Enum.map(& &1.id)
+
+      inspected_ids = Enum.map(bottom_cards, & &1.id)
+
+      assert {:ok, game} = Mechanics.play_card(game, "player_1", dusk_ball.id, %{})
+
+      [prompt] = awaiting_prompts(game.id)
+      assert prompt.player_id == "player_1"
+      assert prompt.prompt_type == "select_cards"
+      assert prompt.payload["choice_key"] == "search_bottom_7_for_pokemon_to_hand"
+      assert prompt.payload["min"] == 0
+      assert prompt.payload["max"] == 1
+      assert prompt.payload["look_count"] == 7
+      assert prompt.payload["deck_slice_position"] == "bottom"
+      assert prompt.payload["inspected_card_count"] == 7
+      assert prompt.payload["inspected_card_ids"] == inspected_ids
+      assert Enum.sort(prompt.payload["legal_choices"]) == Enum.sort(pokemon_ids)
+
+      assert {:ok, view_with_prompt} = GameView.for_player(game.id, "player_1")
+      [view_prompt] = view_with_prompt.prompts
+
+      assert Enum.sort(Enum.map(view_prompt.payload["legal_choice_cards"], & &1.id)) ==
+               Enum.sort(pokemon_ids)
+
+      assert Enum.map(view_prompt.payload["inspected_cards"], & &1.id) == inspected_ids
+
+      hand_before = cards_in_zone(game.id, "player_1", :hand)
+      deck_before = cards_in_zone(game.id, "player_1", :deck)
+      selected = [List.first(pokemon_ids)]
+
+      assert {:ok, game} = Mechanics.choose_prompt(game, "player_1", prompt.id, selected)
+
+      assert zone(List.first(selected)) == :hand
+      assert zone(dusk_ball.id) == :discard
+      assert length(cards_in_zone(game.id, "player_1", :hand)) == length(hand_before) + 1
+      assert length(cards_in_zone(game.id, "player_1", :deck)) == length(deck_before) - 1
+
+      cards_moved_event =
+        game.id
+        |> game_events_by_type("cards_moved")
+        |> Enum.find(&(&1.payload["effect_key"] == "search_bottom_7_for_pokemon_to_hand"))
+
+      assert cards_moved_event.payload["public_reveal"] == true
+
+      assert Enum.map(cards_moved_event.payload["revealed_cards"], & &1["instance_id"]) ==
+               selected
+
+      assert game_events_by_type(game.id, "deck_shuffled") != []
+    end
+
+    test "inspects only the bottom seven and allows selecting no Pokémon" do
+      {:ok, game} = create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147)
+      dusk_ball = move_owned_or_custom_card_to_hand(game.id, "player_1", "SSP-175", 1)
+      [top_pokemon] = stage_top_deck_cards(game.id, "player_1", ["TWM-129"])
+
+      bottom_cards =
+        stage_bottom_deck_cards(game.id, "player_1", [
+          "SCR-133",
+          "TWM-143",
+          "POR-071",
+          "MEG-131",
+          "SCR-133",
+          "TWM-143",
+          "POR-071"
+        ])
+
+      assert {:ok, game} = Mechanics.play_card(game, "player_1", dusk_ball.id, %{})
+
+      [prompt] = awaiting_prompts(game.id)
+      inspected_ids = Enum.map(bottom_cards, & &1.id)
+
+      assert prompt.payload["legal_choices"] == []
+      assert prompt.payload["inspected_card_ids"] == inspected_ids
+      refute top_pokemon.id in prompt.payload["legal_choices"]
+      refute top_pokemon.id in prompt.payload["inspected_card_ids"]
+
+      hand_before = cards_in_zone(game.id, "player_1", :hand)
+      deck_before = cards_in_zone(game.id, "player_1", :deck)
+
+      assert {:ok, game} = Mechanics.choose_prompt(game, "player_1", prompt.id, [])
+
+      assert length(cards_in_zone(game.id, "player_1", :hand)) == length(hand_before)
+      assert length(cards_in_zone(game.id, "player_1", :deck)) == length(deck_before)
+
+      cards_moved_event =
+        game.id
+        |> game_events_by_type("cards_moved")
+        |> Enum.find(&(&1.payload["effect_key"] == "search_bottom_7_for_pokemon_to_hand"))
+
+      assert cards_moved_event.payload["cards"] == []
+      assert cards_moved_event.payload["public_reveal"] == false
+      assert game_events_by_type(game.id, "deck_shuffled") != []
+    end
+  end
+
   describe "SCR-114 Hoothoot and SCR-115 Noctowl support" do
     test "Hoothoot Triple Stab scales damage by heads count" do
       {:ok, game} = create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147)
@@ -3252,6 +3366,34 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
       {:ok, card} = create_custom_owned_card(game_id, player_id, card_id, position)
       card
     end)
+  end
+
+  defp stage_bottom_deck_cards(game_id, player_id, card_ids) when is_list(card_ids) do
+    max_position =
+      game_id
+      |> cards_in_zone(player_id, :deck)
+      |> Enum.map(& &1.position)
+      |> Enum.max(fn -> 0 end)
+
+    card_ids
+    |> Enum.with_index(max_position + 1)
+    |> Enum.map(fn {card_id, position} ->
+      {:ok, card} = create_custom_owned_card(game_id, player_id, card_id, position)
+      card
+    end)
+  end
+
+  defp move_owned_or_custom_card_to_hand(game_id, player_id, card_id, position) do
+    case owned_card(game_id, player_id, card_id) do
+      %CardInstance{} = card -> move_card_to_hand(card, position)
+      nil -> create_custom_card_in_hand(game_id, player_id, card_id, position)
+    end
+  end
+
+  defp create_custom_card_in_hand(game_id, player_id, card_id, position) do
+    {:ok, card} = create_custom_owned_card(game_id, player_id, card_id, 260 + position)
+    {:ok, card} = ash_update(card, :draw_to_hand, %{position: position})
+    card
   end
 
   defp create_started_setup_game do

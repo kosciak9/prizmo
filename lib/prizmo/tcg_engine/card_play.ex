@@ -1497,13 +1497,18 @@ defmodule Prizmo.TcgEngine.CardPlay do
              prompt_type: "select_cards",
              player_id: prompt_player_id,
              payload:
-               prompt_payload(
-                 game.id,
+               game.id
+               |> prompt_payload(
                  prompt_player_id,
                  choice_key,
                  legal_choice_ids,
                  min,
                  max
+               )
+               |> maybe_put_deck_slice_inspection(
+                 game.id,
+                 prompt_player_id,
+                 effect_step(definition, choice_key)
                )
            }),
          {:ok, _event} <-
@@ -1845,6 +1850,7 @@ defmodule Prizmo.TcgEngine.CardPlay do
 
   defp validate_search_top_deck_effect(game_id, player_id, effect, target_ids) do
     look_count = Map.fetch!(effect.params, :look_count)
+    source_position = deck_slice_position(effect)
 
     with {:ok, target_ids} <-
            EffectRunner.validate_choice_selection(
@@ -1854,7 +1860,15 @@ defmodule Prizmo.TcgEngine.CardPlay do
            ),
          {:ok, target_cards} <- CardStore.get_cards(game_id, target_ids),
          :ok <- require_all_owned_in_zone(target_cards, player_id, :deck),
-         :ok <- require_all_in_top_deck(game_id, player_id, target_cards, look_count, effect.key),
+         :ok <-
+           require_all_in_deck_slice(
+             game_id,
+             player_id,
+             target_cards,
+             look_count,
+             source_position,
+             effect.key
+           ),
          :ok <- require_all_search_filters(target_cards, Map.get(effect.params, :filter)) do
       {:ok, target_cards}
     end
@@ -2573,7 +2587,7 @@ defmodule Prizmo.TcgEngine.CardPlay do
   defp search_top_deck_choice_cards(cards, player_id, choice_step) do
     choices =
       cards
-      |> top_deck_cards(player_id, Map.fetch!(choice_step.params, :look_count))
+      |> deck_slice_choice_cards(player_id, choice_step)
       |> Enum.filter(&matches_search_filter?(&1, Map.get(choice_step.params, :filter)))
 
     if required_search_groups_available?(choices, Map.get(choice_step.params, :required_groups)) do
@@ -2583,11 +2597,62 @@ defmodule Prizmo.TcgEngine.CardPlay do
     end
   end
 
-  defp top_deck_cards(cards, player_id, look_count) do
+  defp deck_slice_choice_cards(cards, player_id, choice_step) do
     cards
     |> Enum.filter(&(&1.owner_player_id == player_id and &1.zone == :deck))
     |> Enum.sort_by(&{&1.position, &1.instance_id})
-    |> Enum.take(look_count)
+    |> deck_slice_cards(
+      deck_slice_position(choice_step),
+      Map.fetch!(choice_step.params, :look_count)
+    )
+  end
+
+  defp deck_slice_cards(cards, :bottom, look_count), do: Enum.take(cards, -look_count)
+  defp deck_slice_cards(cards, :top, look_count), do: Enum.take(cards, look_count)
+
+  defp deck_slice_position(%{params: %{source_position: :bottom}}), do: :bottom
+  defp deck_slice_position(_effect), do: :top
+
+  defp deck_slice_error_tag(:bottom), do: :target_not_in_bottom_deck
+  defp deck_slice_error_tag(:top), do: :target_not_in_top_deck
+
+  defp deck_slice_position_payload(:bottom), do: "bottom"
+  defp deck_slice_position_payload(:top), do: "top"
+
+  defp deck_slice_label(:bottom), do: "bottom"
+  defp deck_slice_label(:top), do: "top"
+
+  defp maybe_put_deck_slice_inspection(
+         payload,
+         game_id,
+         player_id,
+         %{type: :search_top_deck, params: %{look_count: look_count}} = effect
+       ) do
+    source_position = deck_slice_position(effect)
+
+    case CardStore.cards_in_zone(game_id, player_id, :deck) do
+      {:ok, deck_cards} ->
+        inspected_cards = deck_slice_cards(deck_cards, source_position, look_count)
+
+        payload
+        |> Map.put(:look_count, look_count)
+        |> Map.put(:deck_slice_position, deck_slice_position_payload(source_position))
+        |> Map.put(:inspected_card_count, length(inspected_cards))
+        |> Map.put(:inspected_card_ids, Enum.map(inspected_cards, & &1.id))
+
+      {:error, _reason} ->
+        payload
+    end
+  end
+
+  defp maybe_put_deck_slice_inspection(payload, _game_id, _player_id, _effect), do: payload
+
+  defp search_top_deck_choice_label(%CardInstance{} = card, source_position, look_count) do
+    %{
+      id: card.id,
+      label: card_name(card, card.card_id),
+      detail: "Card in the #{deck_slice_label(source_position)} #{look_count} cards of your deck."
+    }
   end
 
   defp opponent_bench_choice_cards(cards, player_id) do
@@ -2928,16 +2993,33 @@ defmodule Prizmo.TcgEngine.CardPlay do
     |> collect_ok_results()
   end
 
-  defp require_all_in_top_deck(_game_id, _player_id, [], _look_count, _effect_key), do: :ok
+  defp require_all_in_deck_slice(
+         _game_id,
+         _player_id,
+         [],
+         _look_count,
+         _source_position,
+         _effect_key
+       ), do: :ok
 
-  defp require_all_in_top_deck(game_id, player_id, target_cards, look_count, effect_key) do
+  defp require_all_in_deck_slice(
+         game_id,
+         player_id,
+         target_cards,
+         look_count,
+         source_position,
+         effect_key
+       ) do
     with {:ok, deck_cards} <- CardStore.cards_in_zone(game_id, player_id, :deck) do
-      top_card_ids = deck_cards |> Enum.take(look_count) |> MapSet.new(& &1.id)
+      legal_card_ids =
+        deck_cards
+        |> deck_slice_cards(source_position, look_count)
+        |> MapSet.new(& &1.id)
 
-      if Enum.all?(target_cards, &MapSet.member?(top_card_ids, &1.id)) do
+      if Enum.all?(target_cards, &MapSet.member?(legal_card_ids, &1.id)) do
         :ok
       else
-        {:error, {:target_not_in_top_deck, effect_key, look_count}}
+        {:error, {deck_slice_error_tag(source_position), effect_key, look_count}}
       end
     end
   end
@@ -3890,7 +3972,7 @@ defmodule Prizmo.TcgEngine.CardPlay do
 
   defp maybe_put_reveal_payload(payload, card, %{params: %{reveal: true}}, moved_cards) do
     payload
-    |> Map.put(:public_reveal, true)
+    |> Map.put(:public_reveal, moved_cards != [])
     |> Map.put(:source_card_id, card.card_id)
     |> Map.put(:revealed_cards, moved_cards)
   end
@@ -4174,6 +4256,33 @@ defmodule Prizmo.TcgEngine.CardPlay do
     end
   end
 
+  defp maybe_put_prompt_choice_labels(payload, game_id, player_id, choice_key, legal_choice_ids)
+       when choice_key in [
+              :search_top_7_for_supporter_to_hand,
+              :search_top_7_for_grass_pokemon_or_basic_grass_energy,
+              :search_bottom_7_for_pokemon_to_hand
+            ] do
+    case CardStore.list_cards(game_id) do
+      {:ok, cards} ->
+        cards_by_id = Map.new(cards, &{&1.id, &1})
+        choice_step = search_top_deck_choice_step(choice_key)
+        source_position = deck_slice_position(choice_step)
+        look_count = Map.fetch!(choice_step.params, :look_count)
+
+        labels =
+          legal_choice_ids
+          |> Enum.map(&Map.get(cards_by_id, &1))
+          |> Enum.reject(&is_nil/1)
+          |> Enum.filter(&(&1.owner_player_id == player_id))
+          |> Enum.map(&search_top_deck_choice_label(&1, source_position, look_count))
+
+        Map.put(payload, :legal_choice_labels, labels)
+
+      {:error, _reason} ->
+        payload
+    end
+  end
+
   defp maybe_put_prompt_choice_labels(
          payload,
          game_id,
@@ -4373,6 +4482,18 @@ defmodule Prizmo.TcgEngine.CardPlay do
          _choice_key,
          _legal_choice_ids
        ), do: payload
+
+  defp search_top_deck_choice_step(:search_top_7_for_supporter_to_hand) do
+    %{params: %{look_count: 7}}
+  end
+
+  defp search_top_deck_choice_step(:search_top_7_for_grass_pokemon_or_basic_grass_energy) do
+    %{params: %{look_count: 7}}
+  end
+
+  defp search_top_deck_choice_step(:search_bottom_7_for_pokemon_to_hand) do
+    %{params: %{source_position: :bottom, look_count: 7}}
+  end
 
   defp team_rockets_giovanni_choice_label(
          %CardInstance{owner_player_id: player_id} = card,

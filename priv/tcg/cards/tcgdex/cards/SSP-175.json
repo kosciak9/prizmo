@@ -1,0 +1,57 @@
+{
+  "prizmo_id": "SSP-175",
+  "source": {
+    "base_url": "https://api.tcgdex.net/v2/en",
+    "dynamic_fields_removed": [
+      "pricing"
+    ],
+    "language": "en",
+    "provider": "TCGdex"
+  },
+  "tcgdex": {
+    "category": "Trainer",
+    "effect": "Look at the bottom 7 cards of your deck. You may reveal a Pokémon you find there and put it into your hand. Shuffle the other cards back into your deck.",
+    "id": "sv08-175",
+    "illustrator": "Studio Bora Inc.",
+    "image": "https://assets.tcgdex.net/en/sv/sv08/175",
+    "legal": {
+      "expanded": true,
+      "standard": true
+    },
+    "localId": "175",
+    "name": "Dusk Ball",
+    "rarity": "Uncommon",
+    "regulationMark": "H",
+    "set": {
+      "cardCount": {
+        "official": 191,
+        "total": 252
+      },
+      "id": "sv08",
+      "logo": "https://assets.tcgdex.net/en/sv/sv08/logo",
+      "name": "Surging Sparks"
+    },
+    "trainerType": "Item",
+    "updated": "2026-04-28T20:18:34+01:00",
+    "variants": {
+      "firstEdition": false,
+      "holo": false,
+      "normal": true,
+      "reverse": true,
+      "wPromo": false
+    },
+    "variants_detailed": [
+      {
+        "size": "standard",
+        "type": "normal",
+        "variantId": "endfynwn4n10gzq"
+      },
+      {
+        "size": "standard",
+        "type": "reverse",
+        "variantId": "cm4kqul3x1bwlz1f"
+      }
+    ]
+  },
+  "tcgdex_id": "sv08-175"
+}

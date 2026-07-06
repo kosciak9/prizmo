@@ -399,6 +399,29 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     ]
   }
 
+  @dusk_ball %CardDefinition{
+    id: "SSP-175",
+    kind: :trainer,
+    trainer_type: :item,
+    play_window: :action_window,
+    effects: [
+      %Effect{
+        key: :search_bottom_7_for_pokemon_to_hand,
+        type: :search_top_deck,
+        params: %{
+          source_position: :bottom,
+          look_count: 7,
+          filter: %{kind: :pokemon},
+          min_count: 0,
+          max_count: 1,
+          destination: :hand,
+          reveal: true,
+          shuffle_after: true
+        }
+      }
+    ]
+  }
+
   @enhanced_hammer %CardDefinition{
     id: "TWM-148",
     kind: :trainer,
@@ -1254,6 +1277,7 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     @crispin.id => @crispin,
     @dawn.id => @dawn,
     @briar.id => @briar,
+    @dusk_ball.id => @dusk_ball,
     @enhanced_hammer.id => @enhanced_hammer,
     @energy_search.id => @energy_search,
     @energy_retrieval.id => @energy_retrieval,

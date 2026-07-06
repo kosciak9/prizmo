@@ -64,13 +64,13 @@ Those reports are the canonical starting point for autonomous Goal 2 implementat
 - Tracked top archetypes: `30`
 - Tracked cards with usage greater than `0.00`: `377`
 - Coverage buckets from `mix prizmo.goal2.corpus`:
-  - `supported=159`
+  - `supported=160`
   - `generic-supported=8`
   - `partial=10`
-  - `unimplemented=200`
+  - `unimplemented=199`
 - Metadata buckets:
-  - `cached=180`
-  - `missing=197`
+  - `cached=181`
+  - `missing=196`
 
 Important interpretation:
 
@@ -82,16 +82,16 @@ Important interpretation:
 
 The strongest current Goal 2 implementation candidates are the incomplete cards shared by the most archetypes and/or the most total metagame share.
 
-The latest Goal 2 engine batch closed `TWM-131` Tatsugiri as the default highest-share remaining two-archetype Pokémon blocker after Punk Helmet. Tatsugiri now has committed TCGdex metadata and an engine-defined `Attract Customers` Ability exposed through Ash RPC, `GameView`, and the temporary React SPA: while Tatsugiri is Active, once during the player's turn it looks at the top 6 deck cards, privately shows those inspected cards to the owning player, prompts them to choose up to 1 Supporter from those cards, reveals and moves the selected Supporter to hand, and shuffles the other cards back into the deck. The prompt supports declining or having no legal Supporter, still shuffling afterward and marking the Ability used.
+The latest Goal 2 engine batch closed `SSP-175` Dusk Ball as the default highest-share remaining two-archetype Item blocker after Tatsugiri. Dusk Ball now has committed TCGdex metadata and an engine-defined Item effect on the reusable deck-slice search path: it privately exposes the bottom 7 deck cards to the owning player, prompts them to choose up to 1 Pokémon from only those inspected cards, allows choosing none, publicly reveals and moves the selected Pokémon to hand, shuffles the remaining deck, and marks no public reveal when no card is selected. The shared `search_top_deck` primitive now supports a `source_position: :bottom` deck slice while preserving existing top-deck searches such as Pokegear 3.0 and Bug Catching Set.
 
 ### Highest-priority remaining `unimplemented` cards from current report
 
 | Card | Archetypes | Total share | Notes |
 | --- | --- | --- | --- |
-| `SSP-175` Dusk Ball | `2` | `7.78%` | Default next shared two-archetype Item blocker after Tatsugiri. |
-| `TEF-081` Iron Crown ex | `2` | `6.69%` | Next shared two-archetype Pokémon ex blocker behind Dusk Ball. |
-| `CRI-076` AZ's Tranquility | `2` | `6.49%` | Next shared two-archetype Supporter blocker after the top Item/ex queue unless a broader primitive re-ranks above it. |
-| `DRI-016` Applin | `2` | `6.45%` | Next shared two-archetype Pokémon blocker behind the current Item/ex/Supporter queue. |
+| `TEF-081` Iron Crown ex | `2` | `6.69%` | Default next shared two-archetype Pokémon ex blocker after Dusk Ball. |
+| `CRI-076` AZ's Tranquility | `2` | `6.49%` | Next shared two-archetype Supporter blocker behind Iron Crown ex unless a broader primitive re-ranks above it. |
+| `DRI-016` Applin | `2` | `6.45%` | Next shared two-archetype Pokémon blocker behind the current ex/Supporter queue. |
+| `JTG-159` Spiky Energy | `2` | `6.38%` | Next shared two-archetype Special Energy blocker, tied in share with `PFL-091` Jumbo Ice Cream. |
 
 ### Shared `partial` cards worth finishing after the broad unimplemented slice
 
@@ -118,9 +118,9 @@ That means prior Goal 1 and six-deck coverage was not wasted; it now acts as see
 
 ## Recommended next implementation order
 
-1. Take `SSP-175` Dusk Ball next as the default highest-share remaining two-archetype blocker unless a broader primitive re-ranks above it.
-2. Keep `TEF-081` Iron Crown ex and `CRI-076` AZ's Tranquility as the next shared two-archetype blockers behind Dusk Ball.
-3. Keep `DRI-016` Applin and `JTG-159` Spiky Energy as the next high-share two-archetype follow-ups after the top Item/ex/Supporter queue.
+1. Take `TEF-081` Iron Crown ex next as the default highest-share remaining two-archetype blocker unless a broader primitive re-ranks above it.
+2. Keep `CRI-076` AZ's Tranquility and `DRI-016` Applin as the next shared two-archetype blockers behind Iron Crown ex.
+3. Keep `JTG-159` Spiky Energy and `PFL-091` Jumbo Ice Cream as the next high-share two-archetype follow-ups after the top ex/Supporter/Pokémon queue.
 4. Keep the remaining Dragapult-only cached pair `TWM-099` / `TWM-100` as deliberate single-archetype cleanup, not the default autonomous queue.
 5. Finish the remaining shared partials only after the broad unimplemented slice unless another batch naturally extends the new HP infrastructure; if returning to HP work soon, `POR-086` Growing Grass Energy remains the strongest follow-up.
 6. Keep using `mix prizmo.goal2.corpus` after each batch to re-rank the next blockers by archetype count and weighted share.
