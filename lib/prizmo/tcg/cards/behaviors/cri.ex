@@ -3,6 +3,14 @@ defmodule Prizmo.Tcg.Cards.Behaviors.CRI do
 
   use Prizmo.Tcg.Cards.DSL
 
+  card "CRI-070" do
+    ability(:watchful_eye,
+      effect: %{type: :prevent_damage_counter_moves_between_pokemon}
+    )
+
+    attack(:bite, effect: nil)
+  end
+
   card "CRI-080" do
     card_effect(
       effect: %{

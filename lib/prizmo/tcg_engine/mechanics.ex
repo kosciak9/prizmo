@@ -1157,6 +1157,7 @@ defmodule Prizmo.TcgEngine.Mechanics do
            :ok <- AbilityEffects.require_damage_counter_count(damage_counters, from_card),
            :ok <- require_card_owned_by_player(target_card, opponent_player_id),
            :ok <- require_in_play_pokemon_zone(target_card),
+           :ok <- AbilityEffects.require_damage_counter_moves_not_blocked(game.id),
            {:ok, ability_result} <-
              move_adrena_brain_damage_counters(
                game.id,

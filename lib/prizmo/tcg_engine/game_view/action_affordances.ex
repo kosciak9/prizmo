@@ -143,7 +143,7 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
       run_away_draw_affordances(player, current_turn, cards) ++
       cursed_blast_affordances(game, player, current_turn, cards, all_cards) ++
       fan_call_affordances(player, current_turn, cards) ++
-      adrena_brain_affordances(player, current_turn, cards, all_cards) ++
+      adrena_brain_affordances(game, player, current_turn, cards, all_cards) ++
       evolve_from_hand_affordances(game, player, current_turn, cards, all_cards) ++
       declare_attack_affordances(player, current_turn, cards, all_cards) ++
       unsupported_card_text_affordances(player, current_turn, cards, all_cards) ++
@@ -371,7 +371,13 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
     end
   end
 
-  defp adrena_brain_affordances(%GamePlayer{} = player, %Turn{} = current_turn, cards, all_cards) do
+  defp adrena_brain_affordances(
+         %Game{} = game,
+         %GamePlayer{} = player,
+         %Turn{} = current_turn,
+         cards,
+         all_cards
+       ) do
     own_in_play_cards = in_play_pokemon_cards(cards)
 
     damaged_from_cards =
@@ -379,31 +385,35 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
 
     opponent_target_cards = opponent_in_play_pokemon_cards(all_cards, player.player_id)
 
-    for source_card <- own_in_play_cards,
-        AbilityEffects.adrena_brain_available?(
-          source_card,
-          attached_cards_for(cards, source_card.id),
-          current_turn
-        ),
-        from_card <- damaged_from_cards,
-        target_card <- opponent_target_cards do
-      max_counters = AbilityEffects.movable_damage_counter_count(from_card)
+    if AbilityEffects.damage_counter_moves_blocked?(game.id) do
+      []
+    else
+      for source_card <- own_in_play_cards,
+          AbilityEffects.adrena_brain_available?(
+            source_card,
+            attached_cards_for(cards, source_card.id),
+            current_turn
+          ),
+          from_card <- damaged_from_cards,
+          target_card <- opponent_target_cards do
+        max_counters = AbilityEffects.movable_damage_counter_count(from_card)
 
-      affordance(
-        :adrena_brain,
-        adrena_brain_label(from_card, target_card),
-        :command,
-        player.player_id,
-        source_card_instance_ids: [source_card.id, from_card.id],
-        target_card_instance_ids: [target_card.id],
-        required_source_count: max_counters,
-        choice_keys: ["damage_counters"],
-        note: adrena_brain_note(max_counters)
-      )
+        affordance(
+          :adrena_brain,
+          adrena_brain_label(from_card, target_card),
+          :command,
+          player.player_id,
+          source_card_instance_ids: [source_card.id, from_card.id],
+          target_card_instance_ids: [target_card.id],
+          required_source_count: max_counters,
+          choice_keys: ["damage_counters"],
+          note: adrena_brain_note(max_counters)
+        )
+      end
     end
   end
 
-  defp adrena_brain_affordances(_player, _current_turn, _cards, _all_cards), do: []
+  defp adrena_brain_affordances(_game, _player, _current_turn, _cards, _all_cards), do: []
 
   defp teal_dance_affordances(%GamePlayer{} = player, %Turn{} = current_turn, cards) do
     hand_grass_energy_cards =

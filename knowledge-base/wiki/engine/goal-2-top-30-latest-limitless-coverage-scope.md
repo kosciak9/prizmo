@@ -64,13 +64,13 @@ Those reports are the canonical starting point for autonomous Goal 2 implementat
 - Tracked top archetypes: `30`
 - Tracked cards with usage greater than `0.00`: `377`
 - Coverage buckets from `mix prizmo.goal2.corpus`:
-  - `supported=144`
+  - `supported=145`
   - `generic-supported=8`
   - `partial=10`
-  - `unimplemented=215`
+  - `unimplemented=214`
 - Metadata buckets:
-  - `cached=165`
-  - `missing=212`
+  - `cached=166`
+  - `missing=211`
 
 Important interpretation:
 
@@ -82,17 +82,17 @@ Important interpretation:
 
 The strongest current Goal 2 implementation candidates are the incomplete cards shared by the most archetypes and/or the most total metagame share.
 
-The latest Goal 2 engine batch closed `CRI-080` Prism Tower as the Stadium follow-up after the ACE SPEC slice. `CRI-080` now has committed TCGdex metadata, a CRI behavior overlay for its discard-two-draw-one Stadium text, server-side once-per-turn tracking per player, a `GameView` `prism_tower` affordance, Ash RPC/code-interface wiring, and React SPA buttons for legal two-card discard pairs. The command rejects invalid discard counts and same-turn repeats before moving cards.
+The latest Goal 2 engine batch closed `CRI-070` Patrat as the highest-share remaining three-archetype Pokémon blocker after the ACE SPEC/Stadium slice. `CRI-070` now has committed TCGdex metadata, a CRI behavior overlay for `Watchful Eye`, executable `Bite`, and canonical damage-counter-move prevention shared by direct Ability movement (`Adrena-Brain`) and attack-based movement (`Strange Hacking`). Patrat removes the `adrena_brain` affordance while active, direct movement commands reject before moving counters, and attack effects keep non-movement effects such as Confusion while reporting prevented counter moves.
 
 ### Highest-priority remaining `unimplemented` cards from current report
 
 | Card | Archetypes | Total share | Notes |
 | --- | --- | --- | --- |
-| `CRI-070` Patrat | `3` | `2.76%` | Three-archetype Pokémon metadata/behavior cleanup after the ACE SPEC/Stadium slice. |
-| `MEG-074` Lunatone | `3` | `1.99%` | Lower-share three-archetype Pokémon cleanup shared by Ceruledge, Mega Greninja, and Mega Lucario. |
-| `MEG-075` Solrock | `3` | `1.99%` | Paired lower-share three-archetype Pokémon cleanup alongside Lunatone. |
-| `PRE-115` Larry's Skill | `3` | `1.25%` | Next three-archetype Trainer after the ACE SPEC/Stadium and basic Pokémon cleanup slice. |
+| `MEG-074` Lunatone | `3` | `1.99%` | Next three-archetype Pokémon cleanup shared by Ceruledge, Mega Greninja, and Mega Lucario. |
+| `MEG-075` Solrock | `3` | `1.99%` | Paired three-archetype Pokémon cleanup alongside Lunatone. |
+| `PRE-115` Larry's Skill | `3` | `1.25%` | Next three-archetype Trainer after the shared Pokémon cleanup slice. |
 | `TWM-157` Lucian | `3` | `0.92%` | Additional three-archetype Supporter cleanup after the higher-share three-archetype queue. |
+| `POR-020` Staryu | `3` | `0.85%` | Later three-archetype Pokémon cleanup shared by the Greninja/Starmie cluster. |
 
 ### Shared `partial` cards worth finishing after the broad unimplemented slice
 
@@ -119,9 +119,9 @@ That means prior Goal 1 and six-deck coverage was not wasted; it now acts as see
 
 ## Recommended next implementation order
 
-1. Take `CRI-070` Patrat next as the highest-share remaining three-archetype blocker after the ACE SPEC/Stadium slice.
-2. Continue the same three-archetype Pokémon cleanup with the `MEG-074` Lunatone / `MEG-075` Solrock pair.
-3. Use `PRE-115` Larry's Skill, then `TWM-157` Lucian, as the next lower-share three-archetype Trainer/Supporter cleanup queue after those Pokémon blockers are reduced.
+1. Continue the three-archetype Pokémon cleanup with the `MEG-074` Lunatone / `MEG-075` Solrock pair now that `CRI-070` Patrat is closed.
+2. Use `PRE-115` Larry's Skill, then `TWM-157` Lucian, as the next lower-share three-archetype Trainer/Supporter cleanup queue after those Pokémon blockers are reduced.
+3. Keep the Greninja/Starmie `POR-020` / `POR-021` pair as a later three-archetype Pokémon follow-up after the higher-share pair.
 4. Keep the remaining Dragapult-only cached pair `TWM-099` / `TWM-100` as deliberate single-archetype cleanup, not the default autonomous queue.
 5. Finish the remaining shared partials only after the broad unimplemented slice unless another batch naturally extends the new HP infrastructure; if returning to HP work soon, `POR-086` Growing Grass Energy remains the strongest follow-up.
 6. Keep using `mix prizmo.goal2.corpus` after each batch to re-rank the next blockers by archetype count and weighted share.

@@ -1,0 +1,82 @@
+{
+  "prizmo_id": "CRI-070",
+  "source": {
+    "base_url": "https://api.tcgdex.net/v2/en",
+    "dynamic_fields_removed": [
+      "pricing"
+    ],
+    "language": "en",
+    "provider": "TCGdex"
+  },
+  "tcgdex": {
+    "abilities": [
+      {
+        "effect": "Damage counters on each Pokémon (both yours and your opponent's) can't be moved to other Pokémon.",
+        "name": "Watchful Eye",
+        "type": "Ability"
+      }
+    ],
+    "attacks": [
+      {
+        "cost": [
+          "Colorless"
+        ],
+        "damage": 10,
+        "name": "Bite"
+      }
+    ],
+    "category": "Pokemon",
+    "dexId": [
+      504
+    ],
+    "hp": 70,
+    "id": "me04-070",
+    "illustrator": "Souichirou Gunjima",
+    "image": "https://assets.tcgdex.net/en/me/me04/070",
+    "legal": {
+      "expanded": true,
+      "standard": true
+    },
+    "localId": "070",
+    "name": "Patrat",
+    "rarity": "Common",
+    "regulationMark": "J",
+    "retreat": 1,
+    "set": {
+      "cardCount": {
+        "official": 86,
+        "total": 122
+      },
+      "id": "me04",
+      "logo": "https://assets.tcgdex.net/en/me/me04/logo",
+      "name": "Chaos Rising",
+      "symbol": "https://assets.tcgdex.net/univ/me/me04/symbol"
+    },
+    "stage": "Basic",
+    "types": [
+      "Colorless"
+    ],
+    "updated": "2026-05-25T19:34:02Z",
+    "variants": {
+      "firstEdition": false,
+      "holo": false,
+      "normal": true,
+      "reverse": false,
+      "wPromo": false
+    },
+    "variants_detailed": [
+      {
+        "size": "standard",
+        "type": "normal",
+        "variantId": "generated"
+      }
+    ],
+    "weaknesses": [
+      {
+        "type": "Fighting",
+        "value": "×2"
+      }
+    ]
+  },
+  "tcgdex_id": "me04-070"
+}

@@ -1,5 +1,12 @@
 # Wiki Log
 
+## [2026-07-06] codebase update | Goal 2 Patrat support
+
+- Task attempted: closed `CRI-070` Patrat as the highest-share remaining three-archetype Goal 2 Pokémon blocker after the ACE SPEC/Stadium slice. Added committed TCGdex metadata, authored `Watchful Eye` as a shared damage-counter-move prevention Ability, added executable `Bite`, hid `Adrena-Brain` affordances while Patrat is active, rejected direct counter-moving Ability commands before movement, and made attack-based counter movement report prevention while preserving non-movement effects such as `Strange Hacking` Confusion.
+- Files changed: `lib/prizmo/tcg/cards/behaviors/cri.ex`, `lib/prizmo/tcg_engine/ability_effects.ex`, `lib/prizmo/tcg_engine/attack_effects.ex`, `lib/prizmo/tcg_engine/game_view/action_affordances.ex`, `lib/prizmo/tcg_engine/mechanics.ex`, `priv/tcg/cards/tcgdex/cards/CRI-070.json`, `knowledge-base/wiki/engine/goal-2-top-30-latest-limitless-coverage-scope.md`, `knowledge-base/wiki/engine/ash-backed-tcg-engine-playtest-handoff.md`, `knowledge-base/wiki/log.md`.
+- Validation: `mix format`; `mix compile --warnings-as-errors`; Tidewave runtime check confirmed `CRI-070` reports `coverage_status: :supported`, Patrat blocks direct `Adrena-Brain` with no damage movement and no affordance, and `Strange Hacking` Confuses while preventing requested counter movement; `mix test test/prizmo/tcg/cards/metadata_test.exs`; `mix test test/prizmo/tcg_engine/mechanics_test.exs`; `mix prizmo.goal2.corpus` confirmed `supported=145` / `generic-supported=8` / `partial=10` / `unimplemented=214` and `cached=166` / `missing=211`; final `mix check` passed.
+- Remaining/blocking notes: `CRI-070` is no longer in the shared incomplete queue. The default next Goal 2 priority is now the `MEG-074` Lunatone / `MEG-075` Solrock pair, followed by `PRE-115` Larry's Skill, `TWM-157` Lucian, and the later `POR-020` / `POR-021` Greninja/Starmie pair.
+
 ## [2026-07-06] codebase update | Goal 2 Prism Tower support
 
 - Task attempted: closed `CRI-080` Prism Tower as the highest-share remaining three-archetype Goal 2 Stadium blocker after the ACE SPEC slice. Added committed TCGdex metadata, authored a CRI behavior overlay for its discard-two-draw-one Stadium text, implemented per-player once-per-turn active-Stadium command handling, exposed `prism_tower` through `GameView`, wired Ash RPC/code-interface support, and added React SPA command buttons for legal two-card discard pairs.

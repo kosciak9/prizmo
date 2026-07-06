@@ -69,6 +69,7 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
   @run_away_draw_effect_type :draw_then_shuffle_self_into_deck
   @cursed_blast_ability_id :cursed_blast
   @cursed_blast_effect_type :damage_counters_to_opponent_pokemon_then_self_knock_out
+  @watchful_eye_effect_type :prevent_damage_counter_moves_between_pokemon
   @damp_card_id "ASC-039"
   @damp_ability_id :damp
   @fan_call_card_id "SCR-118"
@@ -151,6 +152,34 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
     case CardCatalog.fetch(card_id) do
       {:ok, %{abilities: abilities}} when is_map(abilities) and map_size(abilities) > 0 -> true
       _other -> false
+    end
+  end
+
+  def damage_counter_moves_blocked?(game_id) when is_binary(game_id) do
+    match?({:prevented, _payload}, damage_counter_move_prevention_payload(game_id))
+  end
+
+  def require_damage_counter_moves_not_blocked(game_id) when is_binary(game_id) do
+    case damage_counter_move_prevention_payload(game_id) do
+      :not_prevented -> :ok
+      {:prevented, payload} -> {:error, {:damage_counter_moves_blocked, payload}}
+    end
+  end
+
+  def damage_counter_move_prevention_payload(game_id) when is_binary(game_id) do
+    with {:ok, cards} <- CardStore.list_cards(game_id),
+         %CardInstance{} = source_card <-
+           Enum.find(cards, &damage_counter_move_prevention_source?/1) do
+      {:prevented,
+       %{
+         damage_counter_move_prevented?: true,
+         damage_counter_move_prevention_source_card_id: source_card.card_id,
+         damage_counter_move_prevention_source_card_instance_id: source_card.id,
+         damage_counter_move_prevention_source_effect_id: @watchful_eye_effect_type,
+         damage_counter_move_prevention_source_player_id: source_card.owner_player_id
+       }}
+    else
+      _other -> :not_prevented
     end
   end
 
@@ -895,6 +924,29 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
   end
 
   defp pokemon_checkup_damage_ability?(_other), do: false
+
+  defp damage_counter_move_prevention_source?(%CardInstance{} = card) do
+    in_play?(card) and
+      match?({:ok, _effect}, damage_counter_move_prevention_effect(card))
+  end
+
+  defp damage_counter_move_prevention_effect(%CardInstance{card_id: card_id}) do
+    with {:ok, %{abilities: abilities}} <- CardCatalog.fetch(card_id),
+         {_ability_id, %{effect: %{type: @watchful_eye_effect_type}}} <-
+           Enum.find(abilities, &damage_counter_move_prevention_ability?/1) do
+      {:ok, %{}}
+    else
+      _other ->
+        {:error, {:unsupported_damage_counter_move_prevention_effect, card_id}}
+    end
+  end
+
+  defp damage_counter_move_prevention_ability?({_ability_id, %{effect: effect}})
+       when is_map(effect) do
+    match?(%{type: @watchful_eye_effect_type}, effect)
+  end
+
+  defp damage_counter_move_prevention_ability?(_other), do: false
 
   defp adrena_brain_effect(%CardInstance{card_id: card_id}) do
     with {:ok, %{abilities: abilities}} <- CardCatalog.fetch(card_id),

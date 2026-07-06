@@ -44,6 +44,7 @@ defmodule Prizmo.TcgEngine.AttackEffects do
       require_unique_ids: 1
     ]
 
+  alias Prizmo.TcgEngine.AbilityEffects
   alias Prizmo.TcgEngine.AttackLocks
   alias Prizmo.TcgEngine.AttackPrevention
   alias Prizmo.TcgEngine.BattleActions
@@ -1824,6 +1825,32 @@ defmodule Prizmo.TcgEngine.AttackEffects do
       moved_damage: damage_counters * 10
     }
 
+    case AbilityEffects.damage_counter_move_prevention_payload(game_id) do
+      {:prevented, prevention_payload} ->
+        {:ok,
+         move_payload
+         |> Map.merge(prevention_payload)
+         |> Map.put(:applied?, false)
+         |> Map.put(:prevented?, true)}
+
+      :not_prevented ->
+        damage_counter_move_result_after_global_prevention(
+          game_id,
+          player_id,
+          from_card,
+          to_card,
+          move_payload
+        )
+    end
+  end
+
+  defp damage_counter_move_result_after_global_prevention(
+         game_id,
+         player_id,
+         %CardInstance{} = from_card,
+         %CardInstance{} = to_card,
+         move_payload
+       ) do
     case source_damage_counter_move_prevention_payload(game_id, player_id, from_card) do
       {:prevented, prevention_payload} ->
         {:ok,
