@@ -15,10 +15,13 @@ defmodule Prizmo.TcgEngine.EnergyEffects do
   alias Prizmo.TcgEngine.PendingEffect
   alias Prizmo.TcgEngine.Prompt
   alias Prizmo.TcgEngine.Rng
+  alias Prizmo.TcgEngine.SpecialConditions
   alias Prizmo.TcgEngine.Turn
   alias Prizmo.TcgEngine.TurnStore
 
   @telepathic_psychic_choice_key :bench_basic_psychic_from_deck_when_attached_to_psychic
+  @bubbly_water_energy_effect :water_pokemon_special_condition_immunity_energy
+  @special_conditions [:asleep, :burned, :confused, :paralyzed, :poisoned]
   @prism_energy_basic_types [
     :grass,
     :fire,
@@ -102,6 +105,9 @@ defmodule Prizmo.TcgEngine.EnergyEffects do
         %{type: :place_damage_counters_on_attacker_if_damaged_as_active_by_attack} ->
           {:ok, nil}
 
+        %{type: @bubbly_water_energy_effect} ->
+          recover_special_condition(game.id, energy_card, target_card)
+
         %{type: :bench_basic_psychic_from_deck_when_attached_to_psychic, max_targets: max_targets}
         when is_integer(max_targets) and max_targets > 0 ->
           bench_basic_psychic_from_deck_when_attached_to_psychic(
@@ -123,6 +129,37 @@ defmodule Prizmo.TcgEngine.EnergyEffects do
         effect ->
           {:error, {:invalid_energy_effect, energy_card.card_id, effect}}
       end
+    end
+  end
+
+  @spec recover_special_condition(String.t(), CardInstance.t(), CardInstance.t()) ::
+          {:ok, effect_event() | nil} | {:error, term()}
+  def recover_special_condition(
+        game_id,
+        %CardInstance{} = energy_card,
+        %CardInstance{} = target_card
+      )
+      when is_binary(game_id) do
+    with {:ok, energy_metadata} <- CardCatalog.fetch(energy_card.card_id) do
+      if special_condition_immunity_energy?(energy_metadata) do
+        recover_card_special_condition(game_id, energy_card, target_card)
+      else
+        {:ok, nil}
+      end
+    end
+  end
+
+  @spec status_condition_prevention_payload(String.t(), CardInstance.t(), atom() | nil) ::
+          {:prevented, map()} | :not_prevented
+  def status_condition_prevention_payload(game_id, %CardInstance{} = card, status)
+      when is_binary(game_id) do
+    with true <- special_condition?(status),
+         true <- in_play_pokemon?(card),
+         {:ok, %CardInstance{} = source_energy} <-
+           attached_special_condition_immunity_energy(game_id, card) do
+      {:prevented, prevention_payload(source_energy, card, status)}
+    else
+      _other -> :not_prevented
     end
   end
 
@@ -267,6 +304,102 @@ defmodule Prizmo.TcgEngine.EnergyEffects do
 
   defp team_rocket_pokemon?(%{supertype: :pokemon, name: "Team Rocket's " <> _name}), do: true
   defp team_rocket_pokemon?(_card), do: false
+
+  defp recover_card_special_condition(
+         game_id,
+         %CardInstance{} = source_energy,
+         %CardInstance{} = target_card
+       ) do
+    with {:ok, current_target_card} <- CardStore.get_card(game_id, target_card.id) do
+      if recoverable_special_condition?(game_id, current_target_card) do
+        with {:ok, _card} <- update(current_target_card, :set_status, %{status: nil}),
+             {:ok, _card} <-
+               update(current_target_card, :set_markers, %{
+                 markers: SpecialConditions.clear_condition_markers(current_target_card)
+               }) do
+          {:ok,
+           %{
+             type: :energy_special_conditions_recovered,
+             payload: recovery_payload(source_energy, current_target_card)
+           }}
+        end
+      else
+        {:ok, nil}
+      end
+    end
+  end
+
+  defp recoverable_special_condition?(game_id, %CardInstance{} = card) do
+    Enum.any?(SpecialConditions.conditions(card), &special_condition?/1) and
+      in_play_pokemon?(card) and
+      match?({:ok, %CardInstance{}}, attached_special_condition_immunity_energy(game_id, card))
+  end
+
+  defp attached_special_condition_immunity_energy(game_id, %CardInstance{} = card) do
+    if pokemon_has_type?(card, :water) do
+      with {:ok, attached_cards} <- CardStore.attached_cards(game_id, card.id) do
+        {:ok, Enum.find(attached_cards, &special_condition_immunity_energy?/1)}
+      end
+    else
+      {:ok, nil}
+    end
+  end
+
+  defp special_condition_immunity_energy?(%CardInstance{card_id: card_id}) do
+    case CardCatalog.fetch(card_id) do
+      {:ok, card} -> special_condition_immunity_energy?(card)
+      {:error, _reason} -> false
+    end
+  end
+
+  defp special_condition_immunity_energy?(%{
+         supertype: :energy,
+         effect: %{type: @bubbly_water_energy_effect, required_attached_pokemon_type: :water},
+         provides: provides
+       })
+       when is_list(provides) do
+    :water in provides
+  end
+
+  defp special_condition_immunity_energy?(_card), do: false
+
+  defp pokemon_has_type?(%CardInstance{card_id: card_id}, type) when is_atom(type) do
+    case CardCatalog.fetch(card_id) do
+      {:ok, %{supertype: :pokemon, types: types}} when is_list(types) -> type in types
+      {:ok, %{supertype: :pokemon, type: ^type}} -> true
+      _other -> false
+    end
+  end
+
+  defp recovery_payload(%CardInstance{} = source_energy, %CardInstance{} = card) do
+    recovered_statuses = Enum.map(SpecialConditions.conditions(card), &Atom.to_string/1)
+
+    %{
+      source: EventPayloads.card_source(source_energy),
+      effect_key: @bubbly_water_energy_effect,
+      card_instance_id: card.id,
+      card_id: card.card_id,
+      owner_player_id: card.owner_player_id,
+      recovered_status: List.first(recovered_statuses),
+      recovered_statuses: recovered_statuses,
+      energy_card_id: source_energy.card_id,
+      energy_card_instance_id: source_energy.id,
+      target_card_instance_id: card.id
+    }
+  end
+
+  defp prevention_payload(%CardInstance{} = source_energy, %CardInstance{} = card, status) do
+    %{
+      protected_card_instance_id: card.id,
+      prevented_status: Atom.to_string(status),
+      status_prevention_source_card_id: source_energy.card_id,
+      status_prevention_source_card_instance_id: source_energy.id,
+      status_prevention_source_effect_id: @bubbly_water_energy_effect,
+      status_prevention_source_player_id: source_energy.owner_player_id
+    }
+  end
+
+  defp special_condition?(status), do: status in @special_conditions
 
   defp reactive_damage_counter_energy_sources(attached_cards, defender_metadata) do
     Enum.flat_map(attached_cards, fn

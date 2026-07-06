@@ -2418,7 +2418,7 @@ defmodule Prizmo.TcgEngine.Mechanics do
   end
 
   defp maybe_set_pokemon_status(game_id, %CardInstance{} = target_card, status) do
-    case StadiumEffects.status_condition_prevention_payload(game_id, target_card, status) do
+    case status_condition_prevention_payload(game_id, target_card, status) do
       {:prevented, prevention_payload} ->
         {:ok, Map.put(prevention_payload, :status_applied?, false)}
 
@@ -2426,6 +2426,16 @@ defmodule Prizmo.TcgEngine.Mechanics do
         with {:ok, _target_card} <- update(target_card, :set_status, %{status: status}) do
           {:ok, %{status_applied?: true}}
         end
+    end
+  end
+
+  defp status_condition_prevention_payload(game_id, %CardInstance{} = target_card, status) do
+    case StadiumEffects.status_condition_prevention_payload(game_id, target_card, status) do
+      {:prevented, prevention_payload} ->
+        {:prevented, prevention_payload}
+
+      :not_prevented ->
+        EnergyEffects.status_condition_prevention_payload(game_id, target_card, status)
     end
   end
 

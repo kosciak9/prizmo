@@ -30,4 +30,13 @@ defmodule Prizmo.Tcg.Cards.Behaviors.CRI do
       }
     )
   end
+
+  card "CRI-084" do
+    card_effect(
+      effect: %{
+        type: :water_pokemon_special_condition_immunity_energy,
+        required_attached_pokemon_type: :water
+      }
+    )
+  end
 end

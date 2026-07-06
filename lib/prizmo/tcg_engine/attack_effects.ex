@@ -51,6 +51,7 @@ defmodule Prizmo.TcgEngine.AttackEffects do
   alias Prizmo.TcgEngine.CardCatalog
   alias Prizmo.TcgEngine.CardInstance
   alias Prizmo.TcgEngine.CardStore
+  alias Prizmo.TcgEngine.EnergyEffects
   alias Prizmo.TcgEngine.EventPayloads
   alias Prizmo.TcgEngine.Game
   alias Prizmo.TcgEngine.GameStore
@@ -1602,7 +1603,13 @@ defmodule Prizmo.TcgEngine.AttackEffects do
         {:prevented, prevention_payload}
 
       :not_prevented ->
-        StadiumEffects.status_condition_prevention_payload(game_id, target_card, status)
+        case StadiumEffects.status_condition_prevention_payload(game_id, target_card, status) do
+          {:prevented, prevention_payload} ->
+            {:prevented, prevention_payload}
+
+          :not_prevented ->
+            EnergyEffects.status_condition_prevention_payload(game_id, target_card, status)
+        end
     end
   end
 

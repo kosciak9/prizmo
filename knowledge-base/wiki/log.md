@@ -1,5 +1,12 @@
 # Wiki Log
 
+## [2026-07-06] codebase update | Goal 2 Bubbly Water Energy support
+
+- Task attempted: closed `CRI-084` Bubbly Water Energy as the default highest-share remaining two-archetype Goal 2 Special Energy blocker after the Spiky Energy / Jumbo Ice Cream pair. Added committed TCGdex metadata, authored it as a Water-providing Special Energy, and implemented Energy-side Special Condition recovery/prevention for attached Water Pokémon across direct status commands and attack effects.
+- Files changed: `lib/prizmo/tcg/cards/behaviors/cri.ex`, `lib/prizmo/tcg_engine/energy_effects.ex`, `lib/prizmo/tcg_engine/attack_effects.ex`, `lib/prizmo/tcg_engine/mechanics.ex`, `lib/prizmo/tcg/card_coverage.ex`, `priv/tcg/cards/tcgdex/cards/CRI-084.json`, `knowledge-base/wiki/engine/goal-2-top-30-latest-limitless-coverage-scope.md`, `knowledge-base/wiki/engine/ash-backed-tcg-engine-playtest-handoff.md`, `knowledge-base/wiki/log.md`.
+- Validation: `mix format`; `mix compile --warnings-as-errors`; Tidewave runtime validation confirmed `coverage_status: :supported`, Water provision, attach-time Asleep/Poisoned recovery, direct status prevention, and attack-effect status prevention; `mix test test/prizmo/tcg/cards/metadata_test.exs test/prizmo/tcg_engine/mechanics_test.exs`; `mix prizmo.goal2.corpus` confirmed `supported=166` / `generic-supported=8` / `partial=10` / `unimplemented=193` and `cached=187` / `missing=190`; final `mix check` passed.
+- Remaining/blocking notes: `CRI-084` is no longer in the shared incomplete queue. The default next Goal 2 priority is now `CRI-061` Metagross, followed by `SFA-063` Powerglass, `PRE-116` Max Rod, and `PRE-086` Regigigas unless the live corpus re-ranks the queue.
+
 ## [2026-07-06] codebase update | Goal 2 Spiky Energy / Jumbo Ice Cream support
 
 - Task attempted: closed the tied `JTG-159` Spiky Energy / `PFL-091` Jumbo Ice Cream Crustle/Sylveon pair as the highest-priority remaining two-archetype Goal 2 queue after Applin. Added committed TCGdex metadata for both cards, authored Spiky Energy as a Colorless-providing Special Energy with reactive 2-counter attacker backlash after opponent attack damage, and authored Jumbo Ice Cream as an engine-defined Item that heals up to 80 from the acting player's Active only when it has at least 3 Energy attached.

@@ -64,13 +64,13 @@ Those reports are the canonical starting point for autonomous Goal 2 implementat
 - Tracked top archetypes: `30`
 - Tracked cards with usage greater than `0.00`: `377`
 - Coverage buckets from `mix prizmo.goal2.corpus`:
-  - `supported=165`
+  - `supported=166`
   - `generic-supported=8`
   - `partial=10`
-  - `unimplemented=194`
+  - `unimplemented=193`
 - Metadata buckets:
-  - `cached=186`
-  - `missing=191`
+  - `cached=187`
+  - `missing=190`
 
 Important interpretation:
 
@@ -82,16 +82,16 @@ Important interpretation:
 
 The strongest current Goal 2 implementation candidates are the incomplete cards shared by the most archetypes and/or the most total metagame share.
 
-The latest Goal 2 engine batch closed the tied Crustle/Sylveon `JTG-159` Spiky Energy / `PFL-091` Jumbo Ice Cream pair. Spiky Energy now has committed TCGdex metadata, provides Colorless Energy, and executes its reactive 2-damage-counter backlash when the attached Active is damaged by an opponent's attack, even if the attached Pokémon is Knocked Out. Jumbo Ice Cream now has committed TCGdex metadata and an engine-defined Item effect that heals up to 80 damage from the acting player's Active Pokémon only when it has at least 3 Energy attached.
+The latest Goal 2 engine batch closed `CRI-084` Bubbly Water Energy after the Spiky Energy / Jumbo Ice Cream pair. Bubbly Water Energy now has committed TCGdex metadata, provides Water Energy, recovers all Special Conditions from the attached Water Pokémon when attached from hand, and prevents future Special Conditions from direct status commands or attack effects while it remains attached to a Water Pokémon.
 
 ### Highest-priority remaining `unimplemented` cards from current report
 
 | Card | Archetypes | Total share | Notes |
 | --- | --- | --- | --- |
-| `CRI-084` Bubbly Water Energy | `2` | `6.29%` | Default next two-archetype Special Energy blocker after the Spiky Energy / Jumbo Ice Cream pair. |
 | `CRI-061` Metagross | `2` | `6.05%` | Next shared two-archetype Pokémon blocker unless a broader primitive re-ranks above it. |
 | `SFA-063` Powerglass | `2` | `5.74%` | Shared Tool blocker behind the immediate Energy/Pokémon queue. |
 | `PRE-116` Max Rod | `2` | `5.59%` | Shared Item blocker tied to Beedrill/Hydrapple follow-up coverage. |
+| `PRE-086` Regigigas | `2` | `5.30%` | Shared Pokémon blocker behind the immediate Metagross / Tool / Item queue. |
 
 ### Shared `partial` cards worth finishing after the broad unimplemented slice
 
@@ -118,9 +118,9 @@ That means prior Goal 1 and six-deck coverage was not wasted; it now acts as see
 
 ## Recommended next implementation order
 
-1. Take `CRI-084` Bubbly Water Energy next as the default highest-share remaining two-archetype Special Energy blocker unless a broader primitive re-ranks above it.
-2. Keep `CRI-061` Metagross as the next shared Pokémon blocker after Bubbly Water Energy unless the live corpus re-ranks the queue.
-3. Keep `SFA-063` Powerglass and `PRE-116` Max Rod as the next shared two-archetype Tool/Item follow-ups behind the immediate Energy/Pokémon queue.
+1. Take `CRI-061` Metagross next as the default highest-share remaining two-archetype Pokémon blocker unless a broader primitive re-ranks above it.
+2. Keep `SFA-063` Powerglass and `PRE-116` Max Rod as the next shared two-archetype Tool/Item follow-ups behind Metagross.
+3. Keep `PRE-086` Regigigas as the next shared Pokémon follow-up behind that immediate queue.
 4. Keep the remaining Dragapult-only cached pair `TWM-099` / `TWM-100` as deliberate single-archetype cleanup, not the default autonomous queue.
 5. Finish the remaining shared partials only after the broad unimplemented slice unless another batch naturally extends the new HP infrastructure; if returning to HP work soon, `POR-086` Growing Grass Energy remains the strongest follow-up.
 6. Keep using `mix prizmo.goal2.corpus` after each batch to re-rank the next blockers by archetype count and weighted share.
