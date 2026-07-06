@@ -70,6 +70,7 @@ const DISCARD_OWN_BENCH_ENERGY_FOR_BONUS_DAMAGE_EFFECT = 'discard_energy_from_ow
 const DISCARD_DEFENDING_ENERGY_ON_COIN_HEADS_EFFECT = 'discard_defending_energy_on_coin_heads'
 const MOVE_OPPONENT_ATTACHED_ENERGY_BETWEEN_POKEMON_EFFECT = 'move_opponent_attached_energy_between_pokemon'
 const STRANGE_HACKING_EFFECT = 'confuse_defender_active_then_move_opponent_damage_counters'
+const DAMAGE_OPPONENT_BENCH_EFFECT = 'damage_opponent_bench'
 const SHUFFLE_ATTACHED_ENERGY_INTO_DECK_THEN_DAMAGE_OPPONENT_BENCH_EFFECT =
   'shuffle_attached_energy_into_deck_then_damage_opponent_bench'
 const COPY_OPPONENT_ACTIVE_TERA_POKEMON_ATTACK_EFFECT = 'copy_opponent_active_tera_pokemon_attack'
@@ -5442,6 +5443,7 @@ function AttackProgressPanel({
   )
   const pendingAttackRequiresBenchDamageTarget = Boolean(
     turn?.pendingAttackRequiresBenchDamageTarget ||
+      resolutionEffectType === DAMAGE_OPPONENT_BENCH_EFFECT ||
       resolutionEffectType === SHUFFLE_ATTACHED_ENERGY_INTO_DECK_THEN_DAMAGE_OPPONENT_BENCH_EFFECT
   )
   const pendingAttackRequiresBenchDamageCounters = Boolean(
@@ -5825,13 +5827,15 @@ function AttackProgressPanel({
     pendingAttackRequiresShuffledEnergy &&
     shuffledEnergySelectedCount > 0 &&
     shuffledEnergySelectedCount !== shuffledEnergyRequiredCount
-  const benchDamageTargetRequired =
+  const benchDamageTargetSelectionActive =
     pendingAttackRequiresBenchDamageTarget &&
-    shuffledEnergySelectedCount === shuffledEnergyRequiredCount &&
+    (!pendingAttackRequiresShuffledEnergy || shuffledEnergySelectedCount === shuffledEnergyRequiredCount)
+  const benchDamageTargetRequired =
+    benchDamageTargetSelectionActive &&
     benchDamageTargetOptions.length > 1
   const benchDamageTargetUnavailable =
-    pendingAttackRequiresBenchDamageTarget &&
-    shuffledEnergySelectedCount === shuffledEnergyRequiredCount &&
+    benchDamageTargetSelectionActive &&
+    pendingAttackRequiresShuffledEnergy &&
     benchDamageTargetOptions.length === 0
   const benchDamageCounterRequiredCount = 6
   const benchDamageCounterAllocationRequired =
@@ -6059,7 +6063,7 @@ function AttackProgressPanel({
     })
   }
 
-  if (pendingAttackRequiresBenchDamageTarget && shuffledEnergySelectedCount === shuffledEnergyRequiredCount) {
+  if (benchDamageTargetSelectionActive) {
     resolutionChecklistItems.push({
       label: 'Bench damage target',
       tone: benchDamageTargetUnavailable
@@ -6069,6 +6073,8 @@ function AttackProgressPanel({
           : 'ready',
       value: benchDamageTargetUnavailable
         ? 'No opponent Bench'
+        : benchDamageTargetOptions.length === 0
+          ? 'No opponent Bench; effect skipped'
         : benchDamageTargetOptions.length > 1
           ? selectedBenchDamageTargetIsValid
             ? cardsById.get(selectedBenchDamageTargetCardInstanceId)?.name ?? 'Bench target selected'

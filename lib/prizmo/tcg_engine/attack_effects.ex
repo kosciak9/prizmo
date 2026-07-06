@@ -99,6 +99,7 @@ defmodule Prizmo.TcgEngine.AttackEffects do
     :draw_after_attack,
     :active_damage_counters_per_hand_card,
     :damage_any_opponent_pokemon,
+    :damage_opponent_bench,
     :damage_per_own_basic_pokemon_in_play,
     :damage_per_own_benched_pokemon,
     :damage_per_own_team_rocket_pokemon_in_play,
@@ -374,6 +375,10 @@ defmodule Prizmo.TcgEngine.AttackEffects do
 
       %{type: :damage_per_opponent_prize_taken} ->
         {:ok, %{}}
+
+      %{type: :damage_opponent_bench, bench_damage: bench_damage}
+      when is_integer(bench_damage) and bench_damage >= 0 ->
+        damage_opponent_bench(game_id, player_id, opts, bench_damage)
 
       %{type: :discard_hand_then_draw, count: count} when is_integer(count) and count >= 0 ->
         discard_hand_then_draw(game_id, player_id, count)
@@ -1731,6 +1736,62 @@ defmodule Prizmo.TcgEngine.AttackEffects do
          effect_type: "shuffle_attached_energy_into_deck_then_damage_opponent_bench",
          shuffled_energy_card_instance_ids: Enum.map(shuffled_energy_cards, & &1.id),
          shuffled_energy_count: length(shuffled_energy_cards),
+         bench_damage_target_card_instance_id: bench_target.id,
+         bench_damage: damage_result.damage,
+         bench_prevented_damage: Map.get(damage_result, :prevented_damage, 0),
+         bench_resulting_damage: damage_result.resulting_damage,
+         bench_knocked_out?: damage_result.knocked_out?,
+         bench_knockout_prize_count: Map.get(damage_result, :knockout_prize_count),
+         bench_damage_applied?: damage_result.damage > 0,
+         bench_damage_prevented?: Map.get(damage_result, :damage_prevented?, false),
+         bench_damage_prevention: Map.get(damage_result, :damage_prevention)
+       }}
+    end
+  end
+
+  defp damage_opponent_bench(game_id, player_id, opts, bench_damage) do
+    with {:ok, opponent_player_id} <- opponent_player_id(game_id, player_id),
+         {:ok, opponent_bench_cards} <- cards_in_zone(game_id, opponent_player_id, :bench) do
+      case opponent_bench_cards do
+        [] ->
+          no_opponent_bench_damage_payload(opts, bench_damage)
+
+        [_first | _rest] ->
+          damage_selected_opponent_bench(game_id, player_id, opts, bench_damage)
+      end
+    end
+  end
+
+  defp no_opponent_bench_damage_payload(opts, bench_damage) do
+    case bench_damage_target_card_instance_id(opts) do
+      nil ->
+        {:ok,
+         %{
+           effect_type: "damage_opponent_bench",
+           requested_bench_damage: bench_damage,
+           bench_damage: 0,
+           bench_damage_applied?: false
+         }}
+
+      _stale_target ->
+        {:error, :invalid_bench_damage_target}
+    end
+  end
+
+  defp damage_selected_opponent_bench(game_id, player_id, opts, bench_damage) do
+    with {:ok, bench_target} <- bench_damage_target_card(game_id, player_id, opts),
+         {:ok, damage_result} <-
+           apply_bench_attack_damage(
+             game_id,
+             player_id,
+             bench_target,
+             bench_damage,
+             :damage
+           ) do
+      {:ok,
+       %{
+         effect_type: "damage_opponent_bench",
+         requested_bench_damage: bench_damage,
          bench_damage_target_card_instance_id: bench_target.id,
          bench_damage: damage_result.damage,
          bench_prevented_damage: Map.get(damage_result, :prevented_damage, 0),

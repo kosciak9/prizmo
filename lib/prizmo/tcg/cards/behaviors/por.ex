@@ -3,6 +3,20 @@ defmodule Prizmo.Tcg.Cards.Behaviors.POR do
 
   use Prizmo.Tcg.Cards.DSL
 
+  card "POR-020" do
+    attack(:water_gun, effect: nil)
+  end
+
+  card "POR-021" do
+    attack(:jetting_blow,
+      effect: %{type: :damage_opponent_bench, bench_damage: 50}
+    )
+
+    attack(:nebula_beam,
+      effect: %{type: :damage_unaffected_by_weakness_resistance_and_effects_on_opponent_active}
+    )
+  end
+
   card "POR-086" do
     card_effect(effect: %{type: :grass_pokemon_hp_plus_20_energy})
   end

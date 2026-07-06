@@ -2520,6 +2520,134 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
     end
   end
 
+  describe "POR-020 Staryu and POR-021 Mega Starmie ex support" do
+    test "Staryu Water Gun and Mega Starmie ex attacks are executable" do
+      assert CardCoverage.summarize("POR-020").coverage_status == :supported
+      assert CardCoverage.summarize("POR-021").coverage_status == :supported
+
+      assert {:ok, water_gun} = CardCatalog.fetch_attack("POR-020", :water_gun)
+      assert water_gun.damage == 20
+      assert water_gun.cost == [:water]
+
+      assert {:ok, jetting_blow} = CardCatalog.fetch_attack("POR-021", :jetting_blow)
+      assert jetting_blow.damage == 120
+      assert jetting_blow.cost == [:water]
+
+      assert jetting_blow.effect == %{
+               type: :damage_opponent_bench,
+               bench_damage: 50
+             }
+
+      assert {:ok, nebula_beam} = CardCatalog.fetch_attack("POR-021", :nebula_beam)
+      assert nebula_beam.damage == 210
+      assert nebula_beam.cost == [:colorless, :colorless, :colorless]
+
+      assert nebula_beam.effect == %{
+               type: :damage_unaffected_by_weakness_resistance_and_effects_on_opponent_active
+             }
+    end
+
+    test "Jetting Blow damages one opponent Benched Pokémon and respects Tera Bench protection" do
+      {:ok, game} = create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147)
+      {:ok, attacker} = create_custom_owned_card(game.id, "player_1", "POR-021", 230)
+      defender = active_card(game.id, "player_2")
+
+      assert {:ok, jetting_blow} = CardCatalog.fetch_attack(attacker.card_id, :jetting_blow)
+      assert {:ok, 120} = AttackDamage.damage_for(attacker, defender, jetting_blow)
+
+      assert {:ok,
+              %{
+                effect_type: "damage_opponent_bench",
+                requested_bench_damage: 50,
+                bench_damage: 0,
+                bench_damage_applied?: false
+              }} =
+               AttackEffects.resolve_after_damage(
+                 game.id,
+                 "player_1",
+                 attacker,
+                 defender,
+                 jetting_blow,
+                 %{}
+               )
+
+      current_turn_number = current_turn(game.id).turn_number
+
+      {:ok, first_bench_target} = create_custom_owned_card(game.id, "player_2", "PRE-035", 231)
+      {:ok, first_bench_target} = ash_update(first_bench_target, :draw_to_hand, %{position: 20})
+
+      {:ok, first_bench_target} =
+        ash_update(first_bench_target, :play_to_bench, %{
+          position: 1,
+          turn_entered_play: current_turn_number
+        })
+
+      {:ok, tera_bench_target} = create_custom_owned_card(game.id, "player_2", "TWM-112", 232)
+      {:ok, tera_bench_target} = ash_update(tera_bench_target, :draw_to_hand, %{position: 21})
+
+      {:ok, tera_bench_target} =
+        ash_update(tera_bench_target, :play_to_bench, %{
+          position: 2,
+          turn_entered_play: current_turn_number
+        })
+
+      assert {:error, :bench_damage_requires_target} =
+               AttackEffects.resolve_after_damage(
+                 game.id,
+                 "player_1",
+                 attacker,
+                 defender,
+                 jetting_blow,
+                 %{}
+               )
+
+      assert {:ok,
+              %{
+                effect_type: "damage_opponent_bench",
+                bench_damage_target_card_instance_id: first_target_id,
+                bench_damage: 50,
+                bench_resulting_damage: 50,
+                bench_knocked_out?: false,
+                bench_damage_applied?: true,
+                bench_damage_prevented?: false
+              }} =
+               AttackEffects.resolve_after_damage(
+                 game.id,
+                 "player_1",
+                 attacker,
+                 defender,
+                 jetting_blow,
+                 %{bench_damage_target_card_instance_id: first_bench_target.id}
+               )
+
+      assert first_target_id == first_bench_target.id
+      assert card(first_bench_target.id).damage == 50
+
+      assert {:ok,
+              %{
+                effect_type: "damage_opponent_bench",
+                bench_damage_target_card_instance_id: tera_target_id,
+                bench_damage: 0,
+                bench_prevented_damage: 50,
+                bench_resulting_damage: 0,
+                bench_damage_applied?: false,
+                bench_damage_prevented?: true,
+                bench_damage_prevention: "tera_bench_protection"
+              }} =
+               AttackEffects.resolve_after_damage(
+                 game.id,
+                 "player_1",
+                 attacker,
+                 defender,
+                 jetting_blow,
+                 %{bench_damage_target_card_instance_id: tera_bench_target.id}
+               )
+
+      assert tera_target_id == tera_bench_target.id
+      assert card(tera_bench_target.id).damage == 0
+    end
+  end
+
   describe "SFA-039 Pecharunt ex support" do
     test "Irritated Outburst scales with the number of Prize cards the opponent has taken" do
       {:ok, game} = create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147)

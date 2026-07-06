@@ -1,5 +1,12 @@
 # Wiki Log
 
+## [2026-07-06] codebase update | Goal 2 Staryu/Mega Starmie ex support
+
+- Task attempted: closed the `POR-020` Staryu / `POR-021` Mega Starmie ex pair as the recommended Greninja/Starmie three-archetype Goal 2 Pokémon cleanup after Lucian. Added committed TCGdex metadata, made Staryu's `Water Gun` executable through plain damage, authored Mega Starmie ex `Jetting Blow` with a reusable `damage_opponent_bench` attack-effect primitive, authored `Nebula Beam` through the existing weakness/resistance/effects bypass primitive, and updated the GameView/temporary React resolver so non-Energy-shuffle Bench-damage attacks expose target selection correctly.
+- Files changed: `lib/prizmo/tcg/cards/behaviors/por.ex`, `lib/prizmo/tcg_engine/attack_damage.ex`, `lib/prizmo/tcg_engine/attack_effects.ex`, `lib/prizmo/tcg_engine/game_view.ex`, `lib/prizmo_web/spa/features/home/routes/index.tsx`, `test/prizmo/tcg_engine/mechanics_test.exs`, `priv/tcg/cards/tcgdex/cards/POR-020.json`, `priv/tcg/cards/tcgdex/cards/POR-021.json`, `knowledge-base/wiki/engine/goal-2-top-30-latest-limitless-coverage-scope.md`, `knowledge-base/wiki/engine/ash-backed-tcg-engine-playtest-handoff.md`, `knowledge-base/wiki/log.md`.
+- Validation: `mix test test/prizmo/tcg_engine/mechanics_test.exs -n "Mega Starmie"`; `mix test test/prizmo/tcg/cards/metadata_test.exs`; `node_modules/.bin/tsc --noEmit`; `mix test test/prizmo/tcg_engine/mechanics_test.exs`; `mix compile --warnings-as-errors`; `mix prizmo.goal2.corpus` confirmed `supported=151` / `generic-supported=8` / `partial=10` / `unimplemented=208` and `cached=172` / `missing=205`; final `mix check` passed.
+- Remaining/blocking notes: `POR-020` and `POR-021` are no longer in the shared incomplete queue. The default next Goal 2 priority is now `MEG-094` Mega Mawile ex, followed by high-share two-archetype blockers such as `POR-077` Lumiose City and `POR-052` Drapion.
+
 ## [2026-07-06] codebase update | Goal 2 Lucian support
 
 - Task attempted: closed `TWM-157` Lucian as the next lower-share three-archetype Goal 2 Trainer/Supporter blocker after Larry's Skill. Added committed TCGdex metadata and authored Lucian as an engine-defined Supporter that bottoms each player's current hand, flips one deterministic trainer-effect coin per player when any cards were bottomed, and draws `6` on heads or `3` on tails while hiding/rejecting the card when no cards would be bottomed.

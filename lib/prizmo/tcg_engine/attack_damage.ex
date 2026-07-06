@@ -402,6 +402,9 @@ defmodule Prizmo.TcgEngine.AttackDamage do
          type: :return_attached_energy_to_hand
        }), do: {:ok, damage}
 
+  defp apply_effect(damage, _attacker_card, _defender_card, %{type: :damage_opponent_bench}),
+    do: {:ok, damage}
+
   defp apply_effect(damage, _attacker_card, _defender_card, %{
          type: :opponent_bench_damage_counters
        }), do: {:ok, damage}
