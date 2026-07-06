@@ -64,13 +64,13 @@ Those reports are the canonical starting point for autonomous Goal 2 implementat
 - Tracked top archetypes: `30`
 - Tracked cards with usage greater than `0.00`: `377`
 - Coverage buckets from `mix prizmo.goal2.corpus`:
-  - `supported=167`
+  - `supported=168`
   - `generic-supported=8`
   - `partial=10`
-  - `unimplemented=192`
+  - `unimplemented=191`
 - Metadata buckets:
-  - `cached=188`
-  - `missing=189`
+  - `cached=189`
+  - `missing=188`
 
 Important interpretation:
 
@@ -82,16 +82,15 @@ Important interpretation:
 
 The strongest current Goal 2 implementation candidates are the incomplete cards shared by the most archetypes and/or the most total metagame share.
 
-The latest Goal 2 engine batch closed `CRI-061` Metagross after Bubbly Water Energy. Metagross now has committed TCGdex metadata, executable `Bounce Back` that damages then switches the opponent's Active Pokémon to the Bench with opponent-selected replacement, and executable `Metallic Hammer` that can optionally discard three attached Energy that provide Metal from Metagross for +150 damage.
+The latest Goal 2 engine batch closed `SFA-063` Powerglass after Metagross. Powerglass now has committed TCGdex metadata and executable end-of-turn Tool behavior: when attached to the active player's Active Pokémon, pass-turn and after-attack turn-ending flow pause for an optional prompt over Basic Energy cards in that player's discard pile, attach the selected Basic Energy to the attached Active Pokémon, allow declining without repeated prompts that turn, and respect Jamming Tower Tool suppression.
 
 ### Highest-priority remaining `unimplemented` cards from current report
 
 | Card | Archetypes | Total share | Notes |
 | --- | --- | --- | --- |
-| `SFA-063` Powerglass | `2` | `5.74%` | New default shared Tool blocker after Metagross. |
 | `PRE-116` Max Rod | `2` | `5.59%` | Shared Item blocker tied to Beedrill/Hydrapple follow-up coverage. |
 | `PRE-086` Regigigas | `2` | `5.30%` | Shared Pokémon blocker in the Hydrapple/Metagross overlap. |
-| Hydrapple/Ogerpon Grass line cluster (`ASC-008`, `MEG-008`, `MEG-009`, `MEG-010`, `SFA-006`, `TEF-126`) | `2` | `5.15%` | Shared cluster behind Powerglass / Max Rod / Regigigas; split into coherent card batches after confirming metadata/text. |
+| Hydrapple/Ogerpon Grass line cluster (`ASC-008`, `MEG-008`, `MEG-009`, `MEG-010`, `SFA-006`, `TEF-126`) | `2` | `5.15%` | Shared cluster behind Max Rod / Regigigas; split into coherent card batches after confirming metadata/text. |
 
 ### Shared `partial` cards worth finishing after the broad unimplemented slice
 
@@ -118,9 +117,9 @@ That means prior Goal 1 and six-deck coverage was not wasted; it now acts as see
 
 ## Recommended next implementation order
 
-1. Take `SFA-063` Powerglass next as the default highest-share remaining shared Tool blocker unless a broader primitive re-ranks above it.
-2. Keep `PRE-116` Max Rod and `PRE-086` Regigigas as the next shared Item/Pokémon follow-ups behind Powerglass.
-3. Treat the Hydrapple/Ogerpon Grass line cluster as the next 5.15% shared queue after Powerglass / Max Rod / Regigigas, splitting it into coherent card batches instead of trying to close all tied cards at once by default.
+1. Take `PRE-116` Max Rod next as the default highest-share remaining shared Item blocker unless a broader primitive re-ranks above it.
+2. Keep `PRE-086` Regigigas as the next shared Pokémon follow-up behind Max Rod.
+3. Treat the Hydrapple/Ogerpon Grass line cluster as the next 5.15% shared queue after Max Rod / Regigigas, splitting it into coherent card batches instead of trying to close all tied cards at once by default.
 4. Keep the remaining Dragapult-only cached pair `TWM-099` / `TWM-100` as deliberate single-archetype cleanup, not the default autonomous queue.
 5. Finish the remaining shared partials only after the broad unimplemented slice unless another batch naturally extends the new HP infrastructure; if returning to HP work soon, `POR-086` Growing Grass Energy remains the strongest follow-up.
 6. Keep using `mix prizmo.goal2.corpus` after each batch to re-rank the next blockers by archetype count and weighted share.

@@ -22,6 +22,12 @@ defmodule Prizmo.Tcg.Cards.Behaviors.SFA do
     attack(:magnetic_blast, effect: nil)
   end
 
+  card "SFA-063" do
+    card_effect(
+      effect: %{type: :attach_basic_energy_from_discard_to_attached_active_at_end_of_turn}
+    )
+  end
+
   card "SFA-064" do
     card_effect(effect: %{type: :opponent_discards_to_hand_size, target_hand_size: 3})
   end

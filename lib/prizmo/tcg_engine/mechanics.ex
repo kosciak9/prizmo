@@ -776,6 +776,35 @@ defmodule Prizmo.TcgEngine.Mechanics do
   defp resolve_prompt_choice(
          %Game{} = game,
          %Prompt{} = prompt,
+         %PendingEffect{source_type: :tool_effect} = pending_effect,
+         player_id,
+         choice_key,
+         normalized_choice
+       ) do
+    with {:ok, prompt} <- resolve_prompt(prompt, normalized_choice),
+         {:ok, _event} <-
+           write_prompt_resolved_event(game.id, prompt, pending_effect, player_id, choice_key),
+         {:ok, pending_effect} <-
+           update(pending_effect, :resume, %{
+             current_player_id: nil,
+             state: Map.put(pending_effect.state || %{}, "last_choice", normalized_choice)
+           }),
+         {:ok, game} <-
+           ToolEffects.resume_pending_effect(
+             game,
+             prompt,
+             pending_effect,
+             player_id,
+             choice_key,
+             normalized_choice
+           ) do
+      stabilize_flow(game)
+    end
+  end
+
+  defp resolve_prompt_choice(
+         %Game{} = game,
+         %Prompt{} = prompt,
          %PendingEffect{} = pending_effect,
          player_id,
          choice_key,

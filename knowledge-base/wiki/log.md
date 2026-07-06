@@ -1,5 +1,12 @@
 # Wiki Log
 
+## [2026-07-07] codebase update | Goal 2 Powerglass support
+
+- Task attempted: closed `SFA-063` Powerglass as the default highest-share remaining shared Goal 2 Tool blocker after Metagross. Added committed TCGdex metadata, authored optional end-of-turn Tool prompts for pass-turn and after-attack flow, attached a chosen Basic Energy from discard to the attached Active Pokémon, allowed declining without repeated same-turn prompts, and respected Jamming Tower Tool suppression.
+- Files changed: `lib/prizmo/tcg/cards/behaviors/sfa.ex`, `lib/prizmo/tcg_engine/tool_effects.ex`, `lib/prizmo/tcg_engine/flow/machine.ex`, `lib/prizmo/tcg_engine/flow/actions.ex`, `lib/prizmo/tcg_engine/mechanics.ex`, `test/prizmo/tcg_engine/mechanics_test.exs`, `priv/tcg/cards/tcgdex/cards/SFA-063.json`, `knowledge-base/wiki/engine/goal-2-top-30-latest-limitless-coverage-scope.md`, `knowledge-base/wiki/engine/ash-backed-tcg-engine-playtest-handoff.md`, `knowledge-base/wiki/log.md`.
+- Validation: `mix format`; `mix test test/prizmo/tcg_engine/mechanics_test.exs:2390`; `mix compile --warnings-as-errors`; `mix test test/prizmo/tcg/cards/metadata_test.exs test/prizmo/tcg_engine/mechanics_test.exs`; Tidewave runtime validation confirmed `SFA-063` reports `coverage_status: :supported`; `mix prizmo.goal2.corpus` confirmed `supported=168` / `generic-supported=8` / `partial=10` / `unimplemented=191` and `cached=189` / `missing=188`; final `mix check` passed.
+- Remaining/blocking notes: `SFA-063` is no longer in the shared incomplete queue. The default next Goal 2 priority is now `PRE-116` Max Rod, followed by `PRE-086` Regigigas and the Hydrapple/Ogerpon Grass-line cluster unless the live corpus re-ranks the queue.
+
 ## [2026-07-07] codebase update | Goal 2 Metagross support
 
 - Task attempted: closed `CRI-061` Metagross as the default highest-share remaining two-archetype Goal 2 Pokémon blocker after Bubbly Water Energy. Added committed TCGdex metadata, authored `Bounce Back` as 60 damage plus opponent-selected Active replacement, and authored `Metallic Hammer` as optional attached Metal-providing Energy discard for +150 damage.

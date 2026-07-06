@@ -2387,6 +2387,95 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
     end
   end
 
+  describe "Goal 2 Powerglass support slice" do
+    test "SFA-063 prompts at turn end and attaches the chosen Basic Energy from discard" do
+      {:ok, game} = create_flow_action_window_game_with_decks(Alakazam27147, Dragapult27431)
+      active = active_card(game.id, "player_1")
+      {game, powerglass} = attach_powerglass_from_hand(game, "player_1", active)
+      energy = discard_custom_basic_energy(game.id, "player_1")
+
+      assert CardCoverage.summarize("SFA-063").coverage_status == :supported
+
+      assert {:ok, game} = Mechanics.pass_turn(game, "player_1")
+
+      assert game.flow_state == :turn_ending_turn
+      assert current_turn(game.id).status == :action_window
+
+      [prompt] = awaiting_prompts(game.id)
+      assert prompt.player_id == "player_1"
+      assert prompt.prompt_type == "select_cards"
+
+      assert prompt.payload["choice_key"] ==
+               "attach_basic_energy_from_discard_to_attached_active_at_end_of_turn"
+
+      assert prompt.payload["legal_choices"] == [energy.id]
+      assert prompt.payload["source_card_instance_id"] == powerglass.id
+      assert prompt.payload["target_card_instance_id"] == active.id
+
+      assert {:ok, game} = Mechanics.choose_prompt(game, "player_1", prompt.id, [energy.id])
+
+      assert game.flow_state == :turn_action_window
+      assert current_turn(game.id).active_player_id == "player_2"
+      assert current_turn(game.id).status == :action_window
+      assert awaiting_prompts(game.id) == []
+
+      assert zone(energy.id) == :attached
+      assert card(energy.id).attached_to_card_instance_id == active.id
+
+      cards_moved_event = game.id |> game_events_by_type("cards_moved") |> List.last()
+      assert cards_moved_event.payload["reason"] == "tool_effect_resolution"
+
+      assert cards_moved_event.payload["effect_key"] ==
+               "attach_basic_energy_from_discard_to_attached_active_at_end_of_turn"
+    end
+
+    test "SFA-063 prompts after attack before finishing the turn" do
+      {:ok, game} = create_punk_helmet_attack_game()
+      attacker = active_card(game.id, "player_1")
+      defender = active_card(game.id, "player_2")
+
+      attach_direct_basic_energy(game.id, "player_1", attacker, 1)
+      attach_direct_basic_energy(game.id, "player_1", attacker, 2)
+      {game, _powerglass} = attach_powerglass_from_hand(game, "player_1", attacker)
+      energy = discard_custom_basic_energy(game.id, "player_1")
+
+      assert {:ok, game} = Mechanics.declare_attack(game, "player_1", :ram)
+
+      assert game.flow_state == :turn_attack_resolving
+      assert current_turn(game.id).status == :attack_resolving
+      assert card(defender.id).damage == 20
+
+      [prompt] = awaiting_prompts(game.id)
+      assert prompt.payload["legal_choices"] == [energy.id]
+      assert prompt.payload["target_card_instance_id"] == attacker.id
+
+      assert {:ok, game} = Mechanics.choose_prompt(game, "player_1", prompt.id, [energy.id])
+
+      assert game.flow_state == :turn_action_window
+      assert current_turn(game.id).active_player_id == "player_2"
+      assert zone(energy.id) == :attached
+      assert card(energy.id).attached_to_card_instance_id == attacker.id
+    end
+
+    test "Jamming Tower suppresses SFA-063 end-of-turn prompts" do
+      {:ok, game} = create_flow_action_window_game_with_decks(Alakazam27147, Dragapult27431)
+      active = active_card(game.id, "player_1")
+      {game, _powerglass} = attach_powerglass_from_hand(game, "player_1", active)
+      energy = discard_custom_basic_energy(game.id, "player_1")
+
+      {:ok, jamming_tower} = create_custom_owned_card(game.id, "player_1", "TWM-153", 230)
+      {:ok, jamming_tower} = ash_update(jamming_tower, :draw_to_hand, %{position: 30})
+      assert {:ok, game} = Mechanics.play_stadium(game, "player_1", jamming_tower.id)
+
+      assert {:ok, game} = Mechanics.pass_turn(game, "player_1")
+
+      assert game.flow_state == :turn_action_window
+      assert current_turn(game.id).active_player_id == "player_2"
+      assert awaiting_prompts(game.id) == []
+      assert zone(energy.id) == :discard
+    end
+  end
+
   describe "SCR-118 Fan Call Ability" do
     alias Prizmo.Tcg.Goal1.Decks.Alakazam28438
 
@@ -3712,6 +3801,24 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
       })
 
     punk_helmet
+  end
+
+  defp attach_powerglass_from_hand(game, player_id, target_card) do
+    {:ok, powerglass} = create_custom_owned_card(game.id, player_id, "SFA-063", 235)
+    {:ok, powerglass} = ash_update(powerglass, :draw_to_hand, %{position: 35})
+    {:ok, game} = Mechanics.attach_tool(game, player_id, powerglass.id, target_card.id)
+    {game, card(powerglass.id)}
+  end
+
+  defp discard_custom_basic_energy(game_id, player_id) do
+    {:ok, energy} = create_custom_owned_card(game_id, player_id, "MEE-005", 245)
+
+    {:ok, energy} =
+      ash_update(energy, :discard, %{
+        position: card_count_in_zone(game_id, player_id, :discard) + 1
+      })
+
+    energy
   end
 
   defp play_direct_basic_to_bench(game_id, player_id, card_id, position) do

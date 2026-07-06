@@ -1,0 +1,58 @@
+{
+  "prizmo_id": "SFA-063",
+  "source": {
+    "base_url": "https://api.tcgdex.net/v2/en",
+    "dynamic_fields_removed": [
+      "pricing"
+    ],
+    "language": "en",
+    "provider": "TCGdex"
+  },
+  "tcgdex": {
+    "category": "Trainer",
+    "effect": "At the end of your turn (after your attack), if the Pokémon this card is attached to is in the Active Spot, you may attach a Basic Energy card from your discard pile to it.",
+    "id": "sv06.5-063",
+    "illustrator": "Studio Bora Inc.",
+    "image": "https://assets.tcgdex.net/en/sv/sv06.5/063",
+    "legal": {
+      "expanded": true,
+      "standard": true
+    },
+    "localId": "063",
+    "name": "Powerglass",
+    "rarity": "Uncommon",
+    "regulationMark": "H",
+    "set": {
+      "cardCount": {
+        "official": 64,
+        "total": 99
+      },
+      "id": "sv06.5",
+      "logo": "https://assets.tcgdex.net/en/sv/sv06.5/logo",
+      "name": "Shrouded Fable",
+      "symbol": "https://assets.tcgdex.net/univ/sv/sv06.5/symbol"
+    },
+    "trainerType": "Tool",
+    "updated": "2026-06-14T19:13:10+01:00",
+    "variants": {
+      "firstEdition": false,
+      "holo": false,
+      "normal": true,
+      "reverse": true,
+      "wPromo": false
+    },
+    "variants_detailed": [
+      {
+        "size": "standard",
+        "type": "normal",
+        "variantId": "endfynwn4n10gzq"
+      },
+      {
+        "size": "standard",
+        "type": "reverse",
+        "variantId": "cm4kqul3x1bwlz1f"
+      }
+    ]
+  },
+  "tcgdex_id": "sv06.5-063"
+}

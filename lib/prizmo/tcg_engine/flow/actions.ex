@@ -34,6 +34,7 @@ defmodule Prizmo.TcgEngine.Flow.Actions do
 
   alias Prizmo.TcgEngine.AttackEffects
   alias Prizmo.TcgEngine.CardCatalog
+  alias Prizmo.TcgEngine.CardPlay
   alias Prizmo.TcgEngine.EventPayloads
   alias Prizmo.TcgEngine.Flow.Context
   alias Prizmo.TcgEngine.Game
@@ -43,6 +44,7 @@ defmodule Prizmo.TcgEngine.Flow.Actions do
   alias Prizmo.TcgEngine.Rng
   alias Prizmo.TcgEngine.Setup
   alias Prizmo.TcgEngine.SetupStore
+  alias Prizmo.TcgEngine.ToolEffects
   alias Prizmo.TcgEngine.Turn
 
   @coin_faces [:heads, :tails]
@@ -84,8 +86,35 @@ defmodule Prizmo.TcgEngine.Flow.Actions do
 
   def can_end_turn?(%Context{game: %Game{} = game}, _attrs) do
     case current_turn(game.id) do
-      {:ok, %Turn{status: :action_window}} -> true
-      _other -> false
+      {:ok, %Turn{status: :action_window}} ->
+        CardPlay.require_no_awaiting_pending_effect(game.id) == :ok
+
+      _other ->
+        false
+    end
+  end
+
+  def can_create_end_turn_tool_effect_prompt?(%Context{game: %Game{} = game}, _attrs) do
+    case current_turn(game.id) do
+      {:ok, %Turn{status: :action_window, active_player_id: active_player_id} = turn} ->
+        CardPlay.require_no_awaiting_pending_effect(game.id) == :ok and
+          ToolEffects.end_turn_prompt_available?(game.id, active_player_id, turn)
+
+      _other ->
+        false
+    end
+  end
+
+  def can_create_attack_end_turn_tool_effect_prompt?(%Context{game: %Game{} = game}, _attrs) do
+    case current_turn(game.id) do
+      {:ok, %Turn{status: :attack_resolving, active_player_id: active_player_id} = turn} ->
+        CardPlay.require_no_awaiting_pending_effect(game.id) == :ok and
+          require_all_players_have_active(game.id) == :ok and
+          game.active_player_id == active_player_id and
+          ToolEffects.end_turn_prompt_available?(game.id, active_player_id, turn)
+
+      _other ->
+        false
     end
   end
 
@@ -120,7 +149,7 @@ defmodule Prizmo.TcgEngine.Flow.Actions do
   def can_finish_attack?(%Context{game: %Game{} = game}, _attrs) do
     case current_turn(game.id) do
       {:ok, %Turn{status: :attack_resolving, active_player_id: active_player_id}} ->
-        Prizmo.TcgEngine.CardPlay.require_no_awaiting_pending_effect(game.id) == :ok and
+        CardPlay.require_no_awaiting_pending_effect(game.id) == :ok and
           require_all_players_have_active(game.id) == :ok and
           game.active_player_id == active_player_id
 
@@ -442,6 +471,12 @@ defmodule Prizmo.TcgEngine.Flow.Actions do
          {:ok, _snapshot} <- write_snapshot(game.id, event.id, event.index),
          {:ok, game} <- Mechanics.process_pokemon_checkup(game) do
       update(game, :set_flow_state, %{flow_state: :turn_starting_turn})
+    end
+  end
+
+  def create_end_turn_tool_effect_prompt(%Context{game: %Game{} = game}, _attrs) do
+    with {:ok, turn} <- current_turn(game.id) do
+      ToolEffects.create_end_turn_prompt(game, turn)
     end
   end
 

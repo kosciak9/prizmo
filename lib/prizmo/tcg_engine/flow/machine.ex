@@ -101,6 +101,11 @@ defmodule Prizmo.TcgEngine.Flow.Machine do
     ],
     turn_ending_turn: [
       %{
+        guard: :can_create_end_turn_tool_effect_prompt?,
+        action: :create_end_turn_tool_effect_prompt,
+        target: :turn_ending_turn
+      },
+      %{
         guard: :can_end_turn?,
         action: :end_turn,
         target: :turn_starting_turn
@@ -114,6 +119,11 @@ defmodule Prizmo.TcgEngine.Flow.Machine do
       }
     ],
     turn_attack_resolving: [
+      %{
+        guard: :can_create_attack_end_turn_tool_effect_prompt?,
+        action: :create_end_turn_tool_effect_prompt,
+        target: :turn_attack_resolving
+      },
       %{
         guard: :can_finish_attack?,
         action: :finish_attack,
