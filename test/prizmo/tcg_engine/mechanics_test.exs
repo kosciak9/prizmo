@@ -675,6 +675,112 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
       assert game_events_by_type(game.id, "deck_shuffled") != []
     end
 
+    test "Lucian bottoms both players' hands then each player flips to draw 6 or 3" do
+      {:ok, game} =
+        create_flow_action_window_game_with_decks(Alakazam27147, DragapultPlain28256,
+          rng_seed: "lucian-seed"
+        )
+
+      assert {:ok, game} = Mechanics.pass_turn(game, "player_1")
+
+      {:ok, lucian} = create_custom_owned_card(game.id, "player_2", "TWM-157", 240)
+      {:ok, lucian} = ash_update(lucian, :draw_to_hand, %{position: 20})
+
+      player_1_hand_before = cards_in_zone(game.id, "player_1", :hand)
+
+      player_2_hand_before =
+        game.id
+        |> cards_in_zone("player_2", :hand)
+        |> Enum.reject(&(&1.id == lucian.id))
+
+      assert player_1_hand_before != []
+      assert player_2_hand_before != []
+      assert CardCoverage.summarize("TWM-157").coverage_status == :supported
+
+      assert {:ok, view} = GameView.for_player(game.id, "player_2")
+      play_card = Enum.find(view.action_affordances, &(&1.key == "play_card"))
+      assert is_map(play_card)
+      assert lucian.id in play_card.source_card_instance_ids
+
+      assert {:ok, game} = Mechanics.play_card(game, "player_2", lucian.id, %{})
+
+      assert zone(lucian.id) == :discard
+      assert Enum.all?(player_1_hand_before, &(zone(&1.id) == :deck))
+      assert Enum.all?(player_2_hand_before, &(zone(&1.id) == :deck))
+
+      lucian_card_events =
+        game.id
+        |> game_events_by_type("cards_moved")
+        |> Enum.filter(
+          &(&1.payload["effect_key"] ==
+              "each_player_hand_to_bottom_then_coin_draw_if_any")
+        )
+
+      bottom_events =
+        Enum.filter(
+          lucian_card_events,
+          &(&1.payload["destination"] in ["deck_bottom", :deck_bottom])
+        )
+
+      assert length(bottom_events) == 2
+      bottom_event_by_player = Map.new(bottom_events, &{&1.payload["affected_player_id"], &1})
+
+      assert length(bottom_event_by_player["player_1"].payload["cards"]) ==
+               length(player_1_hand_before)
+
+      assert length(bottom_event_by_player["player_2"].payload["cards"]) ==
+               length(player_2_hand_before)
+
+      coin_events =
+        game.id
+        |> game_events_by_type("coin_flipped")
+        |> Enum.filter(
+          &(&1.payload["effect_key"] ==
+              "each_player_hand_to_bottom_then_coin_draw_if_any")
+        )
+
+      assert length(coin_events) == 2
+
+      draw_events = lucian_card_events -- bottom_events
+      assert length(draw_events) == 2
+
+      draw_event_by_player = Map.new(draw_events, &{&1.payload["affected_player_id"], &1})
+
+      for coin_event <- coin_events do
+        player_id = coin_event.player_id
+        result = coin_event.payload["result"]
+        expected_draw_count = if result in ["heads", :heads], do: 6, else: 3
+
+        assert coin_event.payload["rng_context"] ==
+                 "trainer_effect_coin_flip:#{player_id}:turn_2:TWM-157:each_player_hand_to_bottom_then_coin_draw_if_any"
+
+        assert length(draw_event_by_player[player_id].payload["cards"]) == expected_draw_count
+      end
+    end
+
+    test "Lucian is unavailable when neither player would put hand cards on the bottom" do
+      {:ok, game} = create_flow_action_window_game_with_decks(Alakazam27147, DragapultPlain28256)
+      assert {:ok, game} = Mechanics.pass_turn(game, "player_1")
+
+      {:ok, lucian} = create_custom_owned_card(game.id, "player_2", "TWM-157", 260)
+      {:ok, lucian} = ash_update(lucian, :draw_to_hand, %{position: 20})
+
+      discard_all_hand_cards_except(game.id, "player_1", [])
+      discard_all_hand_cards_except(game.id, "player_2", [lucian.id])
+
+      assert {:ok, view} = GameView.for_player(game.id, "player_2")
+      play_card = Enum.find(view.action_affordances, &(&1.key == "play_card"))
+
+      if is_map(play_card) do
+        refute lucian.id in play_card.source_card_instance_ids
+      end
+
+      assert {:error, :lucian_has_no_effect} =
+               Mechanics.play_card(game, "player_2", lucian.id, %{})
+
+      assert zone(lucian.id) == :hand
+    end
+
     test "Brock's Scouting opens a prompt and resolves for up to 2 Basic Pokémon" do
       {:ok, game} = create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147)
 
@@ -2661,6 +2767,16 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
   end
 
   defp move_card_to_hand(%CardInstance{} = card, _position), do: card
+
+  defp discard_all_hand_cards_except(game_id, player_id, kept_card_ids) do
+    game_id
+    |> cards_in_zone(player_id, :hand)
+    |> Enum.reject(&(&1.id in kept_card_ids))
+    |> Enum.with_index(card_count_in_zone(game_id, player_id, :discard) + 1)
+    |> Enum.each(fn {hand_card, position} ->
+      {:ok, _discarded} = ash_update(hand_card, :discard, %{position: position})
+    end)
+  end
 
   defp move_owned_card_to_hand(game_id, player_id, card_id, position) do
     game_id

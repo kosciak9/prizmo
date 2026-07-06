@@ -1,5 +1,12 @@
 # Wiki Log
 
+## [2026-07-06] codebase update | Goal 2 Lucian support
+
+- Task attempted: closed `TWM-157` Lucian as the next lower-share three-archetype Goal 2 Trainer/Supporter blocker after Larry's Skill. Added committed TCGdex metadata and authored Lucian as an engine-defined Supporter that bottoms each player's current hand, flips one deterministic trainer-effect coin per player when any cards were bottomed, and draws `6` on heads or `3` on tails while hiding/rejecting the card when no cards would be bottomed.
+- Files changed: `lib/prizmo/tcg_engine/cards/registry.ex`, `lib/prizmo/tcg_engine/card_play.ex`, `test/prizmo/tcg_engine/mechanics_test.exs`, `priv/tcg/cards/tcgdex/cards/TWM-157.json`, `knowledge-base/wiki/engine/goal-2-top-30-latest-limitless-coverage-scope.md`, `knowledge-base/wiki/engine/ash-backed-tcg-engine-playtest-handoff.md`, `knowledge-base/wiki/log.md`.
+- Validation: `mix test test/prizmo/tcg_engine/mechanics_test.exs -n Lucian`; `mix test test/prizmo/tcg/cards/metadata_test.exs`; `mix test test/prizmo/tcg_engine/mechanics_test.exs`; `mix prizmo.goal2.corpus` confirmed `supported=149` / `generic-supported=8` / `partial=10` / `unimplemented=210` and `cached=170` / `missing=207`; final `mix check` passed.
+- Remaining/blocking notes: `TWM-157` is no longer in the shared incomplete queue. The default next Goal 2 priority is now the `POR-020` Staryu / `POR-021` Mega Starmie ex pair, followed by `MEG-094` Mega Mawile ex and then high-share two-archetype cards such as `POR-077` Lumiose City and `POR-052` Drapion.
+
 ## [2026-07-06] codebase update | Goal 2 Larry's Skill support
 
 - Task attempted: closed `PRE-115` Larry's Skill as the next shared three-archetype Goal 2 Trainer/Supporter blocker after Lunatone/Solrock. Added committed TCGdex metadata, authored Larry's Skill as an engine-defined Supporter that discards the player's remaining hand before searching exactly one Pokémon, one Supporter, and one Basic Energy from deck to hand with reveal and shuffle, and fixed Trainer search-filter ordering so Supporter-only searches no longer allow Item cards.

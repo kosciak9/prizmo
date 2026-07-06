@@ -154,6 +154,20 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     ]
   }
 
+  @lucian %CardDefinition{
+    id: "TWM-157",
+    kind: :trainer,
+    trainer_type: :supporter,
+    play_window: :action_window,
+    effects: [
+      %Effect{
+        key: :each_player_hand_to_bottom_then_coin_draw_if_any,
+        type: :each_player_hand_to_bottom_then_coin_draw_if_any,
+        params: %{heads_draw_count: 6, tails_draw_count: 3}
+      }
+    ]
+  }
+
   @judge %CardDefinition{
     id: "POR-076",
     kind: :trainer,
@@ -1239,6 +1253,7 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     @larrys_skill.id => @larrys_skill,
     @lanas_aid.id => @lanas_aid,
     @lillies_determination.id => @lillies_determination,
+    @lucian.id => @lucian,
     @night_stretcher.id => @night_stretcher,
     @poke_pad.id => @poke_pad,
     @pokegear_3_0.id => @pokegear_3_0,

@@ -82,17 +82,17 @@ Important interpretation:
 
 The strongest current Goal 2 implementation candidates are the incomplete cards shared by the most archetypes and/or the most total metagame share.
 
-The latest Goal 2 engine batch closed `PRE-115` Larry's Skill as the next shared three-archetype Trainer/Supporter cleanup after the Lunatone/Solrock pair. Larry's Skill now has committed TCGdex metadata plus executable Supporter behavior: it discards the acting player's remaining hand, then searches exactly one Pokémon, one Supporter card, and one Basic Energy card from deck to hand, reveals them, and shuffles. The batch also fixed generic Trainer search-filter ordering so `trainer_type: :supporter` no longer accidentally admits Item cards.
+The latest Goal 2 engine batch closed `TWM-157` Lucian as the next lower-share three-archetype Trainer/Supporter cleanup after Larry's Skill. Lucian now has committed TCGdex metadata plus executable Supporter behavior: each player shuffles their current hand and puts it on the bottom of their deck; if either player bottomed at least one card, each player flips a deterministic effect coin and draws `6` on heads or `3` on tails. The batch also made Lucian unavailable when no cards would be bottomed after the played Supporter leaves hand and prechecks exact draw capacity before mutating either hand.
 
 ### Highest-priority remaining `unimplemented` cards from current report
 
 | Card | Archetypes | Total share | Notes |
 | --- | --- | --- | --- |
-| `TWM-157` Lucian | `3` | `0.92%` | Next three-archetype Supporter cleanup after Larry's Skill. |
-| `POR-020` Staryu | `3` | `0.85%` | Later three-archetype Pokémon cleanup shared by the Greninja/Starmie cluster. |
+| `POR-020` Staryu | `3` | `0.85%` | Next coherent three-archetype Pokémon cleanup shared by the Greninja/Starmie cluster. |
 | `POR-021` Mega Starmie ex | `3` | `0.85%` | Paired Greninja/Starmie follow-up alongside Staryu. |
 | `MEG-094` Mega Mawile ex | `3` | `0.77%` | Later three-archetype Metal attacker cleanup shared by Archaludon/Metagross shells. |
 | `POR-077` Lumiose City | `2` | `14.16%` | Highest-share two-archetype unimplemented card once the remaining three-archetype queue is reduced. |
+| `POR-052` Drapion | `2` | `13.61%` | Second-highest-share two-archetype unimplemented card after Lumiose City. |
 
 ### Shared `partial` cards worth finishing after the broad unimplemented slice
 
@@ -119,9 +119,9 @@ That means prior Goal 1 and six-deck coverage was not wasted; it now acts as see
 
 ## Recommended next implementation order
 
-1. Use `TWM-157` Lucian as the next lower-share three-archetype Trainer/Supporter cleanup queue now that Larry's Skill is supported.
-2. Keep the Greninja/Starmie `POR-020` / `POR-021` pair as the next coherent three-archetype Pokémon follow-up after the remaining Supporter blocker.
-3. Keep `MEG-094` Mega Mawile ex and related Metal-shell cards as later three-archetype cleanup after the higher-share queue.
+1. Use the Greninja/Starmie `POR-020` / `POR-021` pair as the next coherent three-archetype Pokémon follow-up now that Lucian is supported.
+2. Keep `MEG-094` Mega Mawile ex and related Metal-shell cards as later three-archetype cleanup after the Greninja/Starmie pair.
+3. Keep `POR-077` Lumiose City and `POR-052` Drapion as the highest-share two-archetype follow-ups once the remaining three-archetype queue is reduced.
 4. Keep the remaining Dragapult-only cached pair `TWM-099` / `TWM-100` as deliberate single-archetype cleanup, not the default autonomous queue.
 5. Finish the remaining shared partials only after the broad unimplemented slice unless another batch naturally extends the new HP infrastructure; if returning to HP work soon, `POR-086` Growing Grass Energy remains the strongest follow-up.
 6. Keep using `mix prizmo.goal2.corpus` after each batch to re-rank the next blockers by archetype count and weighted share.

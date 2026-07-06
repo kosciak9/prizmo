@@ -402,6 +402,30 @@ defmodule Prizmo.TcgEngine.CardPlay do
          turn,
          player,
          card,
+         %{type: :each_player_hand_to_bottom_then_coin_draw_if_any} = effect,
+         _target_ids
+       ) do
+    with {:ok, affected_players} <- PlayerStore.list_players(game.id),
+         :ok <-
+           require_each_player_bottom_draw_capacity_after_play(game, affected_players, effect),
+         {:ok, bottom_summaries} <-
+           bottom_each_player_hand(game, turn, player, card, effect, affected_players) do
+      if any_hand_bottomed?(bottom_summaries) do
+        with {:ok, _draw_summaries} <-
+               coin_draw_for_each_player(game, turn, card, effect, affected_players) do
+          complete_play_card_resolution(game, turn, player, card, effect)
+        end
+      else
+        complete_play_card_resolution(game, turn, player, card, effect)
+      end
+    end
+  end
+
+  defp complete_play_card_effect(
+         game,
+         turn,
+         player,
+         card,
          %{type: :return_own_pokemon_with_attached_cards_to_hand} = effect,
          target_ids
        ) do
@@ -1476,6 +1500,9 @@ defmodule Prizmo.TcgEngine.CardPlay do
           _other ->
             :ok
         end
+
+      {:ok, %{type: :each_player_hand_to_bottom_then_coin_draw_if_any} = effect} ->
+        require_each_player_hand_to_bottom_coin_draw_effect_available(game, player, effect)
 
       {:ok, %{type: :opponent_hand_to_bottom_then_draw_if_any} = effect} ->
         require_opponent_prize_count_at_most(game.id, player.player_id, effect)
@@ -4547,6 +4574,165 @@ defmodule Prizmo.TcgEngine.CardPlay do
       affected_player_id: player_id,
       cards: EventPayloads.moved_cards(cards, :hand, :discard)
     })
+  end
+
+  defp bottom_each_player_hand(
+         %Game{} = game,
+         turn,
+         %GamePlayer{} = action_player,
+         card,
+         effect,
+         affected_players
+       ) do
+    affected_players
+    |> Enum.map(fn affected_player ->
+      with {:ok, bottomed_cards} <-
+             shuffle_hand_to_bottom_of_deck(game, turn, affected_player, card, effect),
+           {:ok, _event} <-
+             write_event_and_snapshot(game.id, :cards_moved, affected_player.player_id, %{
+               reason: :effect_resolution,
+               source: EventPayloads.card_source(card),
+               effect_key: effect.key,
+               action_player_id: action_player.player_id,
+               affected_player_id: affected_player.player_id,
+               cards: EventPayloads.moved_cards(bottomed_cards, :hand, :deck),
+               destination: :deck_bottom
+             }) do
+        {:ok,
+         %{
+           player_id: affected_player.player_id,
+           bottomed_card_count: length(bottomed_cards)
+         }}
+      end
+    end)
+    |> collect_results()
+  end
+
+  defp any_hand_bottomed?(bottom_summaries) do
+    Enum.any?(bottom_summaries, &(&1.bottomed_card_count > 0))
+  end
+
+  defp coin_draw_for_each_player(%Game{} = game, turn, card, effect, affected_players) do
+    affected_players
+    |> Enum.map(&coin_draw_for_player(game, turn, &1, card, effect))
+    |> collect_results()
+  end
+
+  defp coin_draw_for_player(%Game{} = game, turn, %GamePlayer{} = player, card, effect) do
+    with {:ok, result} <- flip_coin_for_effect(game, turn, player, card, effect),
+         {:ok, _event} <-
+           write_effect_coin_flipped(game, turn, player.player_id, card, effect, result),
+         draw_count = lucian_draw_count(effect, result),
+         {:ok, drawn_cards} <- draw_cards_for_effect(game, player, draw_count),
+         {:ok, _event} <-
+           write_event_and_snapshot(game.id, :cards_moved, player.player_id, %{
+             reason: :effect_resolution,
+             source: EventPayloads.card_source(card),
+             effect_key: effect.key,
+             affected_player_id: player.player_id,
+             coin_result: result,
+             cards: EventPayloads.moved_cards(drawn_cards, :deck, :hand)
+           }) do
+      {:ok,
+       %{
+         player_id: player.player_id,
+         coin_result: result,
+         drawn_card_count: length(drawn_cards)
+       }}
+    end
+  end
+
+  defp lucian_draw_count(%{params: %{heads_draw_count: count}}, :heads), do: count
+  defp lucian_draw_count(%{params: %{tails_draw_count: count}}, :tails), do: count
+
+  defp require_each_player_hand_to_bottom_coin_draw_effect_available(
+         %Game{} = game,
+         %GamePlayer{} = action_player,
+         effect
+       ) do
+    with {:ok, affected_players} <- PlayerStore.list_players(game.id),
+         {:ok, bottom_counts} <-
+           lucian_preplay_bottom_counts(game.id, action_player, affected_players),
+         :ok <- require_any_lucian_hand_bottomed(bottom_counts) do
+      require_lucian_draw_capacity(game.id, affected_players, bottom_counts, effect)
+    end
+  end
+
+  defp require_each_player_bottom_draw_capacity_after_play(
+         %Game{} = game,
+         affected_players,
+         effect
+       ) do
+    with {:ok, bottom_counts} <- lucian_current_bottom_counts(game.id, affected_players) do
+      if Enum.any?(bottom_counts, fn {_player_id, count} -> count > 0 end) do
+        require_lucian_draw_capacity(game.id, affected_players, bottom_counts, effect)
+      else
+        :ok
+      end
+    end
+  end
+
+  defp lucian_preplay_bottom_counts(game_id, %GamePlayer{} = action_player, affected_players) do
+    affected_players
+    |> Enum.map(fn affected_player ->
+      with {:ok, hand_cards} <- CardStore.cards_in_zone(game_id, affected_player.player_id, :hand) do
+        bottom_count = length(hand_cards)
+
+        bottom_count =
+          if affected_player.player_id == action_player.player_id do
+            max(bottom_count - 1, 0)
+          else
+            bottom_count
+          end
+
+        {:ok, {affected_player.player_id, bottom_count}}
+      end
+    end)
+    |> collect_results()
+    |> case do
+      {:ok, pairs} -> {:ok, Map.new(pairs)}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp lucian_current_bottom_counts(game_id, affected_players) do
+    affected_players
+    |> Enum.map(fn affected_player ->
+      with {:ok, hand_cards} <- CardStore.cards_in_zone(game_id, affected_player.player_id, :hand) do
+        {:ok, {affected_player.player_id, length(hand_cards)}}
+      end
+    end)
+    |> collect_results()
+    |> case do
+      {:ok, pairs} -> {:ok, Map.new(pairs)}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp require_any_lucian_hand_bottomed(bottom_counts) do
+    if Enum.any?(bottom_counts, fn {_player_id, count} -> count > 0 end) do
+      :ok
+    else
+      {:error, :lucian_has_no_effect}
+    end
+  end
+
+  defp require_lucian_draw_capacity(game_id, affected_players, bottom_counts, effect) do
+    max_draw_count = max(lucian_draw_count(effect, :heads), lucian_draw_count(effect, :tails))
+
+    affected_players
+    |> Enum.map(fn affected_player ->
+      with {:ok, deck_count} <- CardStore.deck_count(game_id, affected_player.player_id) do
+        available_after_bottom = deck_count + Map.fetch!(bottom_counts, affected_player.player_id)
+
+        if available_after_bottom >= max_draw_count do
+          :ok
+        else
+          {:error, {:cannot_draw_card_effect_from_deck, max_draw_count, available_after_bottom}}
+        end
+      end
+    end)
+    |> collect_ok_results()
   end
 
   defp require_all_eri_targets(game_id, player_id, target_cards) do
