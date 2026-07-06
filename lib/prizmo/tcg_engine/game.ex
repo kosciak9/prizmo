@@ -95,8 +95,8 @@ defmodule Prizmo.TcgEngine.Game do
     define :play_stadium_command, args: [:game_id, :player_id, :card_instance_id]
     define :use_team_rockets_factory_command, args: [:game_id, :player_id]
 
-    define :use_prism_tower_command,
-      args: [:game_id, :player_id, :discard_card_instance_ids]
+    define :use_prism_tower_command, args: [:game_id, :player_id, :discard_card_instance_ids]
+    define :use_lumiose_city_command, args: [:game_id, :player_id, :target_card_instance_id]
 
     define :use_munkidori_adrena_brain_command,
       args: [

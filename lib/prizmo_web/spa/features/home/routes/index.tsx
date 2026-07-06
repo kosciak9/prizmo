@@ -44,6 +44,7 @@ import {
   runUseTcgEngineFlipTheScript,
   runUseTcgEngineJewelSeeker,
   runUseTcgEngineLunarCycle,
+  runUseTcgEngineLumioseCity,
   runUseTcgEngineMunkidoriAdrenaBrain,
   runUseTcgEnginePrismTower,
   runUseTcgEnginePsychicDraw,
@@ -598,6 +599,12 @@ type PrismTowerCommandOption = {
   discardCards: Array<CardSummary | undefined>
 }
 
+type LumioseCityCommandOption = {
+  key: string
+  targetCardInstanceId: string
+  targetCard: CardSummary | undefined
+}
+
 type ActionRenderEntry = {
   key: string
   action: ActionAffordance
@@ -702,6 +709,17 @@ type PrismTowerInput = {
 type PrismTowerCommand = {
   playerId: string
   discardCardInstanceIds: string[]
+}
+
+type LumioseCityInput = {
+  gameId: string
+  playerId: PlayerId
+  targetCardInstanceId: string
+}
+
+type LumioseCityCommand = {
+  playerId: string
+  targetCardInstanceId: string
 }
 
 type CursedBlastInput = {
@@ -1431,6 +1449,14 @@ export function HomeRoute() {
     }
   })
 
+  const lumioseCityMutation = useMutation({
+    mutationFn: (input: LumioseCityInput) => useLumioseCity(input),
+    onSuccess: async (_game, input) => {
+      clearUltraBallPostSearchHandoff(input.gameId, input.playerId)
+      await queryClient.invalidateQueries({ queryKey: ['tcg-engine', 'game-state'] })
+    }
+  })
+
   const cursedBlastMutation = useMutation({
     mutationFn: (input: CursedBlastInput) => useCursedBlast(input),
     onSuccess: async (_game, input) => {
@@ -1766,6 +1792,11 @@ export function HomeRoute() {
       playStadiumMutation.error,
       'Play Stadium failed',
       'The Stadium stayed in hand. Refresh state and confirm this viewer still has priority from the action window.'
+    ) ??
+    commandErrorNotice(
+      lumioseCityMutation.error,
+      'Lumiose City failed',
+      'No Pokémon was Benched. Refresh state and confirm Lumiose City is active, the target is still a Basic Pokémon in deck, and this viewer has an open Bench slot.'
     ) ??
     commandErrorNotice(
       cursedBlastMutation.error,
@@ -2403,6 +2434,15 @@ export function HomeRoute() {
                     })
                   }
                 }}
+                onUseLumioseCity={({ playerId, targetCardInstanceId }) => {
+                  if (isPlayerId(playerId)) {
+                    lumioseCityMutation.mutate({
+                      gameId: normalisedGameId,
+                      playerId,
+                      targetCardInstanceId
+                    })
+                  }
+                }}
                 onUseCursedBlast={({ playerId, sourceCardInstanceId, targetCardInstanceId }) => {
                   if (isPlayerId(playerId)) {
                     cursedBlastMutation.mutate({
@@ -2611,6 +2651,9 @@ export function HomeRoute() {
                   prismTowerMutation.isPending && prismTowerMutation.variables
                     ? prismTowerKey(prismTowerMutation.variables.discardCardInstanceIds)
                     : null
+                }
+                lumioseCityPendingTargetId={
+                  lumioseCityMutation.isPending ? lumioseCityMutation.variables?.targetCardInstanceId ?? null : null
                 }
                 cursedBlastPendingKey={
                   cursedBlastMutation.isPending && cursedBlastMutation.variables
@@ -3342,6 +3385,20 @@ async function usePrismTower(input: PrismTowerInput): Promise<CreatedGame> {
   return result.data as CreatedGame
 }
 
+async function useLumioseCity(input: LumioseCityInput): Promise<CreatedGame> {
+  const result = await runUseTcgEngineLumioseCity({
+    input,
+    fields: GAME_RESOURCE_FIELDS,
+    headers: buildAshRpcHeaders()
+  })
+
+  if (!result.success) {
+    throw new Error(rpcErrorMessage(result.errors))
+  }
+
+  return result.data as CreatedGame
+}
+
 async function useCursedBlast(input: CursedBlastInput): Promise<CreatedGame> {
   const result = await runUseTcgEngineCursedBlast({
     input,
@@ -3720,6 +3777,7 @@ function GameStateWorkbench({
   onUseRunAwayDraw,
   onUseTeamRocketsFactory,
   onUsePrismTower,
+  onUseLumioseCity,
   onRetreat,
   onResolveDeclaredAttack,
   onUndo,
@@ -3756,6 +3814,7 @@ function GameStateWorkbench({
   runAwayDrawPendingKey,
   teamRocketsFactoryPendingPlayerId,
   prismTowerPendingKey,
+  lumioseCityPendingTargetId,
   resolveDeclaredAttackPendingPlayerId,
   retreatPendingKey
 }: {
@@ -3800,6 +3859,7 @@ function GameStateWorkbench({
   onUseRunAwayDraw: (input: RunAwayDrawCommand) => void
   onUseTeamRocketsFactory: (input: TeamRocketsFactoryCommand) => void
   onUsePrismTower: (input: PrismTowerCommand) => void
+  onUseLumioseCity: (input: LumioseCityCommand) => void
   onRetreat: (input: RetreatCommand) => void
   onResolveDeclaredAttack: (input: ResolveDeclaredAttackCommand) => void
   onUndo: () => void
@@ -3836,6 +3896,7 @@ function GameStateWorkbench({
   runAwayDrawPendingKey: string | null
   teamRocketsFactoryPendingPlayerId: string | null
   prismTowerPendingKey: string | null
+  lumioseCityPendingTargetId: string | null
   resolveDeclaredAttackPendingPlayerId: string | null
   retreatPendingKey: string | null
 }) {
@@ -3845,6 +3906,7 @@ function GameStateWorkbench({
       playStadiumPendingCardId ||
       teamRocketsFactoryPendingPlayerId ||
       prismTowerPendingKey ||
+      lumioseCityPendingTargetId ||
       cursedBlastPendingKey ||
       subjugatingChainsPendingKey ||
       munkidoriAdrenaBrainPendingKey ||
@@ -3888,12 +3950,14 @@ function GameStateWorkbench({
     onPlayStadium,
     onUseTeamRocketsFactory,
     onUsePrismTower,
+    onUseLumioseCity,
     onRetreat,
     playBasicToBenchPendingCardId,
     playCardPendingCardId,
     playStadiumPendingCardId,
     teamRocketsFactoryPendingPlayerId,
     prismTowerPendingKey,
+    lumioseCityPendingTargetId,
     retreatPendingKey,
     viewerPlayerId
   })
@@ -3992,6 +4056,7 @@ function GameStateWorkbench({
             onUseRunAwayDraw={onUseRunAwayDraw}
             onUseTeamRocketsFactory={onUseTeamRocketsFactory}
             onUsePrismTower={onUsePrismTower}
+            onUseLumioseCity={onUseLumioseCity}
             onRetreat={onRetreat}
             attachEnergyPendingKey={attachEnergyPendingKey}
             attachToolPendingKey={attachToolPendingKey}
@@ -4015,6 +4080,7 @@ function GameStateWorkbench({
             runAwayDrawPendingKey={runAwayDrawPendingKey}
             teamRocketsFactoryPendingPlayerId={teamRocketsFactoryPendingPlayerId}
             prismTowerPendingKey={prismTowerPendingKey}
+            lumioseCityPendingTargetId={lumioseCityPendingTargetId}
             retreatPendingKey={retreatPendingKey}
             ultraBallPostSearchHandoff={ultraBallPostSearchHandoff}
             viewerPlayerId={viewerPlayerId}
@@ -4052,12 +4118,14 @@ function buildCardInteractionModel({
   onPlayStadium,
   onUseTeamRocketsFactory,
   onUsePrismTower,
+  onUseLumioseCity,
   onRetreat,
   playBasicToBenchPendingCardId,
   playCardPendingCardId,
   playStadiumPendingCardId,
   teamRocketsFactoryPendingPlayerId,
   prismTowerPendingKey,
+  lumioseCityPendingTargetId,
   retreatPendingKey,
   viewerPlayerId
 }: {
@@ -4083,12 +4151,14 @@ function buildCardInteractionModel({
   onPlayStadium: (input: PlayStadiumCommand) => void
   onUseTeamRocketsFactory: (input: TeamRocketsFactoryCommand) => void
   onUsePrismTower: (input: PrismTowerCommand) => void
+  onUseLumioseCity: (input: LumioseCityCommand) => void
   onRetreat: (input: RetreatCommand) => void
   playBasicToBenchPendingCardId: string | null
   playCardPendingCardId: string | null
   playStadiumPendingCardId: string | null
   teamRocketsFactoryPendingPlayerId: string | null
   prismTowerPendingKey: string | null
+  lumioseCityPendingTargetId: string | null
   retreatPendingKey: string | null
   viewerPlayerId: PlayerId
 }): CardInteractionModel {
@@ -4221,6 +4291,33 @@ function buildCardInteractionModel({
           })
         }
 
+        cardDirectedActionKeys.add(actionKeyValue)
+      }
+    }
+
+    if (action.key === 'lumiose_city') {
+      let hasCardDirectedLumioseOption = false
+
+      for (const option of lumioseCityCommandOptions(action, cardsById)) {
+        const targetCard = cardsById.get(option.targetCardInstanceId)
+
+        if (!targetCard) {
+          continue
+        }
+
+        hasCardDirectedLumioseOption = true
+
+        setCardIntent(option.targetCardInstanceId, {
+          badge: 'Stadium',
+          disabled: !canRunAction,
+          label: `Use Lumiose City for ${targetCard?.name ?? formatCardInstanceId(option.targetCardInstanceId)}`,
+          pending: lumioseCityPendingTargetId === option.targetCardInstanceId,
+          tone: 'primary',
+          onClick: () => onUseLumioseCity({ playerId: action.playerId, targetCardInstanceId: option.targetCardInstanceId })
+        })
+      }
+
+      if (hasCardDirectedLumioseOption) {
         cardDirectedActionKeys.add(actionKeyValue)
       }
     }
@@ -6978,6 +7075,7 @@ function ActionAffordancesPanel({
   onUseRunAwayDraw,
   onUseTeamRocketsFactory,
   onUsePrismTower,
+  onUseLumioseCity,
   onRetreat,
   attachEnergyPendingKey,
   attachToolPendingKey,
@@ -7001,6 +7099,7 @@ function ActionAffordancesPanel({
   runAwayDrawPendingKey,
   teamRocketsFactoryPendingPlayerId,
   prismTowerPendingKey,
+  lumioseCityPendingTargetId,
   retreatPendingKey,
   ultraBallPostSearchHandoff,
   viewerPlayerId
@@ -7033,6 +7132,7 @@ function ActionAffordancesPanel({
   onUseRunAwayDraw: (input: RunAwayDrawCommand) => void
   onUseTeamRocketsFactory: (input: TeamRocketsFactoryCommand) => void
   onUsePrismTower: (input: PrismTowerCommand) => void
+  onUseLumioseCity: (input: LumioseCityCommand) => void
   onRetreat: (input: RetreatCommand) => void
   attachEnergyPendingKey: string | null
   attachToolPendingKey: string | null
@@ -7056,6 +7156,7 @@ function ActionAffordancesPanel({
   runAwayDrawPendingKey: string | null
   teamRocketsFactoryPendingPlayerId: string | null
   prismTowerPendingKey: string | null
+  lumioseCityPendingTargetId: string | null
   retreatPendingKey: string | null
   ultraBallPostSearchHandoff: UltraBallPostSearchHandoff | null
   viewerPlayerId: PlayerId
@@ -7065,6 +7166,7 @@ function ActionAffordancesPanel({
       playStadiumPendingCardId ||
       teamRocketsFactoryPendingPlayerId ||
       prismTowerPendingKey ||
+      lumioseCityPendingTargetId ||
       cursedBlastPendingKey ||
       subjugatingChainsPendingKey ||
       munkidoriAdrenaBrainPendingKey ||
@@ -7176,6 +7278,7 @@ function ActionAffordancesPanel({
                     onUseRunAwayDraw={onUseRunAwayDraw}
                     onUseTeamRocketsFactory={onUseTeamRocketsFactory}
                     onUsePrismTower={onUsePrismTower}
+                    onUseLumioseCity={onUseLumioseCity}
                     onRetreat={onRetreat}
                     playBasicToBenchPendingCardId={playBasicToBenchPendingCardId}
                     playCardPendingCardId={playCardPendingCardId}
@@ -7194,6 +7297,7 @@ function ActionAffordancesPanel({
                     runAwayDrawPendingKey={runAwayDrawPendingKey}
                     teamRocketsFactoryPendingPlayerId={teamRocketsFactoryPendingPlayerId}
                     prismTowerPendingKey={prismTowerPendingKey}
+                    lumioseCityPendingTargetId={lumioseCityPendingTargetId}
                     postSearchBattleAttackIds={postSearchHandoff?.battleAttackIds ?? []}
                     postSearchBenchCardInstanceIds={postSearchHandoff?.benchableCardInstanceIds ?? []}
                     postSearchEndTurnPlayerIds={postSearchHandoff?.endTurnPlayerIds ?? []}
@@ -7660,6 +7764,8 @@ function handActionChoiceCount(handGroup: ActionGroup, cardsById: Map<string, Ca
         return count + lunarCycleCommandOptions(action, cardsById).length
       case 'seething_spirit':
         return count + seethingSpiritCommandOptions(action, cardsById).length
+      case 'lumiose_city':
+        return count + lumioseCityCommandOptions(action, cardsById).length
       case 'play_stadium':
         return count + action.sourceCardInstanceIds.length
       case 'play_card':
@@ -7791,6 +7897,7 @@ function ActionAffordanceCard({
   onUseRunAwayDraw,
   onUseTeamRocketsFactory,
   onUsePrismTower,
+  onUseLumioseCity,
   onRetreat,
   playBasicToBenchPendingCardId,
   playCardPendingCardId,
@@ -7809,6 +7916,7 @@ function ActionAffordanceCard({
   runAwayDrawPendingKey,
   teamRocketsFactoryPendingPlayerId,
   prismTowerPendingKey,
+  lumioseCityPendingTargetId,
   postSearchBattleAttackIds,
   postSearchBenchCardInstanceIds,
   postSearchEndTurnPlayerIds,
@@ -7848,6 +7956,7 @@ function ActionAffordanceCard({
   onUseRunAwayDraw: (input: RunAwayDrawCommand) => void
   onUseTeamRocketsFactory: (input: TeamRocketsFactoryCommand) => void
   onUsePrismTower: (input: PrismTowerCommand) => void
+  onUseLumioseCity: (input: LumioseCityCommand) => void
   onRetreat: (input: RetreatCommand) => void
   playBasicToBenchPendingCardId: string | null
   playCardPendingCardId: string | null
@@ -7866,6 +7975,7 @@ function ActionAffordanceCard({
   runAwayDrawPendingKey: string | null
   teamRocketsFactoryPendingPlayerId: string | null
   prismTowerPendingKey: string | null
+  lumioseCityPendingTargetId: string | null
   postSearchBattleAttackIds: string[]
   postSearchBenchCardInstanceIds: string[]
   postSearchEndTurnPlayerIds: PlayerId[]
@@ -7894,6 +8004,7 @@ function ActionAffordanceCard({
   const reconDirectiveOptions = reconDirectiveCommandOptions(action, cardsById)
   const runAwayDrawOptions = runAwayDrawCommandOptions(action, cardsById)
   const prismTowerOptions = prismTowerCommandOptions(action, cardsById)
+  const lumioseCityOptions = lumioseCityCommandOptions(action, cardsById)
 
   return (
     <li className={`rounded-xl border px-3 py-2 text-sm ${actionSurfaceClassName(action)}`}>
@@ -8017,6 +8128,30 @@ function ActionAffordanceCard({
                 tone="primary"
               >
                 {isPending ? prismTowerPendingLabel(option) : prismTowerButtonLabel(option)}
+              </ActionCommandButton>
+            )
+          })}
+        </div>
+      ) : null}
+
+      {lumioseCityOptions.length > 0 ? (
+        <div className="mt-2 space-y-1.5">
+          {lumioseCityOptions.map(option => {
+            const isPending = lumioseCityPendingTargetId === option.targetCardInstanceId
+
+            return (
+              <ActionCommandButton
+                disabled={!canRunAction}
+                key={option.key}
+                onClick={() =>
+                  onUseLumioseCity({
+                    playerId: action.playerId,
+                    targetCardInstanceId: option.targetCardInstanceId
+                  })
+                }
+                tone="primary"
+              >
+                {isPending ? lumioseCityPendingLabel(option) : lumioseCityButtonLabel(option)}
               </ActionCommandButton>
             )
           })}
@@ -8652,6 +8787,7 @@ function actionSurfaceClassName(action: ActionAffordance) {
     case 'recon_directive':
     case 'run_away_draw':
     case 'prism_tower':
+    case 'lumiose_city':
     case 'declare_attack':
       return 'border-accent-mint/30 bg-accent-mint/10'
     case 'unsupported_attack':
@@ -8718,6 +8854,8 @@ function actionSummary(action: ActionAffordance) {
       return 'Draw 3 cards, then shuffle Dudunsparce and attached cards into your deck.'
     case 'prism_tower':
       return `Discard 2 cards from hand to draw 1 card with the active Stadium.`
+    case 'lumiose_city':
+      return 'Search your deck for 1 Basic Pokémon, put it onto your Bench, shuffle, then end your turn.'
     case 'declare_attack':
       return `${action.attackName ?? (action.attackId ? formatAttackId(action.attackId) : 'Attack')}: ${attackCostSummary(
         action.attackCost
@@ -9051,6 +9189,30 @@ function prismTowerDiscardLabel(option: PrismTowerCommandOption) {
   return option.discardCardInstanceIds
     .map((cardInstanceId, index) => option.discardCards[index]?.name ?? formatCardInstanceId(cardInstanceId))
     .join(' + ')
+}
+
+function lumioseCityCommandOptions(action: ActionAffordance, cardsById: Map<string, CardSummary>): LumioseCityCommandOption[] {
+  if (action.key !== 'lumiose_city' || action.targetCardInstanceIds.length === 0) {
+    return []
+  }
+
+  return action.targetCardInstanceIds.map(targetCardInstanceId => ({
+    key: lumioseCityKey(targetCardInstanceId),
+    targetCardInstanceId,
+    targetCard: cardsById.get(targetCardInstanceId)
+  }))
+}
+
+function lumioseCityPendingLabel(option: LumioseCityCommandOption) {
+  return `Using Lumiose City: benching ${lumioseCityTargetLabel(option)}...`
+}
+
+function lumioseCityButtonLabel(option: LumioseCityCommandOption) {
+  return `Lumiose City: bench ${lumioseCityTargetLabel(option)} and end turn`
+}
+
+function lumioseCityTargetLabel(option: LumioseCityCommandOption) {
+  return option.targetCard?.name ?? formatCardInstanceId(option.targetCardInstanceId)
 }
 
 function tealDancePendingLabel(option: TealDanceCommandOption) {
@@ -9509,6 +9671,7 @@ function actionGroupId(action: ActionAffordance): ActionGroupId {
     case 'recon_directive':
     case 'run_away_draw':
     case 'prism_tower':
+    case 'lumiose_city':
       return 'hand'
     case 'retreat':
     case 'cursed_blast':
@@ -12556,6 +12719,10 @@ function runAwayDrawKey(sourceCardInstanceId: string) {
 
 function prismTowerKey(discardCardInstanceIds: string[]) {
   return discardCardInstanceIds.join(':')
+}
+
+function lumioseCityKey(targetCardInstanceId: string) {
+  return targetCardInstanceId
 }
 
 function attackKey(playerId: string, attackId: string) {

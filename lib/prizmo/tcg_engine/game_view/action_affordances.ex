@@ -128,6 +128,7 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
       play_stadium_affordance(game, player, cards),
       team_rockets_factory_affordance(game, player, current_turn, all_cards),
       prism_tower_affordance(game, player, current_turn, cards, all_cards),
+      lumiose_city_affordance(game, player, current_turn, all_cards),
       play_basic_to_bench_affordance(player, cards),
       attach_energy_affordance(player, cards),
       attach_tool_affordance(game, player, cards),
@@ -242,6 +243,32 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
   end
 
   defp prism_tower_affordance(_game, _player, _current_turn, _cards, _all_cards), do: nil
+
+  defp lumiose_city_affordance(
+         %Game{} = game,
+         %GamePlayer{} = player,
+         %Turn{id: turn_id},
+         all_cards
+       ) do
+    with %CardInstance{} = stadium_card <- active_lumiose_city_card(all_cards),
+         :ok <- StadiumEffects.require_lumiose_city_available(game.id, turn_id, player.player_id),
+         {:ok, target_cards} <-
+           StadiumEffects.lumiose_city_target_cards(game.id, player.player_id),
+         target_ids when target_ids != [] <- card_ids(target_cards) do
+      affordance(:lumiose_city, "Use Lumiose City", :command, player.player_id,
+        source_card_instance_ids: [stadium_card.id],
+        target_card_instance_ids: target_ids,
+        required_source_count: 1,
+        choice_keys: ["target_card_instance_id"],
+        note:
+          "Once this turn from the active Stadium, search your deck for 1 Basic Pokémon, put it onto your Bench, shuffle, then end your turn."
+      )
+    else
+      _other -> nil
+    end
+  end
+
+  defp lumiose_city_affordance(_game, _player, _current_turn, _all_cards), do: nil
 
   defp play_basic_to_bench_affordance(%GamePlayer{} = player, cards) do
     source_ids =
@@ -852,6 +879,10 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
 
   defp active_prism_tower_card(cards) do
     Enum.find(cards, &(&1.zone == :stadium and StadiumEffects.prism_tower_card?(&1)))
+  end
+
+  defp active_lumiose_city_card(cards) do
+    Enum.find(cards, &(&1.zone == :stadium and StadiumEffects.lumiose_city_card?(&1)))
   end
 
   defp generic_tool_attachable?(%Game{} = game, %GamePlayer{} = player, %CardInstance{

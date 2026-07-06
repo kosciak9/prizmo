@@ -17,6 +17,10 @@ defmodule Prizmo.Tcg.Cards.Behaviors.POR do
     )
   end
 
+  card "POR-077" do
+    card_effect(effect: %{type: :search_basic_pokemon_to_bench_then_end_turn})
+  end
+
   card "POR-086" do
     card_effect(effect: %{type: :grass_pokemon_hp_plus_20_energy})
   end

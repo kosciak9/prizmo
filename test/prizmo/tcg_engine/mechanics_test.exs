@@ -1236,6 +1236,76 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
       assert game_events_by_type(game.id, "stadium_effect_used") == []
     end
 
+    test "POR-077 Lumiose City searches a Basic Pokémon to Bench and ends the turn" do
+      {:ok, game} = create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147)
+
+      {:ok, lumiose_city} = create_custom_owned_card(game.id, "player_1", "POR-077", 220)
+      {:ok, lumiose_city} = ash_update(lumiose_city, :draw_to_hand, %{position: 20})
+
+      {:ok, target} = create_custom_owned_card(game.id, "player_1", "PRE-035", 221)
+      {:ok, non_target} = create_custom_owned_card(game.id, "player_1", "MEE-005", 222)
+
+      assert CardCoverage.summarize("POR-077").coverage_status == :supported
+
+      assert {:ok, game} = Mechanics.play_stadium(game, "player_1", lumiose_city.id)
+
+      assert {:ok, view} = GameView.for_player(game.id, "player_1")
+
+      lumiose_action = Enum.find(view.action_affordances, &(&1.key == "lumiose_city"))
+
+      assert is_map(lumiose_action)
+      assert lumiose_action.source_card_instance_ids == [lumiose_city.id]
+      assert lumiose_action.required_source_count == 1
+      assert lumiose_action.choice_keys == ["target_card_instance_id"]
+      assert target.id in lumiose_action.target_card_instance_ids
+      refute non_target.id in lumiose_action.target_card_instance_ids
+
+      assert {:ok, game} = Mechanics.use_lumiose_city(game, "player_1", target.id)
+
+      assert zone(target.id) == :bench
+      assert card(target.id).turn_entered_play == 1
+      assert current_turn(game.id).status == :ended
+
+      lumiose_event =
+        game.id
+        |> game_events_by_type("stadium_effect_used")
+        |> Enum.find(&(&1.payload["effect_key"] == "search_basic_pokemon_to_bench_then_end_turn"))
+
+      assert lumiose_event.payload["source_card_id"] == "POR-077"
+      assert lumiose_event.payload["public_reveal"] == true
+      assert lumiose_event.payload["public_note"] =~ "Lumiose City"
+      assert [moved_card] = lumiose_event.payload["cards"]
+      assert moved_card["instance_id"] == target.id
+      assert moved_card["from_zone"] == "deck"
+      assert moved_card["to_zone"] == "bench"
+
+      assert [deck_shuffle_event] = game_events_by_type(game.id, "deck_shuffled")
+      assert deck_shuffle_event.payload["source_card_id"] == "POR-077"
+      assert deck_shuffle_event.payload["shuffle"] == "lumiose_city"
+
+      assert game.id
+             |> game_events_by_type("end_turn")
+             |> List.last()
+             |> then(& &1.payload["reason"]) == "lumiose_city"
+    end
+
+    test "POR-077 Lumiose City rejects non-Basic deck selections before moving cards" do
+      {:ok, game} = create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147)
+
+      {:ok, lumiose_city} = create_custom_owned_card(game.id, "player_1", "POR-077", 230)
+      {:ok, lumiose_city} = ash_update(lumiose_city, :draw_to_hand, %{position: 20})
+
+      {:ok, non_target} = create_custom_owned_card(game.id, "player_1", "MEE-005", 231)
+
+      assert {:ok, game} = Mechanics.play_stadium(game, "player_1", lumiose_city.id)
+
+      assert {:error, _reason} = Mechanics.use_lumiose_city(game, "player_1", non_target.id)
+
+      assert zone(non_target.id) == :deck
+      assert current_turn(game.id).status == :action_window
+      assert game_events_by_type(game.id, "stadium_effect_used") == []
+    end
+
     test "SFA-057 Colress's Tenacity searches for a Stadium and an Energy" do
       {:ok, game} = create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147)
 

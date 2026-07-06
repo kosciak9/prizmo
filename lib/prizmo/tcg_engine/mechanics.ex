@@ -482,6 +482,16 @@ defmodule Prizmo.TcgEngine.Mechanics do
     write_event_and_snapshot(game_id, type, player_id, Map.put(payload, :turn_id, turn_id))
   end
 
+  defp shuffle_lumiose_city_deck(%Game{} = game, %Turn{} = turn, player_id) do
+    context = {:stadium_deck_shuffle, player_id, turn.turn_number, :lumiose_city}
+
+    with {:ok, cards} <- cards_in_zone(game.id, player_id, :deck) do
+      cards
+      |> shuffle_cards(game.rng_seed, context)
+      |> reorder_deck_cards()
+    end
+  end
+
   @spec play_trainer_to_discard(Game.t() | String.t(), String.t(), String.t()) ::
           {:ok, Game.t()} | {:error, term()}
   def play_trainer_to_discard(game_or_id, player_id, card_instance_id)
@@ -1117,6 +1127,63 @@ defmodule Prizmo.TcgEngine.Mechanics do
                    length(discarded_cards),
                    length(drawn_cards)
                  )
+             }) do
+        get_game(game.id)
+      end
+    end)
+  end
+
+  @spec use_lumiose_city(Game.t() | String.t(), String.t(), String.t()) ::
+          {:ok, Game.t()} | {:error, term()}
+  def use_lumiose_city(game_or_id, player_id, target_card_instance_id)
+      when is_binary(player_id) and is_binary(target_card_instance_id) do
+    transaction(fn ->
+      with {:ok, game} <- get_game(game_or_id),
+           :ok <- require_game_status(game, :in_progress),
+           :ok <- require_active_player(game, player_id),
+           {:ok, turn} <- require_current_turn_status(game.id, :action_window),
+           :ok <- CardPlay.require_no_awaiting_pending_effect(game.id),
+           {:ok, %CardInstance{} = stadium_card} <- StadiumEffects.active_lumiose_city(game.id),
+           :ok <- StadiumEffects.require_lumiose_city_available(game.id, turn.id, player_id),
+           {:ok, target_card} <- get_card(game.id, target_card_instance_id),
+           :ok <- require_card_owned_by_player(target_card, player_id),
+           :ok <- require_card_zone(target_card, :deck),
+           :ok <- require_basic_pokemon(target_card.card_id),
+           {:ok, [moved_card]} <-
+             move_deck_cards_to_bench(game.id, player_id, [target_card], turn.turn_number),
+           moved_cards_payload = EventPayloads.moved_cards([moved_card], :deck, :bench),
+           {:ok, _event} <-
+             write_event_and_snapshot(game.id, :stadium_effect_used, player_id, %{
+               turn_id: turn.id,
+               source: EventPayloads.card_source(stadium_card),
+               source_card_id: stadium_card.card_id,
+               source_card_instance_id: stadium_card.id,
+               effect_key: :search_basic_pokemon_to_bench_then_end_turn,
+               affected_player_id: player_id,
+               cards: moved_cards_payload,
+               public_reveal: true,
+               revealed_cards: moved_cards_payload,
+               public_note: lumiose_city_public_note(player_id, moved_card.card_id)
+             }),
+           {:ok, shuffled_deck} <- shuffle_lumiose_city_deck(game, turn, player_id),
+           {:ok, _event} <-
+             write_event_and_snapshot(game.id, :deck_shuffled, player_id, %{
+               turn_id: turn.id,
+               source: EventPayloads.card_source(stadium_card),
+               source_card_id: stadium_card.card_id,
+               source_card_instance_id: stadium_card.id,
+               effect_key: :search_basic_pokemon_to_bench_then_end_turn,
+               affected_player_id: player_id,
+               shuffle: "lumiose_city",
+               card_count: length(shuffled_deck)
+             }),
+           {:ok, ended_turn} <- update(turn, :end_turn, %{}),
+           {:ok, _event} <-
+             write_event_and_snapshot(game.id, :end_turn, player_id, %{
+               turn_id: ended_turn.id,
+               reason: :lumiose_city,
+               source_card_id: stadium_card.card_id,
+               source_card_instance_id: stadium_card.id
              }) do
         get_game(game.id)
       end
@@ -3892,6 +3959,10 @@ defmodule Prizmo.TcgEngine.Mechanics do
 
   defp prism_tower_public_note(player_id, discarded_count, drawn_count) do
     "Prism Tower let #{String.replace(player_id, "_", " ")} discard #{discarded_count} cards and draw #{drawn_count} cards."
+  end
+
+  defp lumiose_city_public_note(player_id, card_id) do
+    "Lumiose City let #{String.replace(player_id, "_", " ")} search for #{card_id}, put it onto the Bench, and end their turn."
   end
 
   defp adrena_brain_public_note(1), do: "Adrena-Brain moved 1 damage counter."

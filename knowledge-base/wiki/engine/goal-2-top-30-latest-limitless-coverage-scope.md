@@ -64,13 +64,13 @@ Those reports are the canonical starting point for autonomous Goal 2 implementat
 - Tracked top archetypes: `30`
 - Tracked cards with usage greater than `0.00`: `377`
 - Coverage buckets from `mix prizmo.goal2.corpus`:
-  - `supported=152`
+  - `supported=153`
   - `generic-supported=8`
   - `partial=10`
-  - `unimplemented=207`
+  - `unimplemented=206`
 - Metadata buckets:
-  - `cached=173`
-  - `missing=204`
+  - `cached=174`
+  - `missing=203`
 
 Important interpretation:
 
@@ -82,16 +82,16 @@ Important interpretation:
 
 The strongest current Goal 2 implementation candidates are the incomplete cards shared by the most archetypes and/or the most total metagame share.
 
-The latest Goal 2 engine batch closed `MEG-094` Mega Mawile ex as the remaining three-archetype Metal attacker cleanup shared by Archaludon/Metagross shells. Mega Mawile ex now has committed TCGdex metadata and executable attack behavior: `Gobble Down` uses a reusable `damage_per_own_prize_taken` attack-damage primitive for 80 damage per Prize card taken, and `Huge Bite` uses a reusable `base_damage_if_defender_has_damage_counters` primitive that keeps 260 base damage against an undamaged Active and changes base damage to 30 when the opponent's Active already has damage counters.
+The latest Goal 2 engine batch closed `POR-077` Lumiose City as the highest-share remaining two-archetype Stadium blocker shared by N's Zoroark and Crustle Mysterious Rock Inn. Lumiose City now has committed TCGdex metadata and executable active-Stadium behavior: once during the active player's turn, `Mechanics.use_lumiose_city/3` validates the active Stadium, once-per-turn use, open Bench space, and a selected Basic Pokémon in deck; moves that Basic directly to the Bench with public reveal; shuffles the deck; writes Stadium/deck-shuffle/end-turn events; and ends the turn. `GameView` and the temporary React SPA expose the command over legal Basic deck targets.
 
 ### Highest-priority remaining `unimplemented` cards from current report
 
 | Card | Archetypes | Total share | Notes |
 | --- | --- | --- | --- |
-| `POR-077` Lumiose City | `2` | `14.16%` | Highest-share remaining two-archetype unimplemented card now that the three-archetype Mega Mawile ex queue is closed. |
-| `POR-052` Drapion | `2` | `13.61%` | Second-highest-share two-archetype unimplemented card after Lumiose City. |
+| `POR-052` Drapion | `2` | `13.61%` | Highest-share remaining two-archetype unimplemented card after Lumiose City. |
 | `MEG-086` Mega Absol ex | `2` | `11.20%` | High-share two-archetype Darkness attacker cleanup shared by N's Zoroark and Ogerpon Box. |
 | `SVP-149` Pecharunt | `2` | `11.20%` | Paired high-share two-archetype Darkness support cleanup alongside Mega Absol ex. |
+| `TEF-150` Hand Trimmer | `2` | `10.98%` | Next high-share two-archetype Trainer cleanup after the Darkness pair unless a broader primitive re-ranks above it. |
 
 ### Shared `partial` cards worth finishing after the broad unimplemented slice
 
@@ -118,9 +118,9 @@ That means prior Goal 1 and six-deck coverage was not wasted; it now acts as see
 
 ## Recommended next implementation order
 
-1. Use `POR-077` Lumiose City as the next default Goal 2 implementation target because it is now the highest-share remaining two-archetype blocker after the three-archetype Mega Mawile ex queue closed.
-2. Keep `POR-052` Drapion as the immediate follow-up after Lumiose City.
-3. Keep `MEG-086` Mega Absol ex, `SVP-149` Pecharunt, and `TEF-150` Hand Trimmer as the next high-share two-archetype queue after Lumiose City/Drapion unless a broader primitive re-ranks above them.
+1. Use `POR-052` Drapion as the next default Goal 2 implementation target because it is now the highest-share remaining two-archetype blocker after Lumiose City closed.
+2. Keep `MEG-086` Mega Absol ex and `SVP-149` Pecharunt as the immediate high-share two-archetype Darkness follow-up queue after Drapion.
+3. Keep `TEF-150` Hand Trimmer as the next high-share two-archetype Trainer cleanup unless a broader primitive re-ranks above it.
 4. Keep the remaining Dragapult-only cached pair `TWM-099` / `TWM-100` as deliberate single-archetype cleanup, not the default autonomous queue.
 5. Finish the remaining shared partials only after the broad unimplemented slice unless another batch naturally extends the new HP infrastructure; if returning to HP work soon, `POR-086` Growing Grass Energy remains the strongest follow-up.
 6. Keep using `mix prizmo.goal2.corpus` after each batch to re-rank the next blockers by archetype count and weighted share.

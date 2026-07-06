@@ -1,5 +1,12 @@
 # Wiki Log
 
+## [2026-07-06] codebase update | Goal 2 Lumiose City support
+
+- Task attempted: closed `POR-077` Lumiose City as the highest-share remaining two-archetype Goal 2 Stadium blocker after Mega Mawile ex. Added committed TCGdex metadata, authored active-Stadium behavior that searches one Basic Pokémon from deck to Bench, shuffles, and ends the player's turn, and exposed the command through Ash RPC, `GameView`, and the temporary React SPA.
+- Files changed: `lib/prizmo/tcg/cards/behaviors/por.ex`, `lib/prizmo/tcg_engine/stadium_effects.ex`, `lib/prizmo/tcg_engine/mechanics.ex`, `lib/prizmo/tcg_engine/game.ex`, `lib/prizmo/tcg_engine/game/action_commands.ex`, `lib/prizmo/tcg_engine.ex`, `lib/prizmo/tcg_engine/game_view/action_affordances.ex`, `lib/prizmo_web/spa/lib/ash/client.ts`, `lib/prizmo_web/spa/features/home/routes/index.tsx`, `test/prizmo/tcg_engine/mechanics_test.exs`, `priv/tcg/cards/tcgdex/cards/POR-077.json`, `knowledge-base/wiki/engine/goal-2-top-30-latest-limitless-coverage-scope.md`, `knowledge-base/wiki/engine/ash-backed-tcg-engine-playtest-handoff.md`, `knowledge-base/wiki/log.md`.
+- Validation: `mix test test/prizmo/tcg_engine/mechanics_test.exs -n "Lumiose City"`; `mix ash_typescript.codegen`; `node_modules/.bin/tsc --noEmit`; `mix test test/prizmo/tcg/cards/metadata_test.exs`; `mix test test/prizmo/tcg_engine/mechanics_test.exs`; `mix compile --warnings-as-errors`; `mix ash_typescript.codegen --check`; `mix prizmo.goal2.corpus` confirmed `supported=153` / `generic-supported=8` / `partial=10` / `unimplemented=206` and `cached=174` / `missing=203`; final `mix check` passed.
+- Remaining/blocking notes: `POR-077` is no longer in the shared incomplete queue. The default next Goal 2 priority is now `POR-052` Drapion, followed by `MEG-086` Mega Absol ex / `SVP-149` Pecharunt and then `TEF-150` Hand Trimmer unless the live corpus re-ranks the queue.
+
 ## [2026-07-06] codebase update | Goal 2 Mega Mawile ex support
 
 - Task attempted: closed `MEG-094` Mega Mawile ex as the remaining three-archetype Metal attacker blocker after the Greninja/Starmie pair. Added committed TCGdex metadata, authored `Gobble Down` with a reusable `damage_per_own_prize_taken` primitive, and authored `Huge Bite` with a reusable `base_damage_if_defender_has_damage_counters` primitive that changes base damage to 30 only when the opponent's Active already has damage counters.

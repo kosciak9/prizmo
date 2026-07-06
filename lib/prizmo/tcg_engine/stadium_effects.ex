@@ -30,6 +30,8 @@ defmodule Prizmo.TcgEngine.StadiumEffects do
   @prism_tower_effect :discard_two_cards_to_draw_one
   @prism_tower_card_id "CRI-080"
   @prism_tower_discard_count 2
+  @lumiose_city_effect :search_basic_pokemon_to_bench_then_end_turn
+  @lumiose_city_card_id "POR-077"
 
   def supported_stadium?(%{
         supertype: :trainer,
@@ -104,6 +106,12 @@ defmodule Prizmo.TcgEngine.StadiumEffects do
         effect: %{type: @prism_tower_effect}
       }), do: true
 
+  def supported_stadium?(%{
+        supertype: :trainer,
+        trainer_type: :stadium,
+        effect: %{type: @lumiose_city_effect}
+      }), do: true
+
   def supported_stadium?(_card), do: false
 
   def supported_stadium_card?(card_id) when is_binary(card_id) do
@@ -129,6 +137,16 @@ defmodule Prizmo.TcgEngine.StadiumEffects do
   def prism_tower_card?(card_id) when is_binary(card_id) do
     case CardCatalog.fetch(card_id) do
       {:ok, %{effect: %{type: @prism_tower_effect}}} -> true
+      {:ok, _card} -> false
+      {:error, _reason} -> false
+    end
+  end
+
+  def lumiose_city_card?(%CardInstance{card_id: card_id}), do: lumiose_city_card?(card_id)
+
+  def lumiose_city_card?(card_id) when is_binary(card_id) do
+    case CardCatalog.fetch(card_id) do
+      {:ok, %{effect: %{type: @lumiose_city_effect}}} -> true
       {:ok, _card} -> false
       {:error, _reason} -> false
     end
@@ -168,6 +186,25 @@ defmodule Prizmo.TcgEngine.StadiumEffects do
 
         _multiple ->
           {:error, {:stadium_not_in_play, @prism_tower_card_id}}
+      end
+    end
+  end
+
+  def active_lumiose_city(game_id) when is_binary(game_id) do
+    with {:ok, stadiums} <- CardStore.cards_in_zone(game_id, :stadium) do
+      case stadiums do
+        [%CardInstance{} = stadium] ->
+          if lumiose_city_card?(stadium) do
+            {:ok, stadium}
+          else
+            {:error, {:wrong_stadium_in_play, @lumiose_city_card_id, stadium.card_id}}
+          end
+
+        [] ->
+          {:error, {:stadium_not_in_play, @lumiose_city_card_id}}
+
+        _multiple ->
+          {:error, {:stadium_not_in_play, @lumiose_city_card_id}}
       end
     end
   end
@@ -293,6 +330,32 @@ defmodule Prizmo.TcgEngine.StadiumEffects do
          {:ok, deck_count} <- CardStore.deck_count(game_id, player_id),
          true <- deck_count > 0 || {:error, :prism_tower_has_no_effect} do
       :ok
+    end
+  end
+
+  def require_lumiose_city_available(game_id, turn_id, player_id)
+      when is_binary(game_id) and is_binary(turn_id) and is_binary(player_id) do
+    with :ok <- require_lumiose_city_unused_this_turn(game_id, turn_id, player_id),
+         {:ok, cards} <- CardStore.list_cards(game_id),
+         true <- bench_space(cards, player_id) > 0 || {:error, :bench_full},
+         true <-
+           Enum.any?(cards, &lumiose_city_target_card?(&1, player_id)) ||
+             {:error, :lumiose_city_requires_basic_pokemon_in_deck} do
+      :ok
+    end
+  end
+
+  def lumiose_city_target_cards(game_id, player_id)
+      when is_binary(game_id) and is_binary(player_id) do
+    with {:ok, cards} <- CardStore.list_cards(game_id) do
+      if bench_space(cards, player_id) > 0 do
+        {:ok,
+         cards
+         |> Enum.filter(&lumiose_city_target_card?(&1, player_id))
+         |> Enum.sort_by(&{&1.position, &1.instance_id})}
+      else
+        {:ok, []}
+      end
     end
   end
 
@@ -434,6 +497,16 @@ defmodule Prizmo.TcgEngine.StadiumEffects do
     end
   end
 
+  defp require_lumiose_city_unused_this_turn(game_id, turn_id, player_id) do
+    with {:ok, events} <- stadium_effect_used_events_for_turn(game_id, turn_id, player_id) do
+      if Enum.any?(events, &lumiose_city_effect_used?/1) do
+        {:error, :lumiose_city_already_used_this_turn}
+      else
+        :ok
+      end
+    end
+  end
+
   defp card_play_completed_events_for_turn(game_id, turn_id, player_id) do
     GameEvent
     |> Ash.Query.filter(
@@ -471,6 +544,11 @@ defmodule Prizmo.TcgEngine.StadiumEffects do
       payload_value(payload, "source_card_id") == @prism_tower_card_id
   end
 
+  defp lumiose_city_effect_used?(%GameEvent{payload: payload}) do
+    payload_value(payload, "effect_key") == Atom.to_string(@lumiose_city_effect) or
+      payload_value(payload, "source_card_id") == @lumiose_city_card_id
+  end
+
   defp team_rocket_supporter_card_id?(card_id) when is_binary(card_id) do
     case CardCatalog.fetch(card_id) do
       {:ok, %{trainer_type: :supporter, name: "Team Rocket" <> _rest}} -> true
@@ -490,6 +568,20 @@ defmodule Prizmo.TcgEngine.StadiumEffects do
   defp payload_atom_key("effect_key"), do: :effect_key
   defp payload_atom_key("source_card_id"), do: :source_card_id
   defp payload_atom_key(_key), do: nil
+
+  defp bench_space(cards, player_id) do
+    occupied = Enum.count(cards, &(&1.owner_player_id == player_id and &1.zone == :bench))
+    max(5 - occupied, 0)
+  end
+
+  defp lumiose_city_target_card?(
+         %CardInstance{owner_player_id: player_id, zone: :deck} = card,
+         player_id
+       ) do
+    CardCatalog.basic_pokemon?(card.card_id)
+  end
+
+  defp lumiose_city_target_card?(%CardInstance{}, _player_id), do: false
 
   defp special_condition_immunity_stadium?(%CardInstance{card_id: card_id}) do
     card_id
