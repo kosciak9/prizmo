@@ -1,0 +1,53 @@
+{
+  "prizmo_id": "CRI-076",
+  "source": {
+    "base_url": "https://api.tcgdex.net/v2/en",
+    "dynamic_fields_removed": [
+      "pricing"
+    ],
+    "language": "en",
+    "provider": "TCGdex"
+  },
+  "tcgdex": {
+    "category": "Trainer",
+    "effect": "Switch your Active Pokémon with 1 of your Benched Pokémon. If you moved a Pokémon ex to your Bench in this way, heal 80 damage from that Pokémon.",
+    "id": "me04-076",
+    "illustrator": "GIDORA",
+    "image": "https://assets.tcgdex.net/en/me/me04/076",
+    "legal": {
+      "expanded": true,
+      "standard": true
+    },
+    "localId": "076",
+    "name": "AZ's Tranquility",
+    "rarity": "Uncommon",
+    "regulationMark": "J",
+    "set": {
+      "cardCount": {
+        "official": 86,
+        "total": 122
+      },
+      "id": "me04",
+      "logo": "https://assets.tcgdex.net/en/me/me04/logo",
+      "name": "Chaos Rising",
+      "symbol": "https://assets.tcgdex.net/univ/me/me04/symbol"
+    },
+    "trainerType": "Supporter",
+    "updated": "2026-06-11T22:15:34Z",
+    "variants": {
+      "firstEdition": false,
+      "holo": false,
+      "normal": true,
+      "reverse": false,
+      "wPromo": false
+    },
+    "variants_detailed": [
+      {
+        "size": "standard",
+        "type": "normal",
+        "variantId": "generated"
+      }
+    ]
+  },
+  "tcgdex_id": "me04-076"
+}

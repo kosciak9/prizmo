@@ -630,6 +630,52 @@ defmodule Prizmo.TcgEngine.CardPlay do
          turn,
          player,
          card,
+         %{type: :switch_own_active_with_bench_then_heal_moved_pokemon_ex} = effect,
+         target_ids
+       ) do
+    with {:ok, [bench_card]} <-
+           validate_own_bench_switch_effect(game.id, player.player_id, effect, target_ids),
+         {:ok, active_card} <- own_active_card(game.id, player.player_id),
+         bench_position = bench_card.position,
+         {:ok, moved_active_card} <-
+           update(
+             active_card,
+             :move_active_to_bench,
+             move_active_to_bench_attrs(active_card, bench_position)
+           ),
+         {:ok, moved_bench_card} <-
+           update(bench_card, :promote_to_active, %{position: 1, status: nil}),
+         {:ok, {healed_active_card, healed_damage}} <-
+           maybe_heal_switched_pokemon_ex(moved_active_card, effect),
+         {:ok, _event} <-
+           write_event_and_snapshot(
+             game.id,
+             :cards_moved,
+             player.player_id,
+             maybe_put_heal_payload(
+               %{
+                 reason: :effect_resolution,
+                 source: EventPayloads.card_source(card),
+                 effect_key: effect.key,
+                 cards: [
+                   switched_card_payload(healed_active_card, :active, :bench),
+                   switched_card_payload(moved_bench_card, :bench, :active)
+                 ]
+               },
+               healed_active_card,
+               healed_damage,
+               card
+             )
+           ) do
+      complete_play_card_resolution(game, turn, player, card, effect)
+    end
+  end
+
+  defp complete_play_card_effect(
+         game,
+         turn,
+         player,
+         card,
          %{type: :opponent_hand_to_bottom_then_draw_if_any} = effect,
          _target_ids
        ) do
@@ -2260,6 +2306,18 @@ defmodule Prizmo.TcgEngine.CardPlay do
   defp effect_choice_ids(
          cards,
          player_id,
+         %{type: :switch_own_active_with_bench_then_heal_moved_pokemon_ex},
+         _current_turn
+       ) do
+    cards
+    |> own_bench_choice_cards(player_id)
+    |> Enum.map(& &1.id)
+    |> then(&{:ok, &1})
+  end
+
+  defp effect_choice_ids(
+         cards,
+         player_id,
          %{type: :switch_own_active_with_bench_then_draw_until_hand_size},
          _current_turn
        ) do
@@ -3329,6 +3387,21 @@ defmodule Prizmo.TcgEngine.CardPlay do
     match?({:ok, _metadata}, require_trainer_type(card_id, [:tool]))
   end
 
+  defp pokemon_ex_card?(%CardInstance{card_id: card_id}) do
+    case CardCatalog.fetch(card_id) do
+      {:ok, metadata} -> pokemon_ex?(metadata)
+      {:error, _reason} -> false
+    end
+  end
+
+  defp pokemon_ex?(%{supertype: :pokemon, suffix: "ex"}), do: true
+
+  defp pokemon_ex?(%{supertype: :pokemon, name: name}) when is_binary(name) do
+    String.ends_with?(name, " ex")
+  end
+
+  defp pokemon_ex?(_metadata), do: false
+
   defp crispin_basic_energy_card?(%CardInstance{} = card, player_id) do
     card.owner_player_id == player_id and card.zone == :deck and
       require_basic_energy(card.card_id) == :ok and
@@ -3984,6 +4057,50 @@ defmodule Prizmo.TcgEngine.CardPlay do
   defp sacred_ash_public_note(card_count),
     do: "Sacred Ash shuffled #{card_count} Pokémon from discard into the deck."
 
+  defp maybe_heal_switched_pokemon_ex(%CardInstance{} = card, %{
+         params: %{heal_damage: heal_damage}
+       })
+       when is_integer(heal_damage) and heal_damage > 0 do
+    cond do
+      card.damage <= 0 ->
+        {:ok, {card, 0}}
+
+      not pokemon_ex_card?(card) ->
+        {:ok, {card, 0}}
+
+      true ->
+        healed_damage = min(card.damage, heal_damage)
+
+        with {:ok, healed_card} <-
+               update(card, :set_damage, %{damage: card.damage - healed_damage}) do
+          {:ok, {healed_card, healed_damage}}
+        end
+    end
+  end
+
+  defp maybe_heal_switched_pokemon_ex(%CardInstance{} = card, _effect), do: {:ok, {card, 0}}
+
+  defp maybe_put_heal_payload(payload, %CardInstance{}, 0, _source_card), do: payload
+
+  defp maybe_put_heal_payload(
+         payload,
+         %CardInstance{} = healed_card,
+         healed_damage,
+         %CardInstance{} = source_card
+       )
+       when healed_damage > 0 do
+    payload
+    |> Map.put(:affected_player_id, healed_card.owner_player_id)
+    |> Map.put(:healed_card_instance_id, healed_card.id)
+    |> Map.put(:healed_damage, healed_damage)
+    |> Map.put(:source_card_id, source_card.card_id)
+    |> Map.put(:public_note, azs_tranquility_public_note(healed_card, healed_damage))
+  end
+
+  defp azs_tranquility_public_note(%CardInstance{} = healed_card, healed_damage) do
+    "AZ's Tranquility healed #{healed_damage} damage from #{card_name(healed_card, healed_card.card_id)}."
+  end
+
   defp maybe_put(map, _key, nil), do: map
   defp maybe_put(map, key, value), do: Map.put(map, key, value)
 
@@ -4184,37 +4301,12 @@ defmodule Prizmo.TcgEngine.CardPlay do
     end
   end
 
-  defp maybe_put_prompt_choice_labels(
-         payload,
-         game_id,
-         _player_id,
-         :switch_own_active_with_bench,
-         legal_choice_ids
-       ) do
-    case CardStore.list_cards(game_id) do
-      {:ok, cards} ->
-        cards_by_id = Map.new(cards, &{&1.id, &1})
-
-        labels =
-          legal_choice_ids
-          |> Enum.map(&Map.get(cards_by_id, &1))
-          |> Enum.reject(&is_nil/1)
-          |> Enum.map(&switch_choice_label/1)
-
-        Map.put(payload, :legal_choice_labels, labels)
-
-      {:error, _reason} ->
-        payload
-    end
-  end
-
-  defp maybe_put_prompt_choice_labels(
-         payload,
-         game_id,
-         _player_id,
-         :switch_own_active_with_bench_then_draw_until_hand_size,
-         legal_choice_ids
-       ) do
+  defp maybe_put_prompt_choice_labels(payload, game_id, _player_id, choice_key, legal_choice_ids)
+       when choice_key in [
+              :switch_own_active_with_bench,
+              :switch_own_active_with_bench_then_heal_moved_pokemon_ex,
+              :switch_own_active_with_bench_then_draw_until_hand_size
+            ] do
     case CardStore.list_cards(game_id) do
       {:ok, cards} ->
         cards_by_id = Map.new(cards, &{&1.id, &1})

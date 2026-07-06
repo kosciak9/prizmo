@@ -351,6 +351,20 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     ]
   }
 
+  @azs_tranquility %CardDefinition{
+    id: "CRI-076",
+    kind: :trainer,
+    trainer_type: :supporter,
+    play_window: :action_window,
+    effects: [
+      %Effect{
+        key: :switch_own_active_with_bench_then_heal_moved_pokemon_ex,
+        type: :switch_own_active_with_bench_then_heal_moved_pokemon_ex,
+        params: %{count: 1, heal_damage: 80}
+      }
+    ]
+  }
+
   @boss_orders %CardDefinition{
     id: "MEG-114",
     kind: :trainer,
@@ -1267,6 +1281,7 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
   }
 
   @cards %{
+    @azs_tranquility.id => @azs_tranquility,
     @boss_orders.id => @boss_orders,
     @brocks_scouting.id => @brocks_scouting,
     @budew.id => @budew,

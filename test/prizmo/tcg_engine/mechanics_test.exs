@@ -345,6 +345,140 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
              ]
     end
 
+    test "AZ's Tranquility switches and heals a moved Active Pokemon ex" do
+      {:ok, game} = create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147)
+
+      assert {:ok, game} = Mechanics.pass_turn(game, "player_1")
+
+      {:ok, azs_tranquility} = create_custom_owned_card(game.id, "player_2", "CRI-076", 220)
+      {:ok, azs_tranquility} = ash_update(azs_tranquility, :draw_to_hand, %{position: 20})
+
+      {:ok, pokemon_ex} = create_custom_owned_card(game.id, "player_2", "TWM-112", 221)
+      {:ok, pokemon_ex} = ash_update(pokemon_ex, :draw_to_hand, %{position: 21})
+
+      {:ok, pokemon_ex} =
+        ash_update(pokemon_ex, :play_to_bench, %{
+          position: 2,
+          turn_entered_play: current_turn(game.id).turn_number
+        })
+
+      original_active = active_card(game.id, "player_2")
+
+      {:ok, _original_active} =
+        ash_update(original_active, :move_active_to_bench, %{position: 5, status: nil})
+
+      {:ok, pokemon_ex} = ash_update(pokemon_ex, :promote_to_active, %{position: 1, status: nil})
+      {:ok, pokemon_ex} = ash_update(pokemon_ex, :set_damage, %{damage: 120})
+
+      {:ok, bench_target} = create_custom_owned_card(game.id, "player_2", "PRE-035", 222)
+      {:ok, bench_target} = ash_update(bench_target, :draw_to_hand, %{position: 22})
+
+      {:ok, bench_target} =
+        ash_update(bench_target, :play_to_bench, %{
+          position: 1,
+          turn_entered_play: current_turn(game.id).turn_number
+        })
+
+      assert CardCoverage.summarize("CRI-076").coverage_status == :supported
+
+      assert {:ok, view} = GameView.for_player(game.id, "player_2")
+      play_card = Enum.find(view.action_affordances, &(&1.key == "play_card"))
+      assert is_map(play_card)
+      assert azs_tranquility.id in play_card.source_card_instance_ids
+
+      assert {:ok, game} = Mechanics.play_card(game, "player_2", azs_tranquility.id, %{})
+
+      [prompt] = awaiting_prompts(game.id)
+
+      assert prompt.payload["choice_key"] ==
+               "switch_own_active_with_bench_then_heal_moved_pokemon_ex"
+
+      assert bench_target.id in prompt.payload["legal_choices"]
+
+      assert {:ok, _game} =
+               Mechanics.choose_prompt(game, "player_2", prompt.id, [bench_target.id])
+
+      assert zone(azs_tranquility.id) == :discard
+      assert active_card(game.id, "player_2").id == bench_target.id
+      assert zone(pokemon_ex.id) == :bench
+      assert card(pokemon_ex.id).damage == 40
+
+      cards_moved_event =
+        game.id
+        |> game_events_by_type("cards_moved")
+        |> Enum.find(
+          &(&1.payload["effect_key"] ==
+              "switch_own_active_with_bench_then_heal_moved_pokemon_ex")
+        )
+
+      assert cards_moved_event.payload["healed_card_instance_id"] == pokemon_ex.id
+      assert cards_moved_event.payload["healed_damage"] == 80
+
+      assert Enum.map(cards_moved_event.payload["cards"], & &1["instance_id"]) == [
+               pokemon_ex.id,
+               bench_target.id
+             ]
+    end
+
+    test "AZ's Tranquility does not heal a moved Active non-ex Pokemon" do
+      {:ok, game} = create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147)
+
+      assert {:ok, game} = Mechanics.pass_turn(game, "player_1")
+
+      {:ok, azs_tranquility} = create_custom_owned_card(game.id, "player_2", "CRI-076", 230)
+      {:ok, azs_tranquility} = ash_update(azs_tranquility, :draw_to_hand, %{position: 20})
+
+      {:ok, non_ex_active} = create_custom_owned_card(game.id, "player_2", "PRE-035", 231)
+      {:ok, non_ex_active} = ash_update(non_ex_active, :draw_to_hand, %{position: 21})
+
+      {:ok, non_ex_active} =
+        ash_update(non_ex_active, :play_to_bench, %{
+          position: 2,
+          turn_entered_play: current_turn(game.id).turn_number
+        })
+
+      original_active = active_card(game.id, "player_2")
+
+      {:ok, _original_active} =
+        ash_update(original_active, :move_active_to_bench, %{position: 5, status: nil})
+
+      {:ok, non_ex_active} =
+        ash_update(non_ex_active, :promote_to_active, %{position: 1, status: nil})
+
+      {:ok, non_ex_active} = ash_update(non_ex_active, :set_damage, %{damage: 50})
+
+      {:ok, bench_target} = create_custom_owned_card(game.id, "player_2", "SCR-114", 232)
+      {:ok, bench_target} = ash_update(bench_target, :draw_to_hand, %{position: 22})
+
+      {:ok, bench_target} =
+        ash_update(bench_target, :play_to_bench, %{
+          position: 1,
+          turn_entered_play: current_turn(game.id).turn_number
+        })
+
+      assert {:ok, game} = Mechanics.play_card(game, "player_2", azs_tranquility.id, %{})
+
+      [prompt] = awaiting_prompts(game.id)
+
+      assert {:ok, _game} =
+               Mechanics.choose_prompt(game, "player_2", prompt.id, [bench_target.id])
+
+      assert active_card(game.id, "player_2").id == bench_target.id
+      assert zone(non_ex_active.id) == :bench
+      assert card(non_ex_active.id).damage == 50
+
+      cards_moved_event =
+        game.id
+        |> game_events_by_type("cards_moved")
+        |> Enum.find(
+          &(&1.payload["effect_key"] ==
+              "switch_own_active_with_bench_then_heal_moved_pokemon_ex")
+        )
+
+      refute Map.has_key?(cards_moved_event.payload, "healed_damage")
+      refute Map.has_key?(cards_moved_event.payload, "healed_card_instance_id")
+    end
+
     test "first player cannot play ordinary Supporters on turn 1, but Team Rocket's Proton remains legal" do
       {:ok, game} = create_action_window_game_with_decks(RocketMewtwo27459, Alakazam27147)
 

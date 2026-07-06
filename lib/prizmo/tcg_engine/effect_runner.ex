@@ -17,6 +17,7 @@ defmodule Prizmo.TcgEngine.EffectRunner do
     :kieran_switch_or_damage_bonus,
     :return_own_pokemon_with_attached_cards_to_hand,
     :switch_own_active_with_bench,
+    :switch_own_active_with_bench_then_heal_moved_pokemon_ex,
     :switch_own_active_with_bench_then_draw_until_hand_size,
     :switch_team_rocket_bench_and_opponent_bench_to_active,
     :switch_opponent_bench_to_active,
