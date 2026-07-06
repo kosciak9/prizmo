@@ -1,10 +1,13 @@
 defmodule Prizmo.TcgEngine.AttackDamage do
   @moduledoc false
 
+  import Prizmo.TcgEngine.Requirements, only: [require_unique_ids: 1]
+
   alias Prizmo.TcgEngine.AttackEffects
   alias Prizmo.TcgEngine.CardCatalog
   alias Prizmo.TcgEngine.CardInstance
   alias Prizmo.TcgEngine.CardStore
+  alias Prizmo.TcgEngine.EnergyEffects
   alias Prizmo.TcgEngine.GameEvent
   alias Prizmo.TcgEngine.ToolEffects
   alias Prizmo.TcgEngine.TurnStore
@@ -151,6 +154,37 @@ defmodule Prizmo.TcgEngine.AttackDamage do
     with {:ok, energy_card_instance_ids} <- discarded_energy_card_instance_ids(opts),
          :ok <- require_max_discarded_energy_count(energy_card_instance_ids, max_discards) do
       {:ok, damage + length(energy_card_instance_ids) * bonus_damage}
+    end
+  end
+
+  defp apply_effect(
+         damage,
+         %CardInstance{} = attacker_card,
+         _defender_card,
+         %{
+           type: :discard_attached_energy_for_bonus_damage,
+           energy_type: energy_type,
+           discard_count: discard_count,
+           bonus_damage: bonus_damage
+         },
+         opts
+       )
+       when is_atom(energy_type) and is_integer(discard_count) and discard_count > 0 and
+              is_integer(bonus_damage) and
+              bonus_damage >= 0 do
+    with {:ok, energy_card_instance_ids} <- discarded_energy_card_instance_ids(opts),
+         {:ok, bonus_selected?} <-
+           validate_attached_energy_bonus_discards(
+             attacker_card,
+             energy_card_instance_ids,
+             energy_type,
+             discard_count
+           ) do
+      if bonus_selected? do
+        {:ok, damage + bonus_damage}
+      else
+        {:ok, damage}
+      end
     end
   end
 
@@ -522,6 +556,11 @@ defmodule Prizmo.TcgEngine.AttackDamage do
 
   defp apply_effect(damage, _attacker_card, _defender_card, %{type: :heal_self_after_damage}),
     do: {:ok, damage}
+
+  defp apply_effect(damage, _attacker_card, _defender_card, %{
+         type: :switch_opponent_active_with_bench_chosen_by_opponent
+       }),
+       do: {:ok, damage}
 
   defp apply_effect(damage, _attacker_card, _defender_card, %{
          type: :self_damage_then_paralyze_and_poison_defender_active
@@ -1014,6 +1053,63 @@ defmodule Prizmo.TcgEngine.AttackDamage do
       ids when is_list(ids) -> {:ok, ids}
       _invalid -> {:error, :invalid_discarded_energy_card_instance_ids}
     end
+  end
+
+  defp validate_attached_energy_bonus_discards(%CardInstance{}, [], _energy_type, _discard_count) do
+    {:ok, false}
+  end
+
+  defp validate_attached_energy_bonus_discards(
+         %CardInstance{} = attacker_card,
+         energy_card_instance_ids,
+         energy_type,
+         discard_count
+       )
+       when is_list(energy_card_instance_ids) do
+    with :ok <- require_exact_discard_count(energy_card_instance_ids, discard_count),
+         :ok <- require_unique_ids(energy_card_instance_ids),
+         {:ok, attached_cards} <-
+           CardStore.attached_cards(attacker_card.game_id, attacker_card.id),
+         :ok <-
+           require_attached_energy_cards_provide_type(
+             attached_cards,
+             attacker_card,
+             energy_card_instance_ids,
+             energy_type
+           ) do
+      {:ok, true}
+    end
+  end
+
+  defp require_exact_discard_count(energy_card_instance_ids, discard_count) do
+    if length(energy_card_instance_ids) == discard_count do
+      :ok
+    else
+      {:error, {:wrong_discarded_energy_count, length(energy_card_instance_ids), discard_count}}
+    end
+  end
+
+  defp require_attached_energy_cards_provide_type(
+         attached_cards,
+         %CardInstance{} = attacker_card,
+         energy_card_instance_ids,
+         energy_type
+       ) do
+    attached_by_id = Map.new(attached_cards, &{&1.id, &1})
+
+    Enum.reduce_while(energy_card_instance_ids, :ok, fn energy_card_instance_id, :ok ->
+      case Map.fetch(attached_by_id, energy_card_instance_id) do
+        {:ok, %CardInstance{} = energy_card} ->
+          if EnergyEffects.provides_type?(energy_card, energy_type, attacker_card) do
+            {:cont, :ok}
+          else
+            {:halt, {:error, {:invalid_discarded_energy_type, energy_card.id, energy_type}}}
+          end
+
+        :error ->
+          {:halt, {:error, :invalid_discarded_energy_choice}}
+      end
+    end)
   end
 
   defp require_max_discarded_energy_count(energy_card_instance_ids, max_discards) do

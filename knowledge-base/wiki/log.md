@@ -1,5 +1,12 @@
 # Wiki Log
 
+## [2026-07-07] codebase update | Goal 2 Metagross support
+
+- Task attempted: closed `CRI-061` Metagross as the default highest-share remaining two-archetype Goal 2 Pokémon blocker after Bubbly Water Energy. Added committed TCGdex metadata, authored `Bounce Back` as 60 damage plus opponent-selected Active replacement, and authored `Metallic Hammer` as optional attached Metal-providing Energy discard for +150 damage.
+- Files changed: `lib/prizmo/tcg/cards/behaviors/cri.ex`, `lib/prizmo/tcg_engine/attack_damage.ex`, `lib/prizmo/tcg_engine/attack_effects.ex`, `lib/prizmo/tcg_engine/game_view.ex`, `lib/prizmo_web/spa/features/home/routes/index.tsx`, `test/prizmo/tcg_engine/mechanics_test.exs`, `priv/tcg/cards/tcgdex/cards/CRI-061.json`, `knowledge-base/wiki/engine/goal-2-top-30-latest-limitless-coverage-scope.md`, `knowledge-base/wiki/engine/ash-backed-tcg-engine-playtest-handoff.md`, `knowledge-base/wiki/index.md`, `knowledge-base/wiki/log.md`.
+- Validation: `mix format`; `mix compile --warnings-as-errors`; `mix test test/prizmo/tcg_engine/mechanics_test.exs --only describe:"CRI-061 Metagross support"`; `mix test test/prizmo/tcg/cards/metadata_test.exs test/prizmo/tcg_engine/mechanics_test.exs`; `node_modules/.bin/tsc --noEmit`; Tidewave runtime validation confirmed `CRI-061` reports `coverage_status: :supported`; `mix prizmo.goal2.corpus` confirmed `supported=167` / `generic-supported=8` / `partial=10` / `unimplemented=192` and `cached=188` / `missing=189`; final `mix check` passed.
+- Remaining/blocking notes: `CRI-061` is no longer in the shared incomplete queue. The default next Goal 2 priority is now `SFA-063` Powerglass, followed by `PRE-116` Max Rod, `PRE-086` Regigigas, and then the Hydrapple/Ogerpon Grass-line cluster unless the live corpus re-ranks the queue.
+
 ## [2026-07-06] codebase update | Goal 2 Bubbly Water Energy support
 
 - Task attempted: closed `CRI-084` Bubbly Water Energy as the default highest-share remaining two-archetype Goal 2 Special Energy blocker after the Spiky Energy / Jumbo Ice Cream pair. Added committed TCGdex metadata, authored it as a Water-providing Special Energy, and implemented Energy-side Special Condition recovery/prevention for attached Water Pokémon across direct status commands and attack effects.

@@ -1,0 +1,95 @@
+{
+  "prizmo_id": "CRI-061",
+  "source": {
+    "base_url": "https://api.tcgdex.net/v2/en",
+    "dynamic_fields_removed": [
+      "pricing"
+    ],
+    "language": "en",
+    "provider": "TCGdex"
+  },
+  "tcgdex": {
+    "attacks": [
+      {
+        "cost": [
+          "Metal"
+        ],
+        "damage": 60,
+        "effect": "Switch out your opponent's Active Pokémon to the Bench. (Your opponent chooses the new Active Pokémon.)",
+        "name": "Bounce Back"
+      },
+      {
+        "cost": [
+          "Metal",
+          "Metal",
+          "Metal",
+          "Colorless"
+        ],
+        "damage": "150+",
+        "effect": "You may discard 3 {M} Energy from this Pokémon and have this attack do 150 more damage.",
+        "name": "Metallic Hammer"
+      }
+    ],
+    "category": "Pokemon",
+    "description": "Metang combined to form it. With four brains, it has the intelligence of a supercomputer.",
+    "dexId": [
+      376
+    ],
+    "evolveFrom": "Metang",
+    "hp": 180,
+    "id": "me04-061",
+    "illustrator": "Bun Toujo",
+    "image": "https://assets.tcgdex.net/en/me/me04/061",
+    "legal": {
+      "expanded": true,
+      "standard": true
+    },
+    "localId": "061",
+    "name": "Metagross",
+    "rarity": "Uncommon",
+    "regulationMark": "J",
+    "resistances": [
+      {
+        "type": "Grass",
+        "value": "-30"
+      }
+    ],
+    "retreat": 3,
+    "set": {
+      "cardCount": {
+        "official": 86,
+        "total": 122
+      },
+      "id": "me04",
+      "logo": "https://assets.tcgdex.net/en/me/me04/logo",
+      "name": "Chaos Rising",
+      "symbol": "https://assets.tcgdex.net/univ/me/me04/symbol"
+    },
+    "stage": "Stage2",
+    "types": [
+      "Metal"
+    ],
+    "updated": "2026-06-15T09:33:40+01:00",
+    "variants": {
+      "firstEdition": false,
+      "holo": false,
+      "normal": true,
+      "reverse": false,
+      "wPromo": false
+    },
+    "variants_detailed": [
+      {
+        "size": "standard",
+        "type": "normal",
+        "variantId": "endfynwn4n10gzq"
+      }
+    ],
+    "weaknesses": [
+      {
+        "type": "Fire",
+        "value": "×2"
+      }
+    ]
+  },
+  "tcgdex_id": "me04-061"
+}

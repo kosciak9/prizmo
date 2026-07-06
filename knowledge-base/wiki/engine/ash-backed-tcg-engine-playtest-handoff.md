@@ -1,11 +1,18 @@
 # Ash-backed TCG Engine Playtest Handoff
 
-- Updated: 2026-07-06 (superseded by latest-Limitless/Godot roadmap)
+- Updated: 2026-07-07 (superseded by latest-Limitless/Godot roadmap)
 - Sources: Project codebase; local validation; wiki log
 - Raw: N/A — operational handoff
 
 - This document is historical/operational context. The active canonical roadmap is now [Prizmo TCG Engine and Play Surface North Star](ash-backed-tcg-engine-playtest-north-star.md): Goal 1 latest-Limitless Dragapult/Alakazam completeness, Goal 2 latest top-30 Limitless archetype coverage, Goal 3 React shell + embedded Godot play surface, Goal 4 React Native mobile path, Goal 5 all possible cards.
 - Treat the two-deck and six-deck selection rules below as historical unless they directly help with the current latest-Limitless coverage goals.
+
+## [2026-07-07] Goal 2 Metagross support batch
+
+- Current state: `CRI-061` Metagross is now closed instead of staying as the default highest-share remaining two-archetype Goal 2 Pokémon blocker after Bubbly Water Energy. Added committed TCGdex metadata, authored `Bounce Back` as 60 damage followed by an opponent-selected replacement Active after switching the opponent's Active to the Bench, and authored `Metallic Hammer` as 150 damage with an optional discard of three attached Energy that provide Metal from Metagross for +150 damage.
+- Current live snapshot: rerunning the live Goal 2 corpus after the batch keeps the same `377` tracked cards but moves the support buckets to `supported=167`, `generic-supported=8`, `partial=10`, and `unimplemented=192`, while the metadata split improves to `cached=188` / `missing=189`. `CRI-061` is no longer in the shared incomplete queue. The next default Goal 2 priority is now `SFA-063` Powerglass (`2` archetypes / `5.74%` total share), followed by `PRE-116` Max Rod (`2` / `5.59%`), `PRE-086` Regigigas (`2` / `5.30%`), and the Hydrapple/Ogerpon 5.15% Grass-line cluster.
+- Validation: `mix format`; `mix compile --warnings-as-errors`; `mix test test/prizmo/tcg_engine/mechanics_test.exs --only describe:"CRI-061 Metagross support"`; `mix test test/prizmo/tcg/cards/metadata_test.exs test/prizmo/tcg_engine/mechanics_test.exs`; `node_modules/.bin/tsc --noEmit`; Tidewave runtime validation confirmed `CRI-061` reports `coverage_status: :supported`; `mix prizmo.goal2.corpus` confirmed the new support and metadata counts; final `mix check` passed.
+- Next recommendation: take `SFA-063` Powerglass next as the highest-share remaining shared Tool blocker unless the live corpus re-ranks the queue. Keep `PRE-116` Max Rod and `PRE-086` Regigigas as the immediate Item/Pokémon follow-ups.
 
 ## [2026-07-06] Goal 2 Bubbly Water Energy support batch
 

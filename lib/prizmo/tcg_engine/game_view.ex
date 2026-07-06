@@ -170,7 +170,8 @@ defmodule Prizmo.TcgEngine.GameView do
         pending_attack_effect_type in [
           :damage_per_discarded_own_basic_energy,
           :discard_defending_energy_on_coin_heads,
-          :discard_energy_from_own_bench_for_bonus_damage
+          :discard_energy_from_own_bench_for_bonus_damage,
+          :discard_attached_energy_for_bonus_damage
         ],
       pending_attack_requires_returned_energy:
         pending_attack_effect_type == :return_attached_energy_to_hand,

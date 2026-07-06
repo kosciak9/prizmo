@@ -118,6 +118,8 @@ defmodule Prizmo.TcgEngine.AttackEffects do
     :recover_trainer_from_discard_to_hand,
     :return_attached_energy_to_hand,
     :opponent_bench_damage_counters,
+    :discard_attached_energy_for_bonus_damage,
+    :switch_opponent_active_with_bench_chosen_by_opponent,
     :prevent_damage_and_effects_from_attacks_next_turn_on_coin_heads,
     :put_up_to_3_duskull_from_discard_to_bench,
     :return_attacker_and_attached_to_hand,
@@ -165,6 +167,20 @@ defmodule Prizmo.TcgEngine.AttackEffects do
         case opponent_in_play_pokemon_cards(game_id, player_id) do
           {:ok, opponent_cards} -> length(opponent_cards) <= target_count
           _error -> true
+        end
+
+      %{
+        type: :discard_attached_energy_for_bonus_damage,
+        energy_type: energy_type,
+        discard_count: discard_count
+      }
+      when is_atom(energy_type) and is_integer(discard_count) and discard_count > 0 ->
+        case active_card(game_id, player_id) do
+          {:ok, %CardInstance{} = attacker_card} ->
+            legal_attached_energy_count(game_id, attacker_card, energy_type) < discard_count
+
+          {:error, _reason} ->
+            true
         end
 
       _other_effect ->
@@ -363,6 +379,21 @@ defmodule Prizmo.TcgEngine.AttackEffects do
       %{type: :damage_per_discarded_own_basic_energy} ->
         discard_attached_basic_energy_for_damage(game_id, player_id, opts)
 
+      %{
+        type: :discard_attached_energy_for_bonus_damage,
+        energy_type: energy_type,
+        discard_count: discard_count
+      }
+      when is_atom(energy_type) and is_integer(discard_count) and discard_count > 0 ->
+        discard_attached_energy_for_bonus_damage(
+          game_id,
+          player_id,
+          attacker_card,
+          opts,
+          energy_type,
+          discard_count
+        )
+
       %{type: :discard_defending_energy_on_coin_heads} ->
         discard_defending_energy_on_coin_heads(game_id, player_id, defender_card, opts)
 
@@ -476,6 +507,15 @@ defmodule Prizmo.TcgEngine.AttackEffects do
       %{type: :opponent_bench_damage_counters, total_counters: total_counters}
       when is_integer(total_counters) and total_counters >= 0 ->
         damage_opponent_bench_counters(game_id, player_id, opts, total_counters)
+
+      %{type: :switch_opponent_active_with_bench_chosen_by_opponent} ->
+        switch_opponent_active_with_bench_chosen_by_opponent(
+          game_id,
+          player_id,
+          attacker_card,
+          defender_card,
+          attack
+        )
 
       %{
         type: :shuffle_attached_energy_into_deck_then_damage_opponent_bench,
@@ -643,6 +683,53 @@ defmodule Prizmo.TcgEngine.AttackEffects do
              effect_key: pending_effect.effect_key,
              selected_card_instance_ids: Enum.map(moved_cards, & &1.id),
              selected_count: length(moved_cards)
+           }) do
+      GameStore.get_game(game.id)
+    end
+  end
+
+  def resume_pending_effect(
+        %Game{} = game,
+        %Prompt{} = prompt,
+        %PendingEffect{source_type: :attack_effect, effect_key: :bounce_back_choose_new_active} =
+          pending_effect,
+        player_id,
+        "bounce_back_choose_new_active",
+        selected_card_instance_ids
+      )
+      when is_binary(player_id) and is_list(selected_card_instance_ids) do
+    with :ok <-
+           require_exact_count(selected_card_instance_ids, 1, :wrong_bounce_back_target_count),
+         :ok <- require_unique_ids(selected_card_instance_ids),
+         :ok <- require_prompt_legal_choices(prompt, selected_card_instance_ids),
+         {:ok, [bench_card]} <- get_cards(game.id, selected_card_instance_ids),
+         {:ok, active_card} <- bounce_back_active_card(game.id, player_id, pending_effect),
+         :ok <- require_card_owned_by_player(bench_card, player_id),
+         :ok <- require_card_zone(bench_card, :bench),
+         {:ok, switch_payload} <-
+           switch_opponent_active_with_selected_bench(active_card, bench_card),
+         {:ok, _event} <-
+           write_event_and_snapshot(game.id, :cards_moved, player_id, %{
+             reason: :attack_effect_resolution,
+             source: source_payload(pending_effect),
+             effect_key: pending_effect.effect_key,
+             cards: switch_payload.cards
+           }),
+         {:ok, _pending_effect} <-
+           update(pending_effect, :complete, %{
+             current_player_id: nil,
+             state:
+               Map.merge(pending_effect.state || %{}, %{
+                 "selected_bench_card_instance_id" => bench_card.id,
+                 "switched_active_card_instance_id" => active_card.id
+               })
+           }),
+         {:ok, _event} <-
+           write_event_and_snapshot(game.id, :attack_effect_completed, player_id, %{
+             prompt_id: prompt.id,
+             pending_effect_id: pending_effect.id,
+             effect_key: pending_effect.effect_key,
+             selected_card_instance_id: bench_card.id
            }) do
       GameStore.get_game(game.id)
     end
@@ -863,6 +950,16 @@ defmodule Prizmo.TcgEngine.AttackEffects do
       |> Enum.filter(fn card -> require_pokemon_card(card.card_id) == :ok end)
       |> Enum.map(& &1.id)
       |> then(&{:ok, &1})
+    end
+  end
+
+  defp legal_attached_energy_count(game_id, %CardInstance{} = attacker_card, energy_type) do
+    case attached_cards(game_id, attacker_card.id) do
+      {:ok, attached_cards} ->
+        Enum.count(attached_cards, &EnergyEffects.provides_type?(&1, energy_type, attacker_card))
+
+      {:error, _reason} ->
+        0
     end
   end
 
@@ -1712,6 +1809,73 @@ defmodule Prizmo.TcgEngine.AttackEffects do
          effect_type: "damage_per_discarded_own_basic_energy",
          discarded_energy_card_instance_ids: Enum.map(discarded_cards, & &1.id),
          discarded_energy_count: length(discarded_cards)
+       }}
+    end
+  end
+
+  defp discard_attached_energy_for_bonus_damage(
+         game_id,
+         player_id,
+         %CardInstance{} = attacker_card,
+         opts,
+         energy_type,
+         discard_count
+       ) do
+    with {:ok, energy_card_instance_ids} <- discarded_energy_card_instance_ids(opts) do
+      case energy_card_instance_ids do
+        [] ->
+          {:ok,
+           %{
+             effect_type: "discard_attached_energy_for_bonus_damage",
+             discarded_energy_card_instance_ids: [],
+             discarded_energy_count: 0,
+             bonus_damage_applied?: false
+           }}
+
+        [_first | _rest] ->
+          discard_selected_attached_energy_for_bonus_damage(
+            game_id,
+            player_id,
+            attacker_card,
+            energy_card_instance_ids,
+            energy_type,
+            discard_count
+          )
+      end
+    end
+  end
+
+  defp discard_selected_attached_energy_for_bonus_damage(
+         game_id,
+         player_id,
+         %CardInstance{} = attacker_card,
+         energy_card_instance_ids,
+         energy_type,
+         discard_count
+       ) do
+    with :ok <-
+           require_exact_count(
+             energy_card_instance_ids,
+             discard_count,
+             :wrong_discarded_energy_count
+           ),
+         {:ok, energy_cards} <-
+           discardable_attached_energy_cards_providing_type(
+             game_id,
+             player_id,
+             attacker_card,
+             energy_card_instance_ids,
+             energy_type
+           ),
+         {:ok, discarded_cards} <-
+           BattleActions.discard_retreat_energy(game_id, player_id, energy_cards) do
+      {:ok,
+       %{
+         effect_type: "discard_attached_energy_for_bonus_damage",
+         discarded_energy_card_instance_ids: Enum.map(discarded_cards, & &1.id),
+         discarded_energy_count: length(discarded_cards),
+         discarded_energy_type: Atom.to_string(energy_type),
+         bonus_damage_applied?: length(discarded_cards) == discard_count
        }}
     end
   end
@@ -3369,6 +3533,62 @@ defmodule Prizmo.TcgEngine.AttackEffects do
     end
   end
 
+  defp discardable_attached_energy_cards_providing_type(
+         game_id,
+         player_id,
+         %CardInstance{} = attacker_card,
+         energy_card_instance_ids,
+         energy_type
+       ) do
+    with :ok <- require_unique_ids(energy_card_instance_ids),
+         {:ok, energy_cards} <- get_cards(game_id, energy_card_instance_ids) do
+      energy_cards
+      |> Enum.map(
+        &discardable_attached_energy_card_providing_type(
+          game_id,
+          player_id,
+          attacker_card,
+          &1,
+          energy_type
+        )
+      )
+      |> collect_results()
+    end
+  end
+
+  defp discardable_attached_energy_card_providing_type(
+         game_id,
+         player_id,
+         %CardInstance{} = attacker_card,
+         %CardInstance{} = energy_card,
+         energy_type
+       ) do
+    with :ok <- require_card_owned_by_player(energy_card, player_id),
+         :ok <- require_card_zone(energy_card, :attached),
+         :ok <- require_energy(energy_card.card_id),
+         {:ok, target_card} <- attached_to_own_active_pokemon(game_id, player_id, energy_card),
+         :ok <- require_same_card(target_card, attacker_card),
+         true <-
+           EnergyEffects.provides_type?(energy_card, energy_type, target_card) ||
+             {:error, {:invalid_discarded_energy_type, energy_card.id, energy_type}} do
+      {:ok, energy_card}
+    end
+  end
+
+  defp attached_to_own_active_pokemon(_game_id, _player_id, %CardInstance{
+         attached_to_card_instance_id: nil
+       }) do
+    {:error, :energy_not_attached_to_pokemon}
+  end
+
+  defp attached_to_own_active_pokemon(game_id, player_id, %CardInstance{} = energy_card) do
+    with {:ok, target_card} <- get_card(game_id, energy_card.attached_to_card_instance_id),
+         :ok <- require_card_owned_by_player(target_card, player_id),
+         :ok <- require_card_zone(target_card, :active) do
+      {:ok, target_card}
+    end
+  end
+
   defp discardable_bench_energy_cards(_game_id, _player_id, []), do: {:ok, []}
 
   defp discardable_bench_energy_cards(game_id, player_id, energy_card_instance_ids) do
@@ -3495,6 +3715,196 @@ defmodule Prizmo.TcgEngine.AttackEffects do
          switched_bench_card_instance_id: bench_card.id
        }}
     end
+  end
+
+  defp switch_opponent_active_with_bench_chosen_by_opponent(
+         game_id,
+         player_id,
+         %CardInstance{} = attacker_card,
+         %CardInstance{} = defender_card,
+         attack
+       ) do
+    with {:ok, current_defender_card} <- get_card(game_id, defender_card.id) do
+      if current_defender_card.zone == :active do
+        switch_current_opponent_active_with_bench_chosen_by_opponent(
+          game_id,
+          player_id,
+          attacker_card,
+          current_defender_card,
+          attack
+        )
+      else
+        {:ok,
+         %{
+           effect_type: "switch_opponent_active_with_bench_chosen_by_opponent",
+           switched?: false,
+           switch_reason: "defender_not_active"
+         }}
+      end
+    end
+  end
+
+  defp switch_current_opponent_active_with_bench_chosen_by_opponent(
+         game_id,
+         player_id,
+         %CardInstance{} = attacker_card,
+         %CardInstance{} = current_defender_card,
+         attack
+       ) do
+    opponent_player_id = current_defender_card.owner_player_id
+
+    with {:ok, bench_cards} <- cards_in_zone(game_id, opponent_player_id, :bench) do
+      case bench_cards do
+        [] ->
+          {:ok,
+           %{
+             effect_type: "switch_opponent_active_with_bench_chosen_by_opponent",
+             switched?: false,
+             switch_reason: "no_opponent_bench"
+           }}
+
+        [bench_card] ->
+          with {:ok, switch_payload} <-
+                 switch_opponent_active_with_selected_bench(current_defender_card, bench_card) do
+            {:ok,
+             Map.merge(switch_payload, %{
+               effect_type: "switch_opponent_active_with_bench_chosen_by_opponent",
+               switched?: true,
+               switch_choice_auto_resolved?: true
+             })}
+          end
+
+        [_first | _rest] ->
+          create_bounce_back_switch_prompt(
+            game_id,
+            player_id,
+            opponent_player_id,
+            attacker_card,
+            current_defender_card,
+            attack,
+            bench_cards
+          )
+      end
+    end
+  end
+
+  defp create_bounce_back_switch_prompt(
+         game_id,
+         player_id,
+         opponent_player_id,
+         %CardInstance{} = attacker_card,
+         %CardInstance{} = active_card,
+         attack,
+         bench_cards
+       ) do
+    with {:ok, turn} <- TurnStore.current_turn(game_id),
+         {:ok, pending_effect} <-
+           create(PendingEffect, :create, %{
+             game_id: game_id,
+             source_type: :attack_effect,
+             source_card_instance_id: attacker_card.id,
+             source_card_id: attacker_card.card_id,
+             controller_player_id: player_id,
+             current_player_id: opponent_player_id,
+             effect_key: :bounce_back_choose_new_active,
+             step: "awaiting_choice",
+             state: %{
+               "version" => 1,
+               "kind" => "attack_effect",
+               "effect_type" => "switch_opponent_active_with_bench_chosen_by_opponent",
+               "player_id" => opponent_player_id,
+               "controller_player_id" => player_id,
+               "active_card_instance_id" => active_card.id,
+               "source_card_instance_id" => attacker_card.id,
+               "source_card_id" => attacker_card.card_id,
+               "attack_id" => Atom.to_string(attack.id)
+             }
+           }),
+         {:ok, pending_effect} <-
+           update(pending_effect, :await_prompt, %{
+             current_player_id: opponent_player_id,
+             effect_key: :bounce_back_choose_new_active,
+             step: "awaiting_choice",
+             state: pending_effect.state || %{}
+           }),
+         {:ok, prompt} <-
+           create(Prompt, :create, %{
+             game_id: game_id,
+             turn_id: turn.id,
+             pending_effect_id: pending_effect.id,
+             prompt_type: "select_cards",
+             player_id: opponent_player_id,
+             payload: %{
+               "choice_key" => "bounce_back_choose_new_active",
+               "legal_choices" => Enum.map(bench_cards, & &1.id),
+               "min" => 1,
+               "max" => 1,
+               "active_card_instance_id" => active_card.id,
+               "source_card_instance_id" => attacker_card.id,
+               "source_card_id" => attacker_card.card_id,
+               "attack_id" => Atom.to_string(attack.id)
+             }
+           }) do
+      {:ok,
+       %{
+         effect_type: "switch_opponent_active_with_bench_chosen_by_opponent",
+         switched?: false,
+         switch_prompt_created?: true,
+         switch_legal_choice_count: length(bench_cards),
+         pending_effect_id: pending_effect.id,
+         prompt_id: prompt.id
+       }}
+    end
+  end
+
+  defp bounce_back_active_card(game_id, player_id, %PendingEffect{state: state}) do
+    with active_card_instance_id when is_binary(active_card_instance_id) <-
+           Map.get(state || %{}, "active_card_instance_id"),
+         {:ok, active_card} <- get_card(game_id, active_card_instance_id),
+         :ok <- require_card_owned_by_player(active_card, player_id),
+         :ok <- require_card_zone(active_card, :active) do
+      {:ok, active_card}
+    else
+      nil -> {:error, :missing_bounce_back_active_card_instance_id}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp switch_opponent_active_with_selected_bench(
+         %CardInstance{} = active_card,
+         %CardInstance{} = bench_card
+       ) do
+    bench_position = bench_card.position
+
+    with {:ok, moved_active_card} <-
+           update(
+             active_card,
+             :move_active_to_bench,
+             move_active_to_bench_attrs(active_card, bench_position)
+           ),
+         {:ok, moved_bench_card} <-
+           update(bench_card, :promote_to_active, %{position: 1, status: nil}) do
+      {:ok,
+       %{
+         switched_active_card_instance_id: active_card.id,
+         switched_bench_card_instance_id: bench_card.id,
+         cards: [
+           switched_card_payload(moved_active_card, :active, :bench),
+           switched_card_payload(moved_bench_card, :bench, :active)
+         ]
+       }}
+    end
+  end
+
+  defp switched_card_payload(card, from_zone, to_zone) do
+    %{
+      instance_id: card.id,
+      card_id: card.card_id,
+      owner_player_id: card.owner_player_id,
+      from_zone: from_zone,
+      to_zone: to_zone,
+      to_position: card.position
+    }
   end
 
   defp require_same_card(%CardInstance{id: id}, %CardInstance{id: id}), do: :ok

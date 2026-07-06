@@ -69,6 +69,7 @@ const PLAYER_IDS = [PLAYER_ONE_ID, PLAYER_TWO_ID] as const
 const ULTRA_BALL_POST_SEARCH_HANDOFF_STORAGE_KEY = 'prizmo:tcg-ultra-ball-post-search-handoff'
 const DISCARD_OWN_BASIC_ENERGY_FOR_DAMAGE_EFFECT = 'damage_per_discarded_own_basic_energy'
 const DISCARD_OWN_BENCH_ENERGY_FOR_BONUS_DAMAGE_EFFECT = 'discard_energy_from_own_bench_for_bonus_damage'
+const DISCARD_ATTACHED_ENERGY_FOR_BONUS_DAMAGE_EFFECT = 'discard_attached_energy_for_bonus_damage'
 const DISCARD_DEFENDING_ENERGY_ON_COIN_HEADS_EFFECT = 'discard_defending_energy_on_coin_heads'
 const MOVE_OPPONENT_ATTACHED_ENERGY_BETWEEN_POKEMON_EFFECT = 'move_opponent_attached_energy_between_pokemon'
 const STRANGE_HACKING_EFFECT = 'confuse_defender_active_then_move_opponent_damage_counters'
@@ -5640,6 +5641,7 @@ function AttackProgressPanel({
     turn?.pendingAttackRequiresDiscardedEnergy ||
       resolutionEffectType === DISCARD_OWN_BASIC_ENERGY_FOR_DAMAGE_EFFECT ||
       resolutionEffectType === DISCARD_OWN_BENCH_ENERGY_FOR_BONUS_DAMAGE_EFFECT ||
+      resolutionEffectType === DISCARD_ATTACHED_ENERGY_FOR_BONUS_DAMAGE_EFFECT ||
       resolutionEffectType === DISCARD_DEFENDING_ENERGY_ON_COIN_HEADS_EFFECT
   )
   const pendingAttackRequiresMovedOpponentEnergy =
@@ -5689,6 +5691,10 @@ function AttackProgressPanel({
         : resolutionEffectType === DISCARD_DEFENDING_ENERGY_ON_COIN_HEADS_EFFECT
           ? opponentPlayer?.active
             ? [opponentPlayer.active]
+            : []
+        : resolutionEffectType === DISCARD_ATTACHED_ENERGY_FOR_BONUS_DAMAGE_EFFECT
+          ? activePlayer.active
+            ? [activePlayer.active]
             : []
         : resolutionEffectType === DISCARD_OWN_BASIC_ENERGY_FOR_DAMAGE_EFFECT
           ? [activePlayer.active, ...activePlayer.bench]

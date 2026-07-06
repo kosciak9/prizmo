@@ -3,6 +3,22 @@ defmodule Prizmo.Tcg.Cards.Behaviors.CRI do
 
   use Prizmo.Tcg.Cards.DSL
 
+  card "CRI-061" do
+    attack(:bounce_back,
+      effect: %{type: :switch_opponent_active_with_bench_chosen_by_opponent}
+    )
+
+    attack(:metallic_hammer,
+      damage: 150,
+      effect: %{
+        type: :discard_attached_energy_for_bonus_damage,
+        energy_type: :metal,
+        discard_count: 3,
+        bonus_damage: 150
+      }
+    )
+  end
+
   card "CRI-070" do
     ability(:watchful_eye,
       effect: %{type: :prevent_damage_counter_moves_between_pokemon}

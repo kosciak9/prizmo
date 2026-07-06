@@ -3171,6 +3171,119 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
     end
   end
 
+  describe "CRI-061 Metagross support" do
+    test "Metallic Hammer optionally discards 3 attached Metal Energy for 300 damage" do
+      assert CardCoverage.summarize("CRI-061").coverage_status == :supported
+
+      assert {:ok, bounce_back} = CardCatalog.fetch_attack("CRI-061", :bounce_back)
+      assert bounce_back.damage == 60
+      assert bounce_back.cost == [:metal]
+
+      assert bounce_back.effect == %{
+               type: :switch_opponent_active_with_bench_chosen_by_opponent
+             }
+
+      assert {:ok, metallic_hammer} = CardCatalog.fetch_attack("CRI-061", :metallic_hammer)
+      assert metallic_hammer.damage == 150
+      assert metallic_hammer.cost == [:metal, :metal, :metal, :colorless]
+
+      assert metallic_hammer.effect == %{
+               type: :discard_attached_energy_for_bonus_damage,
+               energy_type: :metal,
+               discard_count: 3,
+               bonus_damage: 150
+             }
+
+      {:ok, game} = create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147)
+      attacker = promote_custom_card_to_active(game.id, "player_1", "CRI-061")
+      defender = promote_custom_card_to_active(game.id, "player_2", "TWM-130")
+
+      metal_energies =
+        for position <- 1..4 do
+          attach_direct_energy(game.id, "player_1", attacker, "MEE-008", position)
+        end
+
+      discarded_energy_ids = metal_energies |> Enum.take(3) |> Enum.map(& &1.id)
+
+      assert {:ok, 150} = AttackDamage.damage_for(attacker, defender, metallic_hammer)
+
+      assert {:ok, 300} =
+               AttackDamage.damage_for(attacker, defender, metallic_hammer, %{
+                 discarded_energy_card_instance_ids: discarded_energy_ids
+               })
+
+      assert {:ok, game} = Mechanics.declare_attack(game, "player_1", :metallic_hammer)
+      assert game.flow_state == :turn_attack_declared
+
+      assert {:ok, view} = GameView.for_player(game.id, "player_1")
+      assert view.current_turn.pending_attack_requires_discarded_energy
+
+      assert {:ok, _game} =
+               Mechanics.resolve_declared_attack(game, "player_1", %{
+                 discarded_energy_card_instance_ids: discarded_energy_ids
+               })
+
+      assert card(defender.id).damage == 300
+      assert Enum.all?(discarded_energy_ids, &(zone(&1) == :discard))
+      assert zone(List.last(metal_energies).id) == :attached
+
+      resolve_event = game.id |> game_events_by_type("resolve_declared_attack") |> List.last()
+      assert resolve_event.payload["effect_type"] == "discard_attached_energy_for_bonus_damage"
+      assert resolve_event.payload["damage"] == 300
+      assert resolve_event.payload["bonus_damage_applied?"]
+      assert resolve_event.payload["discarded_energy_count"] == 3
+
+      assert Enum.sort(resolve_event.payload["discarded_energy_card_instance_ids"]) ==
+               Enum.sort(discarded_energy_ids)
+    end
+
+    test "Bounce Back prompts the opponent to choose the new Active Pokémon" do
+      {:ok, game} = create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147)
+      attacker = promote_custom_card_to_active(game.id, "player_1", "CRI-061")
+      defender = promote_custom_card_to_active(game.id, "player_2", "TWM-130")
+
+      attach_direct_energy(game.id, "player_1", attacker, "MEE-008", 1)
+
+      chosen_bench = play_direct_basic_to_bench(game.id, "player_2", "PRE-035", 1)
+      other_bench = play_direct_basic_to_bench(game.id, "player_2", "PFL-083", 2)
+
+      assert {:ok, game} = Mechanics.declare_attack(game, "player_1", :bounce_back)
+      assert game.flow_state == :turn_attack_resolving
+
+      assert card(defender.id).damage == 60
+      assert active_card(game.id, "player_2").id == defender.id
+
+      [prompt] = awaiting_prompts(game.id)
+      assert prompt.player_id == "player_2"
+      assert prompt.payload["choice_key"] == "bounce_back_choose_new_active"
+      assert chosen_bench.id in prompt.payload["legal_choices"]
+      assert other_bench.id in prompt.payload["legal_choices"]
+
+      resolve_event = game.id |> game_events_by_type("resolve_declared_attack") |> List.last()
+
+      assert resolve_event.payload["effect_type"] ==
+               "switch_opponent_active_with_bench_chosen_by_opponent"
+
+      assert resolve_event.payload["switch_prompt_created?"]
+      assert resolve_event.payload["switch_legal_choice_count"] >= 2
+
+      [pending_effect] = pending_effects(game.id)
+      assert pending_effect.source_card_id == "CRI-061"
+      assert pending_effect.current_player_id == "player_2"
+
+      assert {:ok, _game} =
+               Mechanics.choose_prompt(game, "player_2", prompt.id, [chosen_bench.id])
+
+      assert active_card(game.id, "player_2").id == chosen_bench.id
+      assert zone(defender.id) == :bench
+      assert zone(other_bench.id) == :bench
+
+      cards_moved_event = game.id |> game_events_by_type("cards_moved") |> List.last()
+      assert cards_moved_event.player_id == "player_2"
+      assert cards_moved_event.payload["effect_key"] == "bounce_back_choose_new_active"
+    end
+  end
+
   describe "DRI-016 Applin support" do
     test "DRI-016 Applin Mini Drain heals itself after dealing damage" do
       assert CardCoverage.summarize("DRI-016").coverage_status == :supported
@@ -3570,7 +3683,11 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
   end
 
   defp attach_direct_basic_energy(game_id, player_id, target_card, position) do
-    {:ok, energy} = create_custom_owned_card(game_id, player_id, "MEE-005", 220 + position)
+    attach_direct_energy(game_id, player_id, target_card, "MEE-005", position)
+  end
+
+  defp attach_direct_energy(game_id, player_id, target_card, energy_card_id, position) do
+    {:ok, energy} = create_custom_owned_card(game_id, player_id, energy_card_id, 220 + position)
     {:ok, energy} = ash_update(energy, :draw_to_hand, %{position: 20 + position})
 
     {:ok, energy} =
@@ -3641,6 +3758,22 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
       })
 
     {:ok, card} = ash_update(card, :promote_to_active, %{position: 1, status: nil})
+    card
+  end
+
+  defp promote_custom_card_to_active(game_id, player_id, card_id) do
+    existing_active = active_card(game_id, player_id)
+    {:ok, _existing_active} = ash_update(existing_active, :move_active_to_bench, %{position: 5})
+
+    {:ok, card} = create_custom_owned_card(game_id, player_id, card_id, 270)
+    {:ok, card} = ash_update(card, :draw_to_hand, %{position: 70})
+
+    {:ok, card} =
+      ash_update(card, :choose_active, %{
+        position: 1,
+        turn_entered_play: current_turn(game_id).turn_number
+      })
+
     card
   end
 
