@@ -37,6 +37,7 @@ defmodule Prizmo.TcgEngine do
       rpc_action :play_tcg_engine_card, :play_card_command
       rpc_action :play_tcg_engine_stadium, :play_stadium_command
       rpc_action :use_tcg_engine_team_rockets_factory, :use_team_rockets_factory_command
+      rpc_action :use_tcg_engine_prism_tower, :use_prism_tower_command
       rpc_action :use_tcg_engine_munkidori_adrena_brain, :use_munkidori_adrena_brain_command
       rpc_action :use_tcg_engine_teal_dance, :use_teal_mask_ogerpon_teal_dance_command
       rpc_action :use_tcg_engine_seething_spirit, :use_blaziken_ex_seething_spirit_command
@@ -143,6 +144,10 @@ defmodule Prizmo.TcgEngine do
       define :use_team_rockets_factory_for_game,
         action: :use_team_rockets_factory_command,
         args: [:game_id, :player_id]
+
+      define :use_prism_tower_for_game,
+        action: :use_prism_tower_command,
+        args: [:game_id, :player_id, :discard_card_instance_ids]
 
       define :use_munkidori_adrena_brain_for_game,
         action: :use_munkidori_adrena_brain_command,

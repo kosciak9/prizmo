@@ -1074,6 +1074,55 @@ defmodule Prizmo.TcgEngine.Mechanics do
     end)
   end
 
+  @spec use_prism_tower(Game.t() | String.t(), String.t(), [String.t()]) ::
+          {:ok, Game.t()} | {:error, term()}
+  def use_prism_tower(game_or_id, player_id, discard_card_instance_ids)
+      when is_binary(player_id) and is_list(discard_card_instance_ids) do
+    transaction(fn ->
+      with {:ok, game} <- get_game(game_or_id),
+           :ok <- require_game_status(game, :in_progress),
+           :ok <- require_active_player(game, player_id),
+           {:ok, turn} <- require_current_turn_status(game.id, :action_window),
+           {:ok, player} <- get_player(game.id, player_id),
+           {:ok, %CardInstance{} = stadium_card} <- StadiumEffects.active_prism_tower(game.id),
+           :ok <- StadiumEffects.require_prism_tower_available(game.id, turn.id, player_id),
+           {:ok, %{effect: %{discard_count: discard_count, draw_count: draw_count}}} <-
+             CardCatalog.fetch(stadium_card.card_id),
+           {:ok, discard_cards} <-
+             validate_prism_tower_discard(
+               game.id,
+               player_id,
+               discard_card_instance_ids,
+               discard_count
+             ),
+           {:ok, discarded_cards} <- discard_cards_from_hand(game.id, player_id, discard_cards),
+           {:ok, drawn_cards} <- draw_cards_from_deck(game.id, player, draw_count),
+           {:ok, _event} <-
+             write_event_and_snapshot(game.id, :stadium_effect_used, player_id, %{
+               turn_id: turn.id,
+               source: EventPayloads.card_source(stadium_card),
+               source_card_id: stadium_card.card_id,
+               source_card_instance_id: stadium_card.id,
+               effect_key: :discard_two_cards_to_draw_one,
+               affected_player_id: player_id,
+               discarded_card_count: length(discarded_cards),
+               drawn_card_count: length(drawn_cards),
+               card_count: length(drawn_cards),
+               cards:
+                 EventPayloads.moved_cards(discarded_cards, :hand, :discard) ++
+                   EventPayloads.moved_cards(drawn_cards, :deck, :hand),
+               public_note:
+                 prism_tower_public_note(
+                   player_id,
+                   length(discarded_cards),
+                   length(drawn_cards)
+                 )
+             }) do
+        get_game(game.id)
+      end
+    end)
+  end
+
   @spec use_munkidori_adrena_brain(
           Game.t() | String.t(),
           String.t(),
@@ -3757,12 +3806,34 @@ defmodule Prizmo.TcgEngine.Mechanics do
     end
   end
 
+  defp validate_prism_tower_discard(game_id, player_id, discard_card_instance_ids, discard_count) do
+    with :ok <-
+           require_exact_count(
+             discard_card_instance_ids,
+             discard_count,
+             :wrong_prism_tower_discard_count
+           ),
+         :ok <- require_unique_ids(discard_card_instance_ids),
+         {:ok, discard_cards} <- get_cards(game_id, discard_card_instance_ids),
+         :ok <- require_all_owned_in_zone(discard_cards, player_id, :hand) do
+      {:ok, discard_cards}
+    end
+  end
+
   defp team_rockets_factory_public_note(player_id, 1) do
     "Team Rocket's Factory let #{String.replace(player_id, "_", " ")} draw 1 card."
   end
 
   defp team_rockets_factory_public_note(player_id, card_count) do
     "Team Rocket's Factory let #{String.replace(player_id, "_", " ")} draw #{card_count} cards."
+  end
+
+  defp prism_tower_public_note(player_id, discarded_count, 1) do
+    "Prism Tower let #{String.replace(player_id, "_", " ")} discard #{discarded_count} cards and draw 1 card."
+  end
+
+  defp prism_tower_public_note(player_id, discarded_count, drawn_count) do
+    "Prism Tower let #{String.replace(player_id, "_", " ")} discard #{discarded_count} cards and draw #{drawn_count} cards."
   end
 
   defp adrena_brain_public_note(1), do: "Adrena-Brain moved 1 damage counter."

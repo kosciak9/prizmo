@@ -1,5 +1,12 @@
 # Wiki Log
 
+## [2026-07-06] codebase update | Goal 2 Prism Tower support
+
+- Task attempted: closed `CRI-080` Prism Tower as the highest-share remaining three-archetype Goal 2 Stadium blocker after the ACE SPEC slice. Added committed TCGdex metadata, authored a CRI behavior overlay for its discard-two-draw-one Stadium text, implemented per-player once-per-turn active-Stadium command handling, exposed `prism_tower` through `GameView`, wired Ash RPC/code-interface support, and added React SPA command buttons for legal two-card discard pairs.
+- Files changed: `lib/prizmo/tcg/cards/behaviors/cri.ex`, `lib/prizmo/tcg_engine.ex`, `lib/prizmo/tcg_engine/game.ex`, `lib/prizmo/tcg_engine/game/action_commands.ex`, `lib/prizmo/tcg_engine/game_view/action_affordances.ex`, `lib/prizmo/tcg_engine/mechanics.ex`, `lib/prizmo/tcg_engine/stadium_effects.ex`, `lib/prizmo_web/spa/features/home/routes/index.tsx`, `lib/prizmo_web/spa/lib/ash/client.ts`, `test/prizmo/tcg_engine/mechanics_test.exs`, `priv/tcg/cards/tcgdex/cards/CRI-080.json`, `knowledge-base/wiki/engine/goal-2-top-30-latest-limitless-coverage-scope.md`, `knowledge-base/wiki/engine/ash-backed-tcg-engine-playtest-handoff.md`, `knowledge-base/wiki/log.md`.
+- Validation: `mix ash_typescript.codegen --check`; `mix format`; `mix test test/prizmo/tcg_engine/mechanics_test.exs`; `mix test test/prizmo/tcg/cards/metadata_test.exs`; `mix compile --warnings-as-errors`; `mix assets.build`; `mix prizmo.goal2.corpus` confirmed `supported=144` / `generic-supported=8` / `partial=10` / `unimplemented=215` and `cached=165` / `missing=212`; final `mix check` passed.
+- Remaining/blocking notes: `CRI-080` is no longer in the shared incomplete queue. The default next Goal 2 priority is now `CRI-070` Patrat, followed by `MEG-074` Lunatone, `MEG-075` Solrock, `PRE-115` Larry's Skill, and `TWM-157` Lucian.
+
 ## [2026-07-06] codebase update | Goal 2 Precious Trolley support
 
 - Task attempted: closed `SSP-185` Precious Trolley as the highest-priority remaining three-archetype Goal 2 ACE SPEC blocker. Added committed TCGdex metadata, authored Precious Trolley as an engine-defined Item that searches any number of Basic Pokémon up to available Bench space and puts them directly onto the Bench, and added reusable Bench-destination capacity validation for direct upfront deck-search choices.

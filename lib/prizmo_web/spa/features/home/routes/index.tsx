@@ -44,6 +44,7 @@ import {
   runUseTcgEngineFlipTheScript,
   runUseTcgEngineJewelSeeker,
   runUseTcgEngineMunkidoriAdrenaBrain,
+  runUseTcgEnginePrismTower,
   runUseTcgEnginePsychicDraw,
   runUseTcgEngineReconDirective,
   runUseTcgEngineRunAwayDraw,
@@ -581,6 +582,12 @@ type RunAwayDrawCommandOption = {
   sourceCard: CardSummary | undefined
 }
 
+type PrismTowerCommandOption = {
+  key: string
+  discardCardInstanceIds: string[]
+  discardCards: Array<CardSummary | undefined>
+}
+
 type ActionRenderEntry = {
   key: string
   action: ActionAffordance
@@ -674,6 +681,17 @@ type TeamRocketsFactoryInput = {
 
 type TeamRocketsFactoryCommand = {
   playerId: string
+}
+
+type PrismTowerInput = {
+  gameId: string
+  playerId: PlayerId
+  discardCardInstanceIds: string[]
+}
+
+type PrismTowerCommand = {
+  playerId: string
+  discardCardInstanceIds: string[]
 }
 
 type CursedBlastInput = {
@@ -1376,6 +1394,14 @@ export function HomeRoute() {
 
   const teamRocketsFactoryMutation = useMutation({
     mutationFn: (input: TeamRocketsFactoryInput) => useTeamRocketsFactory(input),
+    onSuccess: async (_game, input) => {
+      clearUltraBallPostSearchHandoff(input.gameId, input.playerId)
+      await queryClient.invalidateQueries({ queryKey: ['tcg-engine', 'game-state'] })
+    }
+  })
+
+  const prismTowerMutation = useMutation({
+    mutationFn: (input: PrismTowerInput) => usePrismTower(input),
     onSuccess: async (_game, input) => {
       clearUltraBallPostSearchHandoff(input.gameId, input.playerId)
       await queryClient.invalidateQueries({ queryKey: ['tcg-engine', 'game-state'] })
@@ -2337,6 +2363,15 @@ export function HomeRoute() {
                     })
                   }
                 }}
+                onUsePrismTower={({ playerId, discardCardInstanceIds }) => {
+                  if (isPlayerId(playerId)) {
+                    prismTowerMutation.mutate({
+                      gameId: normalisedGameId,
+                      playerId,
+                      discardCardInstanceIds
+                    })
+                  }
+                }}
                 onUseCursedBlast={({ playerId, sourceCardInstanceId, targetCardInstanceId }) => {
                   if (isPlayerId(playerId)) {
                     cursedBlastMutation.mutate({
@@ -2529,6 +2564,11 @@ export function HomeRoute() {
                 teamRocketsFactoryPendingPlayerId={
                   teamRocketsFactoryMutation.isPending
                     ? teamRocketsFactoryMutation.variables?.playerId ?? null
+                    : null
+                }
+                prismTowerPendingKey={
+                  prismTowerMutation.isPending && prismTowerMutation.variables
+                    ? prismTowerKey(prismTowerMutation.variables.discardCardInstanceIds)
                     : null
                 }
                 cursedBlastPendingKey={
@@ -3239,6 +3279,20 @@ async function useTeamRocketsFactory(input: TeamRocketsFactoryInput): Promise<Cr
   return result.data as CreatedGame
 }
 
+async function usePrismTower(input: PrismTowerInput): Promise<CreatedGame> {
+  const result = await runUseTcgEnginePrismTower({
+    input,
+    fields: GAME_RESOURCE_FIELDS,
+    headers: buildAshRpcHeaders()
+  })
+
+  if (!result.success) {
+    throw new Error(rpcErrorMessage(result.errors))
+  }
+
+  return result.data as CreatedGame
+}
+
 async function useCursedBlast(input: CursedBlastInput): Promise<CreatedGame> {
   const result = await runUseTcgEngineCursedBlast({
     input,
@@ -3601,6 +3655,7 @@ function GameStateWorkbench({
   onUseReconDirective,
   onUseRunAwayDraw,
   onUseTeamRocketsFactory,
+  onUsePrismTower,
   onRetreat,
   onResolveDeclaredAttack,
   onUndo,
@@ -3635,6 +3690,7 @@ function GameStateWorkbench({
   reconDirectivePendingKey,
   runAwayDrawPendingKey,
   teamRocketsFactoryPendingPlayerId,
+  prismTowerPendingKey,
   resolveDeclaredAttackPendingPlayerId,
   retreatPendingKey
 }: {
@@ -3677,6 +3733,7 @@ function GameStateWorkbench({
   onUseReconDirective: (input: ReconDirectiveCommand) => void
   onUseRunAwayDraw: (input: RunAwayDrawCommand) => void
   onUseTeamRocketsFactory: (input: TeamRocketsFactoryCommand) => void
+  onUsePrismTower: (input: PrismTowerCommand) => void
   onRetreat: (input: RetreatCommand) => void
   onResolveDeclaredAttack: (input: ResolveDeclaredAttackCommand) => void
   onUndo: () => void
@@ -3711,6 +3768,7 @@ function GameStateWorkbench({
   reconDirectivePendingKey: string | null
   runAwayDrawPendingKey: string | null
   teamRocketsFactoryPendingPlayerId: string | null
+  prismTowerPendingKey: string | null
   resolveDeclaredAttackPendingPlayerId: string | null
   retreatPendingKey: string | null
 }) {
@@ -3719,6 +3777,7 @@ function GameStateWorkbench({
     playCardPendingCardId ||
       playStadiumPendingCardId ||
       teamRocketsFactoryPendingPlayerId ||
+      prismTowerPendingKey ||
       cursedBlastPendingKey ||
       subjugatingChainsPendingKey ||
       munkidoriAdrenaBrainPendingKey ||
@@ -3760,11 +3819,13 @@ function GameStateWorkbench({
     onPlayCard,
     onPlayStadium,
     onUseTeamRocketsFactory,
+    onUsePrismTower,
     onRetreat,
     playBasicToBenchPendingCardId,
     playCardPendingCardId,
     playStadiumPendingCardId,
     teamRocketsFactoryPendingPlayerId,
+    prismTowerPendingKey,
     retreatPendingKey,
     viewerPlayerId
   })
@@ -3861,6 +3922,7 @@ function GameStateWorkbench({
             onUseReconDirective={onUseReconDirective}
             onUseRunAwayDraw={onUseRunAwayDraw}
             onUseTeamRocketsFactory={onUseTeamRocketsFactory}
+            onUsePrismTower={onUsePrismTower}
             onRetreat={onRetreat}
             attachEnergyPendingKey={attachEnergyPendingKey}
             attachToolPendingKey={attachToolPendingKey}
@@ -3882,6 +3944,7 @@ function GameStateWorkbench({
             reconDirectivePendingKey={reconDirectivePendingKey}
             runAwayDrawPendingKey={runAwayDrawPendingKey}
             teamRocketsFactoryPendingPlayerId={teamRocketsFactoryPendingPlayerId}
+            prismTowerPendingKey={prismTowerPendingKey}
             retreatPendingKey={retreatPendingKey}
             ultraBallPostSearchHandoff={ultraBallPostSearchHandoff}
             viewerPlayerId={viewerPlayerId}
@@ -3918,11 +3981,13 @@ function buildCardInteractionModel({
   onPlayCard,
   onPlayStadium,
   onUseTeamRocketsFactory,
+  onUsePrismTower,
   onRetreat,
   playBasicToBenchPendingCardId,
   playCardPendingCardId,
   playStadiumPendingCardId,
   teamRocketsFactoryPendingPlayerId,
+  prismTowerPendingKey,
   retreatPendingKey,
   viewerPlayerId
 }: {
@@ -3947,11 +4012,13 @@ function buildCardInteractionModel({
   onPlayCard: (input: PlayCardCommand) => void
   onPlayStadium: (input: PlayStadiumCommand) => void
   onUseTeamRocketsFactory: (input: TeamRocketsFactoryCommand) => void
+  onUsePrismTower: (input: PrismTowerCommand) => void
   onRetreat: (input: RetreatCommand) => void
   playBasicToBenchPendingCardId: string | null
   playCardPendingCardId: string | null
   playStadiumPendingCardId: string | null
   teamRocketsFactoryPendingPlayerId: string | null
+  prismTowerPendingKey: string | null
   retreatPendingKey: string | null
   viewerPlayerId: PlayerId
 }): CardInteractionModel {
@@ -4062,6 +4129,30 @@ function buildCardInteractionModel({
       }
 
       cardDirectedActionKeys.add(actionKeyValue)
+    }
+
+    if (action.key === 'prism_tower' && action.sourceCardInstanceIds.length > 0) {
+      const prismTowerOptions = prismTowerCommandOptions(action, cardsById)
+
+      if (prismTowerOptions.length === 1) {
+        const option = prismTowerOptions[0]!
+
+        for (const cardInstanceId of action.sourceCardInstanceIds) {
+          const card = cardsById.get(cardInstanceId)
+
+          setCardIntent(cardInstanceId, {
+            badge: 'Stadium',
+            disabled: !canRunAction,
+            detail: prismTowerDiscardLabel(option),
+            label: `Use ${card?.name ?? 'Prism Tower'}`,
+            pending: prismTowerPendingKey === option.key,
+            tone: 'primary',
+            onClick: () => onUsePrismTower({ playerId: action.playerId, discardCardInstanceIds: option.discardCardInstanceIds })
+          })
+        }
+
+        cardDirectedActionKeys.add(actionKeyValue)
+      }
     }
 
     if (action.key === 'play_basic_to_bench') {
@@ -6810,6 +6901,7 @@ function ActionAffordancesPanel({
   onUseReconDirective,
   onUseRunAwayDraw,
   onUseTeamRocketsFactory,
+  onUsePrismTower,
   onRetreat,
   attachEnergyPendingKey,
   attachToolPendingKey,
@@ -6831,6 +6923,7 @@ function ActionAffordancesPanel({
   reconDirectivePendingKey,
   runAwayDrawPendingKey,
   teamRocketsFactoryPendingPlayerId,
+  prismTowerPendingKey,
   retreatPendingKey,
   ultraBallPostSearchHandoff,
   viewerPlayerId
@@ -6861,6 +6954,7 @@ function ActionAffordancesPanel({
   onUseReconDirective: (input: ReconDirectiveCommand) => void
   onUseRunAwayDraw: (input: RunAwayDrawCommand) => void
   onUseTeamRocketsFactory: (input: TeamRocketsFactoryCommand) => void
+  onUsePrismTower: (input: PrismTowerCommand) => void
   onRetreat: (input: RetreatCommand) => void
   attachEnergyPendingKey: string | null
   attachToolPendingKey: string | null
@@ -6882,6 +6976,7 @@ function ActionAffordancesPanel({
   reconDirectivePendingKey: string | null
   runAwayDrawPendingKey: string | null
   teamRocketsFactoryPendingPlayerId: string | null
+  prismTowerPendingKey: string | null
   retreatPendingKey: string | null
   ultraBallPostSearchHandoff: UltraBallPostSearchHandoff | null
   viewerPlayerId: PlayerId
@@ -6890,6 +6985,7 @@ function ActionAffordancesPanel({
     playCardPendingCardId ||
       playStadiumPendingCardId ||
       teamRocketsFactoryPendingPlayerId ||
+      prismTowerPendingKey ||
       cursedBlastPendingKey ||
       subjugatingChainsPendingKey ||
       munkidoriAdrenaBrainPendingKey ||
@@ -6998,6 +7094,7 @@ function ActionAffordancesPanel({
                     onUseReconDirective={onUseReconDirective}
                     onUseRunAwayDraw={onUseRunAwayDraw}
                     onUseTeamRocketsFactory={onUseTeamRocketsFactory}
+                    onUsePrismTower={onUsePrismTower}
                     onRetreat={onRetreat}
                     playBasicToBenchPendingCardId={playBasicToBenchPendingCardId}
                     playCardPendingCardId={playCardPendingCardId}
@@ -7014,6 +7111,7 @@ function ActionAffordancesPanel({
                     reconDirectivePendingKey={reconDirectivePendingKey}
                     runAwayDrawPendingKey={runAwayDrawPendingKey}
                     teamRocketsFactoryPendingPlayerId={teamRocketsFactoryPendingPlayerId}
+                    prismTowerPendingKey={prismTowerPendingKey}
                     postSearchBattleAttackIds={postSearchHandoff?.battleAttackIds ?? []}
                     postSearchBenchCardInstanceIds={postSearchHandoff?.benchableCardInstanceIds ?? []}
                     postSearchEndTurnPlayerIds={postSearchHandoff?.endTurnPlayerIds ?? []}
@@ -7607,6 +7705,7 @@ function ActionAffordanceCard({
   onUseReconDirective,
   onUseRunAwayDraw,
   onUseTeamRocketsFactory,
+  onUsePrismTower,
   onRetreat,
   playBasicToBenchPendingCardId,
   playCardPendingCardId,
@@ -7623,6 +7722,7 @@ function ActionAffordanceCard({
   reconDirectivePendingKey,
   runAwayDrawPendingKey,
   teamRocketsFactoryPendingPlayerId,
+  prismTowerPendingKey,
   postSearchBattleAttackIds,
   postSearchBenchCardInstanceIds,
   postSearchEndTurnPlayerIds,
@@ -7660,6 +7760,7 @@ function ActionAffordanceCard({
   onUseReconDirective: (input: ReconDirectiveCommand) => void
   onUseRunAwayDraw: (input: RunAwayDrawCommand) => void
   onUseTeamRocketsFactory: (input: TeamRocketsFactoryCommand) => void
+  onUsePrismTower: (input: PrismTowerCommand) => void
   onRetreat: (input: RetreatCommand) => void
   playBasicToBenchPendingCardId: string | null
   playCardPendingCardId: string | null
@@ -7676,6 +7777,7 @@ function ActionAffordanceCard({
   reconDirectivePendingKey: string | null
   runAwayDrawPendingKey: string | null
   teamRocketsFactoryPendingPlayerId: string | null
+  prismTowerPendingKey: string | null
   postSearchBattleAttackIds: string[]
   postSearchBenchCardInstanceIds: string[]
   postSearchEndTurnPlayerIds: PlayerId[]
@@ -7702,6 +7804,7 @@ function ActionAffordanceCard({
   const psychicDrawOptions = psychicDrawCommandOptions(action, cardsById)
   const reconDirectiveOptions = reconDirectiveCommandOptions(action, cardsById)
   const runAwayDrawOptions = runAwayDrawCommandOptions(action, cardsById)
+  const prismTowerOptions = prismTowerCommandOptions(action, cardsById)
 
   return (
     <li className={`rounded-xl border px-3 py-2 text-sm ${actionSurfaceClassName(action)}`}>
@@ -7801,6 +7904,30 @@ function ActionAffordanceCard({
                 {isPending
                   ? `Using ${stadiumCard?.name ?? "Team Rocket's Factory"}...`
                   : `Use ${stadiumCard?.name ?? formatCardInstanceId(cardInstanceId)}`}
+              </ActionCommandButton>
+            )
+          })}
+        </div>
+      ) : null}
+
+      {prismTowerOptions.length > 0 ? (
+        <div className="mt-2 space-y-1.5">
+          {prismTowerOptions.map(option => {
+            const isPending = prismTowerPendingKey === option.key
+
+            return (
+              <ActionCommandButton
+                disabled={!canRunAction}
+                key={option.key}
+                onClick={() =>
+                  onUsePrismTower({
+                    playerId: action.playerId,
+                    discardCardInstanceIds: option.discardCardInstanceIds
+                  })
+                }
+                tone="primary"
+              >
+                {isPending ? prismTowerPendingLabel(option) : prismTowerButtonLabel(option)}
               </ActionCommandButton>
             )
           })}
@@ -8409,6 +8536,7 @@ function actionSurfaceClassName(action: ActionAffordance) {
     case 'psychic_draw':
     case 'recon_directive':
     case 'run_away_draw':
+    case 'prism_tower':
     case 'declare_attack':
       return 'border-accent-mint/30 bg-accent-mint/10'
     case 'unsupported_attack':
@@ -8471,6 +8599,8 @@ function actionSummary(action: ActionAffordance) {
       return 'Choose 1 of the top 2 cards of your deck for hand; put the other on the bottom.'
     case 'run_away_draw':
       return 'Draw 3 cards, then shuffle Dudunsparce and attached cards into your deck.'
+    case 'prism_tower':
+      return `Discard 2 cards from hand to draw 1 card with the active Stadium.`
     case 'declare_attack':
       return `${action.attackName ?? (action.attackId ? formatAttackId(action.attackId) : 'Attack')}: ${attackCostSummary(
         action.attackCost
@@ -8760,6 +8890,32 @@ function runAwayDrawCommandOptions(action: ActionAffordance, cardsById: Map<stri
       sourceCard: cardsById.get(sourceCardInstanceId)
     }
   ]
+}
+
+function prismTowerCommandOptions(action: ActionAffordance, cardsById: Map<string, CardSummary>): PrismTowerCommandOption[] {
+  if (action.key !== 'prism_tower' || action.targetCardInstanceIds.length < 2) {
+    return []
+  }
+
+  return cardCombinations(action.targetCardInstanceIds, 2).map(discardCardInstanceIds => ({
+    key: prismTowerKey(discardCardInstanceIds),
+    discardCardInstanceIds,
+    discardCards: discardCardInstanceIds.map(cardInstanceId => cardsById.get(cardInstanceId))
+  }))
+}
+
+function prismTowerPendingLabel(option: PrismTowerCommandOption) {
+  return `Using Prism Tower: discarding ${prismTowerDiscardLabel(option)}...`
+}
+
+function prismTowerButtonLabel(option: PrismTowerCommandOption) {
+  return `Prism Tower: discard ${prismTowerDiscardLabel(option)} to draw 1`
+}
+
+function prismTowerDiscardLabel(option: PrismTowerCommandOption) {
+  return option.discardCardInstanceIds
+    .map((cardInstanceId, index) => option.discardCards[index]?.name ?? formatCardInstanceId(cardInstanceId))
+    .join(' + ')
 }
 
 function tealDancePendingLabel(option: TealDanceCommandOption) {
@@ -9206,6 +9362,7 @@ function actionGroupId(action: ActionAffordance): ActionGroupId {
     case 'psychic_draw':
     case 'recon_directive':
     case 'run_away_draw':
+    case 'prism_tower':
       return 'hand'
     case 'retreat':
     case 'cursed_blast':
@@ -12245,6 +12402,10 @@ function reconDirectiveKey(sourceCardInstanceId: string, chosenCardInstanceId: s
 
 function runAwayDrawKey(sourceCardInstanceId: string) {
   return sourceCardInstanceId
+}
+
+function prismTowerKey(discardCardInstanceIds: string[]) {
+  return discardCardInstanceIds.join(':')
 }
 
 function attackKey(playerId: string, attackId: string) {

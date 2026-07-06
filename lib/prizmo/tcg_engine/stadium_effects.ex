@@ -27,6 +27,9 @@ defmodule Prizmo.TcgEngine.StadiumEffects do
   @jamming_tower_effect :pokemon_tools_have_no_effect
   @nighttime_mine_effect :tera_attack_cost_increase
   @gravity_mountain_effect :stage_2_pokemon_hp_modifier
+  @prism_tower_effect :discard_two_cards_to_draw_one
+  @prism_tower_card_id "CRI-080"
+  @prism_tower_discard_count 2
 
   def supported_stadium?(%{
         supertype: :trainer,
@@ -95,6 +98,12 @@ defmodule Prizmo.TcgEngine.StadiumEffects do
       }),
       do: true
 
+  def supported_stadium?(%{
+        supertype: :trainer,
+        trainer_type: :stadium,
+        effect: %{type: @prism_tower_effect}
+      }), do: true
+
   def supported_stadium?(_card), do: false
 
   def supported_stadium_card?(card_id) when is_binary(card_id) do
@@ -115,6 +124,16 @@ defmodule Prizmo.TcgEngine.StadiumEffects do
     end
   end
 
+  def prism_tower_card?(%CardInstance{card_id: card_id}), do: prism_tower_card?(card_id)
+
+  def prism_tower_card?(card_id) when is_binary(card_id) do
+    case CardCatalog.fetch(card_id) do
+      {:ok, %{effect: %{type: @prism_tower_effect}}} -> true
+      {:ok, _card} -> false
+      {:error, _reason} -> false
+    end
+  end
+
   def active_team_rockets_factory(game_id) when is_binary(game_id) do
     with {:ok, stadiums} <- CardStore.cards_in_zone(game_id, :stadium) do
       case stadiums do
@@ -130,6 +149,25 @@ defmodule Prizmo.TcgEngine.StadiumEffects do
 
         _multiple ->
           {:error, {:stadium_not_in_play, @team_rockets_factory_card_id}}
+      end
+    end
+  end
+
+  def active_prism_tower(game_id) when is_binary(game_id) do
+    with {:ok, stadiums} <- CardStore.cards_in_zone(game_id, :stadium) do
+      case stadiums do
+        [%CardInstance{} = stadium] ->
+          if prism_tower_card?(stadium) do
+            {:ok, stadium}
+          else
+            {:error, {:wrong_stadium_in_play, @prism_tower_card_id, stadium.card_id}}
+          end
+
+        [] ->
+          {:error, {:stadium_not_in_play, @prism_tower_card_id}}
+
+        _multiple ->
+          {:error, {:stadium_not_in_play, @prism_tower_card_id}}
       end
     end
   end
@@ -241,6 +279,19 @@ defmodule Prizmo.TcgEngine.StadiumEffects do
          :ok <- require_team_rockets_factory_unused_this_turn(game_id, turn_id, player_id),
          {:ok, deck_count} <- CardStore.deck_count(game_id, player_id),
          true <- deck_count > 0 || {:error, :team_rockets_factory_has_no_effect} do
+      :ok
+    end
+  end
+
+  def require_prism_tower_available(game_id, turn_id, player_id)
+      when is_binary(game_id) and is_binary(turn_id) and is_binary(player_id) do
+    with :ok <- require_prism_tower_unused_this_turn(game_id, turn_id, player_id),
+         {:ok, hand_cards} <- CardStore.cards_in_zone(game_id, player_id, :hand),
+         true <-
+           length(hand_cards) >= @prism_tower_discard_count ||
+             {:error, :prism_tower_requires_two_cards_to_discard},
+         {:ok, deck_count} <- CardStore.deck_count(game_id, player_id),
+         true <- deck_count > 0 || {:error, :prism_tower_has_no_effect} do
       :ok
     end
   end
@@ -373,6 +424,16 @@ defmodule Prizmo.TcgEngine.StadiumEffects do
     end
   end
 
+  defp require_prism_tower_unused_this_turn(game_id, turn_id, player_id) do
+    with {:ok, events} <- stadium_effect_used_events_for_turn(game_id, turn_id, player_id) do
+      if Enum.any?(events, &prism_tower_effect_used?/1) do
+        {:error, :prism_tower_already_used_this_turn}
+      else
+        :ok
+      end
+    end
+  end
+
   defp card_play_completed_events_for_turn(game_id, turn_id, player_id) do
     GameEvent
     |> Ash.Query.filter(
@@ -403,6 +464,11 @@ defmodule Prizmo.TcgEngine.StadiumEffects do
   defp team_rockets_factory_effect_used?(%GameEvent{payload: payload}) do
     payload_value(payload, "effect_key") == Atom.to_string(@team_rockets_factory_effect) or
       payload_value(payload, "source_card_id") == @team_rockets_factory_card_id
+  end
+
+  defp prism_tower_effect_used?(%GameEvent{payload: payload}) do
+    payload_value(payload, "effect_key") == Atom.to_string(@prism_tower_effect) or
+      payload_value(payload, "source_card_id") == @prism_tower_card_id
   end
 
   defp team_rocket_supporter_card_id?(card_id) when is_binary(card_id) do

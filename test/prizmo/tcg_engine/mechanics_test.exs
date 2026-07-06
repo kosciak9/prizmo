@@ -950,6 +950,75 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
       assert {:ok, 10} = AttackDamage.damage_for(attacker, defender, attack)
     end
 
+    test "CRI-080 Prism Tower discards 2 cards from hand to draw 1 once per turn" do
+      {:ok, game} = create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147)
+
+      {:ok, prism_tower} = create_custom_owned_card(game.id, "player_1", "CRI-080", 200)
+      {:ok, prism_tower} = ash_update(prism_tower, :draw_to_hand, %{position: 20})
+
+      {:ok, discard_1} = create_custom_owned_card(game.id, "player_1", "MEE-005", 201)
+      {:ok, discard_1} = ash_update(discard_1, :draw_to_hand, %{position: 21})
+
+      {:ok, discard_2} = create_custom_owned_card(game.id, "player_1", "PRE-035", 202)
+      {:ok, discard_2} = ash_update(discard_2, :draw_to_hand, %{position: 22})
+
+      draw_target = game.id |> cards_in_zone("player_1", :deck) |> List.first()
+
+      assert CardCoverage.summarize("CRI-080").coverage_status == :supported
+
+      assert {:ok, game} = Mechanics.play_stadium(game, "player_1", prism_tower.id)
+
+      assert {:ok, view} = GameView.for_player(game.id, "player_1")
+
+      prism_action = Enum.find(view.action_affordances, &(&1.key == "prism_tower"))
+      assert is_map(prism_action)
+      assert prism_action.source_card_instance_ids == [prism_tower.id]
+      assert prism_action.required_source_count == 2
+      assert prism_action.choice_keys == ["discard_cards"]
+      assert discard_1.id in prism_action.target_card_instance_ids
+      assert discard_2.id in prism_action.target_card_instance_ids
+
+      assert {:ok, game} =
+               Mechanics.use_prism_tower(game, "player_1", [discard_1.id, discard_2.id])
+
+      assert zone(discard_1.id) == :discard
+      assert zone(discard_2.id) == :discard
+      assert zone(draw_target.id) == :hand
+
+      prism_event =
+        game.id
+        |> game_events_by_type("stadium_effect_used")
+        |> Enum.find(&(&1.payload["effect_key"] == "discard_two_cards_to_draw_one"))
+
+      assert prism_event.payload["source_card_id"] == "CRI-080"
+      assert prism_event.payload["discarded_card_count"] == 2
+      assert prism_event.payload["drawn_card_count"] == 1
+      assert prism_event.payload["public_note"] =~ "Prism Tower"
+
+      assert {:error, :prism_tower_already_used_this_turn} =
+               Mechanics.use_prism_tower(game, "player_1", [draw_target.id, prism_tower.id])
+
+      assert {:ok, view} = GameView.for_player(game.id, "player_1")
+      refute Enum.any?(view.action_affordances, &(&1.key == "prism_tower"))
+    end
+
+    test "CRI-080 Prism Tower rejects invalid discard selections before moving cards" do
+      {:ok, game} = create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147)
+
+      {:ok, prism_tower} = create_custom_owned_card(game.id, "player_1", "CRI-080", 210)
+      {:ok, prism_tower} = ash_update(prism_tower, :draw_to_hand, %{position: 20})
+      {:ok, discard_1} = create_custom_owned_card(game.id, "player_1", "MEE-005", 211)
+      {:ok, discard_1} = ash_update(discard_1, :draw_to_hand, %{position: 21})
+
+      assert {:ok, game} = Mechanics.play_stadium(game, "player_1", prism_tower.id)
+
+      assert {:error, {:wrong_prism_tower_discard_count, 1}} =
+               Mechanics.use_prism_tower(game, "player_1", [discard_1.id])
+
+      assert zone(discard_1.id) == :hand
+      assert game_events_by_type(game.id, "stadium_effect_used") == []
+    end
+
     test "SFA-057 Colress's Tenacity searches for a Stadium and an Energy" do
       {:ok, game} = create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147)
 

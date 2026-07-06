@@ -404,6 +404,33 @@ defmodule Prizmo.TcgEngine.Game.ActionCommands do
       end
     end
 
+    action :use_prism_tower_command, :struct do
+      description "Use Prism Tower from the active Stadium zone through the mechanics layer."
+
+      constraints instance_of: Game
+
+      argument :game_id, :uuid do
+        allow_nil? false
+      end
+
+      argument :player_id, :string do
+        allow_nil? false
+      end
+
+      argument :discard_card_instance_ids, {:array, :uuid} do
+        allow_nil? false
+        default []
+      end
+
+      run fn input, _context ->
+        Mechanics.use_prism_tower(
+          input.arguments.game_id,
+          input.arguments.player_id,
+          input.arguments.discard_card_instance_ids
+        )
+      end
+    end
+
     action :use_munkidori_adrena_brain_command, :struct do
       description "Use Munkidori's Adrena-Brain Ability to move damage counters."
 
