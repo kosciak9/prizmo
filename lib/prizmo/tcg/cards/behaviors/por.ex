@@ -17,6 +17,14 @@ defmodule Prizmo.Tcg.Cards.Behaviors.POR do
     )
   end
 
+  card "POR-052" do
+    attack(:wrack_down, effect: nil)
+
+    attack(:hazardous_tail,
+      effect: %{type: :self_damage_then_paralyze_and_poison_defender_active, self_damage: 70}
+    )
+  end
+
   card "POR-077" do
     card_effect(effect: %{type: :search_basic_pokemon_to_bench_then_end_turn})
   end

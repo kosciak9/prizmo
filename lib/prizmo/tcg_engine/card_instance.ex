@@ -133,7 +133,7 @@ defmodule Prizmo.TcgEngine.CardInstance do
     end
 
     update :move_active_to_bench do
-      accept [:position, :status]
+      accept [:position, :status, :markers]
       change transition_state(:bench)
     end
 

@@ -96,6 +96,7 @@ defmodule Prizmo.TcgEngine.Mechanics do
   alias Prizmo.TcgEngine.Rng
   alias Prizmo.TcgEngine.Setup
   alias Prizmo.TcgEngine.SnapshotRestorer
+  alias Prizmo.TcgEngine.SpecialConditions
   alias Prizmo.TcgEngine.StadiumEffects
   alias Prizmo.TcgEngine.ToolEffects
   alias Prizmo.TcgEngine.Turn
@@ -919,10 +920,11 @@ defmodule Prizmo.TcgEngine.Mechanics do
            {:ok, _boss_card} <- discard_trainer_card(game, player, boss_card, %{}),
            bench_position = target_bench_card.position,
            {:ok, _opponent_active_card} <-
-             update(opponent_active_card, :move_active_to_bench, %{
-               position: bench_position,
-               status: nil
-             }),
+             update(
+               opponent_active_card,
+               :move_active_to_bench,
+               move_active_to_bench_attrs(opponent_active_card, bench_position)
+             ),
            {:ok, _target_bench_card} <-
              update(target_bench_card, :promote_to_active, %{position: 1, status: nil}),
            {:ok, event} <-
@@ -1734,7 +1736,11 @@ defmodule Prizmo.TcgEngine.Mechanics do
            {:ok, active_card} <- active_card(game.id, player_id),
            bench_position = target_card.position,
            {:ok, _active_card} <-
-             update(active_card, :move_active_to_bench, %{position: bench_position, status: nil}),
+             update(
+               active_card,
+               :move_active_to_bench,
+               move_active_to_bench_attrs(active_card, bench_position)
+             ),
            {:ok, promoted_card} <-
              update(target_card, :promote_to_active, %{position: 1, status: nil}),
            {:ok, poison_result} <- maybe_set_pokemon_status(game.id, promoted_card, :poisoned),
@@ -2115,7 +2121,11 @@ defmodule Prizmo.TcgEngine.Mechanics do
            :ok <- require_card_zone(bench_card, :bench),
            bench_position = bench_card.position,
            {:ok, _active_card} <-
-             update(active_card, :move_active_to_bench, %{position: bench_position, status: nil}),
+             update(
+               active_card,
+               :move_active_to_bench,
+               move_active_to_bench_attrs(active_card, bench_position)
+             ),
            {:ok, _bench_card} <-
              update(bench_card, :promote_to_active, %{position: 1, status: nil}),
            {:ok, event} <-
@@ -2154,7 +2164,11 @@ defmodule Prizmo.TcgEngine.Mechanics do
            {:ok, _discarded_energy} <- discard_retreat_energy(game.id, player_id, energy_cards),
            bench_position = bench_card.position,
            {:ok, _active_card} <-
-             update(active_card, :move_active_to_bench, %{position: bench_position, status: nil}),
+             update(
+               active_card,
+               :move_active_to_bench,
+               move_active_to_bench_attrs(active_card, bench_position)
+             ),
            {:ok, _bench_card} <-
              update(bench_card, :promote_to_active, %{position: 1, status: nil}),
            {:ok, _player} <- update(player, :mark_retreated, %{}),
@@ -3371,9 +3385,15 @@ defmodule Prizmo.TcgEngine.Mechanics do
       in_play_cards = Enum.filter(cards, &(&1.zone in [:active, :bench]))
       source_effects = pokemon_checkup_source_effects(in_play_cards)
 
-      with {:ok, target_results} <-
-             apply_pokemon_checkup_damage_targets(game_id, in_play_cards, source_effects) do
-        {:ok, %{source_effects: source_effects, target_results: target_results}}
+      with {:ok, ability_target_results} <-
+             apply_pokemon_checkup_damage_targets(game_id, in_play_cards, source_effects),
+           {:ok, poison_target_results} <-
+             apply_pokemon_checkup_poison_targets(game_id, in_play_cards) do
+        {:ok,
+         %{
+           source_effects: source_effects,
+           target_results: ability_target_results ++ poison_target_results
+         }}
       end
     end
   end
@@ -3427,6 +3447,7 @@ defmodule Prizmo.TcgEngine.Mechanics do
              {:ok, _updated_card} <- update(card, :set_damage, %{damage: resulting_damage}) do
           {:ok,
            %{
+             source: :ability,
              card_instance_id: card.id,
              card_id: card.card_id,
              owner_player_id: card.owner_player_id,
@@ -3442,6 +3463,52 @@ defmodule Prizmo.TcgEngine.Mechanics do
       end
     else
       {:ok, nil}
+    end
+  end
+
+  defp apply_pokemon_checkup_poison_targets(game_id, in_play_cards)
+       when is_binary(game_id) and is_list(in_play_cards) do
+    in_play_cards
+    |> Enum.reduce_while({:ok, []}, fn card, {:ok, results} ->
+      case pokemon_checkup_poison_target_result(game_id, card) do
+        {:ok, nil} -> {:cont, {:ok, results}}
+        {:ok, result} -> {:cont, {:ok, [result | results]}}
+        {:error, reason} -> {:halt, {:error, reason}}
+      end
+    end)
+    |> case do
+      {:ok, results} -> {:ok, Enum.reverse(results)}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp pokemon_checkup_poison_target_result(game_id, %CardInstance{} = card) do
+    with {:ok, current_card} <- get_card(game_id, card.id) do
+      if current_card.zone == :active and SpecialConditions.poisoned?(current_card) do
+        damage_counters = 1
+        damage = AbilityEffects.damage_for_counters(damage_counters)
+        resulting_damage = current_card.damage + damage
+
+        with {:ok, knocked_out?} <-
+               HpEffects.damage_knocks_out?(game_id, current_card, resulting_damage),
+             {:ok, _updated_card} <-
+               update(current_card, :set_damage, %{damage: resulting_damage}) do
+          {:ok,
+           %{
+             source: :poison,
+             card_instance_id: current_card.id,
+             card_id: current_card.card_id,
+             owner_player_id: current_card.owner_player_id,
+             starting_damage: current_card.damage,
+             damage_counters: damage_counters,
+             applied_damage: damage,
+             resulting_damage: resulting_damage,
+             knocked_out?: knocked_out?
+           }}
+        end
+      else
+        {:ok, nil}
+      end
     end
   end
 
@@ -3474,6 +3541,7 @@ defmodule Prizmo.TcgEngine.Mechanics do
     %{
       card_instance_id: result.card_instance_id,
       card_id: result.card_id,
+      source: result.source,
       owner_player_id: result.owner_player_id,
       starting_damage: result.starting_damage,
       damage_counters: result.damage_counters,
@@ -3487,8 +3555,32 @@ defmodule Prizmo.TcgEngine.Mechanics do
          source_effects: source_effects,
          target_results: target_results
        }) do
+    ability_target_results = Enum.reject(target_results, &(&1.source == :poison))
+    poison_target_count = Enum.count(target_results, &(&1.source == :poison))
+
+    ability_note = pokemon_checkup_ability_public_note(source_effects, ability_target_results)
+    poison_note = pokemon_checkup_poison_public_note(poison_target_count)
+
+    cond do
+      is_binary(ability_note) and is_binary(poison_note) ->
+        ability_note <> " " <> poison_note
+
+      is_binary(ability_note) ->
+        ability_note
+
+      is_binary(poison_note) ->
+        poison_note
+
+      true ->
+        "Pokémon Checkup resolved supported effects."
+    end
+  end
+
+  defp pokemon_checkup_ability_public_note(_source_effects, []), do: nil
+
+  defp pokemon_checkup_ability_public_note(source_effects, ability_target_results) do
     total_damage_counters =
-      target_results
+      ability_target_results
       |> Enum.map(&Map.get(&1, :damage_counters, 0))
       |> Enum.max(fn -> 0 end)
 
@@ -3506,6 +3598,12 @@ defmodule Prizmo.TcgEngine.Mechanics do
     end
   end
 
+  defp pokemon_checkup_poison_public_note(0), do: nil
+
+  defp pokemon_checkup_poison_public_note(_poison_target_count) do
+    "Poison placed 1 damage counter on each Poisoned Active Pokémon."
+  end
+
   defp resolve_pokemon_checkup_knockouts(%Game{} = game, %{target_results: []}) do
     {:ok, game}
   end
@@ -3518,6 +3616,10 @@ defmodule Prizmo.TcgEngine.Mechanics do
 
   defp pluralize_damage_counter(1), do: "damage counter"
   defp pluralize_damage_counter(_count), do: "damage counters"
+
+  defp move_active_to_bench_attrs(%CardInstance{} = card, position) do
+    %{position: position, status: nil, markers: SpecialConditions.clear_condition_markers(card)}
+  end
 
   defp cursed_blast_event_payload(
          %Turn{} = turn,

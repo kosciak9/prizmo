@@ -59,6 +59,7 @@ defmodule Prizmo.TcgEngine.AttackEffects do
   alias Prizmo.TcgEngine.PlayerStore
   alias Prizmo.TcgEngine.Prompt
   alias Prizmo.TcgEngine.RetreatLocks
+  alias Prizmo.TcgEngine.SpecialConditions
   alias Prizmo.TcgEngine.StadiumEffects
   alias Prizmo.TcgEngine.TeraBenchProtection
   alias Prizmo.TcgEngine.TurnStore
@@ -94,6 +95,7 @@ defmodule Prizmo.TcgEngine.AttackEffects do
     :damage_only_if_stadium_in_play,
     :damage_only_if_own_bench_has_card_id_unaffected_by_weakness_resistance,
     :damage_per_discarded_own_basic_energy,
+    :self_damage_then_paralyze_and_poison_defender_active,
     :discard_defending_energy_on_coin_heads,
     :discard_energy_from_own_bench_for_bonus_damage,
     :defending_pokemon_cannot_retreat_next_turn,
@@ -396,6 +398,16 @@ defmodule Prizmo.TcgEngine.AttackEffects do
 
       %{type: :self_damage, damage: damage} when is_integer(damage) and damage >= 0 ->
         self_damage(game_id, player_id, attacker_card, damage)
+
+      %{type: :self_damage_then_paralyze_and_poison_defender_active, self_damage: damage}
+      when is_integer(damage) and damage >= 0 ->
+        self_damage_then_paralyze_and_poison_defender_active(
+          game_id,
+          player_id,
+          attacker_card,
+          defender_card,
+          damage
+        )
 
       %{type: :search_pokemon_to_hand} ->
         create_search_pokemon_prompt(game_id, player_id, attacker_card, attack)
@@ -1081,6 +1093,46 @@ defmodule Prizmo.TcgEngine.AttackEffects do
     end
   end
 
+  defp self_damage_then_paralyze_and_poison_defender_active(
+         game_id,
+         player_id,
+         %CardInstance{} = attacker_card,
+         %CardInstance{} = defender_card,
+         damage
+       ) do
+    with {:ok, self_damage_payload} <- self_damage(game_id, player_id, attacker_card, damage),
+         {:ok, paralyze_payload} <-
+           set_defender_status(game_id, player_id, defender_card, :paralyzed),
+         {:ok, poison_payload} <-
+           set_defender_condition_marker(game_id, player_id, defender_card, :poisoned) do
+      applied_statuses =
+        []
+        |> maybe_append_status(
+          :paralyzed,
+          Map.get(paralyze_payload, :defender_status_applied?, false)
+        )
+        |> maybe_append_status(
+          :poisoned,
+          Map.get(poison_payload, :defender_status_applied?, false)
+        )
+
+      {:ok,
+       self_damage_payload
+       |> Map.delete(:effect_type)
+       |> Map.merge(%{
+         effect_type: "self_damage_then_paralyze_and_poison_defender_active",
+         defender_status_card_instance_id: defender_card.id,
+         defender_statuses: ["paralyzed", "poisoned"],
+         defender_statuses_applied: Enum.map(applied_statuses, &Atom.to_string/1),
+         paralyzed_applied?: Map.get(paralyze_payload, :defender_status_applied?, false),
+         poisoned_applied?: Map.get(poison_payload, :defender_status_applied?, false)
+       })}
+    end
+  end
+
+  defp maybe_append_status(statuses, status, true), do: statuses ++ [status]
+  defp maybe_append_status(statuses, _status, false), do: statuses
+
   defp draw_after_attack(game_id, player_id, count) do
     with {:ok, player} <- PlayerStore.get_player(game_id, player_id),
          {:ok, deck_cards} <- deck_cards_for_player(player.id, count),
@@ -1199,6 +1251,64 @@ defmodule Prizmo.TcgEngine.AttackEffects do
             :active ->
               with {:ok, _defender_card} <-
                      update(current_defender_card, :set_status, %{status: status}) do
+                {:ok,
+                 %{
+                   effect_type: effect_type,
+                   defender_status: Atom.to_string(status),
+                   defender_status_applied?: true,
+                   defender_status_card_instance_id: current_defender_card.id
+                 }}
+              end
+
+            _other_zone ->
+              {:ok,
+               %{
+                 effect_type: effect_type,
+                 defender_status: Atom.to_string(status),
+                 defender_status_applied?: false,
+                 defender_status_card_instance_id: defender_card.id
+               }}
+          end
+      end
+    end
+  end
+
+  defp set_defender_condition_marker(
+         game_id,
+         attacking_player_id,
+         %CardInstance{} = defender_card,
+         status
+       ) do
+    with {:ok, current_defender_card} <- get_card(game_id, defender_card.id) do
+      effect_type = special_condition_effect_type(status)
+
+      case status_condition_prevention_payload(
+             game_id,
+             attacking_player_id,
+             current_defender_card,
+             status
+           ) do
+        {:prevented, prevention_payload} ->
+          {:ok,
+           Map.merge(
+             %{
+               effect_type: effect_type,
+               defender_status: Atom.to_string(status),
+               defender_status_applied?: false,
+               defender_status_card_instance_id: current_defender_card.id,
+               attack_effect_prevented?: true
+             },
+             prevention_payload
+           )}
+
+        :not_prevented ->
+          case current_defender_card.zone do
+            :active ->
+              with {:ok, _defender_card} <-
+                     update(current_defender_card, :set_markers, %{
+                       markers:
+                         SpecialConditions.put_condition_marker(current_defender_card, status)
+                     }) do
                 {:ok,
                  %{
                    effect_type: effect_type,
@@ -2104,6 +2214,8 @@ defmodule Prizmo.TcgEngine.AttackEffects do
 
   defp special_condition_effect_type(:asleep), do: "sleep_defender_active"
   defp special_condition_effect_type(:confused), do: "confuse_defender_active"
+  defp special_condition_effect_type(:paralyzed), do: "paralyze_defender_active"
+  defp special_condition_effect_type(:poisoned), do: "poison_defender_active"
 
   defp move_opponent_attached_energy_between_pokemon(game_id, player_id, opts) do
     with {:ok, move_option} <- opponent_energy_move_option(game_id, player_id, opts) do
@@ -3009,7 +3121,11 @@ defmodule Prizmo.TcgEngine.AttackEffects do
          :ok <- require_same_card(active_card, attacker_card),
          bench_position = bench_card.position,
          {:ok, _active_card} <-
-           update(active_card, :move_active_to_bench, %{position: bench_position, status: nil}),
+           update(
+             active_card,
+             :move_active_to_bench,
+             move_active_to_bench_attrs(active_card, bench_position)
+           ),
          {:ok, _bench_card} <-
            update(bench_card, :promote_to_active, %{position: 1, status: nil}) do
       {:ok,
@@ -3026,4 +3142,8 @@ defmodule Prizmo.TcgEngine.AttackEffects do
 
   defp require_same_card(%CardInstance{}, %CardInstance{}),
     do: {:error, :attacker_is_no_longer_active}
+
+  defp move_active_to_bench_attrs(%CardInstance{} = card, position) do
+    %{position: position, status: nil, markers: SpecialConditions.clear_condition_markers(card)}
+  end
 end

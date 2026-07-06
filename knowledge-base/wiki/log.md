@@ -1,5 +1,12 @@
 # Wiki Log
 
+## [2026-07-06] codebase update | Goal 2 Drapion support
+
+- Task attempted: closed `POR-052` Drapion as the highest-share remaining two-archetype Goal 2 Pokémon blocker after Lumiose City. Added committed TCGdex metadata, authored `Wrack Down` and `Hazardous Tail`, introduced marker-backed Poison special-condition support so Hazardous Tail can leave the defender both Paralyzed and Poisoned, added generic Poison damage during Pokémon Checkup, exposed combined conditions through `GameView`, and ensured active-to-Bench movement plus Festival Grounds recovery clear marker-backed special conditions.
+- Files changed: `lib/prizmo/tcg/cards/behaviors/por.ex`, `lib/prizmo/tcg_engine/attack_damage.ex`, `lib/prizmo/tcg_engine/attack_effects.ex`, `lib/prizmo/tcg_engine/card_instance.ex`, `lib/prizmo/tcg_engine/card_play.ex`, `lib/prizmo/tcg_engine/game_view.ex`, `lib/prizmo/tcg_engine/mechanics.ex`, `lib/prizmo/tcg_engine/special_conditions.ex`, `lib/prizmo/tcg_engine/stadium_effects.ex`, `priv/tcg/cards/tcgdex/cards/POR-052.json`, `knowledge-base/wiki/engine/goal-2-top-30-latest-limitless-coverage-scope.md`, `knowledge-base/wiki/engine/ash-backed-tcg-engine-playtest-handoff.md`, `knowledge-base/wiki/log.md`.
+- Validation: `mix format`; `mix compile --warnings-as-errors`; `mix test test/prizmo/tcg/cards/metadata_test.exs`; `mix test test/prizmo/tcg_engine/mechanics_test.exs`; Tidewave runtime check confirmed `POR-052` coverage, Hazardous Tail self-damage, Paralyzed + Poisoned condition state, and Poison checkup damage; `mix prizmo.goal2.corpus` confirmed `supported=154` / `generic-supported=8` / `partial=10` / `unimplemented=205` and `cached=175` / `missing=202`; final `mix check` passed.
+- Remaining/blocking notes: `POR-052` is no longer in the shared incomplete queue. The default next Goal 2 priority is now the `MEG-086` Mega Absol ex / `SVP-149` Pecharunt Darkness pair, followed by `TEF-150` Hand Trimmer and `PFL-092` Punk Helmet unless the live corpus re-ranks the queue.
+
 ## [2026-07-06] codebase update | Goal 2 Lumiose City support
 
 - Task attempted: closed `POR-077` Lumiose City as the highest-share remaining two-archetype Goal 2 Stadium blocker after Mega Mawile ex. Added committed TCGdex metadata, authored active-Stadium behavior that searches one Basic Pokémon from deck to Bench, shuffles, and ends the player's turn, and exposed the command through Ash RPC, `GameView`, and the temporary React SPA.

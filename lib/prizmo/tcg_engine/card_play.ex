@@ -53,6 +53,7 @@ defmodule Prizmo.TcgEngine.CardPlay do
   alias Prizmo.TcgEngine.PlayerStore
   alias Prizmo.TcgEngine.Prompt
   alias Prizmo.TcgEngine.Rng
+  alias Prizmo.TcgEngine.SpecialConditions
   alias Prizmo.TcgEngine.StadiumEffects
   alias Prizmo.TcgEngine.TrainerPlay
   alias Prizmo.TcgEngine.Turn
@@ -472,17 +473,19 @@ defmodule Prizmo.TcgEngine.CardPlay do
          own_bench_position = own_bench_card.position,
          opponent_bench_position = opponent_bench_card.position,
          {:ok, moved_opponent_active_card} <-
-           update(opponent_active_card, :move_active_to_bench, %{
-             position: opponent_bench_position,
-             status: nil
-           }),
+           update(
+             opponent_active_card,
+             :move_active_to_bench,
+             move_active_to_bench_attrs(opponent_active_card, opponent_bench_position)
+           ),
          {:ok, moved_opponent_bench_card} <-
            update(opponent_bench_card, :promote_to_active, %{position: 1, status: nil}),
          {:ok, moved_own_active_card} <-
-           update(own_active_card, :move_active_to_bench, %{
-             position: own_bench_position,
-             status: nil
-           }),
+           update(
+             own_active_card,
+             :move_active_to_bench,
+             move_active_to_bench_attrs(own_active_card, own_bench_position)
+           ),
          {:ok, moved_own_bench_card} <-
            update(own_bench_card, :promote_to_active, %{position: 1, status: nil}),
          {:ok, _event} <-
@@ -538,7 +541,11 @@ defmodule Prizmo.TcgEngine.CardPlay do
          {:ok, active_card} <- own_active_card(game.id, player.player_id),
          bench_position = bench_card.position,
          {:ok, moved_active_card} <-
-           update(active_card, :move_active_to_bench, %{position: bench_position, status: nil}),
+           update(
+             active_card,
+             :move_active_to_bench,
+             move_active_to_bench_attrs(active_card, bench_position)
+           ),
          {:ok, moved_bench_card} <-
            update(bench_card, :promote_to_active, %{position: 1, status: nil}),
          {:ok, drawn_cards} <-
@@ -597,7 +604,11 @@ defmodule Prizmo.TcgEngine.CardPlay do
          {:ok, active_card} <- own_active_card(game.id, player.player_id),
          bench_position = bench_card.position,
          {:ok, moved_active_card} <-
-           update(active_card, :move_active_to_bench, %{position: bench_position, status: nil}),
+           update(
+             active_card,
+             :move_active_to_bench,
+             move_active_to_bench_attrs(active_card, bench_position)
+           ),
          {:ok, moved_bench_card} <-
            update(bench_card, :promote_to_active, %{position: 1, status: nil}),
          {:ok, _event} <-
@@ -1035,17 +1046,19 @@ defmodule Prizmo.TcgEngine.CardPlay do
          own_bench_position = own_bench_card.position,
          opponent_bench_position = opponent_bench_card.position,
          {:ok, moved_own_active_card} <-
-           update(own_active_card, :move_active_to_bench, %{
-             position: own_bench_position,
-             status: nil
-           }),
+           update(
+             own_active_card,
+             :move_active_to_bench,
+             move_active_to_bench_attrs(own_active_card, own_bench_position)
+           ),
          {:ok, moved_own_bench_card} <-
            update(own_bench_card, :promote_to_active, %{position: 1, status: nil}),
          {:ok, moved_opponent_active_card} <-
-           update(opponent_active_card, :move_active_to_bench, %{
-             position: opponent_bench_position,
-             status: nil
-           }),
+           update(
+             opponent_active_card,
+             :move_active_to_bench,
+             move_active_to_bench_attrs(opponent_active_card, opponent_bench_position)
+           ),
          {:ok, moved_opponent_bench_card} <-
            update(opponent_bench_card, :promote_to_active, %{position: 1, status: nil}),
          {:ok, _event} <-
@@ -1078,10 +1091,11 @@ defmodule Prizmo.TcgEngine.CardPlay do
          {:ok, opponent_active_card} <- opponent_active_card(game.id, player.player_id),
          bench_position = target_bench_card.position,
          {:ok, moved_active_card} <-
-           update(opponent_active_card, :move_active_to_bench, %{
-             position: bench_position,
-             status: nil
-           }),
+           update(
+             opponent_active_card,
+             :move_active_to_bench,
+             move_active_to_bench_attrs(opponent_active_card, bench_position)
+           ),
          {:ok, moved_target_card} <-
            update(target_bench_card, :promote_to_active, %{position: 1, status: nil}),
          {:ok, _event} <-
@@ -1302,10 +1316,11 @@ defmodule Prizmo.TcgEngine.CardPlay do
              {:ok, active_card} <- own_active_card(game.id, player.player_id),
              bench_position = bench_card.position,
              {:ok, _moved_active_card} <-
-               update(active_card, :move_active_to_bench, %{
-                 position: bench_position,
-                 status: nil
-               }),
+               update(
+                 active_card,
+                 :move_active_to_bench,
+                 move_active_to_bench_attrs(active_card, bench_position)
+               ),
              {:ok, _moved_bench_card} <-
                update(bench_card, :promote_to_active, %{position: 1, status: nil}),
              {:ok, _event} <-
@@ -5209,5 +5224,9 @@ defmodule Prizmo.TcgEngine.CardPlay do
         {:error, reason} -> {:halt, {:error, reason}}
       end
     end)
+  end
+
+  defp move_active_to_bench_attrs(%CardInstance{} = card, position) do
+    %{position: position, status: nil, markers: SpecialConditions.clear_condition_markers(card)}
   end
 end

@@ -496,6 +496,11 @@ defmodule Prizmo.TcgEngine.AttackDamage do
   defp apply_effect(damage, _attacker_card, _defender_card, %{type: :self_damage}),
     do: {:ok, damage}
 
+  defp apply_effect(damage, _attacker_card, _defender_card, %{
+         type: :self_damage_then_paralyze_and_poison_defender_active
+       }),
+       do: {:ok, damage}
+
   defp apply_effect(_damage, _attacker_card, _defender_card, effect) do
     {:error, {:unsupported_attack_effect, AttackEffects.type(effect)}}
   end

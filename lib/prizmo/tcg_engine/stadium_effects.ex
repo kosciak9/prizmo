@@ -7,6 +7,7 @@ defmodule Prizmo.TcgEngine.StadiumEffects do
   alias Prizmo.TcgEngine.CardInstance
   alias Prizmo.TcgEngine.CardStore
   alias Prizmo.TcgEngine.GameEvent
+  alias Prizmo.TcgEngine.SpecialConditions
   alias Prizmo.TcgEngine.Turn
 
   require Ash.Query
@@ -663,7 +664,11 @@ defmodule Prizmo.TcgEngine.StadiumEffects do
 
   defp recover_card_special_condition(game_id, %CardInstance{} = stadium, %CardInstance{} = card) do
     if recoverable_special_condition?(game_id, card) do
-      with {:ok, _card} <- update(card, :set_status, %{status: nil}) do
+      with {:ok, _card} <- update(card, :set_status, %{status: nil}),
+           {:ok, _card} <-
+             update(card, :set_markers, %{
+               markers: SpecialConditions.clear_condition_markers(card)
+             }) do
         {:ok, recovery_payload(stadium, card)}
       end
     else
@@ -671,8 +676,9 @@ defmodule Prizmo.TcgEngine.StadiumEffects do
     end
   end
 
-  defp recoverable_special_condition?(game_id, %CardInstance{status: status} = card) do
-    special_condition?(status) and in_play?(card) and energy_attached?(game_id, card)
+  defp recoverable_special_condition?(game_id, %CardInstance{} = card) do
+    Enum.any?(SpecialConditions.conditions(card), &special_condition?/1) and in_play?(card) and
+      energy_attached?(game_id, card)
   end
 
   defp energy_attached?(game_id, %CardInstance{} = card) do
@@ -693,11 +699,14 @@ defmodule Prizmo.TcgEngine.StadiumEffects do
   end
 
   defp recovery_payload(%CardInstance{} = stadium, %CardInstance{} = card) do
+    recovered_statuses = Enum.map(SpecialConditions.conditions(card), &Atom.to_string/1)
+
     %{
       card_instance_id: card.id,
       card_id: card.card_id,
       owner_player_id: card.owner_player_id,
-      recovered_status: Atom.to_string(card.status),
+      recovered_status: List.first(recovered_statuses),
+      recovered_statuses: recovered_statuses,
       stadium_card_id: stadium.card_id,
       stadium_card_instance_id: stadium.id,
       stadium_effect_id: @festival_grounds_effect_id

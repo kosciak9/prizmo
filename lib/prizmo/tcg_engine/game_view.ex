@@ -15,6 +15,7 @@ defmodule Prizmo.TcgEngine.GameView do
   alias Prizmo.TcgEngine.PlayerStore
   alias Prizmo.TcgEngine.Prompt
   alias Prizmo.TcgEngine.Setup
+  alias Prizmo.TcgEngine.SpecialConditions
   alias Prizmo.TcgEngine.StadiumEffects
   alias Prizmo.TcgEngine.ToolEffects
   alias Prizmo.TcgEngine.Turn
@@ -334,6 +335,7 @@ defmodule Prizmo.TcgEngine.GameView do
       position: card.position,
       damage: card.damage,
       status: stringify(card.status),
+      status_conditions: card |> SpecialConditions.conditions() |> Enum.map(&Atom.to_string/1),
       attached_to_card_instance_id: card.attached_to_card_instance_id,
       evolves_from_card_instance_id: card.evolves_from_card_instance_id,
       turn_entered_play: card.turn_entered_play
