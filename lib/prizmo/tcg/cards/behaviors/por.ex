@@ -7,6 +7,15 @@ defmodule Prizmo.Tcg.Cards.Behaviors.POR do
     card_effect(effect: %{type: :grass_pokemon_hp_plus_20_energy})
   end
 
+  card "POR-087" do
+    card_effect(
+      effect: %{
+        type: :prevent_opponent_attack_effects_to_attached_pokemon,
+        required_attached_pokemon_type: :fighting
+      }
+    )
+  end
+
   card "POR-088" do
     card_effect(
       effect: %{

@@ -1,11 +1,18 @@
 # Ash-backed TCG Engine Playtest Handoff
 
-- Updated: 2026-06-24 (superseded by latest-Limitless/Godot roadmap)
+- Updated: 2026-07-06 (superseded by latest-Limitless/Godot roadmap)
 - Sources: Project codebase; local validation; wiki log
 - Raw: N/A — operational handoff
 
 - This document is historical/operational context. The active canonical roadmap is now [Prizmo TCG Engine and Play Surface North Star](ash-backed-tcg-engine-playtest-north-star.md): Goal 1 latest-Limitless Dragapult/Alakazam completeness, Goal 2 latest top-30 Limitless archetype coverage, Goal 3 React shell + embedded Godot play surface, Goal 4 React Native mobile path, Goal 5 all possible cards.
 - Treat the two-deck and six-deck selection rules below as historical unless they directly help with the current latest-Limitless coverage goals.
+
+## [2026-07-06] Goal 2 Rocky Fighting Energy support batch
+
+- Current state: the top remaining shared Goal 2 Special Energy blocker is now closed instead of staying a metadata-only gap in the Crustle, Cynthia, and Mega Lucario shells. Added committed TCGdex metadata for `POR-087` Rocky Fighting Energy and authored a conditional overlay for its attack-effect prevention text. `POR-087` now provides `{F}` through the existing attached-Energy provider path and prevents effects of attacks used by the opponent only when attached to a Fighting Pokémon; damage remains explicitly unprevented.
+- Current live snapshot: rerunning the live Goal 2 corpus after the batch keeps the same `377` tracked cards but moves the support buckets to `supported=140`, `generic-supported=8`, `partial=10`, and `unimplemented=219`, while the metadata split improves to `cached=161` / `missing=216`. `POR-087` is no longer in the shared incomplete queue. The next highest-share blockers are now `POR-072` Energy Search (`3` archetypes / `4.31%` total share), `TEF-154` Maximum Belt (`3` / `4.11%`), `SSP-185` Precious Trolley (`3` / `4.06%`), `CRI-080` Prism Tower (`3` / `3.45%`), and `CRI-070` Patrat (`3` / `2.76%`).
+- Validation: `mix test test/prizmo/tcg/cards/metadata_test.exs`; `mix test test/prizmo/tcg_engine/mechanics_test.exs`; `mix compile --warnings-as-errors`; direct persisted runtime check confirmed `Prizmo.Tcg.CardCoverage.summarize("POR-087")` reports `coverage_status: :supported`, `Prizmo.TcgEngine.EnergyEffects.provided_types/2` returns `[:fighting]`, Rocky reports attack-effect prevention source `rocky_fighting_energy` for an attached Fighting Pokémon, does not prevent the same effect on a non-Fighting Pokémon, and lets normal attack damage through; refreshed `mix prizmo.goal2.corpus`.
+- Next recommendation: take `POR-072` Energy Search next as the highest-share remaining three-archetype blocker and simplest Item cleanup. After that, continue the same shared slice with `TEF-154`, `SSP-185`, and `CRI-080`; if the next batch deliberately stays on Special Energy/HP partials instead, `POR-086` Growing Grass Energy remains the strongest attached Special Energy follow-up.
 
 ## [2026-06-24] Goal 2 Froslass Pokémon Checkup support batch
 

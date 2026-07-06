@@ -1,6 +1,7 @@
 defmodule Prizmo.TcgEngine.AttackPrevention do
   @moduledoc false
 
+  alias Prizmo.TcgEngine.CardCatalog
   alias Prizmo.TcgEngine.CardInstance
   alias Prizmo.TcgEngine.CardStore
   alias Prizmo.TcgEngine.Turn
@@ -10,6 +11,8 @@ defmodule Prizmo.TcgEngine.AttackPrevention do
   @source_attack_id "dig"
   @mist_energy_card_id "TEF-161"
   @mist_energy_effect_id "mist_energy"
+  @rocky_fighting_energy_card_id "POR-087"
+  @rocky_fighting_energy_effect_id "rocky_fighting_energy"
 
   @spec put_damage_and_effects_next_turn_marker(CardInstance.t(), Turn.t()) :: map()
   def put_damage_and_effects_next_turn_marker(%CardInstance{markers: markers}, %Turn{} = turn) do
@@ -61,10 +64,11 @@ defmodule Prizmo.TcgEngine.AttackPrevention do
     if damage_and_effects_prevented_this_turn?(card, turn, attacking_player_id) do
       {:prevented, prevention_payload(card, turn)}
     else
-      with {:ok, mist_energy_card} <- attached_mist_energy_card(card, attacking_player_id) do
-        case mist_energy_card do
-          %CardInstance{} = mist_energy_card ->
-            {:prevented, mist_energy_prevention_payload(card, turn, mist_energy_card)}
+      with {:ok, prevention_energy_card} <-
+             attached_attack_effect_prevention_energy_card(card, attacking_player_id) do
+        case prevention_energy_card do
+          %CardInstance{} = prevention_energy_card ->
+            {:prevented, energy_prevention_payload(card, turn, prevention_energy_card)}
 
           nil ->
             :not_prevented
@@ -92,33 +96,78 @@ defmodule Prizmo.TcgEngine.AttackPrevention do
     }
   end
 
-  defp attached_mist_energy_card(%CardInstance{} = card, attacking_player_id) do
+  defp attached_attack_effect_prevention_energy_card(%CardInstance{} = card, attacking_player_id) do
     if opponent_attack?(card, attacking_player_id) and in_play?(card) do
       with {:ok, attached_cards} <- CardStore.attached_cards(card.game_id, card.id) do
-        {:ok, Enum.find(attached_cards, &mist_energy_card?/1)}
+        {:ok, Enum.find(attached_cards, &attack_effect_prevention_energy_card?(&1, card))}
       end
     else
       {:ok, nil}
     end
   end
 
-  defp mist_energy_card?(%CardInstance{card_id: @mist_energy_card_id}), do: true
-  defp mist_energy_card?(%CardInstance{}), do: false
+  defp attack_effect_prevention_energy_card?(
+         %CardInstance{card_id: card_id},
+         %CardInstance{} = target_card
+       )
+       when is_binary(card_id) do
+    case CardCatalog.fetch(card_id) do
+      {:ok,
+       %{
+         supertype: :energy,
+         effect: %{type: :prevent_opponent_attack_effects_to_attached_pokemon} = effect
+       }} ->
+        prevention_energy_target_matches?(target_card, effect)
 
-  defp mist_energy_prevention_payload(
+      _other ->
+        false
+    end
+  end
+
+  defp attack_effect_prevention_energy_card?(%CardInstance{}, %CardInstance{}), do: false
+
+  defp prevention_energy_target_matches?(%CardInstance{}, %{required_attached_pokemon_type: nil}),
+    do: true
+
+  defp prevention_energy_target_matches?(%CardInstance{} = target_card, %{
+         required_attached_pokemon_type: type
+       })
+       when is_atom(type) do
+    pokemon_type?(target_card, type)
+  end
+
+  defp prevention_energy_target_matches?(%CardInstance{}, _effect), do: true
+
+  defp pokemon_type?(%CardInstance{card_id: card_id}, type) when is_atom(type) do
+    case CardCatalog.fetch(card_id) do
+      {:ok, %{supertype: :pokemon, types: types}} when is_list(types) -> type in types
+      {:ok, %{supertype: :pokemon, type: ^type}} -> true
+      _other -> false
+    end
+  end
+
+  defp energy_prevention_payload(
          %CardInstance{} = card,
          %Turn{turn_number: turn_number},
-         %CardInstance{} = mist_energy_card
+         %CardInstance{} = energy_card
        ) do
     %{
-      attack_prevention_source_card_id: mist_energy_card.card_id,
-      attack_prevention_source_card_instance_id: mist_energy_card.id,
-      attack_prevention_source_effect_id: @mist_energy_effect_id,
+      attack_prevention_source_card_id: energy_card.card_id,
+      attack_prevention_source_card_instance_id: energy_card.id,
+      attack_prevention_source_effect_id: energy_prevention_effect_id(energy_card),
       attack_prevention_source_player_id: card.owner_player_id,
       attack_prevention_blocked_turn_number: turn_number,
       protected_card_instance_id: card.id
     }
   end
+
+  defp energy_prevention_effect_id(%CardInstance{card_id: @mist_energy_card_id}),
+    do: @mist_energy_effect_id
+
+  defp energy_prevention_effect_id(%CardInstance{card_id: @rocky_fighting_energy_card_id}),
+    do: @rocky_fighting_energy_effect_id
+
+  defp energy_prevention_effect_id(%CardInstance{card_id: card_id}), do: card_id
 
   defp opponent_attack?(%CardInstance{owner_player_id: owner_player_id}, attacking_player_id),
     do: owner_player_id != attacking_player_id
