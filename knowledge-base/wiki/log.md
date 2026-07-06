@@ -1,5 +1,12 @@
 # Wiki Log
 
+## [2026-07-06] codebase update | Goal 2 Precious Trolley support
+
+- Task attempted: closed `SSP-185` Precious Trolley as the highest-priority remaining three-archetype Goal 2 ACE SPEC blocker. Added committed TCGdex metadata, authored Precious Trolley as an engine-defined Item that searches any number of Basic Pokémon up to available Bench space and puts them directly onto the Bench, and added reusable Bench-destination capacity validation for direct upfront deck-search choices.
+- Files changed: `lib/prizmo/tcg_engine/card_play.ex`, `lib/prizmo/tcg_engine/cards/registry.ex`, `priv/tcg/cards/tcgdex/cards/SSP-185.json`, `knowledge-base/wiki/engine/goal-2-top-30-latest-limitless-coverage-scope.md`, `knowledge-base/wiki/engine/ash-backed-tcg-engine-playtest-handoff.md`, `knowledge-base/wiki/log.md`.
+- Validation: `mix format`; `mix compile --warnings-as-errors`; `mix test test/prizmo/tcg/cards/metadata_test.exs`; `mix test test/prizmo/tcg_engine/mechanics_test.exs`; Tidewave runtime check confirmed `SSP-185` reports `coverage_status: :supported`, exposes a Play affordance, opens a Basic-only Bench-search prompt with `min=0` / `max=5`, benches selected Basic Pokémon, excludes Evolutions, and rejects over-Bench direct choices before moving cards; `mix prizmo.goal2.corpus` confirmed `supported=143` / `generic-supported=8` / `partial=10` / `unimplemented=216` and `cached=164` / `missing=213`; final `mix check` passed.
+- Remaining/blocking notes: `SSP-185` is no longer in the shared incomplete queue. The default next Goal 2 priority is now `CRI-080` Prism Tower, followed by `CRI-070` Patrat, `MEG-074` Lunatone, `MEG-075` Solrock, and `PRE-115` Larry's Skill.
+
 ## [2026-07-06] codebase update | Goal 2 Maximum Belt support
 
 - Task attempted: closed `TEF-154` Maximum Belt as the highest-priority remaining three-archetype Goal 2 ACE SPEC Tool blocker. Added committed TCGdex metadata, authored Maximum Belt as an engine-defined Tool that adds `50` damage to attacks used against the opponent's Active Pokémon ex before Weakness and Resistance, and generalized the Tool attack-damage path so Brave Bangle no longer depends on a hard-coded card ID while Jamming Tower suppresses Tool damage bonuses.

@@ -1710,7 +1710,8 @@ defmodule Prizmo.TcgEngine.CardPlay do
              target_cards,
              Map.get(effect.params, :exclusive_groups)
            ),
-         :ok <- require_max_search_groups(target_cards, Map.get(effect.params, :max_groups)) do
+         :ok <- require_max_search_groups(target_cards, Map.get(effect.params, :max_groups)),
+         :ok <- require_search_destination_capacity(game_id, player_id, target_cards, effect) do
       {:ok, target_cards}
     end
   end
@@ -2995,6 +2996,23 @@ defmodule Prizmo.TcgEngine.CardPlay do
     end)
     |> collect_ok_results()
   end
+
+  defp require_search_destination_capacity(game_id, player_id, target_cards, %{
+         params: %{destination: :bench}
+       }) do
+    with {:ok, cards} <- CardStore.list_cards(game_id) do
+      target_count = length(target_cards)
+      available_space = bench_space(cards, player_id)
+
+      if target_count <= available_space do
+        :ok
+      else
+        {:error, {:not_enough_bench_space, target_count, available_space}}
+      end
+    end
+  end
+
+  defp require_search_destination_capacity(_game_id, _player_id, _target_cards, _effect), do: :ok
 
   defp require_exclusive_search_groups(_target_cards, nil), do: :ok
 

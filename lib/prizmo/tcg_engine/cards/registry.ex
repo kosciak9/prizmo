@@ -774,6 +774,27 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     ]
   }
 
+  @precious_trolley %CardDefinition{
+    id: "SSP-185",
+    kind: :trainer,
+    trainer_type: :item,
+    play_window: :action_window,
+    effects: [
+      %Effect{
+        key: :search_deck_for_any_basic_pokemon_to_bench,
+        type: :search_deck,
+        params: %{
+          filter: %{kind: :pokemon, stage: :basic},
+          min_count: 0,
+          max_count: 5,
+          destination: :bench,
+          reveal: true,
+          shuffle_after: true
+        }
+      }
+    ]
+  }
+
   @poke_pad %CardDefinition{
     id: "POR-081",
     kind: :trainer,
@@ -1188,6 +1209,7 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     @night_stretcher.id => @night_stretcher,
     @poke_pad.id => @poke_pad,
     @pokegear_3_0.id => @pokegear_3_0,
+    @precious_trolley.id => @precious_trolley,
     @prime_catcher.id => @prime_catcher,
     @rare_candy.id => @rare_candy,
     @ruffian.id => @ruffian,
