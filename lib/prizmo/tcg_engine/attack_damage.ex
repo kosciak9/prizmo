@@ -422,6 +422,11 @@ defmodule Prizmo.TcgEngine.AttackDamage do
        }),
        do: {:ok, damage}
 
+  defp apply_effect(damage, _attacker_card, _defender_card, %{
+         type: :knock_out_defender_if_exact_damage_counters
+       }),
+       do: {:ok, damage}
+
   defp apply_effect(damage, _attacker_card, _defender_card, %{type: :discard_hand_then_draw}),
     do: {:ok, damage}
 
@@ -475,6 +480,11 @@ defmodule Prizmo.TcgEngine.AttackDamage do
        do: {:ok, damage}
 
   defp apply_effect(damage, _attacker_card, _defender_card, %{
+         type: :poison_defender_active_and_prevent_retreat_next_turn
+       }),
+       do: {:ok, damage}
+
+  defp apply_effect(damage, _attacker_card, _defender_card, %{
          type: :lock_opponent_items_next_turn
        }), do: {:ok, damage}
 
@@ -485,6 +495,11 @@ defmodule Prizmo.TcgEngine.AttackDamage do
 
   defp apply_effect(damage, _attacker_card, _defender_card, %{
          type: :discard_defending_energy_on_coin_heads
+       }),
+       do: {:ok, damage}
+
+  defp apply_effect(damage, _attacker_card, _defender_card, %{
+         type: :discard_one_card_from_opponent_hand
        }),
        do: {:ok, damage}
 

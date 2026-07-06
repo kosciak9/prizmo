@@ -54,6 +54,7 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
   @subjugating_chains_effect_type :subjugating_chains_switch_and_poison
   @subjugating_chains_unavailable_reason :subjugating_chains_requires_benched_darkness_pokemon_except_pecharunt_ex
   @pokemon_checkup_damage_effect_type :pokemon_checkup_damage_to_pokemon_with_abilities_except_names
+  @pokemon_checkup_poison_bonus_effect_type :extra_poison_damage_counters_during_pokemon_checkup
   @jewel_seeker_card_id "SCR-115"
   @jewel_seeker_ability_id :jewel_seeker
   @jewel_seeker_effect_type :search_trainer_cards_when_evolved_with_tera_in_play
@@ -210,6 +211,28 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
          {:unsupported_pokemon_checkup_ability_effect, card_id,
           @pokemon_checkup_damage_effect_type}}
     end
+  end
+
+  def pokemon_checkup_poison_bonus_effect(%CardInstance{zone: :active, card_id: card_id}) do
+    with {:ok, %{abilities: abilities}} <- CardCatalog.fetch(card_id),
+         {_ability_id, %{effect: effect}} <-
+           Enum.find(abilities, &pokemon_checkup_poison_bonus_ability?/1),
+         %{type: @pokemon_checkup_poison_bonus_effect_type, damage_counters: damage_counters} <-
+           effect,
+         true <- damage_counters > 0 do
+      {:ok, %{damage_counters: damage_counters}}
+    else
+      _other ->
+        {:error,
+         {:unsupported_pokemon_checkup_ability_effect, card_id,
+          @pokemon_checkup_poison_bonus_effect_type}}
+    end
+  end
+
+  def pokemon_checkup_poison_bonus_effect(%CardInstance{card_id: card_id}) do
+    {:error,
+     {:unsupported_pokemon_checkup_ability_effect, card_id,
+      @pokemon_checkup_poison_bonus_effect_type}}
   end
 
   def require_self_knock_out_ability_not_blocked(game_id) when is_binary(game_id) do
@@ -1041,6 +1064,20 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
   end
 
   defp pokemon_checkup_damage_ability?(_other), do: false
+
+  defp pokemon_checkup_poison_bonus_ability?({_ability_id, %{effect: effect}})
+       when is_map(effect) do
+    match?(
+      %{
+        type: @pokemon_checkup_poison_bonus_effect_type,
+        damage_counters: damage_counters
+      }
+      when is_integer(damage_counters) and damage_counters > 0,
+      effect
+    )
+  end
+
+  defp pokemon_checkup_poison_bonus_ability?(_other), do: false
 
   defp damage_counter_move_prevention_source?(%CardInstance{} = card) do
     in_play?(card) and

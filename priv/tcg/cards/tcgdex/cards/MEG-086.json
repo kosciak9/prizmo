@@ -1,0 +1,89 @@
+{
+  "prizmo_id": "MEG-086",
+  "source": {
+    "base_url": "https://api.tcgdex.net/v2/en",
+    "dynamic_fields_removed": [
+      "pricing"
+    ],
+    "language": "en",
+    "provider": "TCGdex"
+  },
+  "tcgdex": {
+    "attacks": [
+      {
+        "cost": [
+          "Darkness",
+          "Colorless"
+        ],
+        "effect": "If your opponent's Active Pokémon has exactly 6 damage counters on it, that Pokémon is Knocked Out.",
+        "name": "Terminal Period"
+      },
+      {
+        "cost": [
+          "Darkness",
+          "Darkness",
+          "Colorless"
+        ],
+        "damage": 200,
+        "effect": "Your opponent reveals their hand, and you discard a card you find there.",
+        "name": "Claw of Darkness"
+      }
+    ],
+    "category": "Pokemon",
+    "dexId": [
+      351
+    ],
+    "hp": 280,
+    "id": "me01-086",
+    "illustrator": "aky CG Works",
+    "image": "https://assets.tcgdex.net/en/me/me01/086",
+    "legal": {
+      "expanded": true,
+      "standard": true
+    },
+    "localId": "086",
+    "name": "Mega Absol ex",
+    "rarity": "Double rare",
+    "regulationMark": "I",
+    "retreat": 2,
+    "set": {
+      "cardCount": {
+        "official": 132,
+        "total": 188
+      },
+      "id": "me01",
+      "logo": "https://assets.tcgdex.net/en/me/me01/logo",
+      "name": "Mega Evolution",
+      "symbol": "https://assets.tcgdex.net/univ/me/me01/symbol"
+    },
+    "stage": "Basic",
+    "suffix": "ex",
+    "types": [
+      "Darkness"
+    ],
+    "updated": "2026-04-25T21:46:36+01:00",
+    "variants": {
+      "firstEdition": false,
+      "holo": true,
+      "normal": false,
+      "reverse": false,
+      "wPromo": false
+    },
+    "variants_detailed": [
+      {
+        "size": "standard",
+        "type": "holo",
+        "variantId": "jr7oetx1mqug9"
+      },
+      {
+        "size": "standard",
+        "stamp": [
+          "player-rewards-program"
+        ],
+        "type": "holo",
+        "variantId": "mtltux8quqoc7vwp24c9zzhgmzduu8xcik8"
+      }
+    ]
+  },
+  "tcgdex_id": "me01-086"
+}

@@ -65,6 +65,15 @@ defmodule Prizmo.TcgEngine.GameView.Fields do
     attack_effect_type: [type: :string]
   ]
 
+  @pending_attack_card_choice_fields [
+    id: [type: :uuid, allow_nil?: false],
+    card_id: [type: :string, allow_nil?: false],
+    name: [type: :string, allow_nil?: false],
+    image: [type: :string],
+    category: [type: :string],
+    stage: [type: :string]
+  ]
+
   @turn_view_fields [
     id: [type: :uuid, allow_nil?: false],
     turn_number: [type: :integer, allow_nil?: false],
@@ -86,6 +95,12 @@ defmodule Prizmo.TcgEngine.GameView.Fields do
       type: {:array, :map},
       allow_nil?: false,
       constraints: [items: [fields: @attack_copy_choice_fields]]
+    ],
+    pending_attack_requires_opponent_hand_discard: [type: :boolean, allow_nil?: false],
+    pending_attack_opponent_hand_discard_choices: [
+      type: {:array, :map},
+      allow_nil?: false,
+      constraints: [items: [fields: @pending_attack_card_choice_fields]]
     ],
     pending_attacker_card_instance_id: [type: :uuid],
     pending_defender_card_instance_id: [type: :uuid]

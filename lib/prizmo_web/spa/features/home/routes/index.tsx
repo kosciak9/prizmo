@@ -75,6 +75,7 @@ const DAMAGE_OPPONENT_BENCH_EFFECT = 'damage_opponent_bench'
 const SHUFFLE_ATTACHED_ENERGY_INTO_DECK_THEN_DAMAGE_OPPONENT_BENCH_EFFECT =
   'shuffle_attached_energy_into_deck_then_damage_opponent_bench'
 const COPY_OPPONENT_ACTIVE_TERA_POKEMON_ATTACK_EFFECT = 'copy_opponent_active_tera_pokemon_attack'
+const DISCARD_ONE_CARD_FROM_OPPONENT_HAND_EFFECT = 'discard_one_card_from_opponent_hand'
 const ULTRA_BALL_CARD_ID = 'MEG-131'
 const CRUSHING_HAMMER_CARD_ID = 'POR-071'
 const SECRET_BOX_CARD_ID = 'TWM-163'
@@ -219,6 +220,8 @@ const GAME_STATE_FIELDS = [
       'pendingAttackRequiresHeadsCount',
       'pendingAttackRequiresCopiedAttack',
       { pendingAttackCopyChoices: ['attackId', 'attackName', 'attackDamage', 'attackEffectType'] },
+      'pendingAttackRequiresOpponentHandDiscard',
+      { pendingAttackOpponentHandDiscardChoices: ['id', 'cardId', 'name', 'image', 'category', 'stage'] },
       'pendingAttackerCardInstanceId',
       'pendingDefenderCardInstanceId'
     ]
@@ -669,6 +672,15 @@ type AttackCopyChoice = {
   attackEffectType: string | null
 }
 
+type PendingAttackCardChoice = {
+  id: string
+  cardId: string
+  name: string
+  image: string | null
+  category: string | null
+  stage: string | null
+}
+
 type PlayCardInput = {
   gameId: string
   playerId: PlayerId
@@ -983,6 +995,7 @@ type ResolveDeclaredAttackInput = {
   coinResult?: CoinResult | null
   headsCount?: number | null
   copiedAttackId?: string | null
+  opponentHandCardInstanceId?: string | null
 }
 
 type DamageCounterMoveSelection = {
@@ -1005,6 +1018,7 @@ type ResolveDeclaredAttackCommand = {
   coinResult?: CoinResult | null
   headsCount?: number | null
   copiedAttackId?: string | null
+  opponentHandCardInstanceId?: string | null
 }
 
 type FinishAttackInput = {
@@ -1103,6 +1117,8 @@ type GameState = {
     pendingAttackRequiresHeadsCount: boolean
     pendingAttackRequiresCopiedAttack: boolean
     pendingAttackCopyChoices: AttackCopyChoice[]
+    pendingAttackRequiresOpponentHandDiscard: boolean
+    pendingAttackOpponentHandDiscardChoices: PendingAttackCardChoice[]
     pendingAttackerCardInstanceId: string | null
     pendingDefenderCardInstanceId: string | null
   } | null
@@ -2370,7 +2386,8 @@ export function HomeRoute() {
                   damageCounterMoveSelections,
                   coinResult,
                   headsCount,
-                  copiedAttackId
+                  copiedAttackId,
+                  opponentHandCardInstanceId
                 }) => {
                   if (isPlayerId(playerId)) {
                     resolveDeclaredAttackMutation.mutate({
@@ -2387,7 +2404,8 @@ export function HomeRoute() {
                       damageCounterMoveSelections,
                       coinResult,
                       headsCount,
-                      copiedAttackId
+                      copiedAttackId,
+                      opponentHandCardInstanceId
                     })
                   }
                 }}
@@ -5510,6 +5528,7 @@ function AttackProgressPanel({
   const [selectedCoinResult, setSelectedCoinResult] = useState<CoinResult | ''>('')
   const [selectedHeadsCount, setSelectedHeadsCount] = useState('')
   const [selectedCopiedAttackId, setSelectedCopiedAttackId] = useState('')
+  const [selectedOpponentHandCardInstanceId, setSelectedOpponentHandCardInstanceId] = useState('')
   const turn = gameState.currentTurn
   const activePlayer = turn ? gameState.players.find(player => player.playerId === turn.activePlayerId) : undefined
   const opponentPlayer = turn ? gameState.players.find(player => player.playerId !== turn.activePlayerId) : undefined
@@ -5555,6 +5574,9 @@ function AttackProgressPanel({
   )
   const pendingAttackRequiresHeadsCount = Boolean(
     turn?.pendingAttackRequiresHeadsCount || resolutionEffectType === 'bonus_damage_per_coin_heads_count'
+  )
+  const pendingAttackRequiresOpponentHandDiscard = Boolean(
+    turn?.pendingAttackRequiresOpponentHandDiscard || resolutionEffectType === DISCARD_ONE_CARD_FROM_OPPONENT_HAND_EFFECT
   )
   const switchTargetOptions = pendingAttackRequiresSwitchTarget ? (activePlayer?.bench ?? []) : []
   const selectedSwitchTargetIsValid = switchTargetOptions.some(card => card.id === selectedSwitchBenchCardInstanceId)
@@ -5783,6 +5805,19 @@ function AttackProgressPanel({
     parsedHeadsCount >= 0
       ? parsedHeadsCount
       : null
+  const opponentHandDiscardOptions = pendingAttackRequiresOpponentHandDiscard
+    ? (turn?.pendingAttackOpponentHandDiscardChoices ?? [])
+    : []
+  const selectedOpponentHandCardIsValid = opponentHandDiscardOptions.some(
+    card => card.id === selectedOpponentHandCardInstanceId
+  )
+  const opponentHandCardInstanceIdForResolve = pendingAttackRequiresOpponentHandDiscard
+    ? selectedOpponentHandCardIsValid
+      ? selectedOpponentHandCardInstanceId
+      : opponentHandDiscardOptions.length === 1
+        ? (opponentHandDiscardOptions[0]?.id ?? null)
+        : null
+    : null
 
   useEffect(() => {
     if (selectedSwitchBenchCardInstanceId && !selectedSwitchTargetIsValid) {
@@ -5802,6 +5837,7 @@ function AttackProgressPanel({
     setSelectedCoinResult('')
     setSelectedHeadsCount('')
     setSelectedCopiedAttackId('')
+    setSelectedOpponentHandCardInstanceId('')
   }, [turn?.id, turn?.pendingAttackId])
 
   useEffect(() => {
@@ -5809,6 +5845,12 @@ function AttackProgressPanel({
       setSelectedCopiedAttackId('')
     }
   }, [selectedCopiedAttackChoice, selectedCopiedAttackId])
+
+  useEffect(() => {
+    if (selectedOpponentHandCardInstanceId && !selectedOpponentHandCardIsValid) {
+      setSelectedOpponentHandCardInstanceId('')
+    }
+  }, [selectedOpponentHandCardInstanceId, selectedOpponentHandCardIsValid])
 
   useEffect(() => {
     setSelectedDiscardedEnergyCardInstanceIds(previousSelectedIds => {
@@ -5945,8 +5987,6 @@ function AttackProgressPanel({
 
     return selectedCounters > availableCounters
   })
-  const manualResolveNeededInFlowManagedState =
-    pendingAttackRequiresDamageCounterMoves && damageCounterMoveSourceOptions.length > 0
   const coinResultRequired = pendingAttackRequiresCoinResult && !coinResultForResolve
   const defendingEnergyDiscardRequiresChoice =
     resolutionEffectType === DISCARD_DEFENDING_ENERGY_ON_COIN_HEADS_EFFECT &&
@@ -5954,6 +5994,13 @@ function AttackProgressPanel({
     discardedEnergyOptions.length > 1 &&
     selectedDiscardedEnergyIdsForResolve.length !== 1
   const headsCountRequired = pendingAttackRequiresHeadsCount && headsCountForResolve === null
+  const opponentHandDiscardRequiresChoice =
+    pendingAttackRequiresOpponentHandDiscard &&
+    opponentHandDiscardOptions.length > 1 &&
+    !selectedOpponentHandCardIsValid
+  const manualResolveNeededInFlowManagedState =
+    (pendingAttackRequiresDamageCounterMoves && damageCounterMoveSourceOptions.length > 0) ||
+    opponentHandDiscardRequiresChoice
   const missingActivePlayers = gameState.players.filter(player => !player.active)
   const awaitingPromptPlayerIds = gameState.awaitingPromptPlayerIds
   const awaitingPromptBlocksFinish = viewerCanAdvanceAttack && awaitingPromptPlayerIds.length > 0
@@ -5986,7 +6033,8 @@ function AttackProgressPanel({
     Boolean(damageCounterMoveOverallocationSource) ||
     coinResultRequired ||
     defendingEnergyDiscardRequiresChoice ||
-    headsCountRequired
+    headsCountRequired ||
+    opponentHandDiscardRequiresChoice
   const resolveButtonLabel = resolveDeclaredAttackPendingPlayerId === turn.activePlayerId
     ? `Resolving ${attackLabel}...`
     : copiedAttackUnavailable
@@ -6021,6 +6069,8 @@ function AttackProgressPanel({
                           ? `Choose an Energy to discard for ${attackLabel}`
                           : headsCountRequired
                             ? `Enter a heads count for ${attackLabel}`
+                            : opponentHandDiscardRequiresChoice
+                              ? `Choose an opponent hand card for ${attackLabel}`
                             : `Resolve ${attackLabel}`
   const attackProgressGuideTitle = turn.status === 'attack_resolving' ? 'Damage recorded' : 'Attack declared'
   const attackProgressGuideDetail = turn.status === 'attack_resolving'
@@ -6030,7 +6080,7 @@ function AttackProgressPanel({
     : attackFlowManaged && !manualResolveNeededInFlowManagedState
       ? `The flow machine resolves ${attackLabel} automatically when no player choice is required.`
       : manualResolveNeededInFlowManagedState
-        ? `${attackLabel} needs a player-chosen damage-counter redistribution before the persisted engine can finish the attack.`
+        ? `${attackLabel} needs player-chosen resolution input before the persisted engine can finish the attack.`
       : `Resolve ${attackLabel} to apply its persisted damage and any authored effect before ending the turn.`
   const resolutionChecklistItems: ResolutionChecklistItem[] = []
 
@@ -6065,6 +6115,22 @@ function AttackProgressPanel({
       label: 'Heads count',
       tone: headsCountRequired ? 'waiting' : 'ready',
       value: headsCountForResolve === null ? 'Enter a count' : `${headsCountForResolve} heads`
+    })
+  }
+
+  if (pendingAttackRequiresOpponentHandDiscard) {
+    resolutionChecklistItems.push({
+      label: 'Opponent hand discard',
+      tone: opponentHandDiscardRequiresChoice ? 'waiting' : 'ready',
+      value:
+        opponentHandDiscardOptions.length > 1
+          ? selectedOpponentHandCardIsValid
+            ? opponentHandDiscardOptions.find(card => card.id === selectedOpponentHandCardInstanceId)?.name ??
+              'Card selected'
+            : `${opponentHandDiscardOptions.length} hand choices`
+          : opponentHandDiscardOptions.length === 1
+            ? `Auto: ${opponentHandDiscardOptions[0]?.name ?? 'only card'}`
+            : 'Opponent hand empty; effect skipped'
     })
   }
 
@@ -6450,6 +6516,65 @@ function AttackProgressPanel({
                 Each heads adds the authored bonus damage. Enter 0 when the first flip is tails.
               </span>
             </label>
+          </div>
+        ) : null}
+
+        {pendingAttackRequiresOpponentHandDiscard ? (
+          <div className="rounded-xl border border-purple-200 bg-purple-50/70 p-3">
+            <div className="space-y-1">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-purple-900">
+                Opponent hand discard
+              </p>
+              <p className="text-xs leading-5 text-purple-900/80">
+                This attack reveals the opponent&apos;s hand and discards one card from it after damage. If exactly one
+                card is available, resolution will discard it automatically.
+              </p>
+            </div>
+
+            {opponentHandDiscardOptions.length > 1 ? (
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                {opponentHandDiscardOptions.map(card => {
+                  const selected = card.id === selectedOpponentHandCardInstanceId
+
+                  return (
+                    <label
+                      className={`flex cursor-pointer items-start gap-2 rounded-lg border px-3 py-2 text-xs transition ${
+                        selected
+                          ? 'border-purple-700 bg-purple-100 text-purple-950'
+                          : 'border-purple-200 bg-stone-50 text-stone-700 hover:border-purple-400'
+                      }`}
+                      key={card.id}
+                    >
+                      <input
+                        checked={selected}
+                        className="mt-0.5"
+                        disabled={!viewerCanAdvanceAttack || commandPending}
+                        name="opponent-hand-card-instance-id"
+                        onChange={() => setSelectedOpponentHandCardInstanceId(card.id)}
+                        type="radio"
+                      />
+                      <span className="min-w-0">
+                        <span className="block font-medium">{card.name}</span>
+                        <span className="mt-0.5 block font-mono text-[0.68rem] opacity-70">
+                          {card.cardId}
+                          {card.category ? ` · ${card.category}` : ''}
+                          {card.stage ? ` · ${card.stage}` : ''}
+                        </span>
+                      </span>
+                    </label>
+                  )
+                })}
+              </div>
+            ) : opponentHandDiscardOptions.length === 1 ? (
+              <p className="mt-3 rounded-lg border border-purple-200 bg-stone-50 px-3 py-2 text-xs text-purple-900">
+                Only {opponentHandDiscardOptions[0]?.name ?? 'one card'} is in the opponent&apos;s hand, so resolution
+                will discard it automatically.
+              </p>
+            ) : (
+              <p className="mt-3 rounded-lg border border-purple-200 bg-stone-50 px-3 py-2 text-xs text-purple-900">
+                No opponent hand cards are available, so resolution will apply the attack without discarding a card.
+              </p>
+            )}
           </div>
         ) : null}
 
@@ -7004,7 +7129,8 @@ function AttackProgressPanel({
                 damageCounterMoveSelections: selectedDamageCounterMoveSelectionsForResolve,
                 coinResult: coinResultForResolve,
                 headsCount: headsCountForResolve,
-                copiedAttackId: copiedAttackIdForResolve
+                copiedAttackId: copiedAttackIdForResolve,
+                opponentHandCardInstanceId: opponentHandCardInstanceIdForResolve
               })
             }
             type="button"

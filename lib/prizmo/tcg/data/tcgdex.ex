@@ -30,6 +30,7 @@ defmodule Prizmo.Tcg.Data.TCGdex do
     "SCR" => "sv07",
     "SFA" => "sv06.5",
     "SSP" => "sv08",
+    "SVP" => "svp",
     "SVI" => "sv01",
     "TEF" => "sv05",
     "TWM" => "sv06",

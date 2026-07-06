@@ -92,11 +92,14 @@ defmodule Prizmo.TcgEngine.AttackEffects do
     :damage_per_opponent_prize_taken,
     :damage_per_own_prize_taken,
     :base_damage_if_defender_has_damage_counters,
+    :knock_out_defender_if_exact_damage_counters,
     :damage_only_if_stadium_in_play,
     :damage_only_if_own_bench_has_card_id_unaffected_by_weakness_resistance,
     :damage_per_discarded_own_basic_energy,
     :self_damage_then_paralyze_and_poison_defender_active,
+    :poison_defender_active_and_prevent_retreat_next_turn,
     :discard_defending_energy_on_coin_heads,
+    :discard_one_card_from_opponent_hand,
     :discard_energy_from_own_bench_for_bonus_damage,
     :defending_pokemon_cannot_retreat_next_turn,
     :discard_hand_then_draw,
@@ -142,6 +145,12 @@ defmodule Prizmo.TcgEngine.AttackEffects do
       %{type: :confuse_defender_active_then_move_opponent_damage_counters} ->
         case opponent_in_play_pokemon_cards(game_id, player_id) do
           {:ok, opponent_cards} -> not legal_damage_counter_move_available?(opponent_cards)
+          _error -> true
+        end
+
+      %{type: :discard_one_card_from_opponent_hand} ->
+        case opponent_hand_cards(game_id, player_id) do
+          {:ok, opponent_hand_cards} -> length(opponent_hand_cards) <= 1
           _error -> true
         end
 
@@ -317,6 +326,9 @@ defmodule Prizmo.TcgEngine.AttackEffects do
       %{type: :defending_pokemon_cannot_retreat_next_turn} ->
         defender_cannot_retreat_next_turn(game_id, player_id, defender_card)
 
+      %{type: :poison_defender_active_and_prevent_retreat_next_turn} ->
+        poison_defender_active_and_prevent_retreat_next_turn(game_id, player_id, defender_card)
+
       %{type: :lock_opponent_items_next_turn} ->
         lock_opponent_items_next_turn(game_id, attacker_card, defender_card)
 
@@ -340,6 +352,9 @@ defmodule Prizmo.TcgEngine.AttackEffects do
 
       %{type: :discard_defending_energy_on_coin_heads} ->
         discard_defending_energy_on_coin_heads(game_id, player_id, defender_card, opts)
+
+      %{type: :discard_one_card_from_opponent_hand} ->
+        discard_one_card_from_opponent_hand(game_id, player_id, opts)
 
       %{type: :move_opponent_attached_energy_between_pokemon} ->
         move_opponent_attached_energy_between_pokemon(game_id, player_id, opts)
@@ -385,6 +400,15 @@ defmodule Prizmo.TcgEngine.AttackEffects do
 
       %{type: :base_damage_if_defender_has_damage_counters} ->
         {:ok, %{}}
+
+      %{type: :knock_out_defender_if_exact_damage_counters, damage_counters: damage_counters}
+      when is_integer(damage_counters) and damage_counters >= 0 ->
+        knock_out_defender_if_exact_damage_counters(
+          game_id,
+          player_id,
+          defender_card,
+          damage_counters
+        )
 
       %{type: :damage_opponent_bench, bench_damage: bench_damage}
       when is_integer(bench_damage) and bench_damage >= 0 ->
@@ -1128,6 +1152,176 @@ defmodule Prizmo.TcgEngine.AttackEffects do
          poisoned_applied?: Map.get(poison_payload, :defender_status_applied?, false)
        })}
     end
+  end
+
+  defp poison_defender_active_and_prevent_retreat_next_turn(
+         game_id,
+         player_id,
+         %CardInstance{} = defender_card
+       ) do
+    with {:ok, poison_payload} <-
+           set_defender_condition_marker(game_id, player_id, defender_card, :poisoned),
+         {:ok, retreat_payload} <-
+           defender_cannot_retreat_next_turn(game_id, player_id, defender_card) do
+      {:ok,
+       %{
+         effect_type: "poison_defender_active_and_prevent_retreat_next_turn",
+         defender_status_card_instance_id: defender_card.id,
+         defender_status: "poisoned",
+         defender_status_applied?: Map.get(poison_payload, :defender_status_applied?, false),
+         retreat_lock_applied?: Map.get(retreat_payload, :retreat_lock_applied?, false),
+         cannot_retreat_card_instance_id:
+           Map.get(retreat_payload, :cannot_retreat_card_instance_id),
+         retreat_blocked_turn_number: Map.get(retreat_payload, :retreat_blocked_turn_number),
+         attack_effect_prevented?:
+           Map.get(poison_payload, :attack_effect_prevented?, false) or
+             Map.get(retreat_payload, :attack_effect_prevented?, false),
+         public_note:
+           "The opponent's Active Pokémon is now Poisoned and can't retreat during the opponent's next turn."
+       }
+       |> Map.merge(Map.delete(poison_payload, :effect_type))
+       |> Map.merge(Map.delete(retreat_payload, :effect_type))
+       |> Map.put(:effect_type, "poison_defender_active_and_prevent_retreat_next_turn")}
+    end
+  end
+
+  defp knock_out_defender_if_exact_damage_counters(
+         game_id,
+         player_id,
+         %CardInstance{} = defender_card,
+         damage_counters
+       ) do
+    with {:ok, current_defender_card} <- get_card(game_id, defender_card.id) do
+      case attack_effect_prevention_payload(game_id, player_id, current_defender_card) do
+        {:prevented, prevention_payload} ->
+          {:ok,
+           Map.merge(
+             %{
+               effect_type: "knock_out_defender_if_exact_damage_counters",
+               defender_card_instance_id: current_defender_card.id,
+               required_damage_counters: damage_counters,
+               defender_damage_counters: div(current_defender_card.damage, 10),
+               defender_exact_damage_counter_match?: false,
+               effect_knocked_out?: false,
+               effect_knockout_card_instance_ids: [],
+               attack_effect_prevented?: true
+             },
+             prevention_payload
+           )}
+
+        :not_prevented ->
+          maybe_knock_out_exact_damage_counter_defender(
+            game_id,
+            current_defender_card,
+            damage_counters
+          )
+      end
+    end
+  end
+
+  defp maybe_knock_out_exact_damage_counter_defender(
+         game_id,
+         %CardInstance{} = defender_card,
+         damage_counters
+       ) do
+    required_damage = damage_counters * 10
+    exact_match? = defender_card.zone == :active and defender_card.damage == required_damage
+
+    if exact_match? do
+      with {:ok, discarded_cards} <-
+             BattleActions.discard_knocked_out_stack(game_id, defender_card) do
+        {:ok,
+         %{
+           effect_type: "knock_out_defender_if_exact_damage_counters",
+           defender_card_instance_id: defender_card.id,
+           required_damage_counters: damage_counters,
+           defender_damage_counters: damage_counters,
+           defender_exact_damage_counter_match?: true,
+           effect_knocked_out?: true,
+           effect_knockout_card_instance_ids: [defender_card.id],
+           discarded_card_instance_ids: Enum.map(discarded_cards, & &1.id),
+           public_note:
+             "Terminal Period Knocked Out the opponent's Active Pokémon because it had exactly #{damage_counters} damage counters."
+         }}
+      end
+    else
+      {:ok,
+       %{
+         effect_type: "knock_out_defender_if_exact_damage_counters",
+         defender_card_instance_id: defender_card.id,
+         required_damage_counters: damage_counters,
+         defender_damage_counters: div(defender_card.damage, 10),
+         defender_exact_damage_counter_match?: false,
+         effect_knocked_out?: false,
+         effect_knockout_card_instance_ids: []
+       }}
+    end
+  end
+
+  defp discard_one_card_from_opponent_hand(game_id, player_id, opts) do
+    with {:ok, opponent_hand_cards} <- opponent_hand_cards(game_id, player_id),
+         {:ok, target_card} <- opponent_hand_discard_target(opponent_hand_cards, opts) do
+      case target_card do
+        nil ->
+          {:ok,
+           %{
+             effect_type: "discard_one_card_from_opponent_hand",
+             opponent_hand_revealed?: true,
+             opponent_hand_card_count_before_discard: 0,
+             discarded_count: 0,
+             discarded_card_instance_ids: [],
+             discarded_cards: []
+           }}
+
+        %CardInstance{} = card ->
+          with {:ok, discarded_cards} <-
+                 discard_cards_from_hand(game_id, card.owner_player_id, [card]) do
+            {:ok,
+             %{
+               effect_type: "discard_one_card_from_opponent_hand",
+               opponent_hand_revealed?: true,
+               opponent_hand_card_count_before_discard: length(opponent_hand_cards),
+               discarded_count: length(discarded_cards),
+               discarded_card_instance_ids: Enum.map(discarded_cards, & &1.id),
+               discarded_card_ids: Enum.map(discarded_cards, & &1.card_id),
+               discarded_cards: EventPayloads.moved_cards(discarded_cards, :hand, :discard),
+               public_note: "Claw of Darkness revealed the opponent's hand and discarded 1 card."
+             }}
+          end
+      end
+    end
+  end
+
+  defp opponent_hand_discard_target(opponent_hand_cards, opts)
+       when is_list(opponent_hand_cards) do
+    case opponent_hand_card_instance_id(opts) do
+      nil ->
+        implicit_opponent_hand_discard_target(opponent_hand_cards)
+
+      card_instance_id when is_binary(card_instance_id) ->
+        explicit_opponent_hand_discard_target(opponent_hand_cards, card_instance_id)
+
+      _invalid ->
+        {:error, :invalid_opponent_hand_card_instance_id}
+    end
+  end
+
+  defp implicit_opponent_hand_discard_target([]), do: {:ok, nil}
+  defp implicit_opponent_hand_discard_target([card]), do: {:ok, card}
+
+  defp implicit_opponent_hand_discard_target([_first | _rest]),
+    do: {:error, :opponent_hand_discard_requires_target}
+
+  defp explicit_opponent_hand_discard_target(opponent_hand_cards, card_instance_id) do
+    case Enum.find(opponent_hand_cards, &(&1.id == card_instance_id)) do
+      %CardInstance{} = card -> {:ok, card}
+      nil -> {:error, :invalid_opponent_hand_discard_target}
+    end
+  end
+
+  defp opponent_hand_card_instance_id(opts) do
+    Map.get(opts, :opponent_hand_card_instance_id) ||
+      Map.get(opts, "opponent_hand_card_instance_id")
   end
 
   defp maybe_append_status(statuses, status, true), do: statuses ++ [status]
@@ -2628,6 +2822,12 @@ defmodule Prizmo.TcgEngine.AttackEffects do
          {:ok, active_cards} <- cards_in_zone(game_id, opponent_player_id, :active),
          {:ok, bench_cards} <- cards_in_zone(game_id, opponent_player_id, :bench) do
       {:ok, active_cards ++ bench_cards}
+    end
+  end
+
+  defp opponent_hand_cards(game_id, player_id) do
+    with {:ok, opponent_player_id} <- opponent_player_id(game_id, player_id) do
+      cards_in_zone(game_id, opponent_player_id, :hand)
     end
   end
 

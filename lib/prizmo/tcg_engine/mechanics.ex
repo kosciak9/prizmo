@@ -3384,14 +3384,20 @@ defmodule Prizmo.TcgEngine.Mechanics do
     with {:ok, cards} <- CardStore.list_cards(game_id) do
       in_play_cards = Enum.filter(cards, &(&1.zone in [:active, :bench]))
       source_effects = pokemon_checkup_source_effects(in_play_cards)
+      poison_bonus_source_effects = pokemon_checkup_poison_bonus_source_effects(in_play_cards)
 
       with {:ok, ability_target_results} <-
              apply_pokemon_checkup_damage_targets(game_id, in_play_cards, source_effects),
            {:ok, poison_target_results} <-
-             apply_pokemon_checkup_poison_targets(game_id, in_play_cards) do
+             apply_pokemon_checkup_poison_targets(
+               game_id,
+               in_play_cards,
+               poison_bonus_source_effects
+             ) do
         {:ok,
          %{
            source_effects: source_effects,
+           poison_bonus_source_effects: poison_bonus_source_effects,
            target_results: ability_target_results ++ poison_target_results
          }}
       end
@@ -3401,6 +3407,15 @@ defmodule Prizmo.TcgEngine.Mechanics do
   defp pokemon_checkup_source_effects(cards) when is_list(cards) do
     Enum.flat_map(cards, fn source_card ->
       case AbilityEffects.pokemon_checkup_damage_effect(source_card) do
+        {:ok, effect} -> [%{source_card: source_card, effect: effect}]
+        {:error, _reason} -> []
+      end
+    end)
+  end
+
+  defp pokemon_checkup_poison_bonus_source_effects(cards) when is_list(cards) do
+    Enum.flat_map(cards, fn source_card ->
+      case AbilityEffects.pokemon_checkup_poison_bonus_effect(source_card) do
         {:ok, effect} -> [%{source_card: source_card, effect: effect}]
         {:error, _reason} -> []
       end
@@ -3466,11 +3481,11 @@ defmodule Prizmo.TcgEngine.Mechanics do
     end
   end
 
-  defp apply_pokemon_checkup_poison_targets(game_id, in_play_cards)
-       when is_binary(game_id) and is_list(in_play_cards) do
+  defp apply_pokemon_checkup_poison_targets(game_id, in_play_cards, poison_bonus_source_effects)
+       when is_binary(game_id) and is_list(in_play_cards) and is_list(poison_bonus_source_effects) do
     in_play_cards
     |> Enum.reduce_while({:ok, []}, fn card, {:ok, results} ->
-      case pokemon_checkup_poison_target_result(game_id, card) do
+      case pokemon_checkup_poison_target_result(game_id, card, poison_bonus_source_effects) do
         {:ok, nil} -> {:cont, {:ok, results}}
         {:ok, result} -> {:cont, {:ok, [result | results]}}
         {:error, reason} -> {:halt, {:error, reason}}
@@ -3482,10 +3497,17 @@ defmodule Prizmo.TcgEngine.Mechanics do
     end
   end
 
-  defp pokemon_checkup_poison_target_result(game_id, %CardInstance{} = card) do
+  defp pokemon_checkup_poison_target_result(
+         game_id,
+         %CardInstance{} = card,
+         poison_bonus_source_effects
+       ) do
     with {:ok, current_card} <- get_card(game_id, card.id) do
       if current_card.zone == :active and SpecialConditions.poisoned?(current_card) do
-        damage_counters = 1
+        bonus_damage_counters =
+          pokemon_checkup_poison_bonus_damage_counters(current_card, poison_bonus_source_effects)
+
+        damage_counters = 1 + bonus_damage_counters
         damage = AbilityEffects.damage_for_counters(damage_counters)
         resulting_damage = current_card.damage + damage
 
@@ -3501,6 +3523,7 @@ defmodule Prizmo.TcgEngine.Mechanics do
              owner_player_id: current_card.owner_player_id,
              starting_damage: current_card.damage,
              damage_counters: damage_counters,
+             poison_bonus_damage_counters: bonus_damage_counters,
              applied_damage: damage,
              resulting_damage: resulting_damage,
              knocked_out?: knocked_out?
@@ -3510,6 +3533,21 @@ defmodule Prizmo.TcgEngine.Mechanics do
         {:ok, nil}
       end
     end
+  end
+
+  defp pokemon_checkup_poison_bonus_damage_counters(
+         %CardInstance{} = poisoned_card,
+         poison_bonus_source_effects
+       )
+       when is_list(poison_bonus_source_effects) do
+    Enum.reduce(poison_bonus_source_effects, 0, fn %{source_card: source_card, effect: effect},
+                                                   total ->
+      if source_card.owner_player_id == poisoned_card.owner_player_id do
+        total
+      else
+        total + Map.get(effect, :damage_counters, 0)
+      end
+    end)
   end
 
   defp pokemon_checkup_damage_exempt?(%CardInstance{card_id: card_id}, except_names)
@@ -3524,17 +3562,20 @@ defmodule Prizmo.TcgEngine.Mechanics do
     {:ok, nil}
   end
 
-  defp maybe_write_pokemon_checkup_event(
-         %Game{} = game,
-         %{source_effects: source_effects} = result
-       ) do
+  defp maybe_write_pokemon_checkup_event(%Game{} = game, result) do
     write_event_and_snapshot(game.id, :pokemon_checkup_effect_resolved, nil, %{
       turn_id: current_turn_id(game.id),
-      source_card_ids: Enum.map(source_effects, & &1.source_card.card_id),
-      source_card_instance_ids: Enum.map(source_effects, & &1.source_card.id),
+      source_card_ids:
+        Enum.map(all_pokemon_checkup_source_effects(result), & &1.source_card.card_id),
+      source_card_instance_ids:
+        Enum.map(all_pokemon_checkup_source_effects(result), & &1.source_card.id),
       targets: Enum.map(result.target_results, &pokemon_checkup_target_payload/1),
       public_note: pokemon_checkup_public_note(result)
     })
+  end
+
+  defp all_pokemon_checkup_source_effects(result) do
+    Map.get(result, :source_effects, []) ++ Map.get(result, :poison_bonus_source_effects, [])
   end
 
   defp pokemon_checkup_target_payload(result) do
@@ -3545,6 +3586,7 @@ defmodule Prizmo.TcgEngine.Mechanics do
       owner_player_id: result.owner_player_id,
       starting_damage: result.starting_damage,
       damage_counters: result.damage_counters,
+      poison_bonus_damage_counters: Map.get(result, :poison_bonus_damage_counters, 0),
       applied_damage: result.applied_damage,
       resulting_damage: result.resulting_damage,
       knocked_out?: result.knocked_out?
@@ -3556,10 +3598,10 @@ defmodule Prizmo.TcgEngine.Mechanics do
          target_results: target_results
        }) do
     ability_target_results = Enum.reject(target_results, &(&1.source == :poison))
-    poison_target_count = Enum.count(target_results, &(&1.source == :poison))
+    poison_target_results = Enum.filter(target_results, &(&1.source == :poison))
 
     ability_note = pokemon_checkup_ability_public_note(source_effects, ability_target_results)
-    poison_note = pokemon_checkup_poison_public_note(poison_target_count)
+    poison_note = pokemon_checkup_poison_public_note(poison_target_results)
 
     cond do
       is_binary(ability_note) and is_binary(poison_note) ->
@@ -3598,10 +3640,24 @@ defmodule Prizmo.TcgEngine.Mechanics do
     end
   end
 
-  defp pokemon_checkup_poison_public_note(0), do: nil
+  defp pokemon_checkup_poison_public_note([]), do: nil
 
-  defp pokemon_checkup_poison_public_note(_poison_target_count) do
-    "Poison placed 1 damage counter on each Poisoned Active Pokémon."
+  defp pokemon_checkup_poison_public_note(poison_target_results) do
+    damage_counters =
+      poison_target_results
+      |> Enum.map(&Map.get(&1, :damage_counters, 1))
+      |> Enum.max(fn -> 1 end)
+
+    bonus_damage_counters =
+      poison_target_results
+      |> Enum.map(&Map.get(&1, :poison_bonus_damage_counters, 0))
+      |> Enum.max(fn -> 0 end)
+
+    if bonus_damage_counters > 0 do
+      "Poison placed #{damage_counters} #{pluralize_damage_counter(damage_counters)} on affected Poisoned Active Pokémon after Toxic Subjugation."
+    else
+      "Poison placed 1 damage counter on each Poisoned Active Pokémon."
+    end
   end
 
   defp resolve_pokemon_checkup_knockouts(%Game{} = game, %{target_results: []}) do

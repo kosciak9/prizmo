@@ -27,6 +27,15 @@ defmodule Prizmo.Tcg.Cards.Behaviors.MEG do
     )
   end
 
+  card "MEG-086" do
+    attack(:terminal_period,
+      damage: 0,
+      effect: %{type: :knock_out_defender_if_exact_damage_counters, damage_counters: 6}
+    )
+
+    attack(:claw_of_darkness, effect: %{type: :discard_one_card_from_opponent_hand})
+  end
+
   card "MEG-104" do
     ability(:run_errand, effect: %{type: :active_draw_once_per_turn, count: 2})
 

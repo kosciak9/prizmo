@@ -1079,6 +1079,10 @@ defmodule Prizmo.TcgEngine.Game.ActionCommands do
         allow_nil? true
       end
 
+      argument :opponent_hand_card_instance_id, :uuid do
+        allow_nil? true
+      end
+
       argument :handheld_fan_attachment_id, :uuid do
         allow_nil? true
       end
@@ -1105,6 +1109,8 @@ defmodule Prizmo.TcgEngine.Game.ActionCommands do
             Map.get(input.arguments, :moved_opponent_energy_card_instance_id),
           moved_opponent_energy_target_card_instance_id:
             Map.get(input.arguments, :moved_opponent_energy_target_card_instance_id),
+          opponent_hand_card_instance_id:
+            Map.get(input.arguments, :opponent_hand_card_instance_id),
           handheld_fan_attachment_id: Map.get(input.arguments, :handheld_fan_attachment_id),
           handheld_fan_target_id: Map.get(input.arguments, :handheld_fan_target_id)
         })

@@ -56,7 +56,7 @@ defmodule Prizmo.TcgEngine.GameView do
          latest_event_index: game.latest_event_index,
          awaiting_prompt_player_ids: awaiting_prompt_player_ids(awaiting_prompts),
          setup: setup_view(setup),
-         current_turn: turn_view(current_turn, cards),
+         current_turn: turn_view(current_turn, cards, viewer_player_id),
          action_affordances:
            ActionAffordances.for_viewer(
              game,
@@ -133,13 +133,21 @@ defmodule Prizmo.TcgEngine.GameView do
     }
   end
 
-  defp turn_view(nil, _cards), do: nil
+  defp turn_view(nil, _cards, _viewer_player_id), do: nil
 
-  defp turn_view(%Turn{} = turn, cards) do
+  defp turn_view(%Turn{} = turn, cards, viewer_player_id) do
     pending_attack_effect_type = pending_attack_effect_type(turn, cards)
 
     pending_attack_copy_choices =
       pending_attack_copy_choices(turn, cards, pending_attack_effect_type)
+
+    pending_attack_opponent_hand_discard_choices =
+      pending_attack_opponent_hand_discard_choices(
+        turn,
+        cards,
+        pending_attack_effect_type,
+        viewer_player_id
+      )
 
     %{
       id: turn.id,
@@ -180,6 +188,9 @@ defmodule Prizmo.TcgEngine.GameView do
       pending_attack_requires_copied_attack:
         pending_attack_effect_type == :copy_opponent_active_tera_pokemon_attack,
       pending_attack_copy_choices: pending_attack_copy_choices,
+      pending_attack_requires_opponent_hand_discard:
+        pending_attack_effect_type == :discard_one_card_from_opponent_hand,
+      pending_attack_opponent_hand_discard_choices: pending_attack_opponent_hand_discard_choices,
       pending_attacker_card_instance_id: turn.pending_attacker_card_instance_id,
       pending_defender_card_instance_id: turn.pending_defender_card_instance_id
     }
@@ -216,6 +227,39 @@ defmodule Prizmo.TcgEngine.GameView do
   end
 
   defp pending_attack_copy_choices(%Turn{}, _cards, _pending_attack_effect_type), do: []
+
+  defp pending_attack_opponent_hand_discard_choices(
+         %Turn{active_player_id: active_player_id},
+         cards,
+         :discard_one_card_from_opponent_hand,
+         active_player_id
+       ) do
+    cards
+    |> Enum.filter(&(&1.owner_player_id != active_player_id and &1.zone == :hand))
+    |> Enum.sort_by(&{&1.position, &1.instance_id})
+    |> Enum.map(&pending_attack_card_choice/1)
+  end
+
+  defp pending_attack_opponent_hand_discard_choices(
+         %Turn{},
+         _cards,
+         _pending_attack_effect_type,
+         _viewer_player_id
+       ),
+       do: []
+
+  defp pending_attack_card_choice(%CardInstance{} = card) do
+    catalog = catalog_card(card.card_id)
+
+    %{
+      id: card.id,
+      card_id: card.card_id,
+      name: Map.get(catalog, :name, card.card_id),
+      image: Map.get(catalog, :image),
+      category: stringify(Map.get(catalog, :category)),
+      stage: stringify(Map.get(catalog, :stage))
+    }
+  end
 
   defp stadium_view(cards, attached_cards_by_target) do
     cards
@@ -445,6 +489,17 @@ defmodule Prizmo.TcgEngine.GameView do
         else
           default_public_event_details()
         end
+
+      "discard_one_card_from_opponent_hand" ->
+        revealed_cards = public_revealed_cards(payload, "discarded_cards")
+
+        %{
+          public_note:
+            payload_value(payload, "public_note") ||
+              "Claw of Darkness revealed the opponent's hand and discarded #{length(revealed_cards)} #{pluralize("card", length(revealed_cards))}.",
+          public_card_count: length(revealed_cards),
+          public_revealed_cards: revealed_cards
+        }
 
       _other ->
         case payload_value(payload, "public_note") do

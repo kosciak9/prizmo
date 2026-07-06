@@ -64,13 +64,13 @@ Those reports are the canonical starting point for autonomous Goal 2 implementat
 - Tracked top archetypes: `30`
 - Tracked cards with usage greater than `0.00`: `377`
 - Coverage buckets from `mix prizmo.goal2.corpus`:
-  - `supported=154`
+  - `supported=156`
   - `generic-supported=8`
   - `partial=10`
-  - `unimplemented=205`
+  - `unimplemented=203`
 - Metadata buckets:
-  - `cached=175`
-  - `missing=202`
+  - `cached=177`
+  - `missing=200`
 
 Important interpretation:
 
@@ -82,16 +82,16 @@ Important interpretation:
 
 The strongest current Goal 2 implementation candidates are the incomplete cards shared by the most archetypes and/or the most total metagame share.
 
-The latest Goal 2 engine batch closed `POR-052` Drapion as the highest-share remaining two-archetype Pokémon blocker shared by N's Zoroark and Slowking Seek Inspiration. Drapion now has committed TCGdex metadata and executable attacks: `Wrack Down` uses the plain-damage path, and `Hazardous Tail` deals 100 damage, applies 70 self-damage, leaves the defender Paralyzed through the canonical `status` field, and stores simultaneous Poison through the new marker-backed `SpecialConditions` path. Generic Pokémon Checkup now places 1 damage counter on Poisoned Active Pokémon, `GameView` exposes all active status conditions via `status_conditions`, and active-to-Bench movement plus Festival Grounds recovery clear marker-backed special conditions.
+The latest Goal 2 engine batch closed the `MEG-086` Mega Absol ex / `SVP-149` Pecharunt Darkness pair as the highest-share remaining two-archetype blockers after Drapion. Mega Absol ex now has committed metadata and executable `Terminal Period` / `Claw of Darkness` attacks, including exact-six-damage-counter Active knockout and explicit opponent-hand reveal/discard selection through `GameView` and the temporary React SPA. Pecharunt now has committed metadata and executable `Poison Chain` plus active-spot `Toxic Subjugation`, adding a reusable Pokémon Checkup poison-bonus path while preserving the canonical retreat-prevention marker. The batch also fixes Mega Evolution ex Prize handling so `Mega ... ex` names award 3 Prize cards.
 
 ### Highest-priority remaining `unimplemented` cards from current report
 
 | Card | Archetypes | Total share | Notes |
 | --- | --- | --- | --- |
-| `MEG-086` Mega Absol ex | `2` | `11.20%` | High-share two-archetype Darkness attacker cleanup shared by N's Zoroark and Ogerpon Box. |
-| `SVP-149` Pecharunt | `2` | `11.20%` | Paired high-share two-archetype Darkness support cleanup alongside Mega Absol ex. |
 | `TEF-150` Hand Trimmer | `2` | `10.98%` | Next high-share two-archetype Trainer cleanup after the Darkness pair unless a broader primitive re-ranks above it. |
 | `PFL-092` Punk Helmet | `2` | `10.16%` | Next high-share two-archetype Tool cleanup behind Hand Trimmer in the live report. |
+| `TWM-131` Tatsugiri | `2` | `8.37%` | Next shared two-archetype Pokémon blocker after the top Trainer/Tool pair. |
+| `SSP-175` Dusk Ball | `2` | `7.78%` | Shared Item blocker behind Tatsugiri in the live report. |
 
 ### Shared `partial` cards worth finishing after the broad unimplemented slice
 
@@ -118,9 +118,9 @@ That means prior Goal 1 and six-deck coverage was not wasted; it now acts as see
 
 ## Recommended next implementation order
 
-1. Use the `MEG-086` Mega Absol ex / `SVP-149` Pecharunt pair as the next default Goal 2 implementation target because Drapion closed and these are now the highest-share remaining two-archetype Darkness blockers.
-2. Keep `TEF-150` Hand Trimmer as the next high-share two-archetype Trainer cleanup unless a broader primitive re-ranks above it.
-3. Keep `PFL-092` Punk Helmet as the next high-share two-archetype Tool cleanup behind Hand Trimmer in the live report.
+1. Take `TEF-150` Hand Trimmer next as the default highest-share remaining two-archetype blocker unless a broader primitive re-ranks above it.
+2. Keep `PFL-092` Punk Helmet as the immediate Tool follow-up behind Hand Trimmer.
+3. Keep `TWM-131` Tatsugiri and `SSP-175` Dusk Ball as the next shared two-archetype blockers after the top Trainer/Tool pair.
 4. Keep the remaining Dragapult-only cached pair `TWM-099` / `TWM-100` as deliberate single-archetype cleanup, not the default autonomous queue.
 5. Finish the remaining shared partials only after the broad unimplemented slice unless another batch naturally extends the new HP infrastructure; if returning to HP work soon, `POR-086` Growing Grass Energy remains the strongest follow-up.
 6. Keep using `mix prizmo.goal2.corpus` after each batch to re-rank the next blockers by archetype count and weighted share.

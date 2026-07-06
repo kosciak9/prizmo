@@ -1,0 +1,76 @@
+{
+  "prizmo_id": "SVP-149",
+  "source": {
+    "base_url": "https://api.tcgdex.net/v2/en",
+    "dynamic_fields_removed": [
+      "pricing"
+    ],
+    "language": "en",
+    "provider": "TCGdex"
+  },
+  "tcgdex": {
+    "abilities": [
+      {
+        "effect": "As long as this Pokémon is in the Active Spot, put 5 more damage counters on your opponent's Poisoned Pokémon during Pokémon Checkup.",
+        "name": "Toxic Subjugation",
+        "type": "Ability"
+      }
+    ],
+    "attacks": [
+      {
+        "cost": [
+          "Darkness",
+          "Colorless"
+        ],
+        "damage": 10,
+        "effect": "Your opponent's Active Pokémon is now Poisoned. During your opponent's next turn, that Pokémon can't retreat.",
+        "name": "Poison Chain"
+      }
+    ],
+    "category": "Pokemon",
+    "dexId": [
+      1025
+    ],
+    "hp": 80,
+    "id": "svp-149",
+    "illustrator": "Souichirou Gunjima",
+    "image": "https://assets.tcgdex.net/en/sv/svp/149",
+    "legal": {
+      "expanded": true,
+      "standard": true
+    },
+    "localId": "149",
+    "name": "Pecharunt",
+    "rarity": "None",
+    "regulationMark": "H",
+    "retreat": 1,
+    "set": {
+      "cardCount": {
+        "official": 225,
+        "total": 226
+      },
+      "id": "svp",
+      "name": "SVP Black Star Promos"
+    },
+    "stage": "Basic",
+    "types": [
+      "Darkness"
+    ],
+    "updated": "2025-08-16T19:38:01Z",
+    "variants": {
+      "firstEdition": false,
+      "holo": false,
+      "normal": true,
+      "reverse": false,
+      "wPromo": false
+    },
+    "variants_detailed": [
+      {
+        "size": "standard",
+        "type": "normal",
+        "variantId": "generated"
+      }
+    ]
+  },
+  "tcgdex_id": "svp-149"
+}

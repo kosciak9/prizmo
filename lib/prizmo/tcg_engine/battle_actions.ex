@@ -344,11 +344,15 @@ defmodule Prizmo.TcgEngine.BattleActions do
 
   defp briar_card_play?(%GameEvent{payload: payload}), do: payload["card_id"] == "SCR-132"
 
-  defp prize_count_for_card(%{supertype: :pokemon, suffix: "ex"}), do: 2
-
   defp prize_count_for_card(%{supertype: :pokemon, name: name}) when is_binary(name) do
-    if String.ends_with?(name, " ex"), do: 2, else: 1
+    cond do
+      String.starts_with?(name, "Mega ") and String.ends_with?(name, " ex") -> 3
+      String.ends_with?(name, " ex") -> 2
+      true -> 1
+    end
   end
+
+  defp prize_count_for_card(%{supertype: :pokemon, suffix: "ex"}), do: 2
 
   defp prize_count_for_card(_card), do: 1
 

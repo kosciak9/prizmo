@@ -44,6 +44,7 @@ defmodule Prizmo.TcgEngine.CardCatalog do
     Prizmo.Tcg.Cards.Behaviors.SCR,
     Prizmo.Tcg.Cards.Behaviors.SFA,
     Prizmo.Tcg.Cards.Behaviors.SSP,
+    Prizmo.Tcg.Cards.Behaviors.SVP,
     Prizmo.Tcg.Cards.Behaviors.SVI,
     Prizmo.Tcg.Cards.Behaviors.TEF,
     Prizmo.Tcg.Cards.Behaviors.TWM,
