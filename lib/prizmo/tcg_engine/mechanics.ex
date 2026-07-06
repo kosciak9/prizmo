@@ -2388,6 +2388,7 @@ defmodule Prizmo.TcgEngine.Mechanics do
              CardCatalog.fetch_attack(attacker_card.card_id, turn.pending_attack_id),
            {:ok, {effective_attack, copied_attack_payload}} <-
              AttackEffects.effective_attack_for_resolution(defender_card, attack, opts),
+           {:ok, defender_attached_cards} <- CardStore.attached_cards(game.id, defender_card.id),
            {:ok, damage} <-
              AttackDamage.damage_for(attacker_card, defender_card, effective_attack, opts),
            {:ok, turn} <- update(turn, :resolve_attack, %{}),
@@ -2402,6 +2403,16 @@ defmodule Prizmo.TcgEngine.Mechanics do
                effective_attack,
                opts
              ),
+           {:ok, punk_helmet_payload} <-
+             ToolEffects.apply_reactive_damage_counter_tools_if_needed(
+               game.id,
+               player_id,
+               attacker_card,
+               defender_card,
+               defender_attached_cards,
+               damage_result
+             ),
+           effect_payload = Map.merge(effect_payload, punk_helmet_payload),
            {:ok, handheld_fan_payload} <-
              ToolEffects.apply_handheld_fan_if_needed(
                game.id,

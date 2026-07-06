@@ -2152,6 +2152,107 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
     end
   end
 
+  describe "Goal 2 Punk Helmet support slice" do
+    test "PFL-092 places 4 damage counters on the attacker after damaging an Active Darkness Pokémon" do
+      {:ok, game} = create_punk_helmet_attack_game()
+      attacker = active_card(game.id, "player_1")
+      defender = active_card(game.id, "player_2")
+
+      attach_direct_basic_energy(game.id, "player_1", attacker, 1)
+      attach_direct_basic_energy(game.id, "player_1", attacker, 2)
+      punk_helmet = attach_direct_punk_helmet(game.id, defender)
+
+      assert CardCoverage.summarize("PFL-092").coverage_status == :supported
+
+      assert {:ok, game} = Mechanics.declare_attack(game, "player_1", :ram)
+
+      assert card(attacker.id).damage == 40
+      assert card(defender.id).damage == 20
+      assert zone(punk_helmet.id) == :attached
+
+      resolve_event = game.id |> game_events_by_type("resolve_declared_attack") |> List.last()
+      assert resolve_event.payload["punk_helmet_damage_counter_count"] == 4
+      assert resolve_event.payload["punk_helmet_damage"] == 40
+      assert resolve_event.payload["punk_helmet_source_card_instance_ids"] == [punk_helmet.id]
+      refute resolve_event.payload["self_knocked_out?"]
+    end
+
+    test "PFL-092 still triggers when the attached Darkness Pokémon is Knocked Out by damage" do
+      {:ok, game} = create_punk_helmet_attack_game()
+      attacker = active_card(game.id, "player_1")
+      defender = active_card(game.id, "player_2")
+
+      play_direct_basic_to_bench(game.id, "player_2", "PFL-083", 1)
+      attach_direct_basic_energy(game.id, "player_1", attacker, 1)
+      attach_direct_basic_energy(game.id, "player_1", attacker, 2)
+      punk_helmet = attach_direct_punk_helmet(game.id, defender)
+      {:ok, _defender} = ash_update(defender, :set_damage, %{damage: 190})
+
+      assert {:ok, game} = Mechanics.declare_attack(game, "player_1", :ram)
+
+      assert zone(defender.id) == :discard
+      assert zone(punk_helmet.id) == :discard
+      assert card(attacker.id).damage == 40
+
+      [prompt] = awaiting_prompts(game.id)
+      assert prompt.player_id == "player_1"
+      assert prompt.prompt_type == "choose_knockout_prizes"
+      assert prompt.payload["knocked_out_card_instance_ids"] == [defender.id]
+
+      resolve_event = game.id |> game_events_by_type("resolve_declared_attack") |> List.last()
+      assert resolve_event.payload["punk_helmet_damage_counter_count"] == 4
+      assert resolve_event.payload["knocked_out?"]
+    end
+
+    test "Jamming Tower suppresses PFL-092 damage counters" do
+      {:ok, game} = create_punk_helmet_attack_game()
+      attacker = active_card(game.id, "player_1")
+      defender = active_card(game.id, "player_2")
+
+      attach_direct_basic_energy(game.id, "player_1", attacker, 1)
+      attach_direct_basic_energy(game.id, "player_1", attacker, 2)
+      attach_direct_punk_helmet(game.id, defender)
+
+      {:ok, jamming_tower} = create_custom_owned_card(game.id, "player_1", "TWM-153", 240)
+      {:ok, jamming_tower} = ash_update(jamming_tower, :draw_to_hand, %{position: 20})
+      assert {:ok, game} = Mechanics.play_stadium(game, "player_1", jamming_tower.id)
+
+      assert {:ok, game} = Mechanics.declare_attack(game, "player_1", :ram)
+
+      assert card(attacker.id).damage == 0
+      assert card(defender.id).damage == 20
+
+      resolve_event = game.id |> game_events_by_type("resolve_declared_attack") |> List.last()
+      refute Map.has_key?(resolve_event.payload, "punk_helmet_damage_counter_count")
+    end
+
+    test "PFL-092 damage counters can Knock Out the attacking Pokémon" do
+      {:ok, game} = create_punk_helmet_attack_game()
+      attacker = active_card(game.id, "player_1")
+      defender = active_card(game.id, "player_2")
+
+      play_direct_basic_to_bench(game.id, "player_1", "PFL-083", 1)
+      attach_direct_basic_energy(game.id, "player_1", attacker, 1)
+      attach_direct_basic_energy(game.id, "player_1", attacker, 2)
+      attach_direct_punk_helmet(game.id, defender)
+      {:ok, _attacker} = ash_update(attacker, :set_damage, %{damage: 30})
+
+      assert {:ok, game} = Mechanics.declare_attack(game, "player_1", :ram)
+
+      assert zone(attacker.id) == :discard
+      assert active_card(game.id, "player_1").card_id == "PFL-083"
+
+      [prompt] = awaiting_prompts(game.id)
+      assert prompt.player_id == "player_2"
+      assert prompt.prompt_type == "choose_knockout_prizes"
+      assert prompt.payload["knocked_out_card_instance_ids"] == [attacker.id]
+
+      resolve_event = game.id |> game_events_by_type("resolve_declared_attack") |> List.last()
+      assert resolve_event.payload["punk_helmet_resulting_damage"] == 70
+      assert resolve_event.payload["self_knocked_out?"]
+    end
+  end
+
   describe "SCR-118 Fan Call Ability" do
     alias Prizmo.Tcg.Goal1.Decks.Alakazam28438
 
@@ -2937,6 +3038,54 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
 
     {:ok, card} =
       ash_update(card, :play_to_bench, %{position: position, turn_entered_play: turn_number})
+
+    card
+  end
+
+  defp create_punk_helmet_attack_game do
+    create_flow_action_window_game_with_decks(Alakazam27147, Dragapult27431,
+      player_1_active_card_id: "JTG-120",
+      player_2_active_card_id: "ASC-142"
+    )
+  end
+
+  defp attach_direct_basic_energy(game_id, player_id, target_card, position) do
+    {:ok, energy} = create_custom_owned_card(game_id, player_id, "MEE-005", 220 + position)
+    {:ok, energy} = ash_update(energy, :draw_to_hand, %{position: 20 + position})
+
+    {:ok, energy} =
+      ash_update(energy, :attach, %{
+        attached_to_card_instance_id: target_card.id,
+        position: position
+      })
+
+    energy
+  end
+
+  defp attach_direct_punk_helmet(game_id, target_card) do
+    {:ok, punk_helmet} =
+      create_custom_owned_card(game_id, target_card.owner_player_id, "PFL-092", 230)
+
+    {:ok, punk_helmet} = ash_update(punk_helmet, :draw_to_hand, %{position: 30})
+
+    {:ok, punk_helmet} =
+      ash_update(punk_helmet, :attach, %{
+        attached_to_card_instance_id: target_card.id,
+        position: 1
+      })
+
+    punk_helmet
+  end
+
+  defp play_direct_basic_to_bench(game_id, player_id, card_id, position) do
+    {:ok, card} = create_custom_owned_card(game_id, player_id, card_id, 240 + position)
+    {:ok, card} = ash_update(card, :draw_to_hand, %{position: 40 + position})
+
+    {:ok, card} =
+      ash_update(card, :play_to_bench, %{
+        position: position,
+        turn_entered_play: current_turn(game_id).turn_number
+      })
 
     card
   end

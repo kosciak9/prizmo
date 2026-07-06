@@ -629,9 +629,10 @@ defmodule Prizmo.TcgEngine.AttackDamage do
          %CardInstance{} = attacker_card,
          %CardInstance{} = defender_card
        ) do
-    with {:ok, defender_metadata} <- CardCatalog.fetch(defender_card.card_id) do
-      if pokemon_ex?(defender_metadata) and
+    with {:ok, defender_metadata} <- CardCatalog.fetch(defender_card.card_id),
+         {:ok, black_belts_training_played?} <-
            black_belts_training_played_this_turn?(attacker_card) do
+      if pokemon_ex?(defender_metadata) and black_belts_training_played? do
         {:ok, damage + 40}
       else
         {:ok, damage}
@@ -668,9 +669,9 @@ defmodule Prizmo.TcgEngine.AttackDamage do
          %CardInstance{} = attacker_card,
          %CardInstance{} = defender_card
        ) do
-    with {:ok, defender_metadata} <- CardCatalog.fetch(defender_card.card_id) do
-      if pokemon_ex_or_v?(defender_metadata) and
-           kieran_damage_played_this_turn?(attacker_card) do
+    with {:ok, defender_metadata} <- CardCatalog.fetch(defender_card.card_id),
+         {:ok, kieran_damage_played?} <- kieran_damage_played_this_turn?(attacker_card) do
+      if pokemon_ex_or_v?(defender_metadata) and kieran_damage_played? do
         {:ok, damage + 30}
       else
         {:ok, damage}

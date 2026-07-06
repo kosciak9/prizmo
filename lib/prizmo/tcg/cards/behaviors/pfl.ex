@@ -28,6 +28,16 @@ defmodule Prizmo.Tcg.Cards.Behaviors.PFL do
     card_effect(effect: %{type: :prevent_damage_counters_to_bench_from_opponent_pokemon_effects})
   end
 
+  card "PFL-092" do
+    card_effect(
+      effect: %{
+        type: :place_damage_counters_on_attacker_if_damaged_as_active_by_attack,
+        count: 4,
+        required_attached_pokemon_type: :darkness
+      }
+    )
+  end
+
   card "PFL-094" do
     card_effect(
       effect: %{type: :attach_basic_psychic_energy_from_discard_to_benched_psychic_pokemon}
