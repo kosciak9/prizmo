@@ -262,9 +262,36 @@ defmodule Prizmo.TcgEngine.AttackDamage do
          damage_per_prize: damage_per_prize
        })
        when is_integer(damage_per_prize) and damage_per_prize >= 0 do
-    with {:ok, opponent_prize_taken_count} <- opponent_prize_taken_count(attacker_card) do
-      {:ok, damage + damage_per_prize * opponent_prize_taken_count}
+    with {:ok, prize_taken_count} <- prize_taken_count(attacker_card) do
+      {:ok, damage + damage_per_prize * prize_taken_count}
     end
+  end
+
+  defp apply_effect(damage, %CardInstance{} = attacker_card, _defender_card, %{
+         type: :damage_per_own_prize_taken,
+         damage_per_prize: damage_per_prize
+       })
+       when is_integer(damage_per_prize) and damage_per_prize >= 0 do
+    with {:ok, prize_taken_count} <- prize_taken_count(attacker_card) do
+      {:ok, damage + damage_per_prize * prize_taken_count}
+    end
+  end
+
+  defp apply_effect(_damage, _attacker_card, %CardInstance{damage: defender_damage}, %{
+         type: :base_damage_if_defender_has_damage_counters,
+         base_damage: base_damage
+       })
+       when is_integer(defender_damage) and defender_damage > 0 and is_integer(base_damage) and
+              base_damage >= 0 do
+    {:ok, base_damage}
+  end
+
+  defp apply_effect(damage, _attacker_card, _defender_card, %{
+         type: :base_damage_if_defender_has_damage_counters,
+         base_damage: base_damage
+       })
+       when is_integer(base_damage) and base_damage >= 0 do
+    {:ok, damage}
   end
 
   defp apply_effect(damage, %CardInstance{} = attacker_card, _defender_card, %{
@@ -386,6 +413,14 @@ defmodule Prizmo.TcgEngine.AttackDamage do
 
   defp apply_effect(damage, _attacker_card, _defender_card, %{type: :draw_after_attack}),
     do: {:ok, damage}
+
+  defp apply_effect(damage, _attacker_card, _defender_card, %{type: :damage_per_own_prize_taken}),
+    do: {:ok, damage}
+
+  defp apply_effect(damage, _attacker_card, _defender_card, %{
+         type: :base_damage_if_defender_has_damage_counters
+       }),
+       do: {:ok, damage}
 
   defp apply_effect(damage, _attacker_card, _defender_card, %{type: :discard_hand_then_draw}),
     do: {:ok, damage}
@@ -919,7 +954,7 @@ defmodule Prizmo.TcgEngine.AttackDamage do
 
   defp bench_to_active_event?(%GameEvent{}, _card_instance_id), do: false
 
-  defp opponent_prize_taken_count(%CardInstance{game_id: game_id, owner_player_id: player_id}) do
+  defp prize_taken_count(%CardInstance{game_id: game_id, owner_player_id: player_id}) do
     with {:ok, prizes} <- CardStore.cards_in_zone(game_id, player_id, :prize) do
       {:ok, max(@starting_prize_count - length(prizes), 0)}
     end

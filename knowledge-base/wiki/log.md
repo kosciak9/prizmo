@@ -1,5 +1,12 @@
 # Wiki Log
 
+## [2026-07-06] codebase update | Goal 2 Mega Mawile ex support
+
+- Task attempted: closed `MEG-094` Mega Mawile ex as the remaining three-archetype Metal attacker blocker after the Greninja/Starmie pair. Added committed TCGdex metadata, authored `Gobble Down` with a reusable `damage_per_own_prize_taken` primitive, and authored `Huge Bite` with a reusable `base_damage_if_defender_has_damage_counters` primitive that changes base damage to 30 only when the opponent's Active already has damage counters.
+- Files changed: `lib/prizmo/tcg/cards/behaviors/meg.ex`, `lib/prizmo/tcg_engine/attack_damage.ex`, `lib/prizmo/tcg_engine/attack_effects.ex`, `test/prizmo/tcg_engine/mechanics_test.exs`, `priv/tcg/cards/tcgdex/cards/MEG-094.json`, `knowledge-base/wiki/engine/goal-2-top-30-latest-limitless-coverage-scope.md`, `knowledge-base/wiki/engine/ash-backed-tcg-engine-playtest-handoff.md`, `knowledge-base/wiki/log.md`.
+- Validation: `mix test test/prizmo/tcg_engine/mechanics_test.exs:2652`; `mix test test/prizmo/tcg/cards/metadata_test.exs`; `mix test test/prizmo/tcg_engine/mechanics_test.exs`; `mix compile --warnings-as-errors`; `mix prizmo.goal2.corpus` confirmed `supported=152` / `generic-supported=8` / `partial=10` / `unimplemented=207` and `cached=173` / `missing=204`.
+- Remaining/blocking notes: `MEG-094` is no longer in the shared incomplete queue. The default next Goal 2 priority is now `POR-077` Lumiose City, followed by `POR-052` Drapion and then high-share two-archetype blockers such as `MEG-086` Mega Absol ex, `SVP-149` Pecharunt, and `TEF-150` Hand Trimmer.
+
 ## [2026-07-06] codebase update | Goal 2 Staryu/Mega Starmie ex support
 
 - Task attempted: closed the `POR-020` Staryu / `POR-021` Mega Starmie ex pair as the recommended Greninja/Starmie three-archetype Goal 2 Pokémon cleanup after Lucian. Added committed TCGdex metadata, made Staryu's `Water Gun` executable through plain damage, authored Mega Starmie ex `Jetting Blow` with a reusable `damage_opponent_bench` attack-effect primitive, authored `Nebula Beam` through the existing weakness/resistance/effects bypass primitive, and updated the GameView/temporary React resolver so non-Energy-shuffle Bench-damage attacks expose target selection correctly.

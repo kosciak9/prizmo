@@ -95,4 +95,15 @@ defmodule Prizmo.Tcg.Cards.Behaviors.MEG do
   card "MEG-088" do
     attack(:clutch, effect: %{type: :defending_pokemon_cannot_retreat_next_turn})
   end
+
+  card "MEG-094" do
+    attack(:gobble_down,
+      damage: 0,
+      effect: %{type: :damage_per_own_prize_taken, damage_per_prize: 80}
+    )
+
+    attack(:huge_bite,
+      effect: %{type: :base_damage_if_defender_has_damage_counters, base_damage: 30}
+    )
+  end
 end

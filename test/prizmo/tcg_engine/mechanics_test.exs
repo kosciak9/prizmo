@@ -2648,6 +2648,51 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
     end
   end
 
+  describe "MEG-094 Mega Mawile ex support" do
+    test "Gobble Down and Huge Bite damage follow prize and prior-damage text" do
+      assert CardCoverage.summarize("MEG-094").coverage_status == :supported
+
+      assert {:ok, gobble_down} = CardCatalog.fetch_attack("MEG-094", :gobble_down)
+      assert gobble_down.damage == 0
+      assert gobble_down.cost == [:metal, :metal]
+
+      assert gobble_down.effect == %{
+               type: :damage_per_own_prize_taken,
+               damage_per_prize: 80
+             }
+
+      assert {:ok, huge_bite} = CardCatalog.fetch_attack("MEG-094", :huge_bite)
+      assert huge_bite.damage == 260
+      assert huge_bite.cost == [:metal, :metal, :colorless]
+
+      assert huge_bite.effect == %{
+               type: :base_damage_if_defender_has_damage_counters,
+               base_damage: 30
+             }
+
+      {:ok, game} =
+        create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147,
+          player_2_active_card_id: "JTG-120"
+        )
+
+      {:ok, attacker} = create_custom_owned_card(game.id, "player_1", "MEG-094", 240)
+      defender = active_card(game.id, "player_2")
+
+      assert {:ok, 0} = AttackDamage.damage_for(attacker, defender, gobble_down)
+
+      reduce_player_prize_count_to(game.id, "player_1", 4)
+      assert {:ok, 160} = AttackDamage.damage_for(attacker, defender, gobble_down)
+
+      reduce_player_prize_count_to(game.id, "player_1", 1)
+      assert {:ok, 400} = AttackDamage.damage_for(attacker, defender, gobble_down)
+
+      assert {:ok, 260} = AttackDamage.damage_for(attacker, defender, huge_bite)
+
+      {:ok, damaged_defender} = ash_update(defender, :set_damage, %{damage: 10})
+      assert {:ok, 30} = AttackDamage.damage_for(attacker, damaged_defender, huge_bite)
+    end
+  end
+
   describe "SFA-039 Pecharunt ex support" do
     test "Irritated Outburst scales with the number of Prize cards the opponent has taken" do
       {:ok, game} = create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147)
@@ -2988,7 +3033,7 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
     |> length()
   end
 
-  defp reduce_opponent_prize_count_to(game_id, player_id, target_count) do
+  defp reduce_player_prize_count_to(game_id, player_id, target_count) do
     CardInstance
     |> Ash.Query.filter(game_id == ^game_id and owner_player_id == ^player_id and zone == :prize)
     |> Ash.Query.sort(position: :asc)
@@ -3004,6 +3049,10 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
         ash_update(prize_card, :take_prize, %{position: position})
       end)
     end)
+  end
+
+  defp reduce_opponent_prize_count_to(game_id, player_id, target_count) do
+    reduce_player_prize_count_to(game_id, player_id, target_count)
   end
 
   defp game_events_by_type(game_id, type) do

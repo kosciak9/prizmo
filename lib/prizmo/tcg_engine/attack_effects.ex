@@ -89,6 +89,8 @@ defmodule Prizmo.TcgEngine.AttackEffects do
     :damage_unaffected_by_weakness_resistance_and_effects_on_opponent_active,
     :damage_per_opponent_pokemon_ex_in_play,
     :damage_per_opponent_prize_taken,
+    :damage_per_own_prize_taken,
+    :base_damage_if_defender_has_damage_counters,
     :damage_only_if_stadium_in_play,
     :damage_only_if_own_bench_has_card_id_unaffected_by_weakness_resistance,
     :damage_per_discarded_own_basic_energy,
@@ -374,6 +376,12 @@ defmodule Prizmo.TcgEngine.AttackEffects do
         {:ok, %{}}
 
       %{type: :damage_per_opponent_prize_taken} ->
+        {:ok, %{}}
+
+      %{type: :damage_per_own_prize_taken} ->
+        {:ok, %{}}
+
+      %{type: :base_damage_if_defender_has_damage_counters} ->
         {:ok, %{}}
 
       %{type: :damage_opponent_bench, bench_damage: bench_damage}

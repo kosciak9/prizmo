@@ -1,0 +1,90 @@
+{
+  "prizmo_id": "MEG-094",
+  "source": {
+    "base_url": "https://api.tcgdex.net/v2/en",
+    "dynamic_fields_removed": [
+      "pricing"
+    ],
+    "language": "en",
+    "provider": "TCGdex"
+  },
+  "tcgdex": {
+    "attacks": [
+      {
+        "cost": [
+          "Metal",
+          "Metal"
+        ],
+        "damage": "80×",
+        "effect": "This attack does 80 damage for each Prize card you have taken.",
+        "name": "Gobble Down"
+      },
+      {
+        "cost": [
+          "Metal",
+          "Metal",
+          "Colorless"
+        ],
+        "damage": 260,
+        "effect": "If your opponent's Active Pokémon already has any damage counters on it, this attack's base damage is 30.",
+        "name": "Huge Bite"
+      }
+    ],
+    "category": "Pokemon",
+    "dexId": [
+      303
+    ],
+    "hp": 270,
+    "id": "me01-094",
+    "illustrator": "aky CG Works",
+    "image": "https://assets.tcgdex.net/en/me/me01/094",
+    "legal": {
+      "expanded": true,
+      "standard": true
+    },
+    "localId": "094",
+    "name": "Mega Mawile ex",
+    "rarity": "Double rare",
+    "regulationMark": "I",
+    "retreat": 2,
+    "set": {
+      "cardCount": {
+        "official": 132,
+        "total": 188
+      },
+      "id": "me01",
+      "logo": "https://assets.tcgdex.net/en/me/me01/logo",
+      "name": "Mega Evolution",
+      "symbol": "https://assets.tcgdex.net/univ/me/me01/symbol"
+    },
+    "stage": "Basic",
+    "suffix": "ex",
+    "types": [
+      "Metal"
+    ],
+    "updated": "2026-04-25T21:46:36+01:00",
+    "variants": {
+      "firstEdition": false,
+      "holo": true,
+      "normal": false,
+      "reverse": false,
+      "wPromo": false
+    },
+    "variants_detailed": [
+      {
+        "size": "standard",
+        "type": "holo",
+        "variantId": "jr7oetx1mqug9"
+      },
+      {
+        "size": "standard",
+        "stamp": [
+          "player-rewards-program"
+        ],
+        "type": "holo",
+        "variantId": "mtltux8quqoc7vwp24c9zzhgmzduu8xcik8"
+      }
+    ]
+  },
+  "tcgdex_id": "me01-094"
+}

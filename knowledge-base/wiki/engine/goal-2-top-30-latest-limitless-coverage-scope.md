@@ -64,13 +64,13 @@ Those reports are the canonical starting point for autonomous Goal 2 implementat
 - Tracked top archetypes: `30`
 - Tracked cards with usage greater than `0.00`: `377`
 - Coverage buckets from `mix prizmo.goal2.corpus`:
-  - `supported=151`
+  - `supported=152`
   - `generic-supported=8`
   - `partial=10`
-  - `unimplemented=208`
+  - `unimplemented=207`
 - Metadata buckets:
-  - `cached=172`
-  - `missing=205`
+  - `cached=173`
+  - `missing=204`
 
 Important interpretation:
 
@@ -82,14 +82,13 @@ Important interpretation:
 
 The strongest current Goal 2 implementation candidates are the incomplete cards shared by the most archetypes and/or the most total metagame share.
 
-The latest Goal 2 engine batch closed the `POR-020` Staryu / `POR-021` Mega Starmie ex pair as the next coherent Greninja/Starmie three-archetype Pokémon cleanup after Lucian. Staryu now has committed TCGdex metadata and executable plain `Water Gun` damage. Mega Starmie ex now has committed metadata plus authored attack behavior: `Jetting Blow` does 120 Active damage and uses a reusable `damage_opponent_bench` attack-effect primitive for 50 damage to one opposing Benched Pokémon, including no-op resolution when there is no opposing Bench, explicit target selection when there are multiple Bench choices, and existing Tera Bench protection. `Nebula Beam` uses the existing weakness/resistance/effects bypass primitive for its 210 damage.
+The latest Goal 2 engine batch closed `MEG-094` Mega Mawile ex as the remaining three-archetype Metal attacker cleanup shared by Archaludon/Metagross shells. Mega Mawile ex now has committed TCGdex metadata and executable attack behavior: `Gobble Down` uses a reusable `damage_per_own_prize_taken` attack-damage primitive for 80 damage per Prize card taken, and `Huge Bite` uses a reusable `base_damage_if_defender_has_damage_counters` primitive that keeps 260 base damage against an undamaged Active and changes base damage to 30 when the opponent's Active already has damage counters.
 
 ### Highest-priority remaining `unimplemented` cards from current report
 
 | Card | Archetypes | Total share | Notes |
 | --- | --- | --- | --- |
-| `MEG-094` Mega Mawile ex | `3` | `0.77%` | Next coherent three-archetype Metal attacker cleanup shared by Archaludon/Metagross shells. |
-| `POR-077` Lumiose City | `2` | `14.16%` | Highest-share two-archetype unimplemented card once the remaining three-archetype queue is reduced. |
+| `POR-077` Lumiose City | `2` | `14.16%` | Highest-share remaining two-archetype unimplemented card now that the three-archetype Mega Mawile ex queue is closed. |
 | `POR-052` Drapion | `2` | `13.61%` | Second-highest-share two-archetype unimplemented card after Lumiose City. |
 | `MEG-086` Mega Absol ex | `2` | `11.20%` | High-share two-archetype Darkness attacker cleanup shared by N's Zoroark and Ogerpon Box. |
 | `SVP-149` Pecharunt | `2` | `11.20%` | Paired high-share two-archetype Darkness support cleanup alongside Mega Absol ex. |
@@ -119,8 +118,8 @@ That means prior Goal 1 and six-deck coverage was not wasted; it now acts as see
 
 ## Recommended next implementation order
 
-1. Use `MEG-094` Mega Mawile ex as the next coherent three-archetype Pokémon follow-up now that the Greninja/Starmie pair is supported.
-2. Keep `POR-077` Lumiose City and `POR-052` Drapion as the highest-share two-archetype follow-ups once the remaining three-archetype queue is reduced.
+1. Use `POR-077` Lumiose City as the next default Goal 2 implementation target because it is now the highest-share remaining two-archetype blocker after the three-archetype Mega Mawile ex queue closed.
+2. Keep `POR-052` Drapion as the immediate follow-up after Lumiose City.
 3. Keep `MEG-086` Mega Absol ex, `SVP-149` Pecharunt, and `TEF-150` Hand Trimmer as the next high-share two-archetype queue after Lumiose City/Drapion unless a broader primitive re-ranks above them.
 4. Keep the remaining Dragapult-only cached pair `TWM-099` / `TWM-100` as deliberate single-archetype cleanup, not the default autonomous queue.
 5. Finish the remaining shared partials only after the broad unimplemented slice unless another batch naturally extends the new HP infrastructure; if returning to HP work soon, `POR-086` Growing Grass Energy remains the strongest follow-up.
