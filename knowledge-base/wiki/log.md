@@ -1,5 +1,12 @@
 # Wiki Log
 
+## [2026-07-07] codebase update | Goal 2 Max Rod support
+
+- Task attempted: closed `PRE-116` Max Rod as the default highest-share remaining shared Goal 2 Item blocker after Powerglass. Added committed TCGdex metadata and authored Max Rod as an engine-defined ACE SPEC Item that returns up to five Pokémon and/or Basic Energy cards from the acting player's discard pile to hand through the existing `recover_discard_to_hand` prompt path while filtering out Trainers and Special Energy.
+- Files changed: `lib/prizmo/tcg_engine/cards/registry.ex`, `priv/tcg/cards/tcgdex/cards/PRE-116.json`, `test/prizmo/tcg_engine/mechanics_test.exs`, `knowledge-base/wiki/engine/goal-2-top-30-latest-limitless-coverage-scope.md`, `knowledge-base/wiki/engine/ash-backed-tcg-engine-playtest-handoff.md`, `knowledge-base/wiki/log.md`.
+- Validation: `mix format`; `mix test test/prizmo/tcg/cards/metadata_test.exs`; `mix test test/prizmo/tcg_engine/mechanics_test.exs -n "PRE-116 Max Rod"`; `mix compile --warnings-as-errors`; `mix test test/prizmo/tcg/cards/metadata_test.exs test/prizmo/tcg_engine/mechanics_test.exs`; Tidewave runtime validation confirmed `PRE-116` reports `coverage_status: :supported`; `mix prizmo.goal2.corpus` confirmed `supported=169` / `generic-supported=8` / `partial=10` / `unimplemented=190` and `cached=190` / `missing=187`; final `mix check` passed.
+- Remaining/blocking notes: `PRE-116` is no longer in the shared incomplete queue. The default next Goal 2 priority is now `PRE-086` Regigigas, followed by the Hydrapple/Ogerpon Grass-line cluster unless the live corpus re-ranks the queue.
+
 ## [2026-07-07] codebase update | Goal 2 Powerglass support
 
 - Task attempted: closed `SFA-063` Powerglass as the default highest-share remaining shared Goal 2 Tool blocker after Metagross. Added committed TCGdex metadata, authored optional end-of-turn Tool prompts for pass-turn and after-attack flow, attached a chosen Basic Energy from discard to the attached Active Pokémon, allowed declining without repeated same-turn prompts, and respected Jamming Tower Tool suppression.

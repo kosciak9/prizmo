@@ -1534,6 +1534,99 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
                Enum.sort([basic_energy_1.id, basic_energy_2.id])
     end
 
+    test "PRE-116 Max Rod returns up to 5 Pokemon and Basic Energy cards from discard to hand" do
+      {:ok, game} = create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147)
+
+      {:ok, max_rod} = create_custom_owned_card(game.id, "player_1", "PRE-116", 200)
+      {:ok, max_rod} = ash_update(max_rod, :draw_to_hand, %{position: 20})
+
+      {:ok, pokemon_1} = create_custom_owned_card(game.id, "player_1", "PRE-035", 201)
+      {:ok, pokemon_1} = ash_update(pokemon_1, :draw_to_hand, %{position: 21})
+
+      {:ok, pokemon_2} = create_custom_owned_card(game.id, "player_1", "DRI-016", 202)
+      {:ok, pokemon_2} = ash_update(pokemon_2, :draw_to_hand, %{position: 22})
+
+      {:ok, pokemon_3} = create_custom_owned_card(game.id, "player_1", "TWM-130", 203)
+      {:ok, pokemon_3} = ash_update(pokemon_3, :draw_to_hand, %{position: 23})
+
+      {:ok, basic_energy_1} = create_custom_owned_card(game.id, "player_1", "MEE-005", 204)
+      {:ok, basic_energy_1} = ash_update(basic_energy_1, :draw_to_hand, %{position: 24})
+
+      {:ok, basic_energy_2} = create_custom_owned_card(game.id, "player_1", "MEE-006", 205)
+      {:ok, basic_energy_2} = ash_update(basic_energy_2, :draw_to_hand, %{position: 25})
+
+      {:ok, special_energy} = create_custom_owned_card(game.id, "player_1", "POR-088", 206)
+      {:ok, special_energy} = ash_update(special_energy, :draw_to_hand, %{position: 26})
+
+      {:ok, trainer} = create_custom_owned_card(game.id, "player_1", "PRE-115", 207)
+      {:ok, trainer} = ash_update(trainer, :draw_to_hand, %{position: 27})
+
+      selected_targets = [pokemon_1, pokemon_2, pokemon_3, basic_energy_1, basic_energy_2]
+
+      assert {:ok, game} = Mechanics.discard_from_hand(game, "player_1", pokemon_1.id)
+      assert {:ok, game} = Mechanics.discard_from_hand(game, "player_1", pokemon_2.id)
+      assert {:ok, game} = Mechanics.discard_from_hand(game, "player_1", pokemon_3.id)
+      assert {:ok, game} = Mechanics.discard_from_hand(game, "player_1", basic_energy_1.id)
+      assert {:ok, game} = Mechanics.discard_from_hand(game, "player_1", basic_energy_2.id)
+      assert {:ok, game} = Mechanics.discard_from_hand(game, "player_1", special_energy.id)
+      assert {:ok, game} = Mechanics.discard_from_hand(game, "player_1", trainer.id)
+
+      assert {:ok, game} = Mechanics.play_card(game, "player_1", max_rod.id, %{})
+
+      [prompt] = awaiting_prompts(game.id)
+      assert prompt.player_id == "player_1"
+      assert prompt.payload["choice_key"] == "recover_pokemon_or_basic_energy_from_discard"
+      assert prompt.payload["min"] == 0
+      assert prompt.payload["max"] == 5
+
+      for card <- selected_targets do
+        assert card.id in prompt.payload["legal_choices"]
+      end
+
+      refute special_energy.id in prompt.payload["legal_choices"]
+      refute trainer.id in prompt.payload["legal_choices"]
+
+      assert {:ok, game} =
+               Mechanics.choose_prompt(
+                 game,
+                 "player_1",
+                 prompt.id,
+                 Enum.map(selected_targets, & &1.id)
+               )
+
+      assert zone(max_rod.id) == :discard
+
+      for card <- selected_targets do
+        assert zone(card.id) == :hand
+      end
+
+      assert zone(special_energy.id) == :discard
+      assert zone(trainer.id) == :discard
+
+      game_id = game.id
+
+      player =
+        GamePlayer
+        |> Ash.Query.filter(game_id == ^game_id and player_id == "player_1")
+        |> Ash.read_one!()
+
+      assert player.ace_spec_played_this_game?
+
+      cards_moved_event =
+        game.id
+        |> game_events_by_type("cards_moved")
+        |> Enum.find(
+          &(&1.payload["effect_key"] == "recover_pokemon_or_basic_energy_from_discard")
+        )
+
+      assert Enum.sort(Enum.map(cards_moved_event.payload["cards"], & &1["instance_id"])) ==
+               selected_targets
+               |> Enum.map(& &1.id)
+               |> Enum.sort()
+
+      assert CardCoverage.summarize("PRE-116").coverage_status == :supported
+    end
+
     test "MEG-116 Fighting Gong searches for a Basic Fighting Energy or a Basic Fighting Pokémon" do
       {:ok, game} = create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147)
 

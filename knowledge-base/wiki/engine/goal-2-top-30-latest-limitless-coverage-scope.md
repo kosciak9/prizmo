@@ -64,13 +64,13 @@ Those reports are the canonical starting point for autonomous Goal 2 implementat
 - Tracked top archetypes: `30`
 - Tracked cards with usage greater than `0.00`: `377`
 - Coverage buckets from `mix prizmo.goal2.corpus`:
-  - `supported=168`
+  - `supported=169`
   - `generic-supported=8`
   - `partial=10`
-  - `unimplemented=191`
+  - `unimplemented=190`
 - Metadata buckets:
-  - `cached=189`
-  - `missing=188`
+  - `cached=190`
+  - `missing=187`
 
 Important interpretation:
 
@@ -82,15 +82,14 @@ Important interpretation:
 
 The strongest current Goal 2 implementation candidates are the incomplete cards shared by the most archetypes and/or the most total metagame share.
 
-The latest Goal 2 engine batch closed `SFA-063` Powerglass after Metagross. Powerglass now has committed TCGdex metadata and executable end-of-turn Tool behavior: when attached to the active player's Active Pokémon, pass-turn and after-attack turn-ending flow pause for an optional prompt over Basic Energy cards in that player's discard pile, attach the selected Basic Energy to the attached Active Pokémon, allow declining without repeated prompts that turn, and respect Jamming Tower Tool suppression.
+The latest Goal 2 engine batch closed `PRE-116` Max Rod after Powerglass. Max Rod now has committed TCGdex metadata and executable ACE SPEC Item behavior: during the action window, it prompts over owned discard-pile Pokémon and Basic Energy cards, returns up to five selected cards to hand, filters out Trainers and Special Energy, and marks the player's once-per-game ACE SPEC flag through the generic Trainer play path.
 
 ### Highest-priority remaining `unimplemented` cards from current report
 
 | Card | Archetypes | Total share | Notes |
 | --- | --- | --- | --- |
-| `PRE-116` Max Rod | `2` | `5.59%` | Shared Item blocker tied to Beedrill/Hydrapple follow-up coverage. |
 | `PRE-086` Regigigas | `2` | `5.30%` | Shared Pokémon blocker in the Hydrapple/Metagross overlap. |
-| Hydrapple/Ogerpon Grass line cluster (`ASC-008`, `MEG-008`, `MEG-009`, `MEG-010`, `SFA-006`, `TEF-126`) | `2` | `5.15%` | Shared cluster behind Max Rod / Regigigas; split into coherent card batches after confirming metadata/text. |
+| Hydrapple/Ogerpon Grass line cluster (`ASC-008`, `MEG-008`, `MEG-009`, `MEG-010`, `SFA-006`, `TEF-126`) | `2` | `5.15%` | Shared cluster behind Regigigas; split into coherent card batches after confirming metadata/text. |
 
 ### Shared `partial` cards worth finishing after the broad unimplemented slice
 
@@ -117,12 +116,11 @@ That means prior Goal 1 and six-deck coverage was not wasted; it now acts as see
 
 ## Recommended next implementation order
 
-1. Take `PRE-116` Max Rod next as the default highest-share remaining shared Item blocker unless a broader primitive re-ranks above it.
-2. Keep `PRE-086` Regigigas as the next shared Pokémon follow-up behind Max Rod.
-3. Treat the Hydrapple/Ogerpon Grass line cluster as the next 5.15% shared queue after Max Rod / Regigigas, splitting it into coherent card batches instead of trying to close all tied cards at once by default.
-4. Keep the remaining Dragapult-only cached pair `TWM-099` / `TWM-100` as deliberate single-archetype cleanup, not the default autonomous queue.
-5. Finish the remaining shared partials only after the broad unimplemented slice unless another batch naturally extends the new HP infrastructure; if returning to HP work soon, `POR-086` Growing Grass Energy remains the strongest follow-up.
-6. Keep using `mix prizmo.goal2.corpus` after each batch to re-rank the next blockers by archetype count and weighted share.
+1. Take `PRE-086` Regigigas next as the default highest-share remaining shared Pokémon blocker unless a broader primitive re-ranks above it.
+2. Treat the Hydrapple/Ogerpon Grass line cluster as the next 5.15% shared queue after Regigigas, splitting it into coherent card batches instead of trying to close all tied cards at once by default.
+3. Keep the remaining Dragapult-only cached pair `TWM-099` / `TWM-100` as deliberate single-archetype cleanup, not the default autonomous queue.
+4. Finish the remaining shared partials only after the broad unimplemented slice unless another batch naturally extends the new HP infrastructure; if returning to HP work soon, `POR-086` Growing Grass Energy remains the strongest follow-up.
+5. Keep using `mix prizmo.goal2.corpus` after each batch to re-rank the next blockers by archetype count and weighted share.
 
 ## See Also
 

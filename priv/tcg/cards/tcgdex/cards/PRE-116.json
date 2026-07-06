@@ -1,0 +1,52 @@
+{
+  "prizmo_id": "PRE-116",
+  "source": {
+    "base_url": "https://api.tcgdex.net/v2/en",
+    "dynamic_fields_removed": [
+      "pricing"
+    ],
+    "language": "en",
+    "provider": "TCGdex"
+  },
+  "tcgdex": {
+    "category": "Trainer",
+    "effect": "Put up to 5 in any combination of Pokémon and Basic Energy cards from your discard pile into your hand.",
+    "id": "sv08.5-116",
+    "illustrator": "Toyste Beach",
+    "image": "https://assets.tcgdex.net/en/sv/sv08.5/116",
+    "legal": {
+      "expanded": true,
+      "standard": true
+    },
+    "localId": "116",
+    "name": "Max Rod",
+    "rarity": "ACE SPEC Rare",
+    "regulationMark": "H",
+    "set": {
+      "cardCount": {
+        "official": 131,
+        "total": 180
+      },
+      "id": "sv08.5",
+      "logo": "https://assets.tcgdex.net/en/sv/sv08.5/logo",
+      "name": "Prismatic Evolutions"
+    },
+    "trainerType": "Item",
+    "updated": "2026-04-23T19:37:54+01:00",
+    "variants": {
+      "firstEdition": false,
+      "holo": true,
+      "normal": false,
+      "reverse": false,
+      "wPromo": false
+    },
+    "variants_detailed": [
+      {
+        "size": "standard",
+        "type": "holo",
+        "variantId": "jr7oetx1mqug9"
+      }
+    ]
+  },
+  "tcgdex_id": "sv08.5-116"
+}

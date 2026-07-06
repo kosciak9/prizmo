@@ -154,6 +154,25 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     ]
   }
 
+  @max_rod %CardDefinition{
+    id: "PRE-116",
+    kind: :trainer,
+    trainer_type: :item,
+    play_window: :action_window,
+    effects: [
+      %Effect{
+        key: :recover_pokemon_or_basic_energy_from_discard,
+        type: :recover_discard_to_hand,
+        params: %{
+          filter: %{any: [%{kind: :pokemon}, %{kind: :energy, energy_type: :basic}]},
+          min_count: 0,
+          max_count: 5,
+          destination: :hand
+        }
+      }
+    ]
+  }
+
   @lucian %CardDefinition{
     id: "TWM-157",
     kind: :trainer,
@@ -1323,6 +1342,7 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     @lanas_aid.id => @lanas_aid,
     @lillies_determination.id => @lillies_determination,
     @lucian.id => @lucian,
+    @max_rod.id => @max_rod,
     @night_stretcher.id => @night_stretcher,
     @poke_pad.id => @poke_pad,
     @pokegear_3_0.id => @pokegear_3_0,
