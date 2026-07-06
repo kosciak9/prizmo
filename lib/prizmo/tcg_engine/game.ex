@@ -67,7 +67,6 @@ defmodule Prizmo.TcgEngine.Game do
     define :list_supported_decks
     define :get_supported_deck_blueprint, args: [:deck_key]
     define :create_from_supported_decks, args: [:players]
-
     define :create_from_decklists, args: [:players]
 
     define :create_from_decklists_with_seed,
@@ -134,6 +133,9 @@ defmodule Prizmo.TcgEngine.Game do
       args: [:game_id, :player_id, :source_card_instance_id, :target_card_instance_id]
 
     define :use_psychic_draw_command, args: [:game_id, :player_id, :source_card_instance_id]
+
+    define :use_lunatone_lunar_cycle_command,
+      args: [:game_id, :player_id, :source_card_instance_id, :energy_card_instance_id]
 
     define :use_drakloak_recon_directive_command,
       args: [:game_id, :player_id, :source_card_instance_id, :chosen_card_instance_id]

@@ -47,6 +47,7 @@ defmodule Prizmo.TcgEngine do
       rpc_action :use_tcg_engine_jewel_seeker, :use_noctowl_jewel_seeker_command
       rpc_action :use_tcg_engine_subjugating_chains, :use_pecharunt_ex_subjugating_chains_command
       rpc_action :use_tcg_engine_psychic_draw, :use_psychic_draw_command
+      rpc_action :use_tcg_engine_lunar_cycle, :use_lunatone_lunar_cycle_command
       rpc_action :use_tcg_engine_recon_directive, :use_drakloak_recon_directive_command
       rpc_action :use_tcg_engine_run_away_draw, :use_dudunsparce_run_away_draw_command
       rpc_action :play_tcg_engine_basic_to_bench, :play_basic_to_bench_command
@@ -197,6 +198,10 @@ defmodule Prizmo.TcgEngine do
       define :use_psychic_draw_for_game,
         action: :use_psychic_draw_command,
         args: [:game_id, :player_id, :source_card_instance_id]
+
+      define :use_lunatone_lunar_cycle_for_game,
+        action: :use_lunatone_lunar_cycle_command,
+        args: [:game_id, :player_id, :source_card_instance_id, :energy_card_instance_id]
 
       define :use_drakloak_recon_directive_for_game,
         action: :use_drakloak_recon_directive_command,

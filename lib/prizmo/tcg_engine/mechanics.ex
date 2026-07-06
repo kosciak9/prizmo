@@ -1375,6 +1375,42 @@ defmodule Prizmo.TcgEngine.Mechanics do
     end)
   end
 
+  @spec use_lunatone_lunar_cycle(Game.t() | String.t(), String.t(), String.t(), String.t()) ::
+          {:ok, Game.t()} | {:error, term()}
+  def use_lunatone_lunar_cycle(
+        game_or_id,
+        player_id,
+        source_card_instance_id,
+        energy_card_instance_id
+      )
+      when is_binary(player_id) and is_binary(source_card_instance_id) and
+             is_binary(energy_card_instance_id) do
+    transaction(fn ->
+      with {:ok, game} <- get_game(game_or_id),
+           {:ok, turn} <- require_action_window_for_player(game, player_id),
+           :ok <- CardPlay.require_no_awaiting_pending_effect(game.id),
+           {:ok, player} <- get_player(game.id, player_id),
+           {:ok, source_card} <- get_card(game.id, source_card_instance_id),
+           {:ok, energy_card} <- get_card(game.id, energy_card_instance_id),
+           :ok <- require_card_owned_by_player(source_card, player_id),
+           :ok <- AbilityEffects.require_lunar_cycle_available(game.id, source_card, turn),
+           :ok <- require_card_owned_by_player(energy_card, player_id),
+           :ok <- require_card_zone(energy_card, :hand),
+           :ok <- AbilityEffects.require_basic_fighting_energy(energy_card),
+           {:ok, ability_result} <-
+             discard_lunar_cycle_energy_and_draw(game, player, source_card, energy_card, turn),
+           {:ok, _event} <-
+             write_event_and_snapshot(
+               game.id,
+               :ability_used,
+               player_id,
+               lunar_cycle_event_payload(turn, source_card, energy_card, ability_result)
+             ) do
+        get_game(game.id)
+      end
+    end)
+  end
+
   @spec use_noctowl_jewel_seeker(Game.t() | String.t(), String.t(), String.t()) ::
           {:ok, Game.t()} | {:error, term()}
   def use_noctowl_jewel_seeker(game_or_id, player_id, source_card_instance_id)
@@ -3664,6 +3700,27 @@ defmodule Prizmo.TcgEngine.Mechanics do
     end
   end
 
+  defp discard_lunar_cycle_energy_and_draw(
+         %Game{} = game,
+         player,
+         %CardInstance{} = source_card,
+         %CardInstance{} = energy_card,
+         %Turn{} = turn
+       ) do
+    with {:ok, %{discard_count: 1, draw_count: draw_count}} <-
+           AbilityEffects.lunar_cycle_counts(source_card),
+         {:ok, discarded_cards} <-
+           discard_cards_from_hand(game.id, player.player_id, [energy_card]),
+         {:ok, drawn_cards} <- draw_cards_from_deck(game.id, player, draw_count),
+         {:ok, current_source_card} <- get_card(game.id, source_card.id),
+         {:ok, _source_card} <-
+           update(current_source_card, :set_markers, %{
+             markers: AbilityEffects.put_lunar_cycle_used_marker(current_source_card, turn)
+           }) do
+      {:ok, %{discarded_cards: discarded_cards, drawn_cards: drawn_cards}}
+    end
+  end
+
   defp require_top_deck_choice(top_cards, chosen_card_instance_id) when is_list(top_cards) do
     case Enum.find(top_cards, &(&1.id == chosen_card_instance_id)) do
       %CardInstance{} = chosen_card -> {:ok, chosen_card}
@@ -3963,6 +4020,39 @@ defmodule Prizmo.TcgEngine.Mechanics do
       cards: EventPayloads.moved_cards(drawn_cards, :deck, :hand),
       public_note: psychic_draw_public_note(source_card, length(drawn_cards))
     }
+  end
+
+  defp lunar_cycle_event_payload(
+         %Turn{} = turn,
+         %CardInstance{} = source_card,
+         %CardInstance{} = energy_card,
+         ability_result
+       ) do
+    drawn_cards = ability_result.drawn_cards
+    discarded_cards = ability_result.discarded_cards
+
+    %{
+      turn_id: turn.id,
+      source: EventPayloads.card_source(source_card),
+      source_card_id: source_card.card_id,
+      source_card_instance_id: source_card.id,
+      ability_id: Atom.to_string(AbilityEffects.lunar_cycle_ability_id()),
+      effect_type: :discard_basic_fighting_energy_from_hand_then_draw_if_solrock_in_play,
+      energy_card_instance_id: energy_card.id,
+      discarded_card_count: length(discarded_cards),
+      drawn_card_count: length(drawn_cards),
+      cards:
+        EventPayloads.moved_cards(discarded_cards, :hand, :discard) ++
+          EventPayloads.moved_cards(drawn_cards, :deck, :hand),
+      public_note: lunar_cycle_public_note(length(drawn_cards))
+    }
+  end
+
+  defp lunar_cycle_public_note(1),
+    do: "Lunar Cycle discarded Basic Fighting Energy and drew 1 card."
+
+  defp lunar_cycle_public_note(card_count) do
+    "Lunar Cycle discarded Basic Fighting Energy and drew #{card_count} cards."
   end
 
   defp psychic_draw_public_note(%CardInstance{card_id: "MEG-056"}, 1) do

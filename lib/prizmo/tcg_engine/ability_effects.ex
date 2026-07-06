@@ -74,6 +74,13 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
   @damp_ability_id :damp
   @fan_call_card_id "SCR-118"
   @fan_call_ability_id :fan_call
+  @lunar_cycle_card_id "MEG-074"
+  @lunar_cycle_ability_id :lunar_cycle
+  @lunar_cycle_effect_type :discard_basic_fighting_energy_from_hand_then_draw_if_solrock_in_play
+  @lunar_cycle_required_card_id "MEG-075"
+  @lunar_cycle_required_type :fighting
+  @lunar_cycle_draw_count 3
+  @lunar_cycle_discard_count 1
 
   def adrena_brain_card_id, do: @adrena_brain_card_id
   def adrena_brain_ability_id, do: @adrena_brain_ability_id
@@ -99,6 +106,8 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
   def damp_ability_id, do: @damp_ability_id
   def fan_call_card_id, do: @fan_call_card_id
   def fan_call_ability_id, do: @fan_call_ability_id
+  def lunar_cycle_card_id, do: @lunar_cycle_card_id
+  def lunar_cycle_ability_id, do: @lunar_cycle_ability_id
 
   def adrena_brain_source?(%CardInstance{card_id: @adrena_brain_card_id}), do: true
   def adrena_brain_source?(%CardInstance{}), do: false
@@ -147,6 +156,10 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
 
   def fan_call_source?(%CardInstance{card_id: @fan_call_card_id}), do: true
   def fan_call_source?(%CardInstance{}), do: false
+
+  def lunar_cycle_source?(%CardInstance{} = source) do
+    match?({:ok, _effect}, lunar_cycle_effect(source))
+  end
 
   def card_has_ability?(%CardInstance{card_id: card_id}) do
     case CardCatalog.fetch(card_id) do
@@ -416,6 +429,25 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
     end
   end
 
+  def lunar_cycle_available?(game_id, %CardInstance{} = source, hand_cards, %Turn{} = turn)
+      when is_binary(game_id) and is_list(hand_cards) do
+    lunar_cycle_source?(source) and in_play?(source) and
+      Enum.any?(hand_cards, &basic_fighting_energy?/1) and
+      own_required_lunar_cycle_card_in_play?(game_id, source.owner_player_id) and
+      not lunar_cycle_used_this_turn?(game_id, source.owner_player_id, turn)
+  end
+
+  def require_lunar_cycle_available(game_id, %CardInstance{} = source, %Turn{} = turn)
+      when is_binary(game_id) do
+    with {:ok, _effect} <- lunar_cycle_effect(source),
+         :ok <- require_in_play(source),
+         :ok <- require_own_lunar_cycle_required_card_in_play(game_id, source.owner_player_id),
+         :ok <- require_lunar_cycle_unused(game_id, source.owner_player_id, turn),
+         {:ok, hand_cards} <- CardStore.cards_in_zone(game_id, source.owner_player_id, :hand) do
+      require_hand_basic_fighting_energy(source, hand_cards)
+    end
+  end
+
   def psychic_draw_count(%CardInstance{} = source) do
     with {:ok, %{draw_count: draw_count}} <- psychic_draw_effect(source) do
       {:ok, draw_count}
@@ -432,6 +464,10 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
     with {:ok, %{max_targets: max_targets}} <- jewel_seeker_effect(source) do
       {:ok, max_targets}
     end
+  end
+
+  def lunar_cycle_counts(%CardInstance{} = source) do
+    lunar_cycle_effect(source)
   end
 
   def cursed_blast_counters(%CardInstance{} = source) do
@@ -566,6 +602,10 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
 
   def put_fan_call_used_marker(%CardInstance{} = source, %Turn{} = turn) do
     put_ability_used_marker(source, turn, @fan_call_ability_id)
+  end
+
+  def put_lunar_cycle_used_marker(%CardInstance{} = source, %Turn{} = turn) do
+    put_ability_used_marker(source, turn, @lunar_cycle_ability_id)
   end
 
   def resume_pending_effect(
@@ -738,6 +778,19 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
     |> marker_matches_turn?(turn)
   end
 
+  def lunar_cycle_used_this_turn?(game_id, player_id, %Turn{} = turn)
+      when is_binary(game_id) and is_binary(player_id) do
+    case CardStore.list_cards(game_id) do
+      {:ok, cards} ->
+        cards
+        |> Enum.filter(&(&1.owner_player_id == player_id))
+        |> Enum.any?(&ability_used_this_turn?(&1, turn, @lunar_cycle_ability_id))
+
+      {:error, _reason} ->
+        false
+    end
+  end
+
   def require_own_pokemon_knocked_out_during_opponents_last_turn(
         game_id,
         %Turn{} = turn,
@@ -793,10 +846,18 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
   end
 
   def basic_grass_energy?(%CardInstance{} = card) do
+    basic_energy_provides?(card, @teal_dance_required_type)
+  end
+
+  def basic_fighting_energy?(%CardInstance{} = card) do
+    basic_energy_provides?(card, @lunar_cycle_required_type)
+  end
+
+  defp basic_energy_provides?(%CardInstance{} = card, energy_type) when is_atom(energy_type) do
     case CardCatalog.fetch(card.card_id) do
       {:ok, %{supertype: :energy, energy_type: :basic, provides: provides}}
       when is_list(provides) ->
-        @teal_dance_required_type in provides
+        energy_type in provides
 
       {:ok, _metadata} ->
         false
@@ -830,6 +891,14 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
     end
   end
 
+  def require_basic_fighting_energy(%CardInstance{} = energy_card) do
+    if basic_fighting_energy?(energy_card) do
+      :ok
+    else
+      {:error, {:missing_basic_energy_type, energy_card.id, @lunar_cycle_required_type}}
+    end
+  end
+
   defp require_in_play(%CardInstance{} = source) do
     if in_play?(source) do
       :ok
@@ -858,6 +927,14 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
       :ok
     else
       {:error, {:missing_hand_basic_energy_type, source.id, @teal_dance_required_type}}
+    end
+  end
+
+  defp require_hand_basic_fighting_energy(%CardInstance{} = source, hand_cards) do
+    if Enum.any?(hand_cards, &basic_fighting_energy?/1) do
+      :ok
+    else
+      {:error, {:missing_hand_basic_energy_type, source.id, @lunar_cycle_required_type}}
     end
   end
 
@@ -900,6 +977,46 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
       else
         {:error, @jewel_seeker_unavailable_reason}
       end
+    end
+  end
+
+  defp require_own_lunar_cycle_required_card_in_play(game_id, player_id)
+       when is_binary(game_id) and is_binary(player_id) do
+    if own_required_lunar_cycle_card_in_play?(game_id, player_id) do
+      :ok
+    else
+      {:error, {:lunar_cycle_requires_card_in_play, @lunar_cycle_required_card_id}}
+    end
+  end
+
+  defp own_required_lunar_cycle_card_in_play?(game_id, player_id)
+       when is_binary(game_id) and is_binary(player_id) do
+    case CardStore.list_cards(game_id) do
+      {:ok, cards} ->
+        Enum.any?(cards, fn
+          %CardInstance{
+            card_id: @lunar_cycle_required_card_id,
+            owner_player_id: ^player_id,
+            zone: zone
+          }
+          when zone in [:active, :bench] ->
+            true
+
+          %CardInstance{} ->
+            false
+        end)
+
+      {:error, _reason} ->
+        false
+    end
+  end
+
+  defp require_lunar_cycle_unused(game_id, player_id, %Turn{} = turn)
+       when is_binary(game_id) and is_binary(player_id) do
+    if lunar_cycle_used_this_turn?(game_id, player_id, turn) do
+      {:error, {:ability_already_used_this_turn, player_id, @lunar_cycle_ability_id}}
+    else
+      :ok
     end
   end
 
@@ -1038,6 +1155,24 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
         {:error,
          {:unsupported_ability_effect, card_id, @psychic_draw_ability_id,
           @psychic_draw_effect_type}}
+    end
+  end
+
+  defp lunar_cycle_effect(%CardInstance{card_id: card_id}) do
+    with {:ok, %{abilities: abilities}} <- CardCatalog.fetch(card_id),
+         %{effect: effect} <- Map.get(abilities, @lunar_cycle_ability_id),
+         %{
+           type: @lunar_cycle_effect_type,
+           discard_count: @lunar_cycle_discard_count,
+           draw_count: @lunar_cycle_draw_count,
+           required_card_id: @lunar_cycle_required_card_id,
+           required_energy_type: @lunar_cycle_required_type
+         } <- effect do
+      {:ok, %{discard_count: @lunar_cycle_discard_count, draw_count: @lunar_cycle_draw_count}}
+    else
+      _other ->
+        {:error,
+         {:unsupported_ability_effect, card_id, @lunar_cycle_ability_id, @lunar_cycle_effect_type}}
     end
   end
 

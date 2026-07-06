@@ -139,6 +139,7 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
       jewel_seeker_affordances(game, player, current_turn, cards) ++
       subjugating_chains_affordances(game, player, current_turn, cards) ++
       psychic_draw_affordances(player, current_turn, cards) ++
+      lunar_cycle_affordances(game, player, current_turn, cards) ++
       recon_directive_affordances(player, current_turn, cards) ++
       run_away_draw_affordances(player, current_turn, cards) ++
       cursed_blast_affordances(game, player, current_turn, cards, all_cards) ++
@@ -577,6 +578,32 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
   end
 
   defp psychic_draw_affordances(_player, _current_turn, _cards), do: []
+
+  defp lunar_cycle_affordances(
+         %Game{} = game,
+         %GamePlayer{} = player,
+         %Turn{} = current_turn,
+         cards
+       ) do
+    hand_cards = hand_cards(cards)
+    energy_ids = hand_cards |> Enum.filter(&AbilityEffects.basic_fighting_energy?/1) |> card_ids()
+
+    cards
+    |> in_play_pokemon_cards()
+    |> Enum.filter(&AbilityEffects.lunar_cycle_available?(game.id, &1, hand_cards, current_turn))
+    |> Enum.map(fn source_card ->
+      affordance(:lunar_cycle, "Use Lunar Cycle", :command, player.player_id,
+        source_card_instance_ids: [source_card.id | energy_ids],
+        target_card_instance_ids: energy_ids,
+        required_source_count: 1,
+        choice_keys: ["energy_card_instance_id"],
+        note:
+          "If you have Solrock in play, discard 1 Basic Fighting Energy from hand to draw 3 cards."
+      )
+    end)
+  end
+
+  defp lunar_cycle_affordances(_game, _player, _current_turn, _cards), do: []
 
   defp recon_directive_affordances(%GamePlayer{} = player, %Turn{} = current_turn, cards) do
     top_deck_cards = cards |> deck_cards() |> Enum.take(2)

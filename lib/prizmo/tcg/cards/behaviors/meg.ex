@@ -3,6 +3,30 @@ defmodule Prizmo.Tcg.Cards.Behaviors.MEG do
 
   use Prizmo.Tcg.Cards.DSL
 
+  card "MEG-074" do
+    ability(:lunar_cycle,
+      effect: %{
+        type: :discard_basic_fighting_energy_from_hand_then_draw_if_solrock_in_play,
+        discard_count: 1,
+        draw_count: 3,
+        required_card_id: "MEG-075",
+        required_energy_type: :fighting
+      }
+    )
+
+    attack(:power_gem, effect: nil)
+  end
+
+  card "MEG-075" do
+    attack(:cosmic_beam,
+      damage: 70,
+      effect: %{
+        type: :damage_only_if_own_bench_has_card_id_unaffected_by_weakness_resistance,
+        required_card_id: "MEG-074"
+      }
+    )
+  end
+
   card "MEG-104" do
     ability(:run_errand, effect: %{type: :active_draw_once_per_turn, count: 2})
 

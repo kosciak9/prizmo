@@ -290,6 +290,18 @@ defmodule Prizmo.TcgEngine.AttackDamage do
     end
   end
 
+  defp apply_effect(damage, %CardInstance{} = attacker_card, _defender_card, %{
+         type: :damage_only_if_own_bench_has_card_id_unaffected_by_weakness_resistance,
+         required_card_id: required_card_id
+       })
+       when is_binary(required_card_id) do
+    if own_bench_has_card_id?(attacker_card, required_card_id) do
+      {:ok, damage}
+    else
+      {:ok, 0}
+    end
+  end
+
   defp apply_effect(damage, %CardInstance{} = attacker_card, %CardInstance{} = defender_card, %{
          type: :bonus_damage_per_energy_attached_to_both_active,
          bonus_damage: bonus_damage
@@ -364,6 +376,11 @@ defmodule Prizmo.TcgEngine.AttackDamage do
 
   defp apply_effect(damage, _attacker_card, _defender_card, %{
          type: :damage_unaffected_by_weakness_resistance_and_effects_on_opponent_active
+       }),
+       do: {:ok, damage}
+
+  defp apply_effect(damage, _attacker_card, _defender_card, %{
+         type: :damage_only_if_own_bench_has_card_id_unaffected_by_weakness_resistance
        }),
        do: {:ok, damage}
 
@@ -501,7 +518,22 @@ defmodule Prizmo.TcgEngine.AttackDamage do
        }),
        do: true
 
+  defp weakness_and_resistance_ignored?(%{
+         effect: %{type: :damage_only_if_own_bench_has_card_id_unaffected_by_weakness_resistance}
+       }),
+       do: true
+
   defp weakness_and_resistance_ignored?(_attack), do: false
+
+  defp own_bench_has_card_id?(
+         %CardInstance{game_id: game_id, owner_player_id: player_id},
+         required_card_id
+       ) do
+    case CardStore.cards_in_zone(game_id, player_id, :bench) do
+      {:ok, bench_cards} -> Enum.any?(bench_cards, &(&1.card_id == required_card_id))
+      {:error, _reason} -> false
+    end
+  end
 
   defp opponent_fairy_zone_active?(
          %CardInstance{owner_player_id: owner_player_id, zone: zone, card_id: card_id},

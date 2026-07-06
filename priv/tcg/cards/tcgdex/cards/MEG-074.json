@@ -1,0 +1,99 @@
+{
+  "prizmo_id": "MEG-074",
+  "source": {
+    "base_url": "https://api.tcgdex.net/v2/en",
+    "dynamic_fields_removed": [
+      "pricing"
+    ],
+    "language": "en",
+    "provider": "TCGdex"
+  },
+  "tcgdex": {
+    "abilities": [
+      {
+        "effect": "Once during your turn, if you have Solrock in play, you may discard a Basic {F} Energy card from your hand in order to use this Ability. Draw 3 cards. You can't use more than 1 Lunar Cycle Ability each turn.",
+        "name": "Lunar Cycle",
+        "type": "Ability"
+      }
+    ],
+    "attacks": [
+      {
+        "cost": [
+          "Fighting",
+          "Fighting"
+        ],
+        "damage": 50,
+        "name": "Power Gem"
+      }
+    ],
+    "category": "Pokemon",
+    "dexId": [
+      337
+    ],
+    "hp": 110,
+    "id": "me01-074",
+    "illustrator": "Whisker",
+    "image": "https://assets.tcgdex.net/en/me/me01/074",
+    "legal": {
+      "expanded": true,
+      "standard": true
+    },
+    "localId": "074",
+    "name": "Lunatone",
+    "rarity": "Rare",
+    "regulationMark": "I",
+    "retreat": 1,
+    "set": {
+      "cardCount": {
+        "official": 132,
+        "total": 188
+      },
+      "id": "me01",
+      "logo": "https://assets.tcgdex.net/en/me/me01/logo",
+      "name": "Mega Evolution",
+      "symbol": "https://assets.tcgdex.net/univ/me/me01/symbol"
+    },
+    "stage": "Basic",
+    "types": [
+      "Fighting"
+    ],
+    "updated": "2026-04-21T19:02:59Z",
+    "variants": {
+      "firstEdition": false,
+      "holo": true,
+      "normal": true,
+      "reverse": true,
+      "wPromo": false
+    },
+    "variants_detailed": [
+      {
+        "size": "standard",
+        "type": "holo",
+        "variantId": "jr7oetx1mqug9"
+      },
+      {
+        "size": "standard",
+        "type": "reverse",
+        "variantId": "cm4kqul3x1bwlz1f"
+      },
+      {
+        "size": "standard",
+        "stamp": [
+          "player-rewards-program"
+        ],
+        "type": "normal",
+        "variantId": "gx8bq2hegum3q6irsxlvqxm955ikw9gd1h311"
+      },
+      {
+        "foil": "cosmos",
+        "size": "standard",
+        "stamp": [
+          "player-rewards-program"
+        ],
+        "type": "holo",
+        "variantId": "6x9wic2vzb5bfzn0gz10e76xy60nqt2vwbzzupgwp6"
+      }
+    ]
+  },
+  "tcgdex_id": "me01-074"
+}

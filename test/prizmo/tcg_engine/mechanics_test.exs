@@ -1161,6 +1161,122 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
              ]
     end
 
+    test "MEG-074 Lunatone Lunar Cycle discards Basic Fighting Energy to draw 3 once per turn" do
+      {:ok, game} = create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147)
+      current_turn_number = current_turn(game.id).turn_number
+
+      {:ok, lunatone} = create_custom_owned_card(game.id, "player_1", "MEG-074", 230)
+      {:ok, lunatone} = ash_update(lunatone, :draw_to_hand, %{position: 20})
+
+      {:ok, lunatone} =
+        ash_update(lunatone, :play_to_bench, %{
+          position: 1,
+          turn_entered_play: current_turn_number
+        })
+
+      {:ok, fighting_energy} = create_custom_owned_card(game.id, "player_1", "MEE-006", 231)
+      {:ok, fighting_energy} = ash_update(fighting_energy, :draw_to_hand, %{position: 21})
+
+      assert {:error, {:lunar_cycle_requires_card_in_play, "MEG-075"}} =
+               Mechanics.use_lunatone_lunar_cycle(
+                 game,
+                 "player_1",
+                 lunatone.id,
+                 fighting_energy.id
+               )
+
+      {:ok, solrock} = create_custom_owned_card(game.id, "player_1", "MEG-075", 232)
+      {:ok, solrock} = ash_update(solrock, :draw_to_hand, %{position: 22})
+
+      {:ok, _solrock} =
+        ash_update(solrock, :play_to_bench, %{
+          position: 2,
+          turn_entered_play: current_turn_number
+        })
+
+      draw_targets = game.id |> cards_in_zone("player_1", :deck) |> Enum.take(3)
+
+      assert {:ok, view} = GameView.for_player(game.id, "player_1")
+      lunar_action = Enum.find(view.action_affordances, &(&1.key == "lunar_cycle"))
+      assert is_map(lunar_action)
+      assert lunar_action.source_card_instance_ids == [lunatone.id, fighting_energy.id]
+      assert lunar_action.target_card_instance_ids == [fighting_energy.id]
+      assert lunar_action.choice_keys == ["energy_card_instance_id"]
+
+      assert {:ok, game} =
+               Mechanics.use_lunatone_lunar_cycle(
+                 game,
+                 "player_1",
+                 lunatone.id,
+                 fighting_energy.id
+               )
+
+      assert zone(fighting_energy.id) == :discard
+
+      for drawn_card <- draw_targets do
+        assert zone(drawn_card.id) == :hand
+      end
+
+      lunar_event =
+        game.id
+        |> game_events_by_type("ability_used")
+        |> Enum.find(&(&1.payload["ability_id"] == "lunar_cycle"))
+
+      assert lunar_event.payload["source_card_id"] == "MEG-074"
+      assert lunar_event.payload["energy_card_instance_id"] == fighting_energy.id
+      assert lunar_event.payload["discarded_card_count"] == 1
+      assert lunar_event.payload["drawn_card_count"] == 3
+
+      assert lunar_event.payload["public_note"] ==
+               "Lunar Cycle discarded Basic Fighting Energy and drew 3 cards."
+
+      {:ok, second_lunatone} = create_custom_owned_card(game.id, "player_1", "MEG-074", 233)
+      {:ok, second_lunatone} = ash_update(second_lunatone, :draw_to_hand, %{position: 23})
+
+      {:ok, second_lunatone} =
+        ash_update(second_lunatone, :play_to_bench, %{
+          position: 3,
+          turn_entered_play: current_turn_number
+        })
+
+      {:ok, second_energy} = create_custom_owned_card(game.id, "player_1", "MEE-006", 234)
+      {:ok, second_energy} = ash_update(second_energy, :draw_to_hand, %{position: 24})
+
+      assert {:error, {:ability_already_used_this_turn, "player_1", :lunar_cycle}} =
+               Mechanics.use_lunatone_lunar_cycle(
+                 game,
+                 "player_1",
+                 second_lunatone.id,
+                 second_energy.id
+               )
+
+      assert zone(second_energy.id) == :hand
+      assert {:ok, view_after} = GameView.for_player(game.id, "player_1")
+      refute Enum.any?(view_after.action_affordances, &(&1.key == "lunar_cycle"))
+    end
+
+    test "MEG-075 Solrock Cosmic Beam requires a Benched Lunatone and ignores Weakness" do
+      {:ok, game} = create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147)
+
+      {:ok, attacker} = create_custom_owned_card(game.id, "player_1", "MEG-075", 240)
+      {:ok, defender} = create_custom_owned_card(game.id, "player_2", "CRI-070", 241)
+
+      assert {:ok, cosmic_beam} = CardCatalog.fetch_attack(attacker.card_id, :cosmic_beam)
+      assert cosmic_beam.damage == 70
+      assert {:ok, 0} = AttackDamage.damage_for(attacker, defender, cosmic_beam)
+
+      {:ok, lunatone} = create_custom_owned_card(game.id, "player_1", "MEG-074", 242)
+      {:ok, lunatone} = ash_update(lunatone, :draw_to_hand, %{position: 20})
+
+      {:ok, _lunatone} =
+        ash_update(lunatone, :play_to_bench, %{
+          position: 1,
+          turn_entered_play: current_turn(game.id).turn_number
+        })
+
+      assert {:ok, 70} = AttackDamage.damage_for(attacker, defender, cosmic_beam)
+    end
+
     test "ASC-047 Mega Froslass ex scales with opponent hand size and puts the Active Pokémon Asleep" do
       {:ok, game} = create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147)
 

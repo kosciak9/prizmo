@@ -43,6 +43,7 @@ import {
   runUseTcgEngineFanCall,
   runUseTcgEngineFlipTheScript,
   runUseTcgEngineJewelSeeker,
+  runUseTcgEngineLunarCycle,
   runUseTcgEngineMunkidoriAdrenaBrain,
   runUseTcgEnginePrismTower,
   runUseTcgEnginePsychicDraw,
@@ -568,6 +569,14 @@ type PsychicDrawCommandOption = {
   sourceCard: CardSummary | undefined
 }
 
+type LunarCycleCommandOption = {
+  key: string
+  sourceCardInstanceId: string
+  energyCardInstanceId: string
+  sourceCard: CardSummary | undefined
+  energyCard: CardSummary | undefined
+}
+
 type ReconDirectiveCommandOption = {
   key: string
   sourceCardInstanceId: string
@@ -807,6 +816,19 @@ type PsychicDrawInput = {
 type PsychicDrawCommand = {
   playerId: string
   sourceCardInstanceId: string
+}
+
+type LunarCycleInput = {
+  gameId: string
+  playerId: PlayerId
+  sourceCardInstanceId: string
+  energyCardInstanceId: string
+}
+
+type LunarCycleCommand = {
+  playerId: string
+  sourceCardInstanceId: string
+  energyCardInstanceId: string
 }
 
 type ReconDirectiveInput = {
@@ -1474,6 +1496,14 @@ export function HomeRoute() {
 
   const psychicDrawMutation = useMutation({
     mutationFn: (input: PsychicDrawInput) => usePsychicDraw(input),
+    onSuccess: async (_game, input) => {
+      clearUltraBallPostSearchHandoff(input.gameId, input.playerId)
+      await queryClient.invalidateQueries({ queryKey: ['tcg-engine', 'game-state'] })
+    }
+  })
+
+  const lunarCycleMutation = useMutation({
+    mutationFn: (input: LunarCycleInput) => useLunarCycle(input),
     onSuccess: async (_game, input) => {
       clearUltraBallPostSearchHandoff(input.gameId, input.playerId)
       await queryClient.invalidateQueries({ queryKey: ['tcg-engine', 'game-state'] })
@@ -2467,6 +2497,16 @@ export function HomeRoute() {
                     })
                   }
                 }}
+                onUseLunarCycle={({ playerId, sourceCardInstanceId, energyCardInstanceId }) => {
+                  if (isPlayerId(playerId)) {
+                    lunarCycleMutation.mutate({
+                      gameId: normalisedGameId,
+                      playerId,
+                      sourceCardInstanceId,
+                      energyCardInstanceId
+                    })
+                  }
+                }}
                 onUseReconDirective={({ playerId, sourceCardInstanceId, chosenCardInstanceId }) => {
                   if (isPlayerId(playerId)) {
                     reconDirectiveMutation.mutate({
@@ -2632,6 +2672,14 @@ export function HomeRoute() {
                 psychicDrawPendingKey={
                   psychicDrawMutation.isPending && psychicDrawMutation.variables
                     ? psychicDrawKey(psychicDrawMutation.variables.sourceCardInstanceId)
+                    : null
+                }
+                lunarCyclePendingKey={
+                  lunarCycleMutation.isPending && lunarCycleMutation.variables
+                    ? lunarCycleKey(
+                        lunarCycleMutation.variables.sourceCardInstanceId,
+                        lunarCycleMutation.variables.energyCardInstanceId
+                      )
                     : null
                 }
                 reconDirectivePendingKey={
@@ -3419,6 +3467,20 @@ async function usePsychicDraw(input: PsychicDrawInput): Promise<CreatedGame> {
   return result.data as CreatedGame
 }
 
+async function useLunarCycle(input: LunarCycleInput): Promise<CreatedGame> {
+  const result = await runUseTcgEngineLunarCycle({
+    input,
+    fields: GAME_RESOURCE_FIELDS,
+    headers: buildAshRpcHeaders()
+  })
+
+  if (!result.success) {
+    throw new Error(rpcErrorMessage(result.errors))
+  }
+
+  return result.data as CreatedGame
+}
+
 async function useReconDirective(input: ReconDirectiveInput): Promise<CreatedGame> {
   const result = await runUseTcgEngineReconDirective({
     input,
@@ -3652,6 +3714,7 @@ function GameStateWorkbench({
   onUseJewelSeeker,
   onUseFlipTheScript,
   onUsePsychicDraw,
+  onUseLunarCycle,
   onUseReconDirective,
   onUseRunAwayDraw,
   onUseTeamRocketsFactory,
@@ -3687,6 +3750,7 @@ function GameStateWorkbench({
   jewelSeekerPendingKey,
   flipTheScriptPendingKey,
   psychicDrawPendingKey,
+  lunarCyclePendingKey,
   reconDirectivePendingKey,
   runAwayDrawPendingKey,
   teamRocketsFactoryPendingPlayerId,
@@ -3730,6 +3794,7 @@ function GameStateWorkbench({
   onUseJewelSeeker: (input: JewelSeekerCommand) => void
   onUseFlipTheScript: (input: FlipTheScriptCommand) => void
   onUsePsychicDraw: (input: PsychicDrawCommand) => void
+  onUseLunarCycle: (input: LunarCycleCommand) => void
   onUseReconDirective: (input: ReconDirectiveCommand) => void
   onUseRunAwayDraw: (input: RunAwayDrawCommand) => void
   onUseTeamRocketsFactory: (input: TeamRocketsFactoryCommand) => void
@@ -3765,6 +3830,7 @@ function GameStateWorkbench({
   jewelSeekerPendingKey: string | null
   flipTheScriptPendingKey: string | null
   psychicDrawPendingKey: string | null
+  lunarCyclePendingKey: string | null
   reconDirectivePendingKey: string | null
   runAwayDrawPendingKey: string | null
   teamRocketsFactoryPendingPlayerId: string | null
@@ -3786,6 +3852,7 @@ function GameStateWorkbench({
       jewelSeekerPendingKey ||
       flipTheScriptPendingKey ||
       psychicDrawPendingKey ||
+      lunarCyclePendingKey ||
       reconDirectivePendingKey ||
       runAwayDrawPendingKey ||
       playBasicToBenchPendingCardId ||
@@ -3919,6 +3986,7 @@ function GameStateWorkbench({
             onUseJewelSeeker={onUseJewelSeeker}
             onUseFlipTheScript={onUseFlipTheScript}
             onUsePsychicDraw={onUsePsychicDraw}
+            onUseLunarCycle={onUseLunarCycle}
             onUseReconDirective={onUseReconDirective}
             onUseRunAwayDraw={onUseRunAwayDraw}
             onUseTeamRocketsFactory={onUseTeamRocketsFactory}
@@ -3941,6 +4009,7 @@ function GameStateWorkbench({
             jewelSeekerPendingKey={jewelSeekerPendingKey}
             flipTheScriptPendingKey={flipTheScriptPendingKey}
             psychicDrawPendingKey={psychicDrawPendingKey}
+            lunarCyclePendingKey={lunarCyclePendingKey}
             reconDirectivePendingKey={reconDirectivePendingKey}
             runAwayDrawPendingKey={runAwayDrawPendingKey}
             teamRocketsFactoryPendingPlayerId={teamRocketsFactoryPendingPlayerId}
@@ -6898,6 +6967,7 @@ function ActionAffordancesPanel({
   onUseJewelSeeker,
   onUseFlipTheScript,
   onUsePsychicDraw,
+  onUseLunarCycle,
   onUseReconDirective,
   onUseRunAwayDraw,
   onUseTeamRocketsFactory,
@@ -6920,6 +6990,7 @@ function ActionAffordancesPanel({
   jewelSeekerPendingKey,
   flipTheScriptPendingKey,
   psychicDrawPendingKey,
+  lunarCyclePendingKey,
   reconDirectivePendingKey,
   runAwayDrawPendingKey,
   teamRocketsFactoryPendingPlayerId,
@@ -6951,6 +7022,7 @@ function ActionAffordancesPanel({
   onUseJewelSeeker: (input: JewelSeekerCommand) => void
   onUseFlipTheScript: (input: FlipTheScriptCommand) => void
   onUsePsychicDraw: (input: PsychicDrawCommand) => void
+  onUseLunarCycle: (input: LunarCycleCommand) => void
   onUseReconDirective: (input: ReconDirectiveCommand) => void
   onUseRunAwayDraw: (input: RunAwayDrawCommand) => void
   onUseTeamRocketsFactory: (input: TeamRocketsFactoryCommand) => void
@@ -6973,6 +7045,7 @@ function ActionAffordancesPanel({
   jewelSeekerPendingKey: string | null
   flipTheScriptPendingKey: string | null
   psychicDrawPendingKey: string | null
+  lunarCyclePendingKey: string | null
   reconDirectivePendingKey: string | null
   runAwayDrawPendingKey: string | null
   teamRocketsFactoryPendingPlayerId: string | null
@@ -6995,6 +7068,7 @@ function ActionAffordancesPanel({
       jewelSeekerPendingKey ||
       flipTheScriptPendingKey ||
       psychicDrawPendingKey ||
+      lunarCyclePendingKey ||
       reconDirectivePendingKey ||
       runAwayDrawPendingKey ||
       playBasicToBenchPendingCardId ||
@@ -7091,6 +7165,7 @@ function ActionAffordancesPanel({
                     onUseJewelSeeker={onUseJewelSeeker}
                     onUseFlipTheScript={onUseFlipTheScript}
                     onUsePsychicDraw={onUsePsychicDraw}
+                    onUseLunarCycle={onUseLunarCycle}
                     onUseReconDirective={onUseReconDirective}
                     onUseRunAwayDraw={onUseRunAwayDraw}
                     onUseTeamRocketsFactory={onUseTeamRocketsFactory}
@@ -7108,6 +7183,7 @@ function ActionAffordancesPanel({
                     jewelSeekerPendingKey={jewelSeekerPendingKey}
                     flipTheScriptPendingKey={flipTheScriptPendingKey}
                     psychicDrawPendingKey={psychicDrawPendingKey}
+                    lunarCyclePendingKey={lunarCyclePendingKey}
                     reconDirectivePendingKey={reconDirectivePendingKey}
                     runAwayDrawPendingKey={runAwayDrawPendingKey}
                     teamRocketsFactoryPendingPlayerId={teamRocketsFactoryPendingPlayerId}
@@ -7574,6 +7650,8 @@ function handActionChoiceCount(handGroup: ActionGroup, cardsById: Map<string, Ca
         return count + action.sourceCardInstanceIds.length * action.targetCardInstanceIds.length
       case 'teal_dance':
         return count + tealDanceCommandOptions(action, cardsById).length
+      case 'lunar_cycle':
+        return count + lunarCycleCommandOptions(action, cardsById).length
       case 'seething_spirit':
         return count + seethingSpiritCommandOptions(action, cardsById).length
       case 'play_stadium':
@@ -7702,6 +7780,7 @@ function ActionAffordanceCard({
   onUseJewelSeeker,
   onUseFlipTheScript,
   onUsePsychicDraw,
+  onUseLunarCycle,
   onUseReconDirective,
   onUseRunAwayDraw,
   onUseTeamRocketsFactory,
@@ -7719,6 +7798,7 @@ function ActionAffordanceCard({
   jewelSeekerPendingKey,
   flipTheScriptPendingKey,
   psychicDrawPendingKey,
+  lunarCyclePendingKey,
   reconDirectivePendingKey,
   runAwayDrawPendingKey,
   teamRocketsFactoryPendingPlayerId,
@@ -7757,6 +7837,7 @@ function ActionAffordanceCard({
   onUseJewelSeeker: (input: JewelSeekerCommand) => void
   onUseFlipTheScript: (input: FlipTheScriptCommand) => void
   onUsePsychicDraw: (input: PsychicDrawCommand) => void
+  onUseLunarCycle: (input: LunarCycleCommand) => void
   onUseReconDirective: (input: ReconDirectiveCommand) => void
   onUseRunAwayDraw: (input: RunAwayDrawCommand) => void
   onUseTeamRocketsFactory: (input: TeamRocketsFactoryCommand) => void
@@ -7774,6 +7855,7 @@ function ActionAffordanceCard({
   jewelSeekerPendingKey: string | null
   flipTheScriptPendingKey: string | null
   psychicDrawPendingKey: string | null
+  lunarCyclePendingKey: string | null
   reconDirectivePendingKey: string | null
   runAwayDrawPendingKey: string | null
   teamRocketsFactoryPendingPlayerId: string | null
@@ -7802,6 +7884,7 @@ function ActionAffordanceCard({
   const jewelSeekerOptions = jewelSeekerCommandOptions(action, cardsById)
   const flipTheScriptOptions = flipTheScriptCommandOptions(action, cardsById)
   const psychicDrawOptions = psychicDrawCommandOptions(action, cardsById)
+  const lunarCycleOptions = lunarCycleCommandOptions(action, cardsById)
   const reconDirectiveOptions = reconDirectiveCommandOptions(action, cardsById)
   const runAwayDrawOptions = runAwayDrawCommandOptions(action, cardsById)
   const prismTowerOptions = prismTowerCommandOptions(action, cardsById)
@@ -8152,6 +8235,31 @@ function ActionAffordanceCard({
                 tone="primary"
               >
                 {isPending ? psychicDrawPendingLabel(option) : psychicDrawButtonLabel(option)}
+              </ActionCommandButton>
+            )
+          })}
+        </div>
+      ) : null}
+
+      {lunarCycleOptions.length > 0 ? (
+        <div className="mt-2 space-y-1.5">
+          {lunarCycleOptions.map(option => {
+            const isPending = lunarCyclePendingKey === option.key
+
+            return (
+              <ActionCommandButton
+                disabled={!canRunAction}
+                key={option.key}
+                onClick={() =>
+                  onUseLunarCycle({
+                    playerId: action.playerId,
+                    sourceCardInstanceId: option.sourceCardInstanceId,
+                    energyCardInstanceId: option.energyCardInstanceId
+                  })
+                }
+                tone="primary"
+              >
+                {isPending ? lunarCyclePendingLabel(option) : lunarCycleButtonLabel(option)}
               </ActionCommandButton>
             )
           })}
@@ -8529,6 +8637,7 @@ function actionSurfaceClassName(action: ActionAffordance) {
     case 'adrena_brain':
     case 'cursed_blast':
     case 'teal_dance':
+    case 'lunar_cycle':
     case 'seething_spirit':
     case 'subjugating_chains':
     case 'fan_call':
@@ -8595,6 +8704,8 @@ function actionSummary(action: ActionAffordance) {
       return 'If Noctowl evolved from hand this turn and you have a Tera Pokémon in play, search your deck for up to 2 Trainer cards and put them into your hand.'
     case 'psychic_draw':
       return 'Draw cards with a Kadabra or Alakazam that evolved from hand this turn.'
+    case 'lunar_cycle':
+      return 'If you have Solrock in play, discard 1 Basic Fighting Energy from hand to draw 3 cards.'
     case 'recon_directive':
       return 'Choose 1 of the top 2 cards of your deck for hand; put the other on the bottom.'
     case 'run_away_draw':
@@ -8857,6 +8968,24 @@ function psychicDrawCommandOptions(action: ActionAffordance, cardsById: Map<stri
   ]
 }
 
+function lunarCycleCommandOptions(action: ActionAffordance, cardsById: Map<string, CardSummary>): LunarCycleCommandOption[] {
+  if (action.key !== 'lunar_cycle' || action.sourceCardInstanceIds.length < 1) {
+    return []
+  }
+
+  const sourceCardInstanceId = action.sourceCardInstanceIds[0]!
+  const energyCardInstanceIds =
+    action.targetCardInstanceIds.length > 0 ? action.targetCardInstanceIds : action.sourceCardInstanceIds.slice(1)
+
+  return energyCardInstanceIds.map(energyCardInstanceId => ({
+    key: lunarCycleKey(sourceCardInstanceId, energyCardInstanceId),
+    sourceCardInstanceId,
+    energyCardInstanceId,
+    sourceCard: cardsById.get(sourceCardInstanceId),
+    energyCard: cardsById.get(energyCardInstanceId)
+  }))
+}
+
 function reconDirectiveCommandOptions(
   action: ActionAffordance,
   cardsById: Map<string, CardSummary>
@@ -8968,6 +9097,16 @@ function psychicDrawPendingLabel(option: PsychicDrawCommandOption) {
 
 function psychicDrawButtonLabel(option: PsychicDrawCommandOption) {
   return `Psychic Draw with ${option.sourceCard?.name ?? formatCardInstanceId(option.sourceCardInstanceId)}`
+}
+
+function lunarCyclePendingLabel(option: LunarCycleCommandOption) {
+  return `Using Lunar Cycle with ${option.energyCard?.name ?? 'Basic Fighting Energy'}...`
+}
+
+function lunarCycleButtonLabel(option: LunarCycleCommandOption) {
+  return `Lunar Cycle: discard ${option.energyCard?.name ?? formatCardInstanceId(option.energyCardInstanceId)} with ${
+    option.sourceCard?.name ?? formatCardInstanceId(option.sourceCardInstanceId)
+  }`
 }
 
 function reconDirectivePendingLabel(option: ReconDirectiveCommandOption) {
@@ -9355,6 +9494,7 @@ function actionGroupId(action: ActionAffordance): ActionGroupId {
     case 'attach_energy':
     case 'attach_tool':
     case 'teal_dance':
+    case 'lunar_cycle':
     case 'seething_spirit':
     case 'fan_call':
     case 'jewel_seeker':
@@ -12394,6 +12534,10 @@ function flipTheScriptKey(sourceCardInstanceId: string) {
 
 function psychicDrawKey(sourceCardInstanceId: string) {
   return sourceCardInstanceId
+}
+
+function lunarCycleKey(sourceCardInstanceId: string, energyCardInstanceId: string) {
+  return `${sourceCardInstanceId}:${energyCardInstanceId}`
 }
 
 function reconDirectiveKey(sourceCardInstanceId: string, chosenCardInstanceId: string) {

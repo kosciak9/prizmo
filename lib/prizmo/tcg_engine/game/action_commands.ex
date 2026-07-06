@@ -622,6 +622,37 @@ defmodule Prizmo.TcgEngine.Game.ActionCommands do
       end
     end
 
+    action :use_lunatone_lunar_cycle_command, :struct do
+      description "Use Lunatone's Lunar Cycle Ability to discard Basic Fighting Energy and draw."
+
+      constraints instance_of: Game
+
+      argument :game_id, :uuid do
+        allow_nil? false
+      end
+
+      argument :player_id, :string do
+        allow_nil? false
+      end
+
+      argument :source_card_instance_id, :uuid do
+        allow_nil? false
+      end
+
+      argument :energy_card_instance_id, :uuid do
+        allow_nil? false
+      end
+
+      run fn input, _context ->
+        Mechanics.use_lunatone_lunar_cycle(
+          input.arguments.game_id,
+          input.arguments.player_id,
+          input.arguments.source_card_instance_id,
+          input.arguments.energy_card_instance_id
+        )
+      end
+    end
+
     action :use_noctowl_jewel_seeker_command, :struct do
       description "Use Noctowl's Jewel Seeker Ability after evolving from hand with a Tera Pokémon in play."
 
