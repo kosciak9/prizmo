@@ -122,6 +122,38 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     ]
   }
 
+  @larrys_skill %CardDefinition{
+    id: "PRE-115",
+    kind: :trainer,
+    trainer_type: :supporter,
+    play_window: :action_window,
+    effects: [
+      %Effect{
+        key: :discard_hand_then_search_for_pokemon_supporter_basic_energy,
+        type: :search_deck,
+        params: %{
+          discard_hand_before_search?: true,
+          filter: %{
+            any: [
+              %{kind: :pokemon},
+              %{kind: :trainer, trainer_type: :supporter},
+              %{kind: :energy, energy_type: :basic}
+            ]
+          },
+          required_groups: [
+            %{filter: %{kind: :pokemon}, count: 1},
+            %{filter: %{kind: :trainer, trainer_type: :supporter}, count: 1},
+            %{filter: %{kind: :energy, energy_type: :basic}, count: 1}
+          ],
+          count: 3,
+          destination: :hand,
+          reveal: true,
+          shuffle_after: true
+        }
+      }
+    ]
+  }
+
   @judge %CardDefinition{
     id: "POR-076",
     kind: :trainer,
@@ -1204,6 +1236,7 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     @surfer.id => @surfer,
     @hilda.id => @hilda,
     @judge.id => @judge,
+    @larrys_skill.id => @larrys_skill,
     @lanas_aid.id => @lanas_aid,
     @lillies_determination.id => @lillies_determination,
     @night_stretcher.id => @night_stretcher,

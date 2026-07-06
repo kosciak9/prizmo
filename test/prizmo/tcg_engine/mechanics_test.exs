@@ -564,6 +564,117 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
       assert game_events_by_type(game.id, "deck_shuffled") != []
     end
 
+    test "Larry's Skill discards hand before searching a Pokemon Supporter and Basic Energy" do
+      {:ok, game} = create_flow_action_window_game()
+      assert {:ok, game} = Mechanics.pass_turn(game, "player_1")
+
+      {:ok, larry} = create_custom_owned_card(game.id, "player_2", "PRE-115", 230)
+      {:ok, larry} = ash_update(larry, :draw_to_hand, %{position: 20})
+
+      {:ok, discard_card_1} = create_custom_owned_card(game.id, "player_2", "PRE-035", 231)
+      {:ok, discard_card_1} = ash_update(discard_card_1, :draw_to_hand, %{position: 21})
+
+      {:ok, discard_card_2} = create_custom_owned_card(game.id, "player_2", "MEE-005", 232)
+      {:ok, discard_card_2} = ash_update(discard_card_2, :draw_to_hand, %{position: 22})
+
+      {:ok, pokemon} = create_custom_owned_card(game.id, "player_2", "SCR-114", 233)
+      {:ok, second_pokemon} = create_custom_owned_card(game.id, "player_2", "JTG-120", 234)
+      {:ok, supporter} = create_custom_owned_card(game.id, "player_2", "POR-076", 235)
+      {:ok, basic_energy} = create_custom_owned_card(game.id, "player_2", "MEE-005", 236)
+      {:ok, special_energy} = create_custom_owned_card(game.id, "player_2", "ASC-216", 237)
+      {:ok, item} = create_custom_owned_card(game.id, "player_2", "POR-072", 238)
+
+      assert CardCoverage.summarize("PRE-115").coverage_status == :supported
+
+      assert {:ok, view} = GameView.for_player(game.id, "player_2")
+      play_card = Enum.find(view.action_affordances, &(&1.key == "play_card"))
+      assert is_map(play_card)
+      assert larry.id in play_card.source_card_instance_ids
+
+      assert {:error, {:wrong_search_group_count, %{kind: :pokemon}, 2, 1}} =
+               Mechanics.play_card(game, "player_2", larry.id, %{
+                 choices: %{
+                   discard_hand_then_search_for_pokemon_supporter_basic_energy: [
+                     pokemon.id,
+                     second_pokemon.id,
+                     supporter.id
+                   ]
+                 }
+               })
+
+      assert zone(larry.id) == :hand
+      assert zone(discard_card_1.id) == :hand
+      assert zone(discard_card_2.id) == :hand
+
+      assert {:ok, game} = Mechanics.play_card(game, "player_2", larry.id, %{})
+
+      [prompt] = awaiting_prompts(game.id)
+      assert prompt.player_id == "player_2"
+
+      assert prompt.payload["choice_key"] ==
+               "discard_hand_then_search_for_pokemon_supporter_basic_energy"
+
+      assert prompt.payload["min"] == 3
+      assert prompt.payload["max"] == 3
+      assert pokemon.id in prompt.payload["legal_choices"]
+      assert supporter.id in prompt.payload["legal_choices"]
+      assert basic_energy.id in prompt.payload["legal_choices"]
+      refute special_energy.id in prompt.payload["legal_choices"]
+      refute item.id in prompt.payload["legal_choices"]
+
+      expected_discarded_card_ids =
+        game.id
+        |> cards_in_zone("player_2", :hand)
+        |> Enum.map(& &1.card_id)
+        |> Enum.sort()
+
+      assert {:ok, game} =
+               Mechanics.choose_prompt(game, "player_2", prompt.id, [
+                 pokemon.id,
+                 supporter.id,
+                 basic_energy.id
+               ])
+
+      assert zone(larry.id) == :discard
+      assert zone(discard_card_1.id) == :discard
+      assert zone(discard_card_2.id) == :discard
+      assert zone(pokemon.id) == :hand
+      assert zone(supporter.id) == :hand
+      assert zone(basic_energy.id) == :hand
+      assert zone(second_pokemon.id) == :deck
+      assert zone(special_energy.id) == :deck
+      assert zone(item.id) == :deck
+
+      cards_moved_events = game_events_by_type(game.id, "cards_moved")
+
+      discard_event =
+        Enum.find(cards_moved_events, fn event ->
+          event.payload["effect_key"] ==
+            "discard_hand_then_search_for_pokemon_supporter_basic_energy" and
+            Enum.all?(event.payload["cards"], &(&1["to_zone"] == "discard"))
+        end)
+
+      assert discard_event.payload["affected_player_id"] == "player_2"
+
+      assert Enum.sort(Enum.map(discard_event.payload["cards"], & &1["card_id"])) ==
+               expected_discarded_card_ids
+
+      search_event =
+        Enum.find(cards_moved_events, fn event ->
+          event.payload["effect_key"] ==
+            "discard_hand_then_search_for_pokemon_supporter_basic_energy" and
+            event.payload["public_reveal"] == true
+        end)
+
+      assert Enum.sort(Enum.map(search_event.payload["cards"], & &1["card_id"])) == [
+               "MEE-005",
+               "POR-076",
+               "SCR-114"
+             ]
+
+      assert game_events_by_type(game.id, "deck_shuffled") != []
+    end
+
     test "Brock's Scouting opens a prompt and resolves for up to 2 Basic Pokémon" do
       {:ok, game} = create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147)
 

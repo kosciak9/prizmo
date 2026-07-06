@@ -1,5 +1,12 @@
 # Wiki Log
 
+## [2026-07-06] codebase update | Goal 2 Larry's Skill support
+
+- Task attempted: closed `PRE-115` Larry's Skill as the next shared three-archetype Goal 2 Trainer/Supporter blocker after Lunatone/Solrock. Added committed TCGdex metadata, authored Larry's Skill as an engine-defined Supporter that discards the player's remaining hand before searching exactly one Pokémon, one Supporter, and one Basic Energy from deck to hand with reveal and shuffle, and fixed Trainer search-filter ordering so Supporter-only searches no longer allow Item cards.
+- Files changed: `lib/prizmo/tcg_engine/cards/registry.ex`, `lib/prizmo/tcg_engine/card_play.ex`, `test/prizmo/tcg_engine/mechanics_test.exs`, `priv/tcg/cards/tcgdex/cards/PRE-115.json`, `knowledge-base/wiki/engine/goal-2-top-30-latest-limitless-coverage-scope.md`, `knowledge-base/wiki/engine/ash-backed-tcg-engine-playtest-handoff.md`, `knowledge-base/wiki/log.md`.
+- Validation: `mix test test/prizmo/tcg_engine/mechanics_test.exs -n "Larry's Skill"`; `mix test test/prizmo/tcg/cards/metadata_test.exs`; `mix test test/prizmo/tcg_engine/mechanics_test.exs`; `mix prizmo.goal2.corpus` confirmed `supported=148` / `generic-supported=8` / `partial=10` / `unimplemented=211` and `cached=169` / `missing=208`; final `mix check` passed.
+- Remaining/blocking notes: `PRE-115` is no longer in the shared incomplete queue. The default next Goal 2 priority is now `TWM-157` Lucian, followed by the `POR-020` Staryu / `POR-021` Mega Starmie ex pair and later `MEG-094` Mega Mawile ex.
+
 ## [2026-07-06] codebase update | Goal 2 Lunatone/Solrock support
 
 - Task attempted: closed the `MEG-074` Lunatone / `MEG-075` Solrock pair as the next shared three-archetype Goal 2 Pokémon blocker after Patrat. Added committed TCGdex metadata, authored Lunatone's `Lunar Cycle` Ability and Solrock's `Cosmic Beam` attack, implemented Basic Fighting Energy discard/draw/once-per-turn Lunar Cycle mechanics across own copies, added the Solrock-in-play and Lunatone-on-Bench gates, bypassed Weakness/Resistance for Cosmic Beam, and exposed Lunar Cycle through Ash RPC, `GameView`, and the temporary React SPA command UI.

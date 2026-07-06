@@ -64,13 +64,13 @@ Those reports are the canonical starting point for autonomous Goal 2 implementat
 - Tracked top archetypes: `30`
 - Tracked cards with usage greater than `0.00`: `377`
 - Coverage buckets from `mix prizmo.goal2.corpus`:
-  - `supported=147`
+  - `supported=148`
   - `generic-supported=8`
   - `partial=10`
-  - `unimplemented=212`
+  - `unimplemented=211`
 - Metadata buckets:
-  - `cached=168`
-  - `missing=209`
+  - `cached=169`
+  - `missing=208`
 
 Important interpretation:
 
@@ -82,17 +82,17 @@ Important interpretation:
 
 The strongest current Goal 2 implementation candidates are the incomplete cards shared by the most archetypes and/or the most total metagame share.
 
-The latest Goal 2 engine batch closed the `MEG-074` Lunatone / `MEG-075` Solrock pair as the next shared three-archetype Pokémon cleanup after Patrat. Lunatone now has committed TCGdex metadata plus executable `Lunar Cycle`: if own Solrock is in play, the acting player discards a Basic Fighting Energy from hand, draws 3, and may use only one Lunar Cycle Ability each turn across all own copies. Solrock now has committed metadata plus executable `Cosmic Beam`: it does 70 only while own Lunatone is on the Bench, and the damage ignores Weakness/Resistance.
+The latest Goal 2 engine batch closed `PRE-115` Larry's Skill as the next shared three-archetype Trainer/Supporter cleanup after the Lunatone/Solrock pair. Larry's Skill now has committed TCGdex metadata plus executable Supporter behavior: it discards the acting player's remaining hand, then searches exactly one Pokémon, one Supporter card, and one Basic Energy card from deck to hand, reveals them, and shuffles. The batch also fixed generic Trainer search-filter ordering so `trainer_type: :supporter` no longer accidentally admits Item cards.
 
 ### Highest-priority remaining `unimplemented` cards from current report
 
 | Card | Archetypes | Total share | Notes |
 | --- | --- | --- | --- |
-| `PRE-115` Larry's Skill | `3` | `1.25%` | Next three-archetype Trainer after the shared Pokémon cleanup slice. |
-| `TWM-157` Lucian | `3` | `0.92%` | Additional three-archetype Supporter cleanup after the higher-share three-archetype queue. |
+| `TWM-157` Lucian | `3` | `0.92%` | Next three-archetype Supporter cleanup after Larry's Skill. |
 | `POR-020` Staryu | `3` | `0.85%` | Later three-archetype Pokémon cleanup shared by the Greninja/Starmie cluster. |
 | `POR-021` Mega Starmie ex | `3` | `0.85%` | Paired Greninja/Starmie follow-up alongside Staryu. |
 | `MEG-094` Mega Mawile ex | `3` | `0.77%` | Later three-archetype Metal attacker cleanup shared by Archaludon/Metagross shells. |
+| `POR-077` Lumiose City | `2` | `14.16%` | Highest-share two-archetype unimplemented card once the remaining three-archetype queue is reduced. |
 
 ### Shared `partial` cards worth finishing after the broad unimplemented slice
 
@@ -119,8 +119,8 @@ That means prior Goal 1 and six-deck coverage was not wasted; it now acts as see
 
 ## Recommended next implementation order
 
-1. Use `PRE-115` Larry's Skill, then `TWM-157` Lucian, as the next lower-share three-archetype Trainer/Supporter cleanup queue now that the Patrat and Lunatone/Solrock Pokémon blockers are reduced.
-2. Keep the Greninja/Starmie `POR-020` / `POR-021` pair as the next coherent three-archetype Pokémon follow-up after those Trainer/Supporter blockers.
+1. Use `TWM-157` Lucian as the next lower-share three-archetype Trainer/Supporter cleanup queue now that Larry's Skill is supported.
+2. Keep the Greninja/Starmie `POR-020` / `POR-021` pair as the next coherent three-archetype Pokémon follow-up after the remaining Supporter blocker.
 3. Keep `MEG-094` Mega Mawile ex and related Metal-shell cards as later three-archetype cleanup after the higher-share queue.
 4. Keep the remaining Dragapult-only cached pair `TWM-099` / `TWM-100` as deliberate single-archetype cleanup, not the default autonomous queue.
 5. Finish the remaining shared partials only after the broad unimplemented slice unless another batch naturally extends the new HP infrastructure; if returning to HP work soon, `POR-086` Growing Grass Energy remains the strongest follow-up.

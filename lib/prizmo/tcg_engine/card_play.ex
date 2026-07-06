@@ -729,6 +729,8 @@ defmodule Prizmo.TcgEngine.CardPlay do
        ) do
     with {:ok, target_cards} <-
            validate_search_deck_effect(game.id, player.player_id, effect, target_ids),
+         {:ok, _discarded_hand_cards} <-
+           maybe_discard_hand_before_search(game, player, card, effect),
          {:ok, moved_targets} <- move_search_targets(game, turn, player, effect, target_cards),
          {:ok, _event} <-
            write_event_and_snapshot(
@@ -1329,6 +1331,26 @@ defmodule Prizmo.TcgEngine.CardPlay do
 
   defp complete_play_card_effect(_game, _turn, _player, _card, effect, _target_ids) do
     {:error, {:unsupported_card_effect, effect.type}}
+  end
+
+  defp maybe_discard_hand_before_search(%Game{} = game, %GamePlayer{} = player, card, effect) do
+    if Map.get(effect.params, :discard_hand_before_search?, false) do
+      with {:ok, hand_cards} <- CardStore.cards_in_zone(game.id, player.player_id, :hand),
+           {:ok, discarded_cards} <-
+             CardStore.discard_cards_from_hand(game.id, player.player_id, hand_cards),
+           {:ok, _event} <-
+             write_event_and_snapshot(game.id, :cards_moved, player.player_id, %{
+               reason: :effect_resolution,
+               source: EventPayloads.card_source(card),
+               effect_key: effect.key,
+               affected_player_id: player.player_id,
+               cards: EventPayloads.moved_cards(discarded_cards, :hand, :discard)
+             }) do
+        {:ok, discarded_cards}
+      end
+    else
+      {:ok, []}
+    end
   end
 
   defp complete_play_card_resolution(game, turn, player, card, effect) do
@@ -2848,19 +2870,6 @@ defmodule Prizmo.TcgEngine.CardPlay do
     require_pokemon_card(card.card_id)
   end
 
-  defp require_search_filter(%CardInstance{} = card, %{kind: :trainer}) do
-    case CardCatalog.fetch(card.card_id) do
-      {:ok, %{supertype: :trainer}} ->
-        :ok
-
-      {:ok, metadata} ->
-        {:error, {:not_trainer, metadata.id}}
-
-      {:error, reason} ->
-        {:error, reason}
-    end
-  end
-
   defp require_search_filter(%CardInstance{} = card, %{
          kind: :energy,
          energy_type: :basic,
@@ -2935,6 +2944,19 @@ defmodule Prizmo.TcgEngine.CardPlay do
 
       {:ok, %{supertype: :trainer, trainer_type: actual_type}} ->
         {:error, {:wrong_trainer_type, card.card_id, actual_type, trainer_type}}
+
+      {:ok, metadata} ->
+        {:error, {:not_trainer, metadata.id}}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  defp require_search_filter(%CardInstance{} = card, %{kind: :trainer}) do
+    case CardCatalog.fetch(card.card_id) do
+      {:ok, %{supertype: :trainer}} ->
+        :ok
 
       {:ok, metadata} ->
         {:error, {:not_trainer, metadata.id}}
