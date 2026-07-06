@@ -1,0 +1,83 @@
+{
+  "prizmo_id": "TWM-131",
+  "source": {
+    "base_url": "https://api.tcgdex.net/v2/en",
+    "dynamic_fields_removed": [
+      "pricing"
+    ],
+    "language": "en",
+    "provider": "TCGdex"
+  },
+  "tcgdex": {
+    "abilities": [
+      {
+        "effect": "Once during your turn, if this Pokémon is in the Active Spot, you may look at the top 6 cards of your deck, reveal a Supporter card you find there, and put it into your hand. Shuffle the other cards back into your deck.",
+        "name": "Attract Customers",
+        "type": "Ability"
+      }
+    ],
+    "attacks": [
+      {
+        "cost": [
+          "Fire",
+          "Water"
+        ],
+        "damage": 50,
+        "name": "Surf"
+      }
+    ],
+    "category": "Pokemon",
+    "description": "Tatsugiri is an extremely cunning Pokémon. It feigns weakness to lure in prey, then orders its partner to attack.",
+    "dexId": [
+      978
+    ],
+    "hp": 70,
+    "id": "sv06-131",
+    "illustrator": "Jerky",
+    "image": "https://assets.tcgdex.net/en/sv/sv06/131",
+    "legal": {
+      "expanded": true,
+      "standard": true
+    },
+    "localId": "131",
+    "name": "Tatsugiri",
+    "rarity": "Uncommon",
+    "regulationMark": "H",
+    "retreat": 1,
+    "set": {
+      "cardCount": {
+        "official": 167,
+        "total": 226
+      },
+      "id": "sv06",
+      "logo": "https://assets.tcgdex.net/en/sv/sv06/logo",
+      "name": "Twilight Masquerade",
+      "symbol": "https://assets.tcgdex.net/univ/sv/sv06/symbol"
+    },
+    "stage": "Basic",
+    "types": [
+      "Dragon"
+    ],
+    "updated": "2026-06-09T13:04:07+01:00",
+    "variants": {
+      "firstEdition": false,
+      "holo": false,
+      "normal": true,
+      "reverse": true,
+      "wPromo": false
+    },
+    "variants_detailed": [
+      {
+        "size": "standard",
+        "type": "normal",
+        "variantId": "endfynwn4n10gzq"
+      },
+      {
+        "size": "standard",
+        "type": "reverse",
+        "variantId": "cm4kqul3x1bwlz1f"
+      }
+    ]
+  },
+  "tcgdex_id": "sv06-131"
+}

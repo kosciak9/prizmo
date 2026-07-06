@@ -40,6 +40,7 @@ import {
   runStartTcgEngineSetup,
   runUndoTcgEngineGame,
   runUseTcgEngineCursedBlast,
+  runUseTcgEngineAttractCustomers,
   runUseTcgEngineFanCall,
   runUseTcgEngineFlipTheScript,
   runUseTcgEngineJewelSeeker,
@@ -556,6 +557,12 @@ type FanCallCommandOption = {
   sourceCard: CardSummary | undefined
 }
 
+type AttractCustomersCommandOption = {
+  key: string
+  sourceCardInstanceId: string
+  sourceCard: CardSummary | undefined
+}
+
 type JewelSeekerCommandOption = {
   key: string
   sourceCardInstanceId: string
@@ -812,6 +819,17 @@ type FanCallInput = {
 }
 
 type FanCallCommand = {
+  playerId: string
+  sourceCardInstanceId: string
+}
+
+type AttractCustomersInput = {
+  gameId: string
+  playerId: PlayerId
+  sourceCardInstanceId: string
+}
+
+type AttractCustomersCommand = {
   playerId: string
   sourceCardInstanceId: string
 }
@@ -1515,6 +1533,14 @@ export function HomeRoute() {
 
   const fanCallMutation = useMutation({
     mutationFn: (input: FanCallInput) => useFanCall(input),
+    onSuccess: async (_game, input) => {
+      clearUltraBallPostSearchHandoff(input.gameId, input.playerId)
+      await queryClient.invalidateQueries({ queryKey: ['tcg-engine', 'game-state'] })
+    }
+  })
+
+  const attractCustomersMutation = useMutation({
+    mutationFn: (input: AttractCustomersInput) => useAttractCustomers(input),
     onSuccess: async (_game, input) => {
       clearUltraBallPostSearchHandoff(input.gameId, input.playerId)
       await queryClient.invalidateQueries({ queryKey: ['tcg-engine', 'game-state'] })
@@ -2529,6 +2555,15 @@ export function HomeRoute() {
                     })
                   }
                 }}
+                onUseAttractCustomers={({ playerId, sourceCardInstanceId }) => {
+                  if (isPlayerId(playerId)) {
+                    attractCustomersMutation.mutate({
+                      gameId: normalisedGameId,
+                      playerId,
+                      sourceCardInstanceId
+                    })
+                  }
+                }}
                 onUseJewelSeeker={({ playerId, sourceCardInstanceId }) => {
                   if (isPlayerId(playerId)) {
                     jewelSeekerMutation.mutate({
@@ -2719,6 +2754,11 @@ export function HomeRoute() {
                 fanCallPendingKey={
                   fanCallMutation.isPending && fanCallMutation.variables
                     ? fanCallKey(fanCallMutation.variables.sourceCardInstanceId)
+                    : null
+                }
+                attractCustomersPendingKey={
+                  attractCustomersMutation.isPending && attractCustomersMutation.variables
+                    ? attractCustomersKey(attractCustomersMutation.variables.sourceCardInstanceId)
                     : null
                 }
                 jewelSeekerPendingKey={
@@ -3501,6 +3541,20 @@ async function useFanCall(input: FanCallInput): Promise<CreatedGame> {
   return result.data as CreatedGame
 }
 
+async function useAttractCustomers(input: AttractCustomersInput): Promise<CreatedGame> {
+  const result = await runUseTcgEngineAttractCustomers({
+    input,
+    fields: GAME_RESOURCE_FIELDS,
+    headers: buildAshRpcHeaders()
+  })
+
+  if (!result.success) {
+    throw new Error(rpcErrorMessage(result.errors))
+  }
+
+  return result.data as CreatedGame
+}
+
 async function useJewelSeeker(input: JewelSeekerInput): Promise<CreatedGame> {
   const result = await runUseTcgEngineJewelSeeker({
     input,
@@ -3787,6 +3841,7 @@ function GameStateWorkbench({
   onUseTealDance,
   onUseSeethingSpirit,
   onUseFanCall,
+  onUseAttractCustomers,
   onUseJewelSeeker,
   onUseFlipTheScript,
   onUsePsychicDraw,
@@ -3824,6 +3879,7 @@ function GameStateWorkbench({
   tealDancePendingKey,
   seethingSpiritPendingKey,
   fanCallPendingKey,
+  attractCustomersPendingKey,
   jewelSeekerPendingKey,
   flipTheScriptPendingKey,
   psychicDrawPendingKey,
@@ -3869,6 +3925,7 @@ function GameStateWorkbench({
   onUseTealDance: (input: TealDanceCommand) => void
   onUseSeethingSpirit: (input: SeethingSpiritCommand) => void
   onUseFanCall: (input: FanCallCommand) => void
+  onUseAttractCustomers: (input: AttractCustomersCommand) => void
   onUseJewelSeeker: (input: JewelSeekerCommand) => void
   onUseFlipTheScript: (input: FlipTheScriptCommand) => void
   onUsePsychicDraw: (input: PsychicDrawCommand) => void
@@ -3906,6 +3963,7 @@ function GameStateWorkbench({
   tealDancePendingKey: string | null
   seethingSpiritPendingKey: string | null
   fanCallPendingKey: string | null
+  attractCustomersPendingKey: string | null
   jewelSeekerPendingKey: string | null
   flipTheScriptPendingKey: string | null
   psychicDrawPendingKey: string | null
@@ -4066,6 +4124,7 @@ function GameStateWorkbench({
             onUseTealDance={onUseTealDance}
             onUseSeethingSpirit={onUseSeethingSpirit}
             onUseFanCall={onUseFanCall}
+            onUseAttractCustomers={onUseAttractCustomers}
             onUseJewelSeeker={onUseJewelSeeker}
             onUseFlipTheScript={onUseFlipTheScript}
             onUsePsychicDraw={onUsePsychicDraw}
@@ -4090,6 +4149,7 @@ function GameStateWorkbench({
             tealDancePendingKey={tealDancePendingKey}
             seethingSpiritPendingKey={seethingSpiritPendingKey}
             fanCallPendingKey={fanCallPendingKey}
+            attractCustomersPendingKey={attractCustomersPendingKey}
             jewelSeekerPendingKey={jewelSeekerPendingKey}
             flipTheScriptPendingKey={flipTheScriptPendingKey}
             psychicDrawPendingKey={psychicDrawPendingKey}
@@ -5303,6 +5363,7 @@ function PromptChoiceCard({
 }) {
   const legalChoiceIds = promptLegalChoiceIds(prompt.payload)
   const legalChoiceCards = promptLegalChoiceCards(prompt.payload)
+  const inspectedCards = promptInspectedCards(prompt.payload)
   const legalChoiceCardsById = useMemo(() => new Map(legalChoiceCards.map(card => [card.id, card])), [legalChoiceCards])
   const legalChoiceLabels = promptLegalChoiceLabels(prompt.payload)
   const legalChoiceLabelsById = useMemo(
@@ -5364,6 +5425,27 @@ function PromptChoiceCard({
         <p className="mt-3 rounded-lg border border-emerald-200 bg-stone-50 px-3 py-2 text-xs leading-5 text-emerald-900">
           {promptChoiceDisambiguation}
         </p>
+      ) : null}
+
+      {inspectedCards.length > 0 ? (
+        <div className="mt-3 rounded-lg border border-emerald-200 bg-stone-50 px-3 py-2">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-800">
+            Inspected cards
+          </p>
+          <div className="mt-2 grid gap-2 sm:grid-cols-2">
+            {inspectedCards.map(card => (
+              <div className="flex items-center gap-2 rounded-lg bg-white/80 px-2 py-1.5" key={card.id}>
+                <CardArt card={card} variant="choice" />
+                <span className="min-w-0 text-xs">
+                  <span className="block truncate font-semibold text-stone-900">{card.name}</span>
+                  <span className="block truncate text-stone-500">
+                    {card.cardId} · {formatEventType(card.zone)}
+                  </span>
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
       ) : null}
 
       {legalChoiceIds.length > 0 ? (
@@ -7193,6 +7275,7 @@ function ActionAffordancesPanel({
   onUseTealDance,
   onUseSeethingSpirit,
   onUseFanCall,
+  onUseAttractCustomers,
   onUseJewelSeeker,
   onUseFlipTheScript,
   onUsePsychicDraw,
@@ -7217,6 +7300,7 @@ function ActionAffordancesPanel({
   tealDancePendingKey,
   seethingSpiritPendingKey,
   fanCallPendingKey,
+  attractCustomersPendingKey,
   jewelSeekerPendingKey,
   flipTheScriptPendingKey,
   psychicDrawPendingKey,
@@ -7250,6 +7334,7 @@ function ActionAffordancesPanel({
   onUseTealDance: (input: TealDanceCommand) => void
   onUseSeethingSpirit: (input: SeethingSpiritCommand) => void
   onUseFanCall: (input: FanCallCommand) => void
+  onUseAttractCustomers: (input: AttractCustomersCommand) => void
   onUseJewelSeeker: (input: JewelSeekerCommand) => void
   onUseFlipTheScript: (input: FlipTheScriptCommand) => void
   onUsePsychicDraw: (input: PsychicDrawCommand) => void
@@ -7274,6 +7359,7 @@ function ActionAffordancesPanel({
   tealDancePendingKey: string | null
   seethingSpiritPendingKey: string | null
   fanCallPendingKey: string | null
+  attractCustomersPendingKey: string | null
   jewelSeekerPendingKey: string | null
   flipTheScriptPendingKey: string | null
   psychicDrawPendingKey: string | null
@@ -7299,6 +7385,7 @@ function ActionAffordancesPanel({
       tealDancePendingKey ||
       seethingSpiritPendingKey ||
       fanCallPendingKey ||
+      attractCustomersPendingKey ||
       jewelSeekerPendingKey ||
       flipTheScriptPendingKey ||
       psychicDrawPendingKey ||
@@ -7396,6 +7483,7 @@ function ActionAffordancesPanel({
                     onUseTealDance={onUseTealDance}
                     onUseSeethingSpirit={onUseSeethingSpirit}
                     onUseFanCall={onUseFanCall}
+                    onUseAttractCustomers={onUseAttractCustomers}
                     onUseJewelSeeker={onUseJewelSeeker}
                     onUseFlipTheScript={onUseFlipTheScript}
                     onUsePsychicDraw={onUsePsychicDraw}
@@ -7415,6 +7503,7 @@ function ActionAffordancesPanel({
                     tealDancePendingKey={tealDancePendingKey}
                     seethingSpiritPendingKey={seethingSpiritPendingKey}
                     fanCallPendingKey={fanCallPendingKey}
+                    attractCustomersPendingKey={attractCustomersPendingKey}
                     jewelSeekerPendingKey={jewelSeekerPendingKey}
                     flipTheScriptPendingKey={flipTheScriptPendingKey}
                     psychicDrawPendingKey={psychicDrawPendingKey}
@@ -8015,6 +8104,7 @@ function ActionAffordanceCard({
   onUseTealDance,
   onUseSeethingSpirit,
   onUseFanCall,
+  onUseAttractCustomers,
   onUseJewelSeeker,
   onUseFlipTheScript,
   onUsePsychicDraw,
@@ -8034,6 +8124,7 @@ function ActionAffordanceCard({
   tealDancePendingKey,
   seethingSpiritPendingKey,
   fanCallPendingKey,
+  attractCustomersPendingKey,
   jewelSeekerPendingKey,
   flipTheScriptPendingKey,
   psychicDrawPendingKey,
@@ -8074,6 +8165,7 @@ function ActionAffordanceCard({
   onUseTealDance: (input: TealDanceCommand) => void
   onUseSeethingSpirit: (input: SeethingSpiritCommand) => void
   onUseFanCall: (input: FanCallCommand) => void
+  onUseAttractCustomers: (input: AttractCustomersCommand) => void
   onUseJewelSeeker: (input: JewelSeekerCommand) => void
   onUseFlipTheScript: (input: FlipTheScriptCommand) => void
   onUsePsychicDraw: (input: PsychicDrawCommand) => void
@@ -8093,6 +8185,7 @@ function ActionAffordanceCard({
   tealDancePendingKey: string | null
   seethingSpiritPendingKey: string | null
   fanCallPendingKey: string | null
+  attractCustomersPendingKey: string | null
   jewelSeekerPendingKey: string | null
   flipTheScriptPendingKey: string | null
   psychicDrawPendingKey: string | null
@@ -8123,6 +8216,7 @@ function ActionAffordanceCard({
   const tealDanceOptions = tealDanceCommandOptions(action, cardsById)
   const seethingSpiritOptions = seethingSpiritCommandOptions(action, cardsById)
   const fanCallOptions = fanCallCommandOptions(action, cardsById)
+  const attractCustomersOptions = attractCustomersCommandOptions(action, cardsById)
   const jewelSeekerOptions = jewelSeekerCommandOptions(action, cardsById)
   const flipTheScriptOptions = flipTheScriptCommandOptions(action, cardsById)
   const psychicDrawOptions = psychicDrawCommandOptions(action, cardsById)
@@ -8430,6 +8524,30 @@ function ActionAffordanceCard({
                 tone="primary"
               >
                 {isPending ? fanCallPendingLabel(option) : fanCallButtonLabel(option)}
+              </ActionCommandButton>
+            )
+          })}
+        </div>
+      ) : null}
+
+      {attractCustomersOptions.length > 0 ? (
+        <div className="mt-2 space-y-1.5">
+          {attractCustomersOptions.map(option => {
+            const isPending = attractCustomersPendingKey === option.key
+
+            return (
+              <ActionCommandButton
+                disabled={!canRunAction}
+                key={option.key}
+                onClick={() =>
+                  onUseAttractCustomers({
+                    playerId: action.playerId,
+                    sourceCardInstanceId: option.sourceCardInstanceId
+                  })
+                }
+                tone="primary"
+              >
+                {isPending ? attractCustomersPendingLabel(option) : attractCustomersButtonLabel(option)}
               </ActionCommandButton>
             )
           })}
@@ -9203,6 +9321,25 @@ function fanCallCommandOptions(action: ActionAffordance, cardsById: Map<string, 
   ]
 }
 
+function attractCustomersCommandOptions(
+  action: ActionAffordance,
+  cardsById: Map<string, CardSummary>
+): AttractCustomersCommandOption[] {
+  if (action.key !== 'attract_customers' || action.sourceCardInstanceIds.length < 1) {
+    return []
+  }
+
+  const sourceCardInstanceId = action.sourceCardInstanceIds[0]!
+
+  return [
+    {
+      key: attractCustomersKey(sourceCardInstanceId),
+      sourceCardInstanceId,
+      sourceCard: cardsById.get(sourceCardInstanceId)
+    }
+  ]
+}
+
 function jewelSeekerCommandOptions(
   action: ActionAffordance,
   cardsById: Map<string, CardSummary>
@@ -9367,6 +9504,14 @@ function fanCallPendingLabel(option: FanCallCommandOption) {
 
 function fanCallButtonLabel(option: FanCallCommandOption) {
   return `Fan Call with ${option.sourceCard?.name ?? formatCardInstanceId(option.sourceCardInstanceId)}`
+}
+
+function attractCustomersPendingLabel(option: AttractCustomersCommandOption) {
+  return `Using ${option.sourceCard?.name ?? 'Attract Customers'}...`
+}
+
+function attractCustomersButtonLabel(option: AttractCustomersCommandOption) {
+  return `Attract Customers with ${option.sourceCard?.name ?? formatCardInstanceId(option.sourceCardInstanceId)}`
 }
 
 function jewelSeekerPendingLabel(option: JewelSeekerCommandOption) {
@@ -11834,6 +11979,16 @@ function promptLegalChoiceCards(payload: Record<string, unknown>) {
   return value.filter(isCardSummary)
 }
 
+function promptInspectedCards(payload: Record<string, unknown>) {
+  const value = payload.inspected_cards
+
+  if (!Array.isArray(value)) {
+    return []
+  }
+
+  return value.filter(isCardSummary)
+}
+
 function promptLegalChoiceLabels(payload: Record<string, unknown>) {
   const value = payload.legal_choice_labels
 
@@ -12816,6 +12971,10 @@ function seethingSpiritKey(sourceCardInstanceId: string, energyCardInstanceId: s
 }
 
 function fanCallKey(sourceCardInstanceId: string) {
+  return sourceCardInstanceId
+}
+
+function attractCustomersKey(sourceCardInstanceId: string) {
   return sourceCardInstanceId
 }
 

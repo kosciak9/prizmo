@@ -163,6 +163,19 @@ defmodule Prizmo.Tcg.Cards.Behaviors.TWM do
     )
   end
 
+  card "TWM-131" do
+    ability(:attract_customers,
+      effect: %{
+        type: :top_six_choose_supporter_to_hand_then_shuffle,
+        look_count: 6,
+        max_targets: 1,
+        trainer_type: :supporter
+      }
+    )
+
+    attack(:surf, damage: 50, effect: nil)
+  end
+
   card "TWM-141" do
     ability(:seasoned_skill,
       effect: %{type: :reduce_attack_cost_by_colorless_per_opponent_prize_taken}

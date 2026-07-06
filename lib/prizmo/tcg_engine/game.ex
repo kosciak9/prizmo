@@ -39,6 +39,9 @@ defmodule Prizmo.TcgEngine.Game do
     ]
   ]
 
+  @source_ability_args [:game_id, :player_id, :source_card_instance_id]
+  @source_energy_args [:game_id, :player_id, :source_card_instance_id, :energy_card_instance_id]
+
   postgres do
     table "tcg_engine_games"
     repo Prizmo.Repo
@@ -94,7 +97,6 @@ defmodule Prizmo.TcgEngine.Game do
     define :play_card_command, args: [:game_id, :player_id, :card_instance_id]
     define :play_stadium_command, args: [:game_id, :player_id, :card_instance_id]
     define :use_team_rockets_factory_command, args: [:game_id, :player_id]
-
     define :use_prism_tower_command, args: [:game_id, :player_id, :discard_card_instance_ids]
     define :use_lumiose_city_command, args: [:game_id, :player_id, :target_card_instance_id]
 
@@ -108,8 +110,7 @@ defmodule Prizmo.TcgEngine.Game do
         :damage_counters
       ]
 
-    define :use_teal_mask_ogerpon_teal_dance_command,
-      args: [:game_id, :player_id, :source_card_instance_id, :energy_card_instance_id]
+    define :use_teal_mask_ogerpon_teal_dance_command, args: @source_energy_args
 
     define :use_blaziken_ex_seething_spirit_command,
       args: [
@@ -123,27 +124,26 @@ defmodule Prizmo.TcgEngine.Game do
     define :use_cursed_blast_command,
       args: [:game_id, :player_id, :source_card_instance_id, :target_card_instance_id]
 
-    define :use_fezandipiti_flip_the_script_command,
-      args: [:game_id, :player_id, :source_card_instance_id]
+    define :use_fezandipiti_flip_the_script_command, args: @source_ability_args
 
-    define :use_noctowl_jewel_seeker_command,
-      args: [:game_id, :player_id, :source_card_instance_id]
+    define :use_noctowl_jewel_seeker_command, args: @source_ability_args
 
     define :use_pecharunt_ex_subjugating_chains_command,
       args: [:game_id, :player_id, :source_card_instance_id, :target_card_instance_id]
 
-    define :use_psychic_draw_command, args: [:game_id, :player_id, :source_card_instance_id]
+    define :use_psychic_draw_command, args: @source_ability_args
 
-    define :use_lunatone_lunar_cycle_command,
-      args: [:game_id, :player_id, :source_card_instance_id, :energy_card_instance_id]
+    define :use_lunatone_lunar_cycle_command, args: @source_energy_args
 
     define :use_drakloak_recon_directive_command,
       args: [:game_id, :player_id, :source_card_instance_id, :chosen_card_instance_id]
 
-    define :use_dudunsparce_run_away_draw_command,
-      args: [:game_id, :player_id, :source_card_instance_id]
+    define :use_dudunsparce_run_away_draw_command, args: @source_ability_args
 
-    define :use_fan_rotom_fan_call_command, args: [:game_id, :player_id, :source_card_instance_id]
+    define :use_fan_rotom_fan_call_command, args: @source_ability_args
+
+    define :use_tatsugiri_attract_customers_command, args: @source_ability_args
+
     define :play_basic_to_bench_command, args: [:game_id, :player_id, :card_instance_id]
 
     define :attach_tool_command,

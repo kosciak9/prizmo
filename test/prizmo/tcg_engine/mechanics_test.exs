@@ -2376,6 +2376,144 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
     end
   end
 
+  describe "TWM-131 Tatsugiri Attract Customers Ability" do
+    test "creates a top-six Supporter prompt and resolves the selected Supporter to hand" do
+      {:ok, game} = create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147)
+      tatsugiri = promote_custom_tatsugiri_to_active(game.id, "player_1")
+
+      top_cards =
+        stage_top_deck_cards(game.id, "player_1", [
+          "TWM-143",
+          "SCR-133",
+          "TWM-129",
+          "MEG-114",
+          "TWM-143",
+          "TWM-129"
+        ])
+
+      support_ids =
+        top_cards
+        |> Enum.filter(&(&1.card_id in ["SCR-133", "MEG-114"]))
+        |> Enum.map(& &1.id)
+
+      inspected_ids = Enum.map(top_cards, & &1.id)
+
+      assert {:ok, view} = GameView.for_player(game.id, "player_1")
+      affordance = Enum.find(view.action_affordances, &(&1.key == "attract_customers"))
+      assert is_map(affordance)
+      assert affordance.source_card_instance_ids == [tatsugiri.id]
+
+      assert {:ok, game} =
+               Mechanics.use_tatsugiri_attract_customers(game, "player_1", tatsugiri.id)
+
+      [prompt] = awaiting_prompts(game.id)
+      assert prompt.player_id == "player_1"
+      assert prompt.prompt_type == "select_cards"
+      assert prompt.payload["choice_key"] == "attract_customers"
+      assert prompt.payload["min"] == 0
+      assert prompt.payload["max"] == 1
+      assert prompt.payload["look_count"] == 6
+      assert prompt.payload["inspected_card_count"] == 6
+      assert prompt.payload["inspected_card_ids"] == inspected_ids
+      assert Enum.sort(prompt.payload["legal_choices"]) == Enum.sort(support_ids)
+
+      assert {:ok, view_with_prompt} = GameView.for_player(game.id, "player_1")
+      [view_prompt] = view_with_prompt.prompts
+
+      assert Enum.sort(Enum.map(view_prompt.payload["legal_choice_cards"], & &1.id)) ==
+               Enum.sort(support_ids)
+
+      assert Enum.map(view_prompt.payload["inspected_cards"], & &1.id) == inspected_ids
+
+      hand_before = cards_in_zone(game.id, "player_1", :hand)
+      deck_before = cards_in_zone(game.id, "player_1", :deck)
+      selected = [List.first(support_ids)]
+
+      assert {:ok, game} = Mechanics.choose_prompt(game, "player_1", prompt.id, selected)
+
+      assert zone(List.first(selected)) == :hand
+      assert length(cards_in_zone(game.id, "player_1", :hand)) == length(hand_before) + 1
+      assert length(cards_in_zone(game.id, "player_1", :deck)) == length(deck_before) - 1
+
+      cards_moved_event =
+        game.id
+        |> game_events_by_type("cards_moved")
+        |> Enum.find(&(&1.payload["effect_key"] == "attract_customers"))
+
+      assert cards_moved_event.payload["public_reveal"] == true
+
+      assert Enum.map(cards_moved_event.payload["revealed_cards"], & &1["instance_id"]) ==
+               selected
+
+      assert game_events_by_type(game.id, "deck_shuffled") != []
+
+      assert {:error, {:ability_already_used_this_turn, _, :attract_customers}} =
+               Mechanics.use_tatsugiri_attract_customers(game, "player_1", tatsugiri.id)
+    end
+
+    test "requires Tatsugiri to be in the Active Spot" do
+      {:ok, game} = create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147)
+      tatsugiri = play_direct_basic_to_bench(game.id, "player_1", "TWM-131", 4)
+      stage_top_deck_cards(game.id, "player_1", ["SCR-133", "TWM-143"])
+
+      assert {:ok, view} = GameView.for_player(game.id, "player_1")
+      refute Enum.any?(view.action_affordances, &(&1.key == "attract_customers"))
+
+      assert {:error, {:ability_source_not_active, _, :bench}} =
+               Mechanics.use_tatsugiri_attract_customers(game, "player_1", tatsugiri.id)
+    end
+
+    test "allows selecting no Supporter when the top six have no legal choice" do
+      {:ok, game} = create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147)
+      tatsugiri = promote_custom_tatsugiri_to_active(game.id, "player_1")
+
+      staged_cards =
+        stage_top_deck_cards(game.id, "player_1", [
+          "TWM-143",
+          "TWM-129",
+          "TWM-143",
+          "TWM-129",
+          "TWM-143",
+          "TWM-129",
+          "SCR-133"
+        ])
+
+      seventh_card = List.last(staged_cards)
+
+      assert {:ok, game} =
+               Mechanics.use_tatsugiri_attract_customers(game, "player_1", tatsugiri.id)
+
+      [prompt] = awaiting_prompts(game.id)
+      inspected_ids = staged_cards |> Enum.take(6) |> Enum.map(& &1.id)
+
+      assert prompt.payload["choice_key"] == "attract_customers"
+      assert prompt.payload["legal_choices"] == []
+      assert prompt.payload["inspected_card_ids"] == inspected_ids
+      refute seventh_card.id in prompt.payload["legal_choices"]
+      refute seventh_card.id in prompt.payload["inspected_card_ids"]
+
+      hand_before = cards_in_zone(game.id, "player_1", :hand)
+      deck_before = cards_in_zone(game.id, "player_1", :deck)
+
+      assert {:ok, game} = Mechanics.choose_prompt(game, "player_1", prompt.id, [])
+
+      assert length(cards_in_zone(game.id, "player_1", :hand)) == length(hand_before)
+      assert length(cards_in_zone(game.id, "player_1", :deck)) == length(deck_before)
+
+      cards_moved_event =
+        game.id
+        |> game_events_by_type("cards_moved")
+        |> Enum.find(&(&1.payload["effect_key"] == "attract_customers"))
+
+      assert cards_moved_event.payload["cards"] == []
+      assert cards_moved_event.payload["public_reveal"] == false
+      assert game_events_by_type(game.id, "deck_shuffled") != []
+
+      assert {:error, {:ability_already_used_this_turn, _, :attract_customers}} =
+               Mechanics.use_tatsugiri_attract_customers(game, "player_1", tatsugiri.id)
+    end
+  end
+
   describe "SCR-114 Hoothoot and SCR-115 Noctowl support" do
     test "Hoothoot Triple Stab scales damage by heads count" do
       {:ok, game} = create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147)
@@ -3088,6 +3226,32 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
       })
 
     card
+  end
+
+  defp promote_custom_tatsugiri_to_active(game_id, player_id) do
+    existing_active = active_card(game_id, player_id)
+    {:ok, _existing_active} = ash_update(existing_active, :move_active_to_bench, %{position: 5})
+
+    {:ok, tatsugiri} = create_custom_owned_card(game_id, player_id, "TWM-131", 240)
+    {:ok, tatsugiri} = ash_update(tatsugiri, :draw_to_hand, %{position: 40})
+
+    {:ok, tatsugiri} =
+      ash_update(tatsugiri, :play_to_bench, %{
+        position: 4,
+        turn_entered_play: current_turn(game_id).turn_number
+      })
+
+    {:ok, tatsugiri} = ash_update(tatsugiri, :promote_to_active, %{position: 1, status: nil})
+    tatsugiri
+  end
+
+  defp stage_top_deck_cards(game_id, player_id, card_ids) when is_list(card_ids) do
+    card_ids
+    |> Enum.with_index(-length(card_ids))
+    |> Enum.map(fn {card_id, position} ->
+      {:ok, card} = create_custom_owned_card(game_id, player_id, card_id, position)
+      card
+    end)
   end
 
   defp create_started_setup_game do

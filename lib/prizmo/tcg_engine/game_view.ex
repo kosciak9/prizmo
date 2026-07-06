@@ -750,13 +750,39 @@ defmodule Prizmo.TcgEngine.GameView do
   end
 
   defp prompt_payload(%Prompt{payload: payload} = prompt, cards, attached_cards_by_target) do
-    choice_cards = legal_choice_cards(prompt, cards, attached_cards_by_target)
+    payload
+    |> put_prompt_card_views(
+      "legal_choice_cards",
+      legal_choice_cards(prompt, cards, attached_cards_by_target)
+    )
+    |> put_prompt_card_views(
+      "inspected_cards",
+      inspected_cards(prompt, cards, attached_cards_by_target)
+    )
+  end
 
-    if Enum.empty?(choice_cards) do
-      payload
-    else
-      Map.put(payload, "legal_choice_cards", choice_cards)
+  defp put_prompt_card_views(payload, _key, []), do: payload
+  defp put_prompt_card_views(payload, key, card_views), do: Map.put(payload, key, card_views)
+
+  defp inspected_cards(
+         %Prompt{payload: payload, player_id: player_id},
+         cards,
+         attached_cards_by_target
+       ) do
+    cards_by_id = Map.new(cards, &{&1.id, &1})
+
+    payload
+    |> Map.get("inspected_card_ids", [])
+    |> case do
+      ids when is_list(ids) -> ids
+      _other -> []
     end
+    |> Enum.map(&Map.get(cards_by_id, &1))
+    |> Enum.filter(fn
+      %CardInstance{owner_player_id: ^player_id} -> true
+      _other -> false
+    end)
+    |> Enum.map(&card_view(&1, attached_cards_by_target))
   end
 
   defp legal_choice_cards(

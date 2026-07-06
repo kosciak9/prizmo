@@ -1702,6 +1702,99 @@ defmodule Prizmo.TcgEngine.Mechanics do
     end)
   end
 
+  @spec use_tatsugiri_attract_customers(Game.t() | String.t(), String.t(), String.t()) ::
+          {:ok, Game.t()} | {:error, term()}
+  def use_tatsugiri_attract_customers(game_or_id, player_id, source_card_instance_id)
+      when is_binary(player_id) and is_binary(source_card_instance_id) do
+    transaction(fn ->
+      with {:ok, game} <- get_game(game_or_id),
+           {:ok, turn} <- require_action_window_for_player(game, player_id),
+           :ok <- CardPlay.require_no_awaiting_pending_effect(game.id),
+           {:ok, player} <- get_player(game.id, player_id),
+           {:ok, source_card} <- get_card(game.id, source_card_instance_id),
+           {:ok, top_cards} <-
+             CardStore.deck_cards_for_player(
+               player.id,
+               AbilityEffects.attract_customers_look_count()
+             ),
+           :ok <- require_card_owned_by_player(source_card, player_id),
+           :ok <- AbilityEffects.require_attract_customers_available(source_card, top_cards, turn),
+           legal_choice_cards = AbilityEffects.attract_customers_legal_choice_cards(top_cards),
+           legal_choice_ids = Enum.map(legal_choice_cards, & &1.id),
+           {:ok, current_source_card} <- get_card(game.id, source_card.id),
+           {:ok, marked_source_card} <-
+             update(current_source_card, :set_markers, %{
+               markers:
+                 AbilityEffects.put_attract_customers_used_marker(current_source_card, turn)
+             }),
+           {:ok, pending_effect} <-
+             create(PendingEffect, :create, %{
+               game_id: game.id,
+               source_type: :ability_effect,
+               source_card_instance_id: marked_source_card.id,
+               source_card_id: marked_source_card.card_id,
+               controller_player_id: player_id,
+               current_player_id: player_id,
+               effect_key: AbilityEffects.attract_customers_ability_id(),
+               step: "awaiting_choice",
+               state: %{
+                 "version" => 1,
+                 "kind" => "ability_effect",
+                 "effect_type" => Atom.to_string(AbilityEffects.attract_customers_ability_id()),
+                 "player_id" => player_id,
+                 "source_card_instance_id" => marked_source_card.id,
+                 "source_card_id" => marked_source_card.card_id,
+                 "look_count" => AbilityEffects.attract_customers_look_count(),
+                 "inspected_card_count" => length(top_cards),
+                 "inspected_card_ids" => Enum.map(top_cards, & &1.id),
+                 "legal_choice_ids" => legal_choice_ids
+               }
+             }),
+           {:ok, pending_effect} <-
+             update(pending_effect, :await_prompt, %{
+               current_player_id: player_id,
+               effect_key: AbilityEffects.attract_customers_ability_id(),
+               step: "awaiting_choice",
+               state: pending_effect.state || %{}
+             }),
+           {:ok, _prompt} <-
+             create(Prompt, :create, %{
+               game_id: game.id,
+               turn_id: turn.id,
+               pending_effect_id: pending_effect.id,
+               prompt_type: "select_cards",
+               player_id: player_id,
+               payload: %{
+                 "choice_key" => Atom.to_string(AbilityEffects.attract_customers_ability_id()),
+                 "legal_choices" => legal_choice_ids,
+                 "legal_choice_labels" =>
+                   AbilityEffects.attract_customers_choice_labels(legal_choice_cards),
+                 "min" => 0,
+                 "max" => 1,
+                 "look_count" => AbilityEffects.attract_customers_look_count(),
+                 "inspected_card_count" => length(top_cards),
+                 "inspected_card_ids" => Enum.map(top_cards, & &1.id),
+                 "source_card_instance_id" => marked_source_card.id,
+                 "source_card_id" => marked_source_card.card_id
+               }
+             }),
+           {:ok, _event} <-
+             write_event_and_snapshot(
+               game.id,
+               :ability_used,
+               player_id,
+               attract_customers_event_payload(
+                 turn,
+                 marked_source_card,
+                 top_cards,
+                 legal_choice_cards
+               )
+             ) do
+        get_game(game.id)
+      end
+    end)
+  end
+
   @spec use_pecharunt_ex_subjugating_chains(
           Game.t() | String.t(),
           String.t(),
@@ -1802,6 +1895,27 @@ defmodule Prizmo.TcgEngine.Mechanics do
       "source_card_id" => source_card.id,
       "source_card_card_id" => source_card.card_id,
       "message" => "Fan Rotom used Fan Call."
+    }
+  end
+
+  defp attract_customers_event_payload(
+         %Turn{} = turn,
+         %CardInstance{} = source_card,
+         top_cards,
+         legal_choice_cards
+       )
+       when is_list(top_cards) and is_list(legal_choice_cards) do
+    %{
+      "turn_id" => turn.id,
+      "turn_number" => turn.turn_number,
+      "player_id" => source_card.owner_player_id,
+      "ability_id" => Atom.to_string(AbilityEffects.attract_customers_ability_id()),
+      "source_card_id" => source_card.card_id,
+      "source_card_instance_id" => source_card.id,
+      "look_count" => AbilityEffects.attract_customers_look_count(),
+      "inspected_card_count" => length(top_cards),
+      "legal_choice_count" => length(legal_choice_cards),
+      "public_note" => "Tatsugiri used Attract Customers."
     }
   end
 

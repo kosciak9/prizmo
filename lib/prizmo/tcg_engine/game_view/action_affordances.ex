@@ -145,6 +145,7 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
       run_away_draw_affordances(player, current_turn, cards) ++
       cursed_blast_affordances(game, player, current_turn, cards, all_cards) ++
       fan_call_affordances(player, current_turn, cards) ++
+      attract_customers_affordances(player, current_turn, cards) ++
       adrena_brain_affordances(game, player, current_turn, cards, all_cards) ++
       evolve_from_hand_affordances(game, player, current_turn, cards, all_cards) ++
       declare_attack_affordances(player, current_turn, cards, all_cards) ++
@@ -718,6 +719,35 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
   end
 
   defp fan_call_affordances(_player, _current_turn, _cards), do: []
+
+  defp attract_customers_affordances(%GamePlayer{} = player, %Turn{} = current_turn, cards) do
+    top_deck_cards =
+      cards |> deck_cards() |> Enum.take(AbilityEffects.attract_customers_look_count())
+
+    case active_pokemon_card(cards) do
+      %CardInstance{} = source_card ->
+        if AbilityEffects.attract_customers_available?(source_card, top_deck_cards, current_turn) do
+          [
+            affordance(
+              :attract_customers,
+              "Use Attract Customers",
+              :command,
+              player.player_id,
+              source_card_instance_ids: [source_card.id],
+              note:
+                "If this Tatsugiri is in the Active Spot, look at the top 6 cards of your deck, reveal up to 1 Supporter card you find there, and put it into your hand. Shuffle the other cards back into your deck."
+            )
+          ]
+        else
+          []
+        end
+
+      nil ->
+        []
+    end
+  end
+
+  defp attract_customers_affordances(_player, _current_turn, _cards), do: []
 
   defp declare_attack_affordances(
          %GamePlayer{} = player,

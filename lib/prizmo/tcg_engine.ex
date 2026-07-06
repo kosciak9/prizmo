@@ -45,6 +45,7 @@ defmodule Prizmo.TcgEngine do
       rpc_action :use_tcg_engine_cursed_blast, :use_cursed_blast_command
       rpc_action :use_tcg_engine_flip_the_script, :use_fezandipiti_flip_the_script_command
       rpc_action :use_tcg_engine_fan_call, :use_fan_rotom_fan_call_command
+      rpc_action :use_tcg_engine_attract_customers, :use_tatsugiri_attract_customers_command
       rpc_action :use_tcg_engine_jewel_seeker, :use_noctowl_jewel_seeker_command
       rpc_action :use_tcg_engine_subjugating_chains, :use_pecharunt_ex_subjugating_chains_command
       rpc_action :use_tcg_engine_psychic_draw, :use_psychic_draw_command
@@ -190,6 +191,10 @@ defmodule Prizmo.TcgEngine do
 
       define :use_fan_rotom_fan_call_for_game,
         action: :use_fan_rotom_fan_call_command,
+        args: [:game_id, :player_id, :source_card_instance_id]
+
+      define :use_tatsugiri_attract_customers_for_game,
+        action: :use_tatsugiri_attract_customers_command,
         args: [:game_id, :player_id, :source_card_instance_id]
 
       define :use_noctowl_jewel_seeker_for_game,

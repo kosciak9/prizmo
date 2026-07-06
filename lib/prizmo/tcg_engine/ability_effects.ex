@@ -75,6 +75,10 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
   @damp_ability_id :damp
   @fan_call_card_id "SCR-118"
   @fan_call_ability_id :fan_call
+  @attract_customers_card_id "TWM-131"
+  @attract_customers_ability_id :attract_customers
+  @attract_customers_effect_type :top_six_choose_supporter_to_hand_then_shuffle
+  @attract_customers_look_count 6
   @lunar_cycle_card_id "MEG-074"
   @lunar_cycle_ability_id :lunar_cycle
   @lunar_cycle_effect_type :discard_basic_fighting_energy_from_hand_then_draw_if_solrock_in_play
@@ -107,6 +111,9 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
   def damp_ability_id, do: @damp_ability_id
   def fan_call_card_id, do: @fan_call_card_id
   def fan_call_ability_id, do: @fan_call_ability_id
+  def attract_customers_card_id, do: @attract_customers_card_id
+  def attract_customers_ability_id, do: @attract_customers_ability_id
+  def attract_customers_look_count, do: @attract_customers_look_count
   def lunar_cycle_card_id, do: @lunar_cycle_card_id
   def lunar_cycle_ability_id, do: @lunar_cycle_ability_id
 
@@ -157,6 +164,9 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
 
   def fan_call_source?(%CardInstance{card_id: @fan_call_card_id}), do: true
   def fan_call_source?(%CardInstance{}), do: false
+
+  def attract_customers_source?(%CardInstance{card_id: @attract_customers_card_id}), do: true
+  def attract_customers_source?(%CardInstance{}), do: false
 
   def lunar_cycle_source?(%CardInstance{} = source) do
     match?({:ok, _effect}, lunar_cycle_effect(source))
@@ -452,6 +462,34 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
     end
   end
 
+  def attract_customers_available?(%CardInstance{} = source, deck_cards, %Turn{} = turn)
+      when is_list(deck_cards) do
+    attract_customers_source?(source) and active?(source) and deck_cards != [] and
+      not ability_used_this_turn?(source, turn, @attract_customers_ability_id)
+  end
+
+  def require_attract_customers_available(%CardInstance{} = source, deck_cards, %Turn{} = turn)
+      when is_list(deck_cards) do
+    with {:ok, _effect} <- attract_customers_effect(source),
+         :ok <- require_active(source),
+         :ok <- require_non_empty_deck(source, deck_cards) do
+      require_ability_unused(source, turn, @attract_customers_ability_id)
+    end
+  end
+
+  def attract_customers_legal_choice_cards(cards) when is_list(cards) do
+    Enum.filter(cards, &attract_customers_target?/1)
+  end
+
+  def attract_customers_choice_labels(cards) when is_list(cards) do
+    Enum.map(cards, fn card ->
+      case CardCatalog.fetch(card.card_id) do
+        {:ok, %{name: name}} -> name
+        _ -> card.card_id
+      end
+    end)
+  end
+
   def lunar_cycle_available?(game_id, %CardInstance{} = source, hand_cards, %Turn{} = turn)
       when is_binary(game_id) and is_list(hand_cards) do
     lunar_cycle_source?(source) and in_play?(source) and
@@ -627,6 +665,10 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
     put_ability_used_marker(source, turn, @fan_call_ability_id)
   end
 
+  def put_attract_customers_used_marker(%CardInstance{} = source, %Turn{} = turn) do
+    put_ability_used_marker(source, turn, @attract_customers_ability_id)
+  end
+
   def put_lunar_cycle_used_marker(%CardInstance{} = source, %Turn{} = turn) do
     put_ability_used_marker(source, turn, @lunar_cycle_ability_id)
   end
@@ -733,6 +775,46 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
             complete_pending_effect(pending_effect, selected_card_instance_ids)
           end
       end
+    end
+  end
+
+  def resume_pending_effect(
+        %Game{} = game,
+        %Prompt{} = prompt,
+        %PendingEffect{source_type: :ability_effect, effect_key: @attract_customers_ability_id} =
+          pending_effect,
+        player_id,
+        _choice_key,
+        selected_card_instance_ids
+      )
+      when is_binary(player_id) and is_list(selected_card_instance_ids) do
+    with :ok <- require_max_target_count(selected_card_instance_ids, 1),
+         :ok <- require_unique_ids(selected_card_instance_ids),
+         :ok <- require_prompt_legal_choices(prompt, selected_card_instance_ids),
+         {:ok, target_cards} <- CardStore.get_cards(game.id, selected_card_instance_ids),
+         :ok <- require_all_owned_in_zone(target_cards, player_id, :deck),
+         :ok <- require_all_attract_customers_targets(target_cards),
+         {:ok, moved_cards} <- move_deck_targets_to_hand(game.id, player_id, target_cards),
+         moved_cards_payload = EventPayloads.moved_cards(moved_cards, :deck, :hand),
+         {:ok, _event} <-
+           write_event_and_snapshot(game.id, :cards_moved, player_id, %{
+             reason: :ability_effect_resolution,
+             source: pending_effect_source_payload(pending_effect),
+             source_card_id: pending_effect.source_card_id,
+             effect_key: pending_effect.effect_key,
+             cards: moved_cards_payload,
+             public_reveal: moved_cards != [],
+             revealed_cards: moved_cards_payload
+           }),
+         {:ok, _shuffled_deck} <-
+           shuffle_deck_after_ability_search(game, player_id, @attract_customers_ability_id),
+         {:ok, _event} <-
+           write_event_and_snapshot(game.id, :deck_shuffled, player_id, %{
+             source: pending_effect_source_payload(pending_effect),
+             effect_key: pending_effect.effect_key
+           }),
+         {:ok, _game} <- complete_pending_effect(pending_effect, selected_card_instance_ids) do
+      GameStore.get_game(game.id)
     end
   end
 
@@ -930,6 +1012,16 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
     end
   end
 
+  defp require_active(%CardInstance{} = source) do
+    if active?(source) do
+      :ok
+    else
+      {:error, {:ability_source_not_active, source.id, source.zone}}
+    end
+  end
+
+  defp active?(%CardInstance{zone: :active}), do: true
+  defp active?(%CardInstance{}), do: false
   defp in_play?(%CardInstance{zone: zone}), do: zone in [:active, :bench]
 
   defp damp_active_card?(%CardInstance{card_id: @damp_card_id, zone: zone})
@@ -1284,6 +1376,24 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
     end
   end
 
+  defp attract_customers_effect(%CardInstance{card_id: card_id}) do
+    with {:ok, %{abilities: abilities}} <- CardCatalog.fetch(card_id),
+         %{effect: effect} <- Map.get(abilities, @attract_customers_ability_id),
+         %{
+           type: @attract_customers_effect_type,
+           look_count: @attract_customers_look_count,
+           max_targets: 1,
+           trainer_type: :supporter
+         } <- effect do
+      {:ok, %{}}
+    else
+      _other ->
+        {:error,
+         {:unsupported_ability_effect, card_id, @attract_customers_ability_id,
+          @attract_customers_effect_type}}
+    end
+  end
+
   defp subjugating_chains_effect(%CardInstance{card_id: card_id}) do
     with {:ok, %{abilities: abilities}} <- CardCatalog.fetch(card_id),
          %{effect: %{type: @subjugating_chains_effect_type}} <-
@@ -1515,6 +1625,17 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
     end
   end
 
+  defp require_all_attract_customers_targets(cards) when is_list(cards) do
+    results = Enum.map(cards, &require_last_ditch_target/1)
+
+    if Enum.all?(results, &(&1 == :ok)) do
+      :ok
+    else
+      first_error = Enum.find(results, &match?({:error, _}, &1))
+      first_error || :ok
+    end
+  end
+
   defp require_all_jewel_seeker_targets(cards) when is_list(cards) do
     results = Enum.map(cards, &require_jewel_seeker_target/1)
 
@@ -1554,6 +1675,8 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
       _other -> false
     end
   end
+
+  defp attract_customers_target?(%CardInstance{} = card), do: last_ditch_catch_target?(card)
 
   defp subjugating_chains_target?(%CardInstance{zone: :bench} = card) do
     case CardCatalog.fetch(card.card_id) do
