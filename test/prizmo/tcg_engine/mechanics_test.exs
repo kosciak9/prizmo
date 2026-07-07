@@ -1508,6 +1508,70 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
       assert zone(max_rod.id) == :hand
     end
 
+    test "TEF-084 Relicanth Memory Dive grants previous Evolution attacks" do
+      assert {:ok, relicanth_card} = CardCatalog.fetch("TEF-084")
+      assert relicanth_card.name == "Relicanth"
+
+      assert relicanth_card.abilities.memory_dive.effect == %{
+               type: :previous_evolution_attacks_for_evolved_pokemon
+             }
+
+      assert relicanth_card.attacks.razor_fin.damage == 30
+      assert CardCoverage.summarize("TEF-084").coverage_status == :supported
+
+      {:ok, game} = create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147)
+      {attacker, relicanth} = stage_dragapult_memory_dive_stack(game.id, "player_1")
+
+      attach_direct_energy(game.id, "player_1", attacker, "MEE-002", 1)
+      attach_direct_energy(game.id, "player_1", attacker, "MEE-005", 2)
+
+      assert {:error, {:unsupported_attack, "TWM-130", :bite}} =
+               CardCatalog.fetch_attack("TWM-130", :bite)
+
+      assert relicanth.zone == :bench
+
+      assert {:ok, view} = GameView.for_player(game.id, "player_1")
+
+      attack_ids =
+        view.action_affordances
+        |> Enum.filter(&(&1.key == "declare_attack"))
+        |> Enum.map(& &1.attack_id)
+
+      assert "petty_grudge" in attack_ids
+      assert "bite" in attack_ids
+      assert "dragon_headbutt" in attack_ids
+      assert "jet_headbutt" in attack_ids
+
+      defender = active_card(game.id, "player_2")
+      defender_damage_before = defender.damage
+
+      assert {:ok, game} = Mechanics.declare_attack(game, "player_1", :bite)
+
+      assert active_card(game.id, "player_2").damage == defender_damage_before + 40
+
+      assert event_by_type(game.id, "declare_attack").payload["attack_id"] == "bite"
+    end
+
+    test "TEF-084 Memory Dive does not grant attacks without Relicanth in play" do
+      {:ok, game} = create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147)
+      attacker = stage_dragapult_evolution_stack(game.id, "player_1")
+
+      attach_direct_energy(game.id, "player_1", attacker, "MEE-002", 1)
+      attach_direct_energy(game.id, "player_1", attacker, "MEE-005", 2)
+
+      assert {:ok, view} = GameView.for_player(game.id, "player_1")
+
+      attack_ids =
+        view.action_affordances
+        |> Enum.filter(&(&1.key == "declare_attack"))
+        |> Enum.map(& &1.attack_id)
+
+      refute "bite" in attack_ids
+
+      assert {:error, {:unsupported_attack, "TWM-130", :bite}} =
+               Mechanics.declare_attack(game, "player_1", :bite)
+    end
+
     test "ASC-046 Snorunt metadata makes Chilly executable" do
       {:ok, game} = create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147)
 
@@ -4452,6 +4516,74 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
     {:ok, powerglass} = ash_update(powerglass, :draw_to_hand, %{position: 35})
     {:ok, game} = Mechanics.attach_tool(game, player_id, powerglass.id, target_card.id)
     {game, card(powerglass.id)}
+  end
+
+  defp stage_dragapult_memory_dive_stack(game_id, player_id) do
+    attacker = stage_dragapult_evolution_stack(game_id, player_id)
+    relicanth = play_direct_basic_to_bench(game_id, player_id, "TEF-084", 4)
+
+    {attacker, relicanth}
+  end
+
+  defp stage_dragapult_evolution_stack(game_id, player_id) do
+    existing_active = active_card(game_id, player_id)
+    {:ok, _existing_active} = ash_update(existing_active, :move_active_to_bench, %{position: 5})
+
+    turn_number = current_turn(game_id).turn_number
+
+    {:ok, dreepy} = create_custom_owned_card(game_id, player_id, "TWM-128", 280)
+    {:ok, dreepy} = ash_update(dreepy, :draw_to_hand, %{position: 80})
+
+    {:ok, dreepy} =
+      ash_update(dreepy, :choose_active, %{position: 1, turn_entered_play: turn_number})
+
+    {:ok, drakloak} = create_custom_owned_card(game_id, player_id, "TWM-129", 281)
+    {:ok, drakloak} = ash_update(drakloak, :draw_to_hand, %{position: 81})
+
+    {:ok, drakloak} =
+      ash_update(drakloak, :evolve_to_active, %{
+        evolves_from_card_instance_id: dreepy.id,
+        position: 1,
+        turn_entered_play: turn_number,
+        damage: 0,
+        status: nil
+      })
+
+    {:ok, dreepy} =
+      ash_update(dreepy, :evolve_under, %{
+        attached_to_card_instance_id: drakloak.id,
+        position: 1,
+        damage: 0,
+        status: nil
+      })
+
+    {:ok, dragapult} = create_custom_owned_card(game_id, player_id, "TWM-130", 282)
+    {:ok, dragapult} = ash_update(dragapult, :draw_to_hand, %{position: 82})
+
+    {:ok, dragapult} =
+      ash_update(dragapult, :evolve_to_active, %{
+        evolves_from_card_instance_id: drakloak.id,
+        position: 1,
+        turn_entered_play: turn_number,
+        damage: 0,
+        status: nil
+      })
+
+    {:ok, _drakloak} =
+      ash_update(drakloak, :evolve_under, %{
+        attached_to_card_instance_id: dragapult.id,
+        position: 1,
+        damage: 0,
+        status: nil
+      })
+
+    {:ok, _dreepy} =
+      ash_update(dreepy, :reparent_attachment, %{
+        attached_to_card_instance_id: dragapult.id,
+        position: 2
+      })
+
+    dragapult
   end
 
   defp discard_custom_basic_energy(game_id, player_id) do

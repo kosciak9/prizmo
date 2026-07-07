@@ -74,6 +74,7 @@ defmodule Prizmo.TcgEngine.Mechanics do
   import Prizmo.TcgEngine.TurnStore, only: [current_turn: 1]
 
   alias Prizmo.TcgEngine.AbilityEffects
+  alias Prizmo.TcgEngine.AttackAccess
   alias Prizmo.TcgEngine.AttackDamage
   alias Prizmo.TcgEngine.AttackEffects
   alias Prizmo.TcgEngine.AttackRequirements
@@ -2511,7 +2512,7 @@ defmodule Prizmo.TcgEngine.Mechanics do
            {:ok, attacker_card} <- active_card(game.id, player_id),
            {:ok, defender_player_id} <- opponent_player_id(game.id, player_id),
            {:ok, defender_card} <- active_card(game.id, defender_player_id),
-           {:ok, attack} <- CardCatalog.fetch_attack(attacker_card.card_id, attack_id),
+           {:ok, attack} <- AttackAccess.fetch_attack(game.id, attacker_card, attack_id),
            :ok <- require_can_attack(attacker_card, turn, attack.id),
            :ok <- AttackRequirements.require_card_attack_restrictions(game.id, attacker_card),
            :ok <- AttackEffects.require_declarable_attack(attack, defender_card),
@@ -2553,7 +2554,7 @@ defmodule Prizmo.TcgEngine.Mechanics do
            {:ok, attacker_card} <- get_card(game.id, turn.pending_attacker_card_instance_id),
            {:ok, defender_card} <- get_card(game.id, turn.pending_defender_card_instance_id),
            {:ok, attack} <-
-             CardCatalog.fetch_attack(attacker_card.card_id, turn.pending_attack_id),
+             AttackAccess.fetch_attack(game.id, attacker_card, turn.pending_attack_id),
            {:ok, {effective_attack, copied_attack_payload}} <-
              AttackEffects.effective_attack_for_resolution(defender_card, attack, opts),
            {:ok, defender_attached_cards} <- CardStore.attached_cards(game.id, defender_card.id),

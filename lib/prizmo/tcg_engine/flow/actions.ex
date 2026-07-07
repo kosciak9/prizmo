@@ -32,8 +32,8 @@ defmodule Prizmo.TcgEngine.Flow.Actions do
 
   import Prizmo.TcgEngine.TurnStore, only: [current_turn: 1]
 
+  alias Prizmo.TcgEngine.AttackAccess
   alias Prizmo.TcgEngine.AttackEffects
-  alias Prizmo.TcgEngine.CardCatalog
   alias Prizmo.TcgEngine.CardPlay
   alias Prizmo.TcgEngine.EventPayloads
   alias Prizmo.TcgEngine.Flow.Context
@@ -130,7 +130,7 @@ defmodule Prizmo.TcgEngine.Flow.Actions do
        }} ->
         with {:ok, attacker_card} <- get_card(game.id, attacker_card_instance_id),
              {:ok, defender_card} <- get_card(game.id, defender_card_instance_id),
-             {:ok, attack} <- CardCatalog.fetch_attack(attacker_card.card_id, attack_id) do
+             {:ok, attack} <- AttackAccess.fetch_attack(game.id, attacker_card, attack_id) do
           AttackEffects.auto_resolvable_without_input?(
             game.id,
             active_player_id,

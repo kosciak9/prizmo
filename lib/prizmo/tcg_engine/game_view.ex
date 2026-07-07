@@ -1,6 +1,7 @@
 defmodule Prizmo.TcgEngine.GameView do
   @moduledoc false
 
+  alias Prizmo.TcgEngine.AttackAccess
   alias Prizmo.TcgEngine.AttackCosts
   alias Prizmo.TcgEngine.AttackEffects
   alias Prizmo.TcgEngine.CardCatalog
@@ -222,7 +223,7 @@ defmodule Prizmo.TcgEngine.GameView do
        when not is_nil(attack_id) and not is_nil(attacker_id) do
     with %CardInstance{} = attacker_card <- Enum.find(cards, &(&1.id == attacker_id)),
          {:ok, %{effect: effect}} when is_map(effect) <-
-           CardCatalog.fetch_attack(attacker_card.card_id, attack_id) do
+           AttackAccess.fetch_attack(attacker_card.game_id, attacker_card, attack_id) do
       AttackEffects.type(effect)
     else
       _other -> nil

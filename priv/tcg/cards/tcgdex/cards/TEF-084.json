@@ -1,0 +1,93 @@
+{
+  "prizmo_id": "TEF-084",
+  "source": {
+    "base_url": "https://api.tcgdex.net/v2/en",
+    "dynamic_fields_removed": [
+      "pricing"
+    ],
+    "language": "en",
+    "provider": "TCGdex"
+  },
+  "tcgdex": {
+    "abilities": [
+      {
+        "effect": "Each of your evolved Pokémon can use any attack from its previous Evolutions. (You still need the necessary Energy to use each attack.)",
+        "name": "Memory Dive",
+        "type": "Ability"
+      }
+    ],
+    "attacks": [
+      {
+        "cost": [
+          "Fighting",
+          "Colorless"
+        ],
+        "damage": 30,
+        "name": "Razor Fin"
+      }
+    ],
+    "category": "Pokemon",
+    "description": "Rock-hard scales and oil-filled swim bladders allow this Pokémon to survive the intense water pressure of the deep sea.",
+    "dexId": [
+      369
+    ],
+    "hp": 100,
+    "id": "sv05-084",
+    "illustrator": "Mina Nakai",
+    "image": "https://assets.tcgdex.net/en/sv/sv05/084",
+    "legal": {
+      "expanded": true,
+      "standard": true
+    },
+    "localId": "084",
+    "name": "Relicanth",
+    "rarity": "Rare",
+    "regulationMark": "H",
+    "retreat": 1,
+    "set": {
+      "cardCount": {
+        "official": 162,
+        "total": 218
+      },
+      "id": "sv05",
+      "name": "Temporal Forces",
+      "symbol": "https://assets.tcgdex.net/univ/sv/sv05/symbol"
+    },
+    "stage": "Basic",
+    "types": [
+      "Fighting"
+    ],
+    "updated": "2026-06-09T13:03:01+01:00",
+    "variants": {
+      "firstEdition": false,
+      "holo": true,
+      "normal": true,
+      "reverse": true,
+      "wPromo": false
+    },
+    "variants_detailed": [
+      {
+        "size": "standard",
+        "type": "holo",
+        "variantId": "jr7oetx1mqug9"
+      },
+      {
+        "size": "standard",
+        "type": "reverse",
+        "variantId": "cm4kqul3x1bwlz1f"
+      },
+      {
+        "size": "standard",
+        "type": "normal",
+        "variantId": "endfynwn4n10gzq"
+      }
+    ],
+    "weaknesses": [
+      {
+        "type": "Grass",
+        "value": "×2"
+      }
+    ]
+  },
+  "tcgdex_id": "sv05-084"
+}

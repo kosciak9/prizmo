@@ -61,6 +61,14 @@ defmodule Prizmo.Tcg.Cards.Behaviors.TEF do
     )
   end
 
+  card "TEF-084" do
+    ability(:memory_dive,
+      effect: %{type: :previous_evolution_attacks_for_evolved_pokemon}
+    )
+
+    attack(:razor_fin, effect: nil)
+  end
+
   card "TEF-123" do
     attack(:bellowing_thunder,
       damage: 0,

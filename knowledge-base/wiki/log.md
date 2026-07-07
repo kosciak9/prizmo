@@ -1,5 +1,12 @@
 # Wiki Log
 
+## [2026-07-07] codebase update | Goal 2 Relicanth support
+
+- Task attempted: closed `TEF-084` Relicanth as the highest-share shared unimplemented Goal 2 card after Pokémon Catcher. Added committed TCGdex metadata, authored Relicanth with `Razor Fin` plus passive `Memory Dive`, and routed attack declaration/resolution/affordance lookup through a shared `AttackAccess` path so evolved Active Pokémon can use executable attacks from previous Evolutions only while Relicanth is in play.
+- Files changed: `lib/prizmo/tcg/cards/behaviors/tef.ex`, `lib/prizmo/tcg_engine/attack_access.ex`, `lib/prizmo/tcg_engine/flow/actions.ex`, `lib/prizmo/tcg_engine/game_view.ex`, `lib/prizmo/tcg_engine/game_view/action_affordances.ex`, `lib/prizmo/tcg_engine/mechanics.ex`, `priv/tcg/cards/tcgdex/cards/TEF-084.json`, `test/prizmo/tcg_engine/mechanics_test.exs`, `knowledge-base/wiki/engine/goal-2-top-30-latest-limitless-coverage-scope.md`, `knowledge-base/wiki/engine/ash-backed-tcg-engine-playtest-handoff.md`, `knowledge-base/wiki/log.md`.
+- Validation: TCGdex `sv05-084` endpoint confirmed Relicanth text and metadata; `mix format`; `mix test test/prizmo/tcg_engine/mechanics_test.exs --only describe:"Goal 2 metadata-backed support slice"`; `mix test test/prizmo/tcg/cards/metadata_test.exs`; `mix compile --warnings-as-errors`; `mix test test/prizmo/tcg/cards/metadata_test.exs test/prizmo/tcg_engine/mechanics_test.exs`; `mix prizmo.goal2.corpus` confirmed `supported=186` / `generic-supported=8` / `partial=10` / `unimplemented=173` and `cached=206` / `missing=171`; final `mix check` passed.
+- Remaining/blocking notes: `TEF-084` is no longer in the shared incomplete queue. The default next Goal 2 priority is now `MEG-129` Surfing Beach, followed by `CRI-079` Philippe and the tied `BLK-067` Genesect ex / `DRI-164` Energy Recycler pair unless the live corpus re-ranks the queue.
+
 ## [2026-07-07] codebase update | Goal 2 Pokémon Catcher support
 
 - Task attempted: closed `POR-082` Pokémon Catcher as the highest-share shared unimplemented Goal 2 card after Neo Upper Energy. Added committed TCGdex metadata and authored Pokémon Catcher as an engine-defined Item that flips a persisted trainer-effect coin, completes with no switch on tails, and prompts the acting player to choose an opponent Benched Pokémon to switch Active on heads.

@@ -2,6 +2,7 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
   @moduledoc false
 
   alias Prizmo.TcgEngine.AbilityEffects
+  alias Prizmo.TcgEngine.AttackAccess
   alias Prizmo.TcgEngine.AttackCosts
   alias Prizmo.TcgEngine.AttackEffects
   alias Prizmo.TcgEngine.AttackLocks
@@ -764,7 +765,7 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
          opponent_target_cards = opponent_in_play_pokemon_cards(all_cards, player.player_id),
          %CardInstance{} = defender_card <-
            Enum.find(opponent_target_cards, &(&1.zone == :active)),
-         {:ok, %{attacks: attacks}} <- CardCatalog.fetch(active_card.card_id) do
+         {:ok, attacks} <- AttackAccess.executable_attacks(active_card.game_id, active_card) do
       attached_cards = attached_cards_for(cards, active_card.id)
 
       attacks
@@ -1073,8 +1074,7 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
        ) do
     with true <- attack |> AttackCosts.attack_cost() |> AttackCosts.paid?(attached_cards),
          false <- AttackLocks.blocked_this_turn?(active_card, current_turn, attack_id),
-         {:ok, executable_attack} <- CardCatalog.fetch_attack(active_card.card_id, attack_id),
-         :ok <- AttackEffects.require_declarable_attack(executable_attack, defender_card) do
+         :ok <- AttackEffects.require_declarable_attack(attack, defender_card) do
       [
         attack_affordance(
           player,
@@ -1082,7 +1082,7 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
           defender_card,
           opponent_target_cards,
           attack_id,
-          executable_attack
+          attack
         )
       ]
     else
