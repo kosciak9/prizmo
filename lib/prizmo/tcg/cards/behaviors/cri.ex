@@ -3,6 +3,19 @@ defmodule Prizmo.Tcg.Cards.Behaviors.CRI do
 
   use Prizmo.Tcg.Cards.DSL
 
+  card "CRI-020" do
+    attack(:collect, damage: 0, effect: %{type: :draw_after_attack, count: 1})
+  end
+
+  card "CRI-021" do
+    attack(:summoning_jutsu,
+      damage: 0,
+      effect: %{type: :search_pokemon_to_hand, min_targets: 0, max_targets: 3}
+    )
+
+    attack(:aqua_edge, effect: nil)
+  end
+
   card "CRI-061" do
     attack(:bounce_back,
       effect: %{type: :switch_opponent_active_with_bench_chosen_by_opponent}

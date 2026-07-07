@@ -45,4 +45,8 @@ defmodule Prizmo.Tcg.Cards.Behaviors.SCR do
       }
     )
   end
+
+  card "SCR-136" do
+    card_effect(effect: %{type: :grand_tree_evolve_basic_then_stage_1_from_deck})
+  end
 end

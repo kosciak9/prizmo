@@ -136,6 +136,7 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
       attach_tool_affordance(game, player, cards),
       retreat_affordance(game, player, current_turn, cards)
     ] ++
+      grand_tree_affordances(game, player, current_turn, all_cards) ++
       teal_dance_affordances(player, current_turn, cards) ++
       seething_spirit_affordances(player, current_turn, cards) ++
       flip_the_script_affordances(game, player, current_turn, cards) ++
@@ -299,6 +300,77 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
   end
 
   defp surfing_beach_affordance(_game, _player, _current_turn, _all_cards), do: nil
+
+  defp grand_tree_affordances(
+         %Game{} = game,
+         %GamePlayer{} = player,
+         %Turn{turn_number: turn_number} = current_turn,
+         all_cards
+       ) do
+    with %CardInstance{} = stadium_card <- active_grand_tree_card(all_cards),
+         :ok <- Requirements.require_evolution_allowed_this_turn(game, current_turn),
+         :ok <-
+           StadiumEffects.require_grand_tree_available(game.id, current_turn, player.player_id),
+         {:ok, options} <-
+           StadiumEffects.grand_tree_evolution_options(game.id, player.player_id, turn_number),
+         options when options != [] <- options do
+      Enum.flat_map(options, &grand_tree_option_affordances(player, stadium_card, &1))
+    else
+      _other -> []
+    end
+  end
+
+  defp grand_tree_affordances(_game, _player, _current_turn, _all_cards), do: []
+
+  defp grand_tree_option_affordances(%GamePlayer{} = player, %CardInstance{} = stadium_card, %{
+         basic_card: basic_card,
+         stage_1_card: stage_1_card,
+         stage_2_cards: stage_2_cards
+       }) do
+    [grand_tree_affordance(player, stadium_card, basic_card, stage_1_card, nil)] ++
+      Enum.map(stage_2_cards, fn stage_2_card ->
+        grand_tree_affordance(player, stadium_card, basic_card, stage_1_card, stage_2_card)
+      end)
+  end
+
+  defp grand_tree_affordance(
+         %GamePlayer{} = player,
+         %CardInstance{} = stadium_card,
+         %CardInstance{} = basic_card,
+         %CardInstance{} = stage_1_card,
+         stage_2_card
+       ) do
+    source_ids = [stadium_card.id, stage_1_card.id] ++ optional_card_ids(stage_2_card)
+    label = grand_tree_label(basic_card, stage_1_card, stage_2_card)
+
+    affordance(:grand_tree, label, :command, player.player_id,
+      source_card_instance_ids: source_ids,
+      target_card_instance_ids: [basic_card.id],
+      required_source_count: length(source_ids),
+      choice_keys: [
+        "basic_card_instance_id",
+        "stage1_card_instance_id",
+        "stage2_card_instance_id"
+      ],
+      note:
+        "Once this turn from the active Stadium, evolve a Basic Pokémon in play with a Stage 1 from deck, then optionally evolve that Stage 1 with a Stage 2 from deck."
+    )
+  end
+
+  defp grand_tree_label(%CardInstance{} = basic_card, %CardInstance{} = stage_1_card, nil) do
+    "Use Grand Tree: #{card_name(basic_card)} → #{card_name(stage_1_card)}"
+  end
+
+  defp grand_tree_label(
+         %CardInstance{} = basic_card,
+         %CardInstance{} = stage_1_card,
+         %CardInstance{} = stage_2_card
+       ) do
+    "Use Grand Tree: #{card_name(basic_card)} → #{card_name(stage_1_card)} → #{card_name(stage_2_card)}"
+  end
+
+  defp optional_card_ids(nil), do: []
+  defp optional_card_ids(%CardInstance{id: id}), do: [id]
 
   defp play_basic_to_bench_affordance(%GamePlayer{} = player, cards) do
     source_ids =
@@ -978,6 +1050,10 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
 
   defp active_surfing_beach_card(cards) do
     Enum.find(cards, &(&1.zone == :stadium and StadiumEffects.surfing_beach_card?(&1)))
+  end
+
+  defp active_grand_tree_card(cards) do
+    Enum.find(cards, &(&1.zone == :stadium and StadiumEffects.grand_tree_card?(&1)))
   end
 
   defp generic_tool_attachable?(%Game{} = game, %GamePlayer{} = player, %CardInstance{

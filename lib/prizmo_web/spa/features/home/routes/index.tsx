@@ -43,6 +43,7 @@ import {
   runUseTcgEngineAttractCustomers,
   runUseTcgEngineFanCall,
   runUseTcgEngineFlipTheScript,
+  runUseTcgEngineGrandTree,
   runUseTcgEngineJewelSeeker,
   runUseTcgEngineLunarCycle,
   runUseTcgEngineMetallicSignal,
@@ -638,6 +639,16 @@ type SurfingBeachCommandOption = {
   targetCard: CardSummary | undefined
 }
 
+type GrandTreeCommandOption = {
+  key: string
+  basicCardInstanceId: string
+  stage1CardInstanceId: string
+  stage2CardInstanceId: string | null
+  basicCard: CardSummary | undefined
+  stage1Card: CardSummary | undefined
+  stage2Card: CardSummary | undefined
+}
+
 type ActionRenderEntry = {
   key: string
   action: ActionAffordance
@@ -773,6 +784,21 @@ type SurfingBeachInput = {
 type SurfingBeachCommand = {
   playerId: string
   targetCardInstanceId: string
+}
+
+type GrandTreeInput = {
+  gameId: string
+  playerId: PlayerId
+  basicCardInstanceId: string
+  stage1CardInstanceId: string
+  stage2CardInstanceId?: string | null
+}
+
+type GrandTreeCommand = {
+  playerId: string
+  basicCardInstanceId: string
+  stage1CardInstanceId: string
+  stage2CardInstanceId?: string | null
 }
 
 type CursedBlastInput = {
@@ -1546,6 +1572,14 @@ export function HomeRoute() {
 
   const surfingBeachMutation = useMutation({
     mutationFn: (input: SurfingBeachInput) => useSurfingBeach(input),
+    onSuccess: async (_game, input) => {
+      clearUltraBallPostSearchHandoff(input.gameId, input.playerId)
+      await queryClient.invalidateQueries({ queryKey: ['tcg-engine', 'game-state'] })
+    }
+  })
+
+  const grandTreeMutation = useMutation({
+    mutationFn: (input: GrandTreeInput) => useGrandTree(input),
     onSuccess: async (_game, input) => {
       clearUltraBallPostSearchHandoff(input.gameId, input.playerId)
       await queryClient.invalidateQueries({ queryKey: ['tcg-engine', 'game-state'] })
@@ -2574,6 +2608,17 @@ export function HomeRoute() {
                     })
                   }
                 }}
+                onUseGrandTree={({ playerId, basicCardInstanceId, stage1CardInstanceId, stage2CardInstanceId }) => {
+                  if (isPlayerId(playerId)) {
+                    grandTreeMutation.mutate({
+                      gameId: normalisedGameId,
+                      playerId,
+                      basicCardInstanceId,
+                      stage1CardInstanceId,
+                      stage2CardInstanceId
+                    })
+                  }
+                }}
                 onUseCursedBlast={({ playerId, sourceCardInstanceId, targetCardInstanceId }) => {
                   if (isPlayerId(playerId)) {
                     cursedBlastMutation.mutate({
@@ -2806,6 +2851,15 @@ export function HomeRoute() {
                 }
                 surfingBeachPendingTargetId={
                   surfingBeachMutation.isPending ? surfingBeachMutation.variables?.targetCardInstanceId ?? null : null
+                }
+                grandTreePendingKey={
+                  grandTreeMutation.isPending && grandTreeMutation.variables
+                    ? grandTreeKey(
+                        grandTreeMutation.variables.basicCardInstanceId,
+                        grandTreeMutation.variables.stage1CardInstanceId,
+                        grandTreeMutation.variables.stage2CardInstanceId ?? null
+                      )
+                    : null
                 }
                 cursedBlastPendingKey={
                   cursedBlastMutation.isPending && cursedBlastMutation.variables
@@ -3575,6 +3629,20 @@ async function useSurfingBeach(input: SurfingBeachInput): Promise<CreatedGame> {
   return result.data as CreatedGame
 }
 
+async function useGrandTree(input: GrandTreeInput): Promise<CreatedGame> {
+  const result = await runUseTcgEngineGrandTree({
+    input,
+    fields: GAME_RESOURCE_FIELDS,
+    headers: buildAshRpcHeaders()
+  })
+
+  if (!result.success) {
+    throw new Error(rpcErrorMessage(result.errors))
+  }
+
+  return result.data as CreatedGame
+}
+
 async function useCursedBlast(input: CursedBlastInput): Promise<CreatedGame> {
   const result = await runUseTcgEngineCursedBlast({
     input,
@@ -3985,6 +4053,7 @@ function GameStateWorkbench({
   onUsePrismTower,
   onUseLumioseCity,
   onUseSurfingBeach,
+  onUseGrandTree,
   onRetreat,
   onResolveDeclaredAttack,
   onUndo,
@@ -4025,6 +4094,7 @@ function GameStateWorkbench({
   prismTowerPendingKey,
   lumioseCityPendingTargetId,
   surfingBeachPendingTargetId,
+  grandTreePendingKey,
   resolveDeclaredAttackPendingPlayerId,
   retreatPendingKey
 }: {
@@ -4073,6 +4143,7 @@ function GameStateWorkbench({
   onUsePrismTower: (input: PrismTowerCommand) => void
   onUseLumioseCity: (input: LumioseCityCommand) => void
   onUseSurfingBeach: (input: SurfingBeachCommand) => void
+  onUseGrandTree: (input: GrandTreeCommand) => void
   onRetreat: (input: RetreatCommand) => void
   onResolveDeclaredAttack: (input: ResolveDeclaredAttackCommand) => void
   onUndo: () => void
@@ -4113,6 +4184,7 @@ function GameStateWorkbench({
   prismTowerPendingKey: string | null
   lumioseCityPendingTargetId: string | null
   surfingBeachPendingTargetId: string | null
+  grandTreePendingKey: string | null
   resolveDeclaredAttackPendingPlayerId: string | null
   retreatPendingKey: string | null
 }) {
@@ -4124,6 +4196,7 @@ function GameStateWorkbench({
       prismTowerPendingKey ||
       lumioseCityPendingTargetId ||
       surfingBeachPendingTargetId ||
+      grandTreePendingKey ||
       cursedBlastPendingKey ||
       subjugatingChainsPendingKey ||
       munkidoriAdrenaBrainPendingKey ||
@@ -4169,6 +4242,7 @@ function GameStateWorkbench({
     onUsePrismTower,
     onUseLumioseCity,
     onUseSurfingBeach,
+    onUseGrandTree,
     onRetreat,
     playBasicToBenchPendingCardId,
     playCardPendingCardId,
@@ -4177,6 +4251,7 @@ function GameStateWorkbench({
     prismTowerPendingKey,
     lumioseCityPendingTargetId,
     surfingBeachPendingTargetId,
+    grandTreePendingKey,
     retreatPendingKey,
     viewerPlayerId
   })
@@ -4279,6 +4354,7 @@ function GameStateWorkbench({
             onUsePrismTower={onUsePrismTower}
             onUseLumioseCity={onUseLumioseCity}
             onUseSurfingBeach={onUseSurfingBeach}
+            onUseGrandTree={onUseGrandTree}
             onRetreat={onRetreat}
             attachEnergyPendingKey={attachEnergyPendingKey}
             attachToolPendingKey={attachToolPendingKey}
@@ -4306,6 +4382,7 @@ function GameStateWorkbench({
             prismTowerPendingKey={prismTowerPendingKey}
             lumioseCityPendingTargetId={lumioseCityPendingTargetId}
             surfingBeachPendingTargetId={surfingBeachPendingTargetId}
+            grandTreePendingKey={grandTreePendingKey}
             retreatPendingKey={retreatPendingKey}
             ultraBallPostSearchHandoff={ultraBallPostSearchHandoff}
             viewerPlayerId={viewerPlayerId}
@@ -4345,6 +4422,7 @@ function buildCardInteractionModel({
   onUsePrismTower,
   onUseLumioseCity,
   onUseSurfingBeach,
+  onUseGrandTree,
   onRetreat,
   playBasicToBenchPendingCardId,
   playCardPendingCardId,
@@ -4353,6 +4431,7 @@ function buildCardInteractionModel({
   prismTowerPendingKey,
   lumioseCityPendingTargetId,
   surfingBeachPendingTargetId,
+  grandTreePendingKey,
   retreatPendingKey,
   viewerPlayerId
 }: {
@@ -4380,6 +4459,7 @@ function buildCardInteractionModel({
   onUsePrismTower: (input: PrismTowerCommand) => void
   onUseLumioseCity: (input: LumioseCityCommand) => void
   onUseSurfingBeach: (input: SurfingBeachCommand) => void
+  onUseGrandTree: (input: GrandTreeCommand) => void
   onRetreat: (input: RetreatCommand) => void
   playBasicToBenchPendingCardId: string | null
   playCardPendingCardId: string | null
@@ -4388,6 +4468,7 @@ function buildCardInteractionModel({
   prismTowerPendingKey: string | null
   lumioseCityPendingTargetId: string | null
   surfingBeachPendingTargetId: string | null
+  grandTreePendingKey: string | null
   retreatPendingKey: string | null
   viewerPlayerId: PlayerId
 }): CardInteractionModel {
@@ -4574,6 +4655,40 @@ function buildCardInteractionModel({
       }
 
       if (hasCardDirectedSurfingBeachOption) {
+        cardDirectedActionKeys.add(actionKeyValue)
+      }
+    }
+
+    if (action.key === 'grand_tree') {
+      let hasCardDirectedGrandTreeOption = false
+
+      for (const option of grandTreeCommandOptions(action, cardsById)) {
+        const basicCard = cardsById.get(option.basicCardInstanceId)
+
+        if (!basicCard) {
+          continue
+        }
+
+        hasCardDirectedGrandTreeOption = true
+
+        setCardIntent(option.basicCardInstanceId, {
+          badge: 'Stadium',
+          detail: grandTreeOptionDetail(option),
+          disabled: !canRunAction,
+          label: grandTreeButtonLabel(option),
+          pending: grandTreePendingKey === option.key,
+          tone: 'primary',
+          onClick: () =>
+            onUseGrandTree({
+              playerId: action.playerId,
+              basicCardInstanceId: option.basicCardInstanceId,
+              stage1CardInstanceId: option.stage1CardInstanceId,
+              stage2CardInstanceId: option.stage2CardInstanceId
+            })
+        })
+      }
+
+      if (hasCardDirectedGrandTreeOption) {
         cardDirectedActionKeys.add(actionKeyValue)
       }
     }
@@ -7706,6 +7821,7 @@ function ActionAffordancesPanel({
   onUsePrismTower,
   onUseLumioseCity,
   onUseSurfingBeach,
+  onUseGrandTree,
   onRetreat,
   attachEnergyPendingKey,
   attachToolPendingKey,
@@ -7733,6 +7849,7 @@ function ActionAffordancesPanel({
   prismTowerPendingKey,
   lumioseCityPendingTargetId,
   surfingBeachPendingTargetId,
+  grandTreePendingKey,
   retreatPendingKey,
   ultraBallPostSearchHandoff,
   viewerPlayerId
@@ -7769,6 +7886,7 @@ function ActionAffordancesPanel({
   onUsePrismTower: (input: PrismTowerCommand) => void
   onUseLumioseCity: (input: LumioseCityCommand) => void
   onUseSurfingBeach: (input: SurfingBeachCommand) => void
+  onUseGrandTree: (input: GrandTreeCommand) => void
   onRetreat: (input: RetreatCommand) => void
   attachEnergyPendingKey: string | null
   attachToolPendingKey: string | null
@@ -7796,6 +7914,7 @@ function ActionAffordancesPanel({
   prismTowerPendingKey: string | null
   lumioseCityPendingTargetId: string | null
   surfingBeachPendingTargetId: string | null
+  grandTreePendingKey: string | null
   retreatPendingKey: string | null
   ultraBallPostSearchHandoff: UltraBallPostSearchHandoff | null
   viewerPlayerId: PlayerId
@@ -7807,6 +7926,7 @@ function ActionAffordancesPanel({
       prismTowerPendingKey ||
       lumioseCityPendingTargetId ||
       surfingBeachPendingTargetId ||
+      grandTreePendingKey ||
       cursedBlastPendingKey ||
       subjugatingChainsPendingKey ||
       munkidoriAdrenaBrainPendingKey ||
@@ -7924,6 +8044,7 @@ function ActionAffordancesPanel({
                     onUsePrismTower={onUsePrismTower}
                     onUseLumioseCity={onUseLumioseCity}
                     onUseSurfingBeach={onUseSurfingBeach}
+                    onUseGrandTree={onUseGrandTree}
                     onRetreat={onRetreat}
                     playBasicToBenchPendingCardId={playBasicToBenchPendingCardId}
                     playCardPendingCardId={playCardPendingCardId}
@@ -7946,6 +8067,7 @@ function ActionAffordancesPanel({
                     prismTowerPendingKey={prismTowerPendingKey}
                     lumioseCityPendingTargetId={lumioseCityPendingTargetId}
                     surfingBeachPendingTargetId={surfingBeachPendingTargetId}
+                    grandTreePendingKey={grandTreePendingKey}
                     postSearchBattleAttackIds={postSearchHandoff?.battleAttackIds ?? []}
                     postSearchBenchCardInstanceIds={postSearchHandoff?.benchableCardInstanceIds ?? []}
                     postSearchEndTurnPlayerIds={postSearchHandoff?.endTurnPlayerIds ?? []}
@@ -8416,6 +8538,8 @@ function handActionChoiceCount(handGroup: ActionGroup, cardsById: Map<string, Ca
         return count + lumioseCityCommandOptions(action, cardsById).length
       case 'surfing_beach':
         return count + surfingBeachCommandOptions(action, cardsById).length
+      case 'grand_tree':
+        return count + grandTreeCommandOptions(action, cardsById).length
       case 'play_stadium':
         return count + action.sourceCardInstanceIds.length
       case 'play_card':
@@ -8551,6 +8675,7 @@ function ActionAffordanceCard({
   onUsePrismTower,
   onUseLumioseCity,
   onUseSurfingBeach,
+  onUseGrandTree,
   onRetreat,
   playBasicToBenchPendingCardId,
   playCardPendingCardId,
@@ -8573,6 +8698,7 @@ function ActionAffordanceCard({
   prismTowerPendingKey,
   lumioseCityPendingTargetId,
   surfingBeachPendingTargetId,
+  grandTreePendingKey,
   postSearchBattleAttackIds,
   postSearchBenchCardInstanceIds,
   postSearchEndTurnPlayerIds,
@@ -8616,6 +8742,7 @@ function ActionAffordanceCard({
   onUsePrismTower: (input: PrismTowerCommand) => void
   onUseLumioseCity: (input: LumioseCityCommand) => void
   onUseSurfingBeach: (input: SurfingBeachCommand) => void
+  onUseGrandTree: (input: GrandTreeCommand) => void
   onRetreat: (input: RetreatCommand) => void
   playBasicToBenchPendingCardId: string | null
   playCardPendingCardId: string | null
@@ -8638,6 +8765,7 @@ function ActionAffordanceCard({
   prismTowerPendingKey: string | null
   lumioseCityPendingTargetId: string | null
   surfingBeachPendingTargetId: string | null
+  grandTreePendingKey: string | null
   postSearchBattleAttackIds: string[]
   postSearchBenchCardInstanceIds: string[]
   postSearchEndTurnPlayerIds: PlayerId[]
@@ -8670,6 +8798,7 @@ function ActionAffordanceCard({
   const prismTowerOptions = prismTowerCommandOptions(action, cardsById)
   const lumioseCityOptions = lumioseCityCommandOptions(action, cardsById)
   const surfingBeachOptions = surfingBeachCommandOptions(action, cardsById)
+  const grandTreeOptions = grandTreeCommandOptions(action, cardsById)
 
   return (
     <li className={`rounded-xl border px-3 py-2 text-sm ${actionSurfaceClassName(action)}`}>
@@ -8841,6 +8970,32 @@ function ActionAffordanceCard({
                 tone="primary"
               >
                 {isPending ? surfingBeachPendingLabel(option) : surfingBeachButtonLabel(option)}
+              </ActionCommandButton>
+            )
+          })}
+        </div>
+      ) : null}
+
+      {grandTreeOptions.length > 0 ? (
+        <div className="mt-2 space-y-1.5">
+          {grandTreeOptions.map(option => {
+            const isPending = grandTreePendingKey === option.key
+
+            return (
+              <ActionCommandButton
+                disabled={!canRunAction}
+                key={option.key}
+                onClick={() =>
+                  onUseGrandTree({
+                    playerId: action.playerId,
+                    basicCardInstanceId: option.basicCardInstanceId,
+                    stage1CardInstanceId: option.stage1CardInstanceId,
+                    stage2CardInstanceId: option.stage2CardInstanceId
+                  })
+                }
+                tone="primary"
+              >
+                {isPending ? grandTreePendingLabel(option) : grandTreeButtonLabel(option)}
               </ActionCommandButton>
             )
           })}
@@ -9527,6 +9682,7 @@ function actionSurfaceClassName(action: ActionAffordance) {
     case 'prism_tower':
     case 'lumiose_city':
     case 'surfing_beach':
+    case 'grand_tree':
     case 'declare_attack':
       return 'border-accent-mint/30 bg-accent-mint/10'
     case 'unsupported_attack':
@@ -9599,6 +9755,8 @@ function actionSummary(action: ActionAffordance) {
       return 'Search your deck for 1 Basic Pokémon, put it onto your Bench, shuffle, then end your turn.'
     case 'surfing_beach':
       return 'Switch your Active Water Pokémon with 1 of your Benched Water Pokémon.'
+    case 'grand_tree':
+      return 'Evolve a Basic Pokémon in play with a Stage 1 from deck, then optionally a Stage 2 from deck.'
     case 'declare_attack':
       return `${action.attackName ?? (action.attackId ? formatAttackId(action.attackId) : 'Attack')}: ${attackCostSummary(
         action.attackCost
@@ -10018,6 +10176,53 @@ function surfingBeachButtonLabel(option: SurfingBeachCommandOption) {
 
 function surfingBeachTargetLabel(option: SurfingBeachCommandOption) {
   return option.targetCard?.name ?? formatCardInstanceId(option.targetCardInstanceId)
+}
+
+function grandTreeCommandOptions(action: ActionAffordance, cardsById: Map<string, CardSummary>): GrandTreeCommandOption[] {
+  if (action.key !== 'grand_tree' || action.sourceCardInstanceIds.length < 2 || action.targetCardInstanceIds.length !== 1) {
+    return []
+  }
+
+  const basicCardInstanceId = action.targetCardInstanceIds[0]!
+  const stage1CardInstanceId = action.sourceCardInstanceIds[1]!
+  const stage2CardInstanceId = action.sourceCardInstanceIds[2] ?? null
+
+  return [
+    {
+      key: grandTreeKey(basicCardInstanceId, stage1CardInstanceId, stage2CardInstanceId),
+      basicCardInstanceId,
+      stage1CardInstanceId,
+      stage2CardInstanceId,
+      basicCard: cardsById.get(basicCardInstanceId),
+      stage1Card: cardsById.get(stage1CardInstanceId),
+      stage2Card: stage2CardInstanceId ? cardsById.get(stage2CardInstanceId) : undefined
+    }
+  ]
+}
+
+function grandTreePendingLabel(option: GrandTreeCommandOption) {
+  return `Using Grand Tree: ${grandTreeEvolutionLabel(option)}...`
+}
+
+function grandTreeButtonLabel(option: GrandTreeCommandOption) {
+  return `Grand Tree: ${grandTreeEvolutionLabel(option)}`
+}
+
+function grandTreeOptionDetail(option: GrandTreeCommandOption) {
+  return option.stage2CardInstanceId ? 'Evolve through Stage 2 from deck.' : 'Evolve to Stage 1 from deck only.'
+}
+
+function grandTreeEvolutionLabel(option: GrandTreeCommandOption) {
+  const basicName = option.basicCard?.name ?? formatCardInstanceId(option.basicCardInstanceId)
+  const stage1Name = option.stage1Card?.name ?? formatCardInstanceId(option.stage1CardInstanceId)
+
+  if (!option.stage2CardInstanceId) {
+    return `${basicName} → ${stage1Name}`
+  }
+
+  const stage2Name = option.stage2Card?.name ?? formatCardInstanceId(option.stage2CardInstanceId)
+
+  return `${basicName} → ${stage1Name} → ${stage2Name}`
 }
 
 function tealDancePendingLabel(option: TealDanceCommandOption) {
@@ -10495,6 +10700,7 @@ function actionGroupId(action: ActionAffordance): ActionGroupId {
     case 'prism_tower':
     case 'lumiose_city':
     case 'surfing_beach':
+    case 'grand_tree':
       return 'hand'
     case 'retreat':
     case 'cursed_blast':
@@ -13568,6 +13774,10 @@ function lumioseCityKey(targetCardInstanceId: string) {
 
 function surfingBeachKey(targetCardInstanceId: string) {
   return targetCardInstanceId
+}
+
+function grandTreeKey(basicCardInstanceId: string, stage1CardInstanceId: string, stage2CardInstanceId?: string | null) {
+  return `${basicCardInstanceId}:${stage1CardInstanceId}:${stage2CardInstanceId ?? 'no-stage-2'}`
 }
 
 function attackKey(playerId: string, attackId: string) {

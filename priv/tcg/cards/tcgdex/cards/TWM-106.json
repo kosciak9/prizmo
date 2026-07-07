@@ -1,0 +1,92 @@
+{
+  "prizmo_id": "TWM-106",
+  "source": {
+    "base_url": "https://api.tcgdex.net/v2/en",
+    "dynamic_fields_removed": [
+      "pricing"
+    ],
+    "language": "en",
+    "provider": "TCGdex"
+  },
+  "tcgdex": {
+    "attacks": [
+      {
+        "cost": [
+          "Water"
+        ],
+        "damage": 170,
+        "effect": "You may search your deck for a card and put it into your hand. Then, shuffle your deck.",
+        "name": "Shinobi Blade"
+      },
+      {
+        "cost": [
+          "Water",
+          "Colorless",
+          "Colorless"
+        ],
+        "effect": "Discard 2 Energy from this Pokémon. This attack does 120 damage to 2 of your opponent's Pokémon. (Don't apply Weakness and Resistance for Benched Pokémon.)",
+        "name": "Mirage Barrage"
+      }
+    ],
+    "category": "Pokemon",
+    "dexId": [
+      658
+    ],
+    "evolveFrom": "Frogadier",
+    "hp": 310,
+    "id": "sv06-106",
+    "illustrator": "5ban Graphics",
+    "image": "https://assets.tcgdex.net/en/sv/sv06/106",
+    "legal": {
+      "expanded": true,
+      "standard": true
+    },
+    "localId": "106",
+    "name": "Greninja ex",
+    "rarity": "Double rare",
+    "regulationMark": "H",
+    "retreat": 1,
+    "set": {
+      "cardCount": {
+        "official": 167,
+        "total": 226
+      },
+      "id": "sv06",
+      "logo": "https://assets.tcgdex.net/en/sv/sv06/logo",
+      "name": "Twilight Masquerade",
+      "symbol": "https://assets.tcgdex.net/univ/sv/sv06/symbol"
+    },
+    "stage": "Stage2",
+    "suffix": "ex",
+    "types": [
+      "Fighting"
+    ],
+    "updated": "2026-06-09T13:04:07+01:00",
+    "variants": {
+      "firstEdition": false,
+      "holo": true,
+      "normal": false,
+      "reverse": false,
+      "wPromo": false
+    },
+    "variants_detailed": [
+      {
+        "size": "standard",
+        "type": "holo",
+        "variantId": "jr7oetx1mqug9"
+      },
+      {
+        "size": "standard",
+        "type": "metal",
+        "variantId": "h0fm0rrgenoyrs"
+      }
+    ],
+    "weaknesses": [
+      {
+        "type": "Psychic",
+        "value": "×2"
+      }
+    ]
+  },
+  "tcgdex_id": "sv06-106"
+}

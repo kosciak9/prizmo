@@ -58,6 +58,43 @@ defmodule Prizmo.Tcg.Cards.MetadataTest do
            }
   end
 
+  test "normalizes cached Greninja shared cluster metadata" do
+    froakie = Metadata.fetch!("CRI-020")
+    frogadier = Metadata.fetch!("CRI-021")
+    greninja = Metadata.fetch!("TWM-106")
+    grand_tree = Metadata.fetch!("SCR-136")
+
+    assert froakie.tcgdex_id == "me04-020"
+    assert froakie.name == "Froakie"
+    assert froakie.stage == :basic
+    assert froakie.types == [:water]
+    assert froakie.hp == 70
+    assert froakie.attacks["collect"].raw_effect == "Draw a card."
+
+    assert frogadier.tcgdex_id == "me04-021"
+    assert frogadier.name == "Frogadier"
+    assert frogadier.stage == :stage_1
+    assert frogadier.evolves_from == "Froakie"
+    assert frogadier.attacks["summoning_jutsu"].raw_effect =~ "up to 3 Pokémon"
+
+    assert greninja.tcgdex_id == "sv06-106"
+    assert greninja.name == "Greninja ex"
+    assert greninja.stage == :stage_2
+    assert greninja.evolves_from == "Frogadier"
+    assert greninja.types == [:fighting]
+    assert greninja.hp == 310
+    assert greninja.rule_box?
+    assert greninja.attacks["shinobi_blade"].damage == 170
+    assert greninja.attacks["mirage_barrage"].raw_effect =~ "Discard 2 Energy"
+
+    assert grand_tree.tcgdex_id == "sv07-136"
+    assert grand_tree.name == "Grand Tree"
+    assert grand_tree.category == :trainer
+    assert grand_tree.trainer_type == :stadium
+    assert grand_tree.ace_spec?
+    assert grand_tree.raw_effect =~ "Stage 1 Pokémon that evolves from 1 of their Basic Pokémon"
+  end
+
   test "normalizes cached Trainer metadata and preserves raw printed effect" do
     metadata = Metadata.fetch!("TWM-165")
 

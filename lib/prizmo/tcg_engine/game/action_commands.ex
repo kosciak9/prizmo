@@ -483,6 +483,42 @@ defmodule Prizmo.TcgEngine.Game.ActionCommands do
       end
     end
 
+    action :use_grand_tree_command, :struct do
+      description "Use Grand Tree from the active Stadium zone through the mechanics layer."
+
+      constraints instance_of: Game
+
+      argument :game_id, :uuid do
+        allow_nil? false
+      end
+
+      argument :player_id, :string do
+        allow_nil? false
+      end
+
+      argument :basic_card_instance_id, :uuid do
+        allow_nil? false
+      end
+
+      argument :stage1_card_instance_id, :uuid do
+        allow_nil? false
+      end
+
+      argument :stage2_card_instance_id, :uuid do
+        allow_nil? true
+      end
+
+      run fn input, _context ->
+        Mechanics.use_grand_tree(
+          input.arguments.game_id,
+          input.arguments.player_id,
+          input.arguments.basic_card_instance_id,
+          input.arguments.stage1_card_instance_id,
+          input.arguments.stage2_card_instance_id
+        )
+      end
+    end
+
     action :use_munkidori_adrena_brain_command, :struct do
       description "Use Munkidori's Adrena-Brain Ability to move damage counters."
 

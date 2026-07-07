@@ -175,7 +175,8 @@ defmodule Prizmo.TcgEngine.GameView do
           :damage_per_discarded_own_basic_energy,
           :discard_defending_energy_on_coin_heads,
           :discard_energy_from_own_bench_for_bonus_damage,
-          :discard_attached_energy_for_bonus_damage
+          :discard_attached_energy_for_bonus_damage,
+          :discard_attached_energy_then_damage_two_opponent_pokemon_unaffected_by_weakness_resistance_or_effects
         ],
       pending_attack_requires_returned_energy:
         pending_attack_effect_type == :return_attached_energy_to_hand,
@@ -190,14 +191,17 @@ defmodule Prizmo.TcgEngine.GameView do
       pending_attack_requires_bench_damage_counters:
         pending_attack_effect_type == :opponent_bench_damage_counters,
       pending_attack_requires_opponent_pokemon_damage_targets:
-        pending_attack_effect_type ==
+        pending_attack_effect_type in [
           :damage_two_opponent_pokemon_unaffected_by_weakness_resistance_or_effects,
+          :discard_attached_energy_then_damage_two_opponent_pokemon_unaffected_by_weakness_resistance_or_effects
+        ],
       pending_attack_opponent_pokemon_damage_choices:
         pending_attack_opponent_pokemon_damage_choices,
       pending_attack_requires_coin_result:
         pending_attack_effect_type in [
           :bonus_damage_on_coin_heads,
           :discard_defending_energy_on_coin_heads,
+          :paralyze_defender_on_coin_heads,
           :prevent_damage_and_effects_from_attacks_next_turn_on_coin_heads
         ],
       pending_attack_requires_heads_count:
@@ -287,8 +291,12 @@ defmodule Prizmo.TcgEngine.GameView do
   defp pending_attack_opponent_pokemon_damage_choices(
          %Turn{active_player_id: active_player_id},
          cards,
-         :damage_two_opponent_pokemon_unaffected_by_weakness_resistance_or_effects
-       ) do
+         pending_attack_effect_type
+       )
+       when pending_attack_effect_type in [
+              :damage_two_opponent_pokemon_unaffected_by_weakness_resistance_or_effects,
+              :discard_attached_energy_then_damage_two_opponent_pokemon_unaffected_by_weakness_resistance_or_effects
+            ] do
     cards
     |> Enum.filter(&(&1.owner_player_id != active_player_id and &1.zone in [:active, :bench]))
     |> Enum.sort_by(&{in_play_zone_sort(&1.zone), &1.position, &1.instance_id})

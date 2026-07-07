@@ -36,6 +36,8 @@ defmodule Prizmo.TcgEngine.StadiumEffects do
   @surfing_beach_effect :switch_active_water_with_benched_water_once_per_turn
   @surfing_beach_card_id "MEG-129"
   @surfing_beach_required_type :water
+  @grand_tree_effect :grand_tree_evolve_basic_then_stage_1_from_deck
+  @grand_tree_card_id "SCR-136"
 
   def supported_stadium?(%{
         supertype: :trainer,
@@ -122,6 +124,12 @@ defmodule Prizmo.TcgEngine.StadiumEffects do
         effect: %{type: @surfing_beach_effect}
       }), do: true
 
+  def supported_stadium?(%{
+        supertype: :trainer,
+        trainer_type: :stadium,
+        effect: %{type: @grand_tree_effect}
+      }), do: true
+
   def supported_stadium?(_card), do: false
 
   def supported_stadium_card?(card_id) when is_binary(card_id) do
@@ -167,6 +175,16 @@ defmodule Prizmo.TcgEngine.StadiumEffects do
   def surfing_beach_card?(card_id) when is_binary(card_id) do
     case CardCatalog.fetch(card_id) do
       {:ok, %{effect: %{type: @surfing_beach_effect}}} -> true
+      {:ok, _card} -> false
+      {:error, _reason} -> false
+    end
+  end
+
+  def grand_tree_card?(%CardInstance{card_id: card_id}), do: grand_tree_card?(card_id)
+
+  def grand_tree_card?(card_id) when is_binary(card_id) do
+    case CardCatalog.fetch(card_id) do
+      {:ok, %{effect: %{type: @grand_tree_effect}}} -> true
       {:ok, _card} -> false
       {:error, _reason} -> false
     end
@@ -244,6 +262,25 @@ defmodule Prizmo.TcgEngine.StadiumEffects do
 
         _multiple ->
           {:error, {:stadium_not_in_play, @surfing_beach_card_id}}
+      end
+    end
+  end
+
+  def active_grand_tree(game_id) when is_binary(game_id) do
+    with {:ok, stadiums} <- CardStore.cards_in_zone(game_id, :stadium) do
+      case stadiums do
+        [%CardInstance{} = stadium] ->
+          if grand_tree_card?(stadium) do
+            {:ok, stadium}
+          else
+            {:error, {:wrong_stadium_in_play, @grand_tree_card_id, stadium.card_id}}
+          end
+
+        [] ->
+          {:error, {:stadium_not_in_play, @grand_tree_card_id}}
+
+        _multiple ->
+          {:error, {:stadium_not_in_play, @grand_tree_card_id}}
       end
     end
   end
@@ -398,6 +435,19 @@ defmodule Prizmo.TcgEngine.StadiumEffects do
     end
   end
 
+  def require_grand_tree_available(
+        game_id,
+        %Turn{id: turn_id, turn_number: turn_number},
+        player_id
+      )
+      when is_binary(game_id) and is_binary(turn_id) and is_binary(player_id) do
+    with :ok <- require_grand_tree_unused_this_turn(game_id, turn_id, player_id),
+         {:ok, options} <- grand_tree_evolution_options(game_id, player_id, turn_number),
+         true <- options != [] || {:error, :grand_tree_requires_stage_1_evolution_in_deck} do
+      :ok
+    end
+  end
+
   def lumiose_city_target_cards(game_id, player_id)
       when is_binary(game_id) and is_binary(player_id) do
     with {:ok, cards} <- CardStore.list_cards(game_id) do
@@ -426,6 +476,26 @@ defmodule Prizmo.TcgEngine.StadiumEffects do
       end
     else
       {:error, _reason} -> {:ok, []}
+    end
+  end
+
+  def grand_tree_evolution_options(game_id, player_id, turn_number)
+      when is_binary(game_id) and is_binary(player_id) and is_integer(turn_number) do
+    with {:ok, cards} <- CardStore.list_cards(game_id) do
+      {:ok, grand_tree_evolution_options_from_cards(cards, player_id, turn_number)}
+    end
+  end
+
+  def grand_tree_stage_2_cards_for_stage_1(game_id, player_id, stage_1_card_id)
+      when is_binary(game_id) and is_binary(player_id) and is_binary(stage_1_card_id) do
+    with {:ok, cards} <- CardStore.list_cards(game_id) do
+      stage_1_card = Enum.find(cards, &(&1.id == stage_1_card_id))
+
+      {:ok,
+       cards
+       |> stage_2_deck_cards(player_id)
+       |> Enum.filter(&evolves_from?(&1, stage_1_card))
+       |> Enum.sort_by(&{&1.position, &1.instance_id})}
     end
   end
 
@@ -591,6 +661,16 @@ defmodule Prizmo.TcgEngine.StadiumEffects do
     end
   end
 
+  defp require_grand_tree_unused_this_turn(game_id, turn_id, player_id) do
+    with {:ok, events} <- stadium_effect_used_events_for_turn(game_id, turn_id, player_id) do
+      if Enum.any?(events, &grand_tree_effect_used?/1) do
+        {:error, :grand_tree_already_used_this_turn}
+      else
+        :ok
+      end
+    end
+  end
+
   defp card_play_completed_events_for_turn(game_id, turn_id, player_id) do
     GameEvent
     |> Ash.Query.filter(
@@ -638,6 +718,11 @@ defmodule Prizmo.TcgEngine.StadiumEffects do
       payload_value(payload, "source_card_id") == @surfing_beach_card_id
   end
 
+  defp grand_tree_effect_used?(%GameEvent{payload: payload}) do
+    payload_value(payload, "effect_key") == Atom.to_string(@grand_tree_effect) or
+      payload_value(payload, "source_card_id") == @grand_tree_card_id
+  end
+
   defp team_rocket_supporter_card_id?(card_id) when is_binary(card_id) do
     case CardCatalog.fetch(card_id) do
       {:ok, %{trainer_type: :supporter, name: "Team Rocket" <> _rest}} -> true
@@ -680,6 +765,89 @@ defmodule Prizmo.TcgEngine.StadiumEffects do
   end
 
   defp surfing_beach_target_card?(%CardInstance{}, _player_id), do: false
+
+  defp grand_tree_evolution_options_from_cards(cards, player_id, turn_number) do
+    basic_targets =
+      cards
+      |> Enum.filter(&grand_tree_basic_target?(&1, player_id, turn_number))
+      |> Enum.sort_by(&{zone_sort(&1.zone), &1.position, &1.instance_id})
+
+    stage_1_cards = stage_1_deck_cards(cards, player_id)
+    stage_2_cards = stage_2_deck_cards(cards, player_id)
+
+    for basic_card <- basic_targets,
+        stage_1_card <- stage_1_cards,
+        evolves_from?(stage_1_card, basic_card) do
+      %{
+        basic_card: basic_card,
+        stage_1_card: stage_1_card,
+        stage_2_cards:
+          stage_2_cards
+          |> Enum.filter(&evolves_from?(&1, stage_1_card))
+          |> Enum.sort_by(&{&1.position, &1.instance_id})
+      }
+    end
+  end
+
+  defp grand_tree_basic_target?(
+         %CardInstance{
+           owner_player_id: player_id,
+           zone: zone,
+           turn_entered_play: turn_entered_play
+         } = card,
+         player_id,
+         turn_number
+       )
+       when zone in [:active, :bench] and is_integer(turn_entered_play) do
+    turn_entered_play < turn_number and basic_pokemon?(card)
+  end
+
+  defp grand_tree_basic_target?(%CardInstance{}, _player_id, _turn_number), do: false
+
+  defp stage_1_deck_cards(cards, player_id) do
+    cards
+    |> Enum.filter(
+      &(&1.owner_player_id == player_id and &1.zone == :deck and stage_1_pokemon?(&1))
+    )
+    |> Enum.sort_by(&{&1.position, &1.instance_id})
+  end
+
+  defp stage_2_deck_cards(cards, player_id) do
+    cards
+    |> Enum.filter(
+      &(&1.owner_player_id == player_id and &1.zone == :deck and stage_2_pokemon?(&1))
+    )
+    |> Enum.sort_by(&{&1.position, &1.instance_id})
+  end
+
+  defp basic_pokemon?(%CardInstance{card_id: card_id}) do
+    match?({:ok, %{supertype: :pokemon, stage: :basic}}, CardCatalog.fetch(card_id))
+  end
+
+  defp stage_1_pokemon?(%CardInstance{card_id: card_id}) do
+    match?({:ok, %{supertype: :pokemon, stage: :stage_1}}, CardCatalog.fetch(card_id))
+  end
+
+  defp stage_2_pokemon?(%CardInstance{card_id: card_id}) do
+    match?({:ok, %{supertype: :pokemon, stage: :stage_2}}, CardCatalog.fetch(card_id))
+  end
+
+  defp evolves_from?(%CardInstance{}, nil), do: false
+
+  defp evolves_from?(%CardInstance{card_id: evolution_card_id}, %CardInstance{
+         card_id: target_card_id
+       }) do
+    with {:ok, evolution_card} <- CardCatalog.fetch(evolution_card_id),
+         {:ok, target_card} <- CardCatalog.fetch(target_card_id) do
+      evolution_card.evolves_from in [target_card.name, target_card.id]
+    else
+      _other -> false
+    end
+  end
+
+  defp zone_sort(:active), do: 0
+  defp zone_sort(:bench), do: 1
+  defp zone_sort(_zone), do: 2
 
   defp active_pokemon_card(cards, player_id) do
     case Enum.find(cards, &(&1.owner_player_id == player_id and &1.zone == :active)) do

@@ -1,0 +1,86 @@
+{
+  "prizmo_id": "CRI-022",
+  "source": {
+    "base_url": "https://api.tcgdex.net/v2/en",
+    "dynamic_fields_removed": [
+      "pricing"
+    ],
+    "language": "en",
+    "provider": "TCGdex"
+  },
+  "tcgdex": {
+    "abilities": [
+      {
+        "effect": "Once during your turn, if this Pokémon is in the Active Spot, you may discard a Basic {W} Energy card from your hand in order to use this Ability. Place 6 damage counters on 1 of your opponent's Pokémon.",
+        "name": "Mortal Shuriken",
+        "type": "Ability"
+      }
+    ],
+    "attacks": [
+      {
+        "cost": [
+          "Water",
+          "Water"
+        ],
+        "damage": "120+",
+        "effect": "You may put a {W} Energy attached to this Pokémon into your hand and have this attack do 80 more damage.",
+        "name": "Ninja Spinner"
+      }
+    ],
+    "category": "Pokemon",
+    "dexId": [
+      658
+    ],
+    "evolveFrom": "Frogadier",
+    "hp": 350,
+    "id": "me04-022",
+    "illustrator": "takuyoa",
+    "image": "https://assets.tcgdex.net/en/me/me04/022",
+    "legal": {
+      "expanded": true,
+      "standard": true
+    },
+    "localId": "022",
+    "name": "Mega Greninja ex",
+    "rarity": "Double rare",
+    "regulationMark": "J",
+    "retreat": 1,
+    "set": {
+      "cardCount": {
+        "official": 86,
+        "total": 122
+      },
+      "id": "me04",
+      "logo": "https://assets.tcgdex.net/en/me/me04/logo",
+      "name": "Chaos Rising",
+      "symbol": "https://assets.tcgdex.net/univ/me/me04/symbol"
+    },
+    "stage": "Stage2",
+    "suffix": "EX",
+    "types": [
+      "Water"
+    ],
+    "updated": "2026-06-11T22:15:34Z",
+    "variants": {
+      "firstEdition": false,
+      "holo": true,
+      "normal": false,
+      "reverse": false,
+      "wPromo": false
+    },
+    "variants_detailed": [
+      {
+        "size": "standard",
+        "type": "holo",
+        "variantId": "jr7oetx1mqug9"
+      }
+    ],
+    "weaknesses": [
+      {
+        "type": "Lightning",
+        "value": "×2"
+      }
+    ]
+  },
+  "tcgdex_id": "me04-022"
+}

@@ -1,0 +1,83 @@
+{
+  "prizmo_id": "CRI-020",
+  "source": {
+    "base_url": "https://api.tcgdex.net/v2/en",
+    "dynamic_fields_removed": [
+      "pricing"
+    ],
+    "language": "en",
+    "provider": "TCGdex"
+  },
+  "tcgdex": {
+    "attacks": [
+      {
+        "cost": [
+          "Colorless"
+        ],
+        "effect": "Draw a card.",
+        "name": "Collect"
+      },
+      {
+        "cost": [
+          "Water"
+        ],
+        "damage": 10,
+        "name": "Water Gun"
+      }
+    ],
+    "category": "Pokemon",
+    "description": "It protects its skin by covering its body in delicate bubbles. Beneath its happy-go-lucky air, it keeps a watchful eye on its surroundings.",
+    "dexId": [
+      656
+    ],
+    "hp": 70,
+    "id": "me04-020",
+    "illustrator": "Kariya",
+    "image": "https://assets.tcgdex.net/en/me/me04/020",
+    "legal": {
+      "expanded": true,
+      "standard": true
+    },
+    "localId": "020",
+    "name": "Froakie",
+    "rarity": "Common",
+    "regulationMark": "J",
+    "retreat": 1,
+    "set": {
+      "cardCount": {
+        "official": 86,
+        "total": 122
+      },
+      "id": "me04",
+      "logo": "https://assets.tcgdex.net/en/me/me04/logo",
+      "name": "Chaos Rising",
+      "symbol": "https://assets.tcgdex.net/univ/me/me04/symbol"
+    },
+    "stage": "Basic",
+    "types": [
+      "Water"
+    ],
+    "updated": "2026-06-15T09:33:40+01:00",
+    "variants": {
+      "firstEdition": false,
+      "holo": false,
+      "normal": true,
+      "reverse": false,
+      "wPromo": false
+    },
+    "variants_detailed": [
+      {
+        "size": "standard",
+        "type": "normal",
+        "variantId": "endfynwn4n10gzq"
+      }
+    ],
+    "weaknesses": [
+      {
+        "type": "Lightning",
+        "value": "×2"
+      }
+    ]
+  },
+  "tcgdex_id": "me04-020"
+}

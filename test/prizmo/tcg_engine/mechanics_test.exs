@@ -3275,6 +3275,237 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
     end
   end
 
+  describe "Greninja shared cluster" do
+    test "CRI-021 Summoning Jutsu searches up to 3 Pokémon from deck" do
+      {:ok, game} = create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147)
+      attacker = promote_custom_card_to_active(game.id, "player_1", "CRI-021")
+      attach_direct_energy(game.id, "player_1", attacker, "MEE-003", 1)
+
+      [froakie, greninja, non_pokemon] =
+        stage_top_deck_cards(game.id, "player_1", ["CRI-020", "TWM-106", "MEE-003"])
+
+      assert CardCoverage.summarize("CRI-021").coverage_status == :supported
+
+      assert {:ok, game} = Mechanics.declare_attack(game, "player_1", :summoning_jutsu)
+
+      [prompt] = awaiting_prompts(game.id)
+      assert prompt.player_id == "player_1"
+      assert prompt.payload["choice_key"] == "search_pokemon_to_hand"
+      assert prompt.payload["min"] == 0
+      assert prompt.payload["max"] == 3
+      assert froakie.id in prompt.payload["legal_choices"]
+      assert greninja.id in prompt.payload["legal_choices"]
+      refute non_pokemon.id in prompt.payload["legal_choices"]
+
+      assert {:ok, _game} =
+               Mechanics.choose_prompt(game, "player_1", prompt.id, [froakie.id, greninja.id])
+
+      assert zone(froakie.id) == :hand
+      assert zone(greninja.id) == :hand
+      assert zone(non_pokemon.id) == :deck
+
+      cards_moved_event =
+        game.id
+        |> game_events_by_type("cards_moved")
+        |> Enum.find(&(&1.payload["effect_key"] == "search_pokemon_to_hand"))
+
+      assert cards_moved_event.payload["public_reveal"] == true
+
+      assert Enum.sort(Enum.map(cards_moved_event.payload["cards"], & &1["instance_id"])) ==
+               Enum.sort([froakie.id, greninja.id])
+
+      assert game_events_by_type(game.id, "deck_shuffled") != []
+    end
+
+    test "TWM-057 Numbing Water paralyzes the defender on coin heads" do
+      {:ok, game} = create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147)
+      attacker = promote_custom_card_to_active(game.id, "player_1", "TWM-057")
+      defender = promote_custom_basic_to_active(game.id, "player_2", "BLK-067")
+      attach_direct_energy(game.id, "player_1", attacker, "MEE-003", 1)
+
+      assert CardCoverage.summarize("TWM-057").coverage_status == :supported
+
+      assert {:ok, game} = Mechanics.declare_attack(game, "player_1", :numbing_water)
+      assert game.flow_state == :turn_attack_declared
+
+      assert {:ok, view} = GameView.for_player(game.id, "player_1")
+      assert view.current_turn.pending_attack_requires_coin_result
+
+      assert {:ok, _game} =
+               Mechanics.resolve_declared_attack(game, "player_1", %{coin_result: :heads})
+
+      assert card(defender.id).damage == 20
+      assert card(defender.id).status == :paralyzed
+
+      resolve_event = game.id |> game_events_by_type("resolve_declared_attack") |> List.last()
+      assert resolve_event.payload["effect_type"] == "paralyze_defender_on_coin_heads"
+      assert resolve_event.payload["coin_result"] == "heads"
+      assert resolve_event.payload["defender_status_applied?"] == true
+    end
+
+    test "TWM-106 Shinobi Blade damages then optionally searches any card from deck" do
+      {:ok, game} =
+        create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147)
+
+      attacker = promote_custom_card_to_active(game.id, "player_1", "TWM-106")
+      defender = promote_custom_basic_to_active(game.id, "player_2", "BLK-067")
+      attach_direct_energy(game.id, "player_1", attacker, "MEE-003", 1)
+
+      [pokemon_target, energy_target] =
+        stage_top_deck_cards(game.id, "player_1", ["CRI-020", "MEE-003"])
+
+      assert CardCoverage.summarize("TWM-106").coverage_status == :supported
+
+      assert {:ok, game} = Mechanics.declare_attack(game, "player_1", :shinobi_blade)
+
+      assert card(defender.id).damage == 170
+
+      [prompt] = awaiting_prompts(game.id)
+      assert prompt.player_id == "player_1"
+      assert prompt.payload["choice_key"] == "search_card_to_hand"
+      assert prompt.payload["min"] == 0
+      assert prompt.payload["max"] == 1
+      assert pokemon_target.id in prompt.payload["legal_choices"]
+      assert energy_target.id in prompt.payload["legal_choices"]
+
+      assert {:ok, _game} =
+               Mechanics.choose_prompt(game, "player_1", prompt.id, [energy_target.id])
+
+      assert zone(energy_target.id) == :hand
+      assert zone(pokemon_target.id) == :deck
+      assert game_events_by_type(game.id, "deck_shuffled") != []
+    end
+
+    test "TWM-106 Mirage Barrage discards 2 attached Energy and damages 2 opponent Pokémon" do
+      {:ok, game} =
+        create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147)
+
+      attacker = promote_custom_card_to_active(game.id, "player_1", "TWM-106")
+      defender = promote_custom_basic_to_active(game.id, "player_2", "BLK-067")
+      bench_target = play_direct_basic_to_bench(game.id, "player_2", "BLK-067", 1)
+      unselected_bench = play_direct_basic_to_bench(game.id, "player_2", "BLK-067", 2)
+
+      water_energy = attach_direct_energy(game.id, "player_1", attacker, "MEE-003", 1)
+      psychic_energy = attach_direct_energy(game.id, "player_1", attacker, "MEE-005", 2)
+      fighting_energy = attach_direct_energy(game.id, "player_1", attacker, "MEE-006", 3)
+
+      assert {:ok, game} = Mechanics.declare_attack(game, "player_1", :mirage_barrage)
+      assert game.flow_state == :turn_attack_declared
+
+      assert {:ok, view} = GameView.for_player(game.id, "player_1")
+      assert view.current_turn.pending_attack_requires_discarded_energy
+      assert view.current_turn.pending_attack_requires_opponent_pokemon_damage_targets
+
+      discarded_energy_ids = [water_energy.id, psychic_energy.id]
+      target_ids = [defender.id, bench_target.id]
+
+      assert {:ok, _game} =
+               Mechanics.resolve_declared_attack(game, "player_1", %{
+                 discarded_energy_card_instance_ids: discarded_energy_ids,
+                 opponent_pokemon_damage_target_card_instance_ids: target_ids
+               })
+
+      assert Enum.all?(discarded_energy_ids, &(zone(&1) == :discard))
+      assert zone(fighting_energy.id) == :attached
+      assert card(defender.id).damage == 120
+      assert card(bench_target.id).damage == 120
+      assert card(unselected_bench.id).damage == 0
+
+      resolve_event = game.id |> game_events_by_type("resolve_declared_attack") |> List.last()
+
+      assert resolve_event.payload["effect_type"] ==
+               "discard_attached_energy_then_damage_two_opponent_pokemon_unaffected_by_weakness_resistance_or_effects"
+
+      assert resolve_event.payload["discarded_energy_count"] == 2
+
+      assert Enum.sort(resolve_event.payload["discarded_energy_card_instance_ids"]) ==
+               Enum.sort(discarded_energy_ids)
+
+      assert Enum.sort(resolve_event.payload["opponent_pokemon_damage_target_card_instance_ids"]) ==
+               Enum.sort(target_ids)
+    end
+
+    test "SCR-136 Grand Tree evolves Basic to Stage 1 and optional Stage 2 from deck" do
+      {:ok, game} = create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147)
+
+      froakie = play_direct_basic_to_bench(game.id, "player_2", "CRI-020", 1)
+      {:ok, froakie} = ash_update(froakie, :set_damage, %{damage: 30})
+      attached_energy = attach_direct_energy(game.id, "player_2", froakie, "MEE-003", 1)
+
+      {:ok, frogadier} = create_custom_owned_card(game.id, "player_2", "CRI-021", 310)
+      {:ok, greninja} = create_custom_owned_card(game.id, "player_2", "TWM-106", 311)
+
+      assert {:ok, game} = Mechanics.pass_turn(game, "player_1")
+      assert {:ok, game} = Mechanics.pass_turn(game, "player_2")
+      assert {:ok, game} = Mechanics.pass_turn(game, "player_1")
+
+      {:ok, grand_tree} = create_custom_owned_card(game.id, "player_2", "SCR-136", 312)
+      {:ok, grand_tree} = ash_update(grand_tree, :draw_to_hand, %{position: 20})
+
+      assert CardCoverage.summarize("SCR-136").coverage_status == :supported
+
+      assert {:ok, game} = Mechanics.play_stadium(game, "player_2", grand_tree.id)
+
+      assert {:ok, view} = GameView.for_player(game.id, "player_2")
+      grand_tree_actions = Enum.filter(view.action_affordances, &(&1.key == "grand_tree"))
+
+      assert Enum.any?(grand_tree_actions, fn action ->
+               action.source_card_instance_ids == [grand_tree.id, frogadier.id] and
+                 action.target_card_instance_ids == [froakie.id]
+             end)
+
+      assert Enum.any?(grand_tree_actions, fn action ->
+               action.source_card_instance_ids == [grand_tree.id, frogadier.id, greninja.id] and
+                 action.target_card_instance_ids == [froakie.id] and
+                 action.choice_keys == [
+                   "basic_card_instance_id",
+                   "stage1_card_instance_id",
+                   "stage2_card_instance_id"
+                 ]
+             end)
+
+      assert {:ok, _game} =
+               Mechanics.use_grand_tree(game, "player_2", froakie.id, frogadier.id, greninja.id)
+
+      evolved_greninja = card(greninja.id)
+      evolved_frogadier = card(frogadier.id)
+      evolved_froakie = card(froakie.id)
+      reparented_energy = card(attached_energy.id)
+
+      assert evolved_greninja.zone == :bench
+      assert evolved_greninja.position == froakie.position
+      assert evolved_greninja.damage == 30
+      assert evolved_greninja.evolves_from_card_instance_id == frogadier.id
+      assert evolved_frogadier.zone == :attached
+      assert evolved_frogadier.attached_to_card_instance_id == greninja.id
+      assert evolved_frogadier.position == 1
+      assert evolved_froakie.zone == :attached
+      assert evolved_froakie.attached_to_card_instance_id == greninja.id
+      assert reparented_energy.zone == :attached
+      assert reparented_energy.attached_to_card_instance_id == greninja.id
+
+      grand_tree_event =
+        game.id
+        |> game_events_by_type("stadium_effect_used")
+        |> Enum.find(
+          &(&1.payload["effect_key"] == "grand_tree_evolve_basic_then_stage_1_from_deck")
+        )
+
+      assert grand_tree_event.payload["source_card_id"] == "SCR-136"
+      assert grand_tree_event.payload["basic_card_instance_id"] == froakie.id
+      assert grand_tree_event.payload["stage_1_card_instance_id"] == frogadier.id
+      assert grand_tree_event.payload["stage_2_card_instance_id"] == greninja.id
+      assert grand_tree_event.payload["public_reveal"] == true
+      assert grand_tree_event.payload["public_note"] =~ "Grand Tree evolved Froakie"
+
+      deck_shuffle_event = game.id |> game_events_by_type("deck_shuffled") |> List.last()
+      assert deck_shuffle_event.payload["source_card_id"] == "SCR-136"
+
+      assert deck_shuffle_event.payload["effect_key"] ==
+               "grand_tree_evolve_basic_then_stage_1_from_deck"
+    end
+  end
+
   describe "TEF-081 Iron Crown ex" do
     test "Cobalt Command boosts Future Pokémon except Iron Crown ex" do
       {:ok, game} = create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147)

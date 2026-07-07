@@ -78,6 +78,10 @@ defmodule Prizmo.Tcg.Cards.Behaviors.TWM do
     attack(:frost_smash, effect: nil)
   end
 
+  card "TWM-057" do
+    attack(:numbing_water, effect: %{type: :paralyze_defender_on_coin_heads})
+  end
+
   card "TWM-064" do
     tag(:tera)
 
@@ -129,6 +133,23 @@ defmodule Prizmo.Tcg.Cards.Behaviors.TWM do
     )
 
     attack(:mind_bend, effect: %{type: :confuse_defender_active})
+  end
+
+  card "TWM-106" do
+    attack(:shinobi_blade,
+      effect: %{type: :search_card_to_hand, min_targets: 0, max_targets: 1}
+    )
+
+    attack(:mirage_barrage,
+      damage: 0,
+      effect: %{
+        type:
+          :discard_attached_energy_then_damage_two_opponent_pokemon_unaffected_by_weakness_resistance_or_effects,
+        discard_count: 2,
+        damage: 120,
+        target_count: 2
+      }
+    )
   end
 
   card "TWM-126" do

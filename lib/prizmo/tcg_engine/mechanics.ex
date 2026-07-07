@@ -1281,6 +1281,250 @@ defmodule Prizmo.TcgEngine.Mechanics do
     end)
   end
 
+  @spec use_grand_tree(
+          Game.t() | String.t(),
+          String.t(),
+          String.t(),
+          String.t(),
+          String.t() | nil
+        ) :: {:ok, Game.t()} | {:error, term()}
+  def use_grand_tree(
+        game_or_id,
+        player_id,
+        basic_card_instance_id,
+        stage_1_card_instance_id,
+        stage_2_card_instance_id \\ nil
+      )
+      when is_binary(player_id) and is_binary(basic_card_instance_id) and
+             is_binary(stage_1_card_instance_id) and
+             (is_binary(stage_2_card_instance_id) or is_nil(stage_2_card_instance_id)) do
+    transaction(fn ->
+      with {:ok, game} <- get_game(game_or_id),
+           :ok <- require_game_status(game, :in_progress),
+           :ok <- require_active_player(game, player_id),
+           {:ok, turn} <- require_current_turn_status(game.id, :action_window),
+           :ok <- CardPlay.require_no_awaiting_pending_effect(game.id),
+           {:ok, %CardInstance{} = stadium_card} <- StadiumEffects.active_grand_tree(game.id),
+           :ok <- require_evolution_allowed_this_turn(game, turn),
+           :ok <- StadiumEffects.require_grand_tree_available(game.id, turn, player_id),
+           {:ok, basic_card} <- get_card(game.id, basic_card_instance_id),
+           {:ok, stage_1_card} <- get_card(game.id, stage_1_card_instance_id),
+           {:ok, stage_2_card} <- maybe_get_card(game.id, stage_2_card_instance_id),
+           :ok <- require_grand_tree_basic_target(basic_card, player_id, turn),
+           :ok <- require_grand_tree_stage_1_card(stage_1_card, player_id, basic_card),
+           :ok <- require_grand_tree_stage_2_card(stage_2_card, player_id, stage_1_card),
+           {:ok, stage_1_result} <-
+             evolve_deck_card_onto_target(game.id, turn, stage_1_card, basic_card),
+           {:ok, stage_2_result} <-
+             maybe_evolve_grand_tree_stage_2(game.id, turn, stage_2_card, stage_1_result.card),
+           {:ok, _event} <-
+             write_event_and_snapshot(
+               game.id,
+               :stadium_effect_used,
+               player_id,
+               grand_tree_event_payload(turn, stadium_card, stage_1_result, stage_2_result)
+             ),
+           {:ok, _event} <-
+             write_event_and_snapshot(game.id, :deck_shuffled, player_id, %{
+               turn_id: turn.id,
+               source: EventPayloads.card_source(stadium_card),
+               source_card_id: stadium_card.card_id,
+               source_card_instance_id: stadium_card.id,
+               effect_key: :grand_tree_evolve_basic_then_stage_1_from_deck
+             }),
+           {:ok, _game} <- resolve_hp_state_based_knockouts(game.id) do
+        get_game(game.id)
+      end
+    end)
+  end
+
+  defp maybe_get_card(_game_id, nil), do: {:ok, nil}
+  defp maybe_get_card(game_id, card_instance_id), do: get_card(game_id, card_instance_id)
+
+  defp require_grand_tree_basic_target(%CardInstance{} = basic_card, player_id, %Turn{} = turn) do
+    with :ok <- require_card_owned_by_player(basic_card, player_id),
+         :ok <- require_in_play_pokemon_zone(basic_card),
+         :ok <- require_basic_pokemon(basic_card.card_id) do
+      require_can_evolve_target(basic_card, turn.turn_number)
+    end
+  end
+
+  defp require_grand_tree_stage_1_card(
+         %CardInstance{} = stage_1_card,
+         player_id,
+         %CardInstance{} = basic_card
+       ) do
+    with :ok <- require_card_owned_by_player(stage_1_card, player_id),
+         :ok <- require_card_zone(stage_1_card, :deck),
+         :ok <- require_stage_1_pokemon_card(stage_1_card.card_id) do
+      require_evolves_from(stage_1_card.card_id, basic_card.card_id)
+    end
+  end
+
+  defp require_grand_tree_stage_2_card(nil, _player_id, %CardInstance{}), do: :ok
+
+  defp require_grand_tree_stage_2_card(
+         %CardInstance{} = stage_2_card,
+         player_id,
+         %CardInstance{} = stage_1_card
+       ) do
+    with :ok <- require_card_owned_by_player(stage_2_card, player_id),
+         :ok <- require_card_zone(stage_2_card, :deck),
+         :ok <- require_stage_2_pokemon(stage_2_card.card_id) do
+      require_evolves_from(stage_2_card.card_id, stage_1_card.card_id)
+    end
+  end
+
+  defp require_stage_1_pokemon_card(card_id) do
+    case CardCatalog.fetch(card_id) do
+      {:ok, %{supertype: :pokemon, stage: :stage_1}} ->
+        :ok
+
+      {:ok, %{supertype: :pokemon, stage: stage} = metadata} ->
+        {:error, {:not_stage_1_pokemon, metadata.id, stage}}
+
+      {:ok, metadata} ->
+        {:error, {:not_pokemon, metadata.id}}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  defp evolve_deck_card_onto_target(
+         game_id,
+         %Turn{} = turn,
+         %CardInstance{} = evolution_card,
+         %CardInstance{} = target_card
+       ) do
+    evolve_action = evolve_action_for_zone(target_card.zone)
+    target_position = target_card.position
+    target_zone = target_card.zone
+
+    with {:ok, evolution_card} <-
+           update(evolution_card, evolve_action, %{
+             evolves_from_card_instance_id: target_card.id,
+             position: target_position,
+             damage: target_card.damage,
+             status: nil,
+             turn_entered_play: turn.turn_number
+           }),
+         {:ok, reparented_attachments} <-
+           reparent_attached_cards(game_id, target_card.id, evolution_card.id),
+         {:ok, evolved_under_card} <-
+           update(target_card, :evolve_under, %{
+             attached_to_card_instance_id: evolution_card.id,
+             damage: 0,
+             status: nil,
+             position: 1
+           }) do
+      {:ok,
+       %{
+         card: evolution_card,
+         evolved_under_card: evolved_under_card,
+         from_zone: :deck,
+         target_from_zone: target_zone,
+         preserved_damage: target_card.damage,
+         cleared_status: target_card.status,
+         reparented_attachments: reparented_attachments
+       }}
+    end
+  end
+
+  defp maybe_evolve_grand_tree_stage_2(_game_id, %Turn{}, nil, %CardInstance{}), do: {:ok, nil}
+
+  defp maybe_evolve_grand_tree_stage_2(
+         game_id,
+         %Turn{} = turn,
+         %CardInstance{} = stage_2_card,
+         %CardInstance{} = stage_1_card
+       ) do
+    evolve_deck_card_onto_target(game_id, turn, stage_2_card, stage_1_card)
+  end
+
+  defp grand_tree_event_payload(
+         %Turn{} = turn,
+         %CardInstance{} = stadium_card,
+         stage_1_result,
+         stage_2_result
+       ) do
+    %{
+      turn_id: turn.id,
+      source: EventPayloads.card_source(stadium_card),
+      source_card_id: stadium_card.card_id,
+      source_card_instance_id: stadium_card.id,
+      effect_key: :grand_tree_evolve_basic_then_stage_1_from_deck,
+      basic_card_instance_id: stage_1_result.evolved_under_card.id,
+      stage_1_card_instance_id: stage_1_result.card.id,
+      preserved_damage: stage_1_result.preserved_damage,
+      preserved_attachment_card_instance_ids:
+        Enum.map(stage_1_result.reparented_attachments, & &1.id),
+      cards: grand_tree_moved_cards(stage_1_result, stage_2_result),
+      public_reveal: true,
+      revealed_cards: grand_tree_revealed_cards(stage_1_result, stage_2_result),
+      public_note: grand_tree_public_note(stage_1_result, stage_2_result)
+    }
+    |> maybe_put(
+      :stage_2_card_instance_id,
+      if(stage_2_result, do: stage_2_result.card.id)
+    )
+    |> maybe_put(
+      :stage_2_preserved_attachment_card_instance_ids,
+      if(stage_2_result, do: Enum.map(stage_2_result.reparented_attachments, & &1.id))
+    )
+  end
+
+  defp grand_tree_moved_cards(stage_1_result, nil) do
+    EventPayloads.moved_cards(
+      [stage_1_result.card],
+      stage_1_result.from_zone,
+      stage_1_result.card.zone
+    ) ++
+      EventPayloads.moved_cards(
+        [stage_1_result.evolved_under_card],
+        stage_1_result.target_from_zone,
+        :attached
+      )
+  end
+
+  defp grand_tree_moved_cards(stage_1_result, stage_2_result) do
+    grand_tree_moved_cards(stage_1_result, nil) ++
+      EventPayloads.moved_cards(
+        [stage_2_result.card],
+        stage_2_result.from_zone,
+        stage_2_result.card.zone
+      ) ++
+      EventPayloads.moved_cards(
+        [stage_2_result.evolved_under_card],
+        stage_2_result.target_from_zone,
+        :attached
+      )
+  end
+
+  defp grand_tree_revealed_cards(stage_1_result, nil) do
+    EventPayloads.moved_cards([stage_1_result.card], :deck, stage_1_result.card.zone)
+  end
+
+  defp grand_tree_revealed_cards(stage_1_result, stage_2_result) do
+    grand_tree_revealed_cards(stage_1_result, nil) ++
+      EventPayloads.moved_cards([stage_2_result.card], :deck, stage_2_result.card.zone)
+  end
+
+  defp grand_tree_public_note(stage_1_result, nil) do
+    "Grand Tree evolved #{card_name(stage_1_result.evolved_under_card, stage_1_result.evolved_under_card.card_id)} into #{card_name(stage_1_result.card, stage_1_result.card.card_id)}."
+  end
+
+  defp grand_tree_public_note(stage_1_result, stage_2_result) do
+    "Grand Tree evolved #{card_name(stage_1_result.evolved_under_card, stage_1_result.evolved_under_card.card_id)} into #{card_name(stage_1_result.card, stage_1_result.card.card_id)}, then into #{card_name(stage_2_result.card, stage_2_result.card.card_id)}."
+  end
+
+  defp card_name(%CardInstance{card_id: card_id}, fallback) do
+    case CardCatalog.fetch(card_id) do
+      {:ok, %{name: name}} when is_binary(name) -> name
+      _other -> fallback
+    end
+  end
+
   @spec use_munkidori_adrena_brain(
           Game.t() | String.t(),
           String.t(),

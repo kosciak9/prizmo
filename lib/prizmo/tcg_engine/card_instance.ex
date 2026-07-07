@@ -40,8 +40,8 @@ defmodule Prizmo.TcgEngine.CardInstance do
         to: :deck
       )
 
-      transition(:evolve_to_active, from: :hand, to: :active)
-      transition(:evolve_to_bench, from: :hand, to: :bench)
+      transition(:evolve_to_active, from: [:hand, :deck], to: :active)
+      transition(:evolve_to_bench, from: [:hand, :deck], to: :bench)
       transition(:evolve_under, from: [:active, :bench], to: :attached)
       transition(:play_stadium, from: :hand, to: :stadium)
 

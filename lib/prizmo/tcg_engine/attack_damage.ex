@@ -134,6 +134,18 @@ defmodule Prizmo.TcgEngine.AttackDamage do
          damage,
          _attacker_card,
          _defender_card,
+         %{type: :paralyze_defender_on_coin_heads},
+         opts
+       ) do
+    with {:ok, _coin_result} <- AttackEffects.coin_result(opts) do
+      {:ok, damage}
+    end
+  end
+
+  defp apply_effect(
+         damage,
+         _attacker_card,
+         _defender_card,
          %{type: :damage_per_discarded_own_basic_energy, damage_per_energy: damage_per_energy},
          opts
        )
@@ -493,6 +505,9 @@ defmodule Prizmo.TcgEngine.AttackDamage do
   defp apply_effect(damage, _attacker_card, _defender_card, %{type: :search_pokemon_to_hand}),
     do: {:ok, damage}
 
+  defp apply_effect(damage, _attacker_card, _defender_card, %{type: :search_card_to_hand}),
+    do: {:ok, damage}
+
   defp apply_effect(damage, _attacker_card, _defender_card, %{type: :search_supporter_to_hand}),
     do: {:ok, damage}
 
@@ -510,6 +525,12 @@ defmodule Prizmo.TcgEngine.AttackDamage do
 
   defp apply_effect(damage, _attacker_card, _defender_card, %{
          type: :damage_two_opponent_pokemon_unaffected_by_weakness_resistance_or_effects
+       }),
+       do: {:ok, damage}
+
+  defp apply_effect(damage, _attacker_card, _defender_card, %{
+         type:
+           :discard_attached_energy_then_damage_two_opponent_pokemon_unaffected_by_weakness_resistance_or_effects
        }),
        do: {:ok, damage}
 

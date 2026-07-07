@@ -64,13 +64,13 @@ Those reports are the canonical starting point for autonomous Goal 2 implementat
 - Tracked top archetypes: `30`
 - Tracked cards with usage greater than `0.00`: `377`
 - Coverage buckets from `mix prizmo.goal2.corpus`:
-  - `supported=190`
+  - `supported=196`
   - `generic-supported=8`
-  - `partial=10`
-  - `unimplemented=169`
+  - `partial=9`
+  - `unimplemented=164`
 - Metadata buckets:
-  - `cached=210`
-  - `missing=167`
+  - `cached=216`
+  - `missing=161`
 
 Important interpretation:
 
@@ -110,15 +110,17 @@ The latest Goal 2 engine batch closed `DRI-164` Energy Recycler as the prior tie
 
 The newest Goal 2 engine batch closed `BLK-067` Genesect ex as the prior highest-share shared unimplemented card. It now has committed TCGdex metadata and executable Ash engine behavior as a Basic Metal Pokémon ex: `Metallic Signal` is an in-play once-per-turn Ability that searches the player's deck for up to two Evolution Metal Pokémon, publicly reveals selected cards, moves them to hand, shuffles afterward, and is exposed through `GameView`, Ash RPC/codegen, and the temporary React action rail. `Protect Charge` deals 150 damage and records an incoming next-turn damage-reduction marker so, during the opponent's next turn, Genesect ex takes 30 less damage from attacks after Weakness and Resistance.
 
+The latest Goal 2 engine batch closed the shared Greninja/Mega Greninja line cluster. `CRI-020` Froakie, `CRI-021` Frogadier, `TWM-057` Frogadier, `TWM-106` Greninja ex, `SCR-136` Grand Tree, and adjacent cached `CRI-022` Mega Greninja ex metadata now have committed TCGdex cache coverage. Executable behavior now covers Froakie `Collect`, Frogadier `Summoning Jutsu` / `Aqua Edge`, TWM Frogadier `Numbing Water`, Greninja ex `Shinobi Blade` / `Mirage Barrage`, and Grand Tree as a once-per-turn Stadium evolution command from deck through `GameView`, Ash RPC/codegen, and the temporary React action rail. The batch also added reusable attack primitives for optional deck search, Pokémon-search reveal payloads, coin-heads Paralysis, and discard-attached-Energy plus two-opponent-Pokémon damage resolution.
+
 ### Highest-priority remaining `unimplemented` cards from current report
 
 | Card | Archetypes | Total share | Notes |
 | --- | --- | --- | --- |
-| `CRI-020` Froakie | `2` | `0.50%` | Highest-share shared unimplemented card after closing Genesect ex; metadata missing and likely belongs with the Greninja/Mega Greninja cluster. |
-| `CRI-021` Frogadier | `2` | `0.50%` | Shared Greninja/Mega Greninja metadata-missing follow-up; evaluate with `CRI-020`, `SCR-136`, and `TWM-106`. |
-| `SCR-136` Grand Tree | `2` | `0.50%` | Shared Greninja/Mega Greninja metadata-missing Trainer/Stadium blocker adjacent to the Froakie/Frogadier line. |
 | `TWM-052` Glalie | `2` | `0.50%` | Shared Greninja ex / Mega Starmie ex metadata-missing blocker; separate from the core Greninja line unless a coherent Water/Psychic batch emerges. |
-| `TWM-106` Greninja ex | `2` | `0.50%` | Shared Greninja/Mega Greninja metadata-missing Pokémon ex target; likely pair with `CRI-020`, `CRI-021`, and `SCR-136`. |
+| `TEF-147` Explorer's Guidance | `2` | `0.40%` | Shared Archaludon ex / Ceruledge ex metadata-missing Supporter blocker. |
+| `TWM-099` Hisuian Growlithe | `1` | `49.22%` | Dragapult-only cached Pokémon blocker; high share but not shared. |
+| `TWM-100` Hisuian Arcanine | `1` | `49.22%` | Dragapult-only cached Pokémon blocker adjacent to `TWM-099`; high share but not shared. |
+| `ASC-155` N's Zekrom | `1` | `8.02%` | N's Zoroark ex metadata-missing blocker; first entry in a large coherent N's Zoroark queue. |
 
 ### Shared `partial` cards worth finishing after the broad unimplemented slice
 
@@ -145,11 +147,12 @@ That means prior Goal 1 and six-deck coverage was not wasted; it now acts as see
 
 ## Recommended next implementation order
 
-1. Treat the shared Greninja/Mega Greninja metadata-missing cluster (`CRI-020`, `CRI-021`, `SCR-136`, `TWM-106`, plus adjacent single-archetype Greninja cards) as the next default queue unless the live corpus re-ranks the blockers; confirm TCGdex IDs/text before implementation.
-2. Keep `TWM-052` Glalie and `TEF-147` Explorer's Guidance as nearby shared follow-ups, but do not mix them into the Greninja line unless they form a coherent batch.
-3. Keep the remaining Dragapult-only cached pair `TWM-099` / `TWM-100` as deliberate single-archetype cleanup, not the default autonomous queue.
-4. Finish the remaining shared partials only after the broad unimplemented slice unless another batch naturally extends the new HP infrastructure; if returning to HP work soon, `POR-086` Growing Grass Energy remains the strongest follow-up.
-5. Keep using `mix prizmo.goal2.corpus` after each batch to re-rank the next blockers by archetype count and weighted share.
+1. Treat `TWM-052` Glalie as the next default shared queue item unless the live corpus re-ranks the blockers; it is now the only `0.50%` / two-archetype unimplemented card after the Greninja cluster.
+2. Keep `TEF-147` Explorer's Guidance as the next shared follow-up, but consider whether it should anchor a small Archaludon/Ceruledge Trainer batch.
+3. Keep the remaining Dragapult-only cached pair `TWM-099` / `TWM-100` as deliberate high-share single-archetype cleanup, not the default autonomous shared queue.
+4. Treat the remaining Mega Greninja ex single-archetype blockers (`CRI-022`, `PRE-054`, plus partial `WHT-086`) as adjacent but lower-priority cleanup unless a coherent Mega Greninja batch is explicitly selected.
+5. Finish the remaining shared partials only after the broad unimplemented slice unless another batch naturally extends existing primitives; if returning to Energy work soon, `WHT-086`, `POR-086`, and `TWM-167` are the strongest shared partials.
+6. Keep using `mix prizmo.goal2.corpus` after each batch to re-rank the next blockers by archetype count and weighted share.
 
 ## See Also
 
