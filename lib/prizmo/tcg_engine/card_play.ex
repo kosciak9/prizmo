@@ -973,7 +973,7 @@ defmodule Prizmo.TcgEngine.CardPlay do
              effect_key: effect.key,
              cards: moved_cards,
              public_reveal: true,
-             public_note: sacred_ash_public_note(length(moved_targets)),
+             public_note: recover_discard_to_deck_public_note(card, length(moved_targets)),
              source_card_id: card.card_id,
              revealed_cards: moved_cards
            }),
@@ -4517,10 +4517,23 @@ defmodule Prizmo.TcgEngine.CardPlay do
 
   defp maybe_put_reveal_payload(payload, _card, _effect, _moved_cards), do: payload
 
-  defp sacred_ash_public_note(1), do: "Sacred Ash shuffled 1 Pokémon from discard into the deck."
+  defp recover_discard_to_deck_public_note(%CardInstance{card_id: "DRI-168"}, 1),
+    do: "Sacred Ash shuffled 1 Pokémon from discard into the deck."
 
-  defp sacred_ash_public_note(card_count),
+  defp recover_discard_to_deck_public_note(%CardInstance{card_id: "DRI-168"}, card_count),
     do: "Sacred Ash shuffled #{card_count} Pokémon from discard into the deck."
+
+  defp recover_discard_to_deck_public_note(%CardInstance{card_id: "DRI-164"}, 1),
+    do: "Energy Recycler shuffled 1 Basic Energy card from discard into the deck."
+
+  defp recover_discard_to_deck_public_note(%CardInstance{card_id: "DRI-164"}, card_count),
+    do: "Energy Recycler shuffled #{card_count} Basic Energy cards from discard into the deck."
+
+  defp recover_discard_to_deck_public_note(%CardInstance{card_id: card_id}, 1),
+    do: "#{card_id} shuffled 1 card from discard into the deck."
+
+  defp recover_discard_to_deck_public_note(%CardInstance{card_id: card_id}, card_count),
+    do: "#{card_id} shuffled #{card_count} cards from discard into the deck."
 
   defp maybe_heal_switched_pokemon_ex(%CardInstance{} = card, %{
          params: %{heal_damage: heal_damage}

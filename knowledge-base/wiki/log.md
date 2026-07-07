@@ -1,5 +1,12 @@
 # Wiki Log
 
+## [2026-07-07] codebase update | Goal 2 Energy Recycler support
+
+- Task attempted: closed `DRI-164` Energy Recycler as the smaller coherent slice from the tied `BLK-067` Genesect ex / `DRI-164` Energy Recycler Goal 2 queue after Philippe. Added committed TCGdex metadata, authored Energy Recycler as an engine-defined Item on the reusable discard-to-deck recovery path, and generalized the public note for discard-to-deck recovery so Energy Recycler no longer emits Sacred Ash text.
+- Files changed: `lib/prizmo/tcg_engine/cards/registry.ex`, `lib/prizmo/tcg_engine/card_play.ex`, `priv/tcg/cards/tcgdex/cards/DRI-164.json`, `test/prizmo/tcg_engine/mechanics_test.exs`, `knowledge-base/wiki/engine/goal-2-top-30-latest-limitless-coverage-scope.md`, `knowledge-base/wiki/engine/ash-backed-tcg-engine-playtest-handoff.md`, `knowledge-base/wiki/log.md`.
+- Validation: TCGdex `sv10-164` endpoint confirmed metadata/text; `mix format`; focused `mix test test/prizmo/tcg/cards/metadata_test.exs test/prizmo/tcg_engine/mechanics_test.exs -n "DRI-164 Energy Recycler"`; full `mix test test/prizmo/tcg/cards/metadata_test.exs test/prizmo/tcg_engine/mechanics_test.exs`; `mix compile --warnings-as-errors`; Tidewave runtime validation confirmed cached metadata and supported coverage; `mix prizmo.goal2.corpus` confirmed `supported=189` / `generic-supported=8` / `partial=10` / `unimplemented=170` and `cached=209` / `missing=168`; final `mix check` passed.
+- Remaining/blocking notes: `DRI-164` is no longer in the shared incomplete queue. The default next Goal 2 priority is now `BLK-067` Genesect ex, followed by the shared Greninja/Mega Greninja missing-metadata cluster unless the live corpus re-ranks the queue.
+
 ## [2026-07-07] codebase update | Goal 2 Philippe support
 
 - Task attempted: closed `CRI-079` Philippe as the highest-share shared unimplemented Goal 2 card after Surfing Beach. Added committed TCGdex metadata, authored Philippe as an engine-defined Supporter using a reusable filtered discard-Energy attachment choice path, and validated that it attaches one or two Basic Metal Energy cards from discard to one in-play Metal Pokémon while filtering illegal Energy/Pokémon choices.

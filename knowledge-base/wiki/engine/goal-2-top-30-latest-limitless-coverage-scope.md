@@ -64,13 +64,13 @@ Those reports are the canonical starting point for autonomous Goal 2 implementat
 - Tracked top archetypes: `30`
 - Tracked cards with usage greater than `0.00`: `377`
 - Coverage buckets from `mix prizmo.goal2.corpus`:
-  - `supported=187`
+  - `supported=189`
   - `generic-supported=8`
   - `partial=10`
-  - `unimplemented=172`
+  - `unimplemented=170`
 - Metadata buckets:
-  - `cached=207`
-  - `missing=170`
+  - `cached=209`
+  - `missing=168`
 
 Important interpretation:
 
@@ -106,13 +106,14 @@ The latest Goal 2 engine batch closed `MEG-129` Surfing Beach as the prior highe
 
 The newest Goal 2 engine batch closed `CRI-079` Philippe as the prior highest-share shared unimplemented card. It now has committed TCGdex metadata and executable Ash engine behavior as a Supporter: after normal Supporter timing checks, it opens a private selection prompt over Basic Metal Energy cards in the acting player's discard pile plus one of that player's in-play Metal Pokémon, attaches one or two selected Basic Metal Energy cards to the selected Metal Pokémon, filters out non-Metal Energy and non-Metal Pokémon, and records the attachment movement event through the shared discard-Energy attachment path.
 
+The latest Goal 2 engine batch closed `DRI-164` Energy Recycler as the prior tied highest-share shared unimplemented Item. It now has committed TCGdex metadata and executable Ash engine behavior as an Item: it opens a private selection prompt over Basic Energy cards in the acting player's discard pile, shuffles one to five selected Basic Energy cards into that player's deck through the shared recover-discard-to-deck path, filters out Special Energy and Pokémon, records public movement/reveal details, and writes the expected deck-shuffled event.
+
 ### Highest-priority remaining `unimplemented` cards from current report
 
 | Card | Archetypes | Total share | Notes |
 | --- | --- | --- | --- |
-| `BLK-067` Genesect ex | `2` | `0.55%` | New highest-share shared unimplemented Pokémon candidate after closing Philippe; tied with `DRI-164` Energy Recycler across Metagross Metal Maker / Steven's Metagross ex. |
-| `DRI-164` Energy Recycler | `2` | `0.55%` | New highest-share shared unimplemented Item candidate after closing Philippe; tied with `BLK-067` Genesect ex across Metagross Metal Maker / Steven's Metagross ex. |
-| `CRI-020` Froakie | `2` | `0.50%` | Next shared Greninja/Mega Greninja metadata-missing card after the Metagross tied pair; likely belongs with `CRI-021`, `SCR-136`, and `TWM-106` follow-up analysis. |
+| `BLK-067` Genesect ex | `2` | `0.55%` | Highest-share shared unimplemented card after closing Energy Recycler; still shared across Metagross Metal Maker / Steven's Metagross ex. |
+| `CRI-020` Froakie | `2` | `0.50%` | Next shared Greninja/Mega Greninja metadata-missing card after Genesect ex; likely belongs with `CRI-021`, `SCR-136`, and `TWM-106` follow-up analysis. |
 
 ### Shared `partial` cards worth finishing after the broad unimplemented slice
 
@@ -139,8 +140,8 @@ That means prior Goal 1 and six-deck coverage was not wasted; it now acts as see
 
 ## Recommended next implementation order
 
-1. Treat the `BLK-067` Genesect ex / `DRI-164` Energy Recycler tied pair as the next default shared unimplemented queue unless the live corpus re-ranks the blockers; confirm both metadata/text entries and choose the smaller coherent implementation slice first.
-2. Keep the shared Greninja/Mega Greninja metadata-missing cluster (`CRI-020`, `CRI-021`, `SCR-136`, `TWM-106`, plus adjacent single-archetype Greninja cards) behind the Metagross tied pair.
+1. Treat `BLK-067` Genesect ex as the next default shared unimplemented queue unless the live corpus re-ranks the blockers; confirm metadata/text before implementation.
+2. Keep the shared Greninja/Mega Greninja metadata-missing cluster (`CRI-020`, `CRI-021`, `SCR-136`, `TWM-106`, plus adjacent single-archetype Greninja cards) behind Genesect ex.
 3. Keep the remaining Dragapult-only cached pair `TWM-099` / `TWM-100` as deliberate single-archetype cleanup, not the default autonomous queue.
 4. Finish the remaining shared partials only after the broad unimplemented slice unless another batch naturally extends the new HP infrastructure; if returning to HP work soon, `POR-086` Growing Grass Energy remains the strongest follow-up.
 5. Keep using `mix prizmo.goal2.corpus` after each batch to re-rank the next blockers by archetype count and weighted share.

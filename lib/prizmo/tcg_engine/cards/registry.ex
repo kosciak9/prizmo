@@ -765,6 +765,25 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     ]
   }
 
+  @energy_recycler %CardDefinition{
+    id: "DRI-164",
+    kind: :trainer,
+    trainer_type: :item,
+    play_window: :action_window,
+    effects: [
+      %Effect{
+        key: :shuffle_up_to_5_basic_energy_from_discard_into_deck,
+        type: :recover_discard_to_deck,
+        params: %{
+          filter: %{kind: :energy, energy_type: :basic},
+          min_count: 1,
+          max_count: 5,
+          shuffle_after: true
+        }
+      }
+    ]
+  }
+
   @night_stretcher %CardDefinition{
     id: "ASC-196",
     kind: :trainer,
@@ -1463,6 +1482,7 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     @dusk_ball.id => @dusk_ball,
     @enhanced_hammer.id => @enhanced_hammer,
     @energy_search.id => @energy_search,
+    @energy_recycler.id => @energy_recycler,
     @energy_retrieval.id => @energy_retrieval,
     @energy_switch.id => @energy_switch,
     @fighting_gong.id => @fighting_gong,

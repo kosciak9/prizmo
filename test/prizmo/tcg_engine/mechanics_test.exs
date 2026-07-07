@@ -1909,6 +1909,74 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
       assert CardCoverage.summarize("PRE-116").coverage_status == :supported
     end
 
+    test "DRI-164 Energy Recycler shuffles up to 5 Basic Energy cards from discard into deck" do
+      {:ok, game} = create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147)
+
+      {:ok, energy_recycler} = create_custom_owned_card(game.id, "player_1", "DRI-164", 200)
+      {:ok, energy_recycler} = ash_update(energy_recycler, :draw_to_hand, %{position: 20})
+
+      {:ok, basic_energy_1} = create_custom_owned_card(game.id, "player_1", "MEE-005", 201)
+      {:ok, basic_energy_1} = ash_update(basic_energy_1, :draw_to_hand, %{position: 21})
+
+      {:ok, basic_energy_2} = create_custom_owned_card(game.id, "player_1", "MEE-006", 202)
+      {:ok, basic_energy_2} = ash_update(basic_energy_2, :draw_to_hand, %{position: 22})
+
+      {:ok, special_energy} = create_custom_owned_card(game.id, "player_1", "POR-088", 203)
+      {:ok, special_energy} = ash_update(special_energy, :draw_to_hand, %{position: 23})
+
+      {:ok, pokemon} = create_custom_owned_card(game.id, "player_1", "DRI-016", 204)
+      {:ok, pokemon} = ash_update(pokemon, :draw_to_hand, %{position: 24})
+
+      assert {:ok, game} = Mechanics.discard_from_hand(game, "player_1", basic_energy_1.id)
+      assert {:ok, game} = Mechanics.discard_from_hand(game, "player_1", basic_energy_2.id)
+      assert {:ok, game} = Mechanics.discard_from_hand(game, "player_1", special_energy.id)
+      assert {:ok, game} = Mechanics.discard_from_hand(game, "player_1", pokemon.id)
+
+      assert {:ok, game} = Mechanics.play_card(game, "player_1", energy_recycler.id, %{})
+
+      [prompt] = awaiting_prompts(game.id)
+      assert prompt.player_id == "player_1"
+
+      assert prompt.payload["choice_key"] ==
+               "shuffle_up_to_5_basic_energy_from_discard_into_deck"
+
+      assert prompt.payload["min"] == 1
+      assert prompt.payload["max"] == 2
+      assert basic_energy_1.id in prompt.payload["legal_choices"]
+      assert basic_energy_2.id in prompt.payload["legal_choices"]
+      refute special_energy.id in prompt.payload["legal_choices"]
+      refute pokemon.id in prompt.payload["legal_choices"]
+
+      assert {:ok, game} =
+               Mechanics.choose_prompt(game, "player_1", prompt.id, [
+                 basic_energy_1.id,
+                 basic_energy_2.id
+               ])
+
+      assert zone(energy_recycler.id) == :discard
+      assert zone(basic_energy_1.id) == :deck
+      assert zone(basic_energy_2.id) == :deck
+      assert zone(special_energy.id) == :discard
+      assert zone(pokemon.id) == :discard
+
+      cards_moved_event =
+        game.id
+        |> game_events_by_type("cards_moved")
+        |> Enum.find(
+          &(&1.payload["effect_key"] ==
+              "shuffle_up_to_5_basic_energy_from_discard_into_deck")
+        )
+
+      assert cards_moved_event.payload["public_note"] ==
+               "Energy Recycler shuffled 2 Basic Energy cards from discard into the deck."
+
+      assert Enum.sort(Enum.map(cards_moved_event.payload["cards"], & &1["instance_id"])) ==
+               Enum.sort([basic_energy_1.id, basic_energy_2.id])
+
+      assert game_events_by_type(game.id, "deck_shuffled") != []
+      assert CardCoverage.summarize("DRI-164").coverage_status == :supported
+    end
+
     test "MEG-116 Fighting Gong searches for a Basic Fighting Energy or a Basic Fighting Pokémon" do
       {:ok, game} = create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147)
 
