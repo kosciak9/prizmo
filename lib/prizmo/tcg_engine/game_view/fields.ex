@@ -102,6 +102,12 @@ defmodule Prizmo.TcgEngine.GameView.Fields do
       allow_nil?: false,
       constraints: [items: [fields: @attack_copy_choice_fields]]
     ],
+    pending_attack_requires_blocked_attack: [type: :boolean, allow_nil?: false],
+    pending_attack_blocked_attack_choices: [
+      type: {:array, :map},
+      allow_nil?: false,
+      constraints: [items: [fields: @attack_copy_choice_fields]]
+    ],
     pending_attack_requires_opponent_hand_discard: [type: :boolean, allow_nil?: false],
     pending_attack_opponent_hand_discard_choices: [
       type: {:array, :map},

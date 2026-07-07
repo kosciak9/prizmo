@@ -1102,6 +1102,10 @@ defmodule Prizmo.TcgEngine.Game.ActionCommands do
         allow_nil? true
       end
 
+      argument :blocked_attack_id, :string do
+        allow_nil? true
+      end
+
       argument :moved_opponent_energy_card_instance_id, :uuid do
         allow_nil? true
       end
@@ -1141,6 +1145,7 @@ defmodule Prizmo.TcgEngine.Game.ActionCommands do
           coin_result: Map.get(input.arguments, :coin_result),
           heads_count: Map.get(input.arguments, :heads_count),
           copied_attack_id: Map.get(input.arguments, :copied_attack_id),
+          blocked_attack_id: Map.get(input.arguments, :blocked_attack_id),
           moved_opponent_energy_card_instance_id:
             Map.get(input.arguments, :moved_opponent_energy_card_instance_id),
           moved_opponent_energy_target_card_instance_id:

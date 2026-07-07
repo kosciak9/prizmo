@@ -84,6 +84,7 @@ defmodule Prizmo.TcgEngine.AttackEffects do
     :bonus_damage_per_energy_attached_to_both_active,
     :bonus_damage_per_energy_attached_to_defender,
     :attacker_cannot_attack_next_turn,
+    :defending_pokemon_cannot_use_selected_attack_next_turn,
     :confuse_defender_active,
     :sleep_defender_active,
     :confuse_defender_active_then_move_opponent_damage_counters,
@@ -120,6 +121,7 @@ defmodule Prizmo.TcgEngine.AttackEffects do
     :lock_opponent_items_next_turn,
     :move_opponent_attached_energy_between_pokemon,
     :recover_trainer_from_discard_to_hand,
+    :search_supporter_to_hand,
     :return_attached_energy_to_hand,
     :self_damage,
     :opponent_bench_damage_counters,
@@ -149,7 +151,7 @@ defmodule Prizmo.TcgEngine.AttackEffects do
 
   @spec auto_resolvable_without_input?(String.t(), String.t(), CardInstance.t(), map()) ::
           boolean()
-  def auto_resolvable_without_input?(game_id, player_id, %CardInstance{}, attack)
+  def auto_resolvable_without_input?(game_id, player_id, %CardInstance{} = defender_card, attack)
       when is_binary(game_id) and is_binary(player_id) and is_map(attack) do
     case Map.get(attack, :effect) do
       %{type: :confuse_defender_active_then_move_opponent_damage_counters} ->
@@ -172,6 +174,12 @@ defmodule Prizmo.TcgEngine.AttackEffects do
         case opponent_in_play_pokemon_cards(game_id, player_id) do
           {:ok, opponent_cards} -> length(opponent_cards) <= target_count
           _error -> true
+        end
+
+      %{type: :defending_pokemon_cannot_use_selected_attack_next_turn} ->
+        case blockable_attack_choices(defender_card) do
+          {:ok, choices} -> length(choices) <= 1
+          {:error, _reason} -> true
         end
 
       %{
@@ -265,6 +273,23 @@ defmodule Prizmo.TcgEngine.AttackEffects do
     end
   end
 
+  @spec blockable_attack_choices(CardInstance.t()) :: {:ok, [map()]} | {:error, term()}
+  def blockable_attack_choices(%CardInstance{card_id: card_id}) do
+    with {:ok, %{attacks: attacks}} <- CardCatalog.fetch(card_id) do
+      attacks
+      |> Enum.sort_by(fn {attack_id, _attack} -> Atom.to_string(attack_id) end)
+      |> Enum.map(fn {attack_id, attack} ->
+        %{
+          attack_id: Atom.to_string(attack_id),
+          attack_name: Map.get(attack, :name) || format_attack_id(attack_id),
+          attack_damage: attack_damage(attack),
+          attack_effect_type: blockable_attack_effect_type(attack)
+        }
+      end)
+      |> then(&{:ok, &1})
+    end
+  end
+
   @spec resolve_after_damage(
           String.t(),
           String.t(),
@@ -345,6 +370,9 @@ defmodule Prizmo.TcgEngine.AttackEffects do
 
       %{type: :attacker_cannot_attack_next_turn} ->
         attacker_cannot_attack_next_turn(game_id, attacker_card)
+
+      %{type: :defending_pokemon_cannot_use_selected_attack_next_turn} ->
+        defender_cannot_use_selected_attack_next_turn(game_id, defender_card, opts)
 
       %{type: :confuse_defender_active} ->
         set_defender_status(game_id, player_id, defender_card, :confused)
@@ -514,6 +542,9 @@ defmodule Prizmo.TcgEngine.AttackEffects do
       %{type: :search_pokemon_to_hand} ->
         create_search_pokemon_prompt(game_id, player_id, attacker_card, attack)
 
+      %{type: :search_supporter_to_hand} ->
+        create_search_supporter_prompt(game_id, player_id, attacker_card, attack)
+
       %{type: :recover_trainer_from_discard_to_hand} ->
         create_recover_trainer_prompt(game_id, player_id, attacker_card, attack)
 
@@ -567,6 +598,56 @@ defmodule Prizmo.TcgEngine.AttackEffects do
           String.t()
         ]) ::
           {:ok, Game.t()} | {:error, term()}
+  def resume_pending_effect(
+        %Game{} = game,
+        %Prompt{} = prompt,
+        %PendingEffect{source_type: :attack_effect, effect_key: :search_supporter_to_hand} =
+          pending_effect,
+        player_id,
+        "search_supporter_to_hand",
+        selected_card_instance_ids
+      )
+      when is_binary(player_id) and is_list(selected_card_instance_ids) do
+    with :ok <- require_exact_count(selected_card_instance_ids, 1, :wrong_search_supporter_count),
+         :ok <- require_unique_ids(selected_card_instance_ids),
+         :ok <- require_prompt_legal_choices(prompt, selected_card_instance_ids),
+         {:ok, [target_card]} <- get_cards(game.id, selected_card_instance_ids),
+         :ok <- require_all_owned_in_zone([target_card], player_id, :deck),
+         {:ok, _metadata} <- require_trainer_type(target_card.card_id, [:supporter]),
+         {:ok, moved_target} <- move_deck_card_to_hand(game.id, player_id, target_card),
+         {:ok, _event} <-
+           write_event_and_snapshot(game.id, :cards_moved, player_id, %{
+             reason: :attack_effect_resolution,
+             source: source_payload(pending_effect),
+             effect_key: pending_effect.effect_key,
+             cards: EventPayloads.moved_cards([moved_target], :deck, :hand)
+           }),
+         {:ok, _event} <-
+           write_event_and_snapshot(game.id, :deck_shuffled, player_id, %{
+             source: source_payload(pending_effect),
+             effect_key: pending_effect.effect_key
+           }),
+         {:ok, _pending_effect} <-
+           update(pending_effect, :complete, %{
+             current_player_id: nil,
+             state:
+               Map.put(
+                 pending_effect.state || %{},
+                 "searched_card_instance_id",
+                 moved_target.id
+               )
+           }),
+         {:ok, _event} <-
+           write_event_and_snapshot(game.id, :attack_effect_completed, player_id, %{
+             prompt_id: prompt.id,
+             pending_effect_id: pending_effect.id,
+             effect_key: pending_effect.effect_key,
+             selected_card_instance_id: moved_target.id
+           }) do
+      GameStore.get_game(game.id)
+    end
+  end
+
   def resume_pending_effect(
         %Game{} = game,
         %Prompt{} = prompt,
@@ -869,6 +950,92 @@ defmodule Prizmo.TcgEngine.AttackEffects do
     end
   end
 
+  defp create_search_supporter_prompt(game_id, player_id, %CardInstance{} = attacker_card, attack) do
+    with {:ok, legal_choice_ids} <- legal_search_supporter_choice_ids(game_id, player_id) do
+      case legal_choice_ids do
+        [] ->
+          {:ok,
+           %{
+             effect_type: "search_supporter_to_hand",
+             search_prompt_created?: false,
+             search_legal_choice_count: 0
+           }}
+
+        [_first | _rest] ->
+          create_search_supporter_prompt(
+            game_id,
+            player_id,
+            attacker_card,
+            attack,
+            legal_choice_ids
+          )
+      end
+    end
+  end
+
+  defp create_search_supporter_prompt(
+         game_id,
+         player_id,
+         %CardInstance{} = attacker_card,
+         attack,
+         legal_choice_ids
+       ) do
+    with {:ok, turn} <- TurnStore.current_turn(game_id),
+         {:ok, pending_effect} <-
+           create(PendingEffect, :create, %{
+             game_id: game_id,
+             source_type: :attack_effect,
+             source_card_instance_id: attacker_card.id,
+             source_card_id: attacker_card.card_id,
+             controller_player_id: player_id,
+             current_player_id: player_id,
+             effect_key: :search_supporter_to_hand,
+             step: "awaiting_choice",
+             state: %{
+               "version" => 1,
+               "kind" => "attack_effect",
+               "effect_type" => "search_supporter_to_hand",
+               "player_id" => player_id,
+               "source_card_instance_id" => attacker_card.id,
+               "source_card_id" => attacker_card.card_id,
+               "attack_id" => Atom.to_string(attack.id)
+             }
+           }),
+         {:ok, pending_effect} <-
+           update(pending_effect, :await_prompt, %{
+             current_player_id: player_id,
+             effect_key: :search_supporter_to_hand,
+             step: "awaiting_choice",
+             state: pending_effect.state || %{}
+           }),
+         {:ok, prompt} <-
+           create(Prompt, :create, %{
+             game_id: game_id,
+             turn_id: turn.id,
+             pending_effect_id: pending_effect.id,
+             prompt_type: "select_cards",
+             player_id: player_id,
+             payload: %{
+               "choice_key" => "search_supporter_to_hand",
+               "legal_choices" => legal_choice_ids,
+               "min" => 1,
+               "max" => 1,
+               "source_card_instance_id" => attacker_card.id,
+               "source_card_id" => attacker_card.card_id,
+               "attack_id" => Atom.to_string(attack.id)
+             }
+           }) do
+      {:ok,
+       %{
+         effect_type: "search_supporter_to_hand",
+         pending_effect_id: pending_effect.id,
+         prompt_id: prompt.id,
+         search_prompt_created?: true,
+         search_legal_choice_count: length(legal_choice_ids)
+       }}
+    end
+  end
+
   defp create_recover_trainer_prompt(game_id, player_id, %CardInstance{} = attacker_card, attack) do
     with {:ok, legal_choice_ids} <- legal_recover_trainer_choice_ids(game_id, player_id) do
       case legal_choice_ids do
@@ -970,6 +1137,17 @@ defmodule Prizmo.TcgEngine.AttackEffects do
     with {:ok, deck_cards} <- cards_in_zone(game_id, player_id, :deck) do
       deck_cards
       |> Enum.filter(fn card -> require_pokemon_card(card.card_id) == :ok end)
+      |> Enum.map(& &1.id)
+      |> then(&{:ok, &1})
+    end
+  end
+
+  defp legal_search_supporter_choice_ids(game_id, player_id) do
+    with {:ok, deck_cards} <- cards_in_zone(game_id, player_id, :deck) do
+      deck_cards
+      |> Enum.filter(fn card ->
+        match?({:ok, _metadata}, require_trainer_type(card.card_id, [:supporter]))
+      end)
       |> Enum.map(& &1.id)
       |> then(&{:ok, &1})
     end
@@ -1240,6 +1418,24 @@ defmodule Prizmo.TcgEngine.AttackEffects do
   end
 
   defp copied_attack_effect_type(_attack), do: nil
+
+  defp blockable_attack_effect_type(%{effect: effect}) when is_map(effect) do
+    effect |> type() |> Atom.to_string()
+  end
+
+  defp blockable_attack_effect_type(%{raw_effect: raw_effect}) when raw_effect not in [nil, ""] do
+    "unsupported"
+  end
+
+  defp blockable_attack_effect_type(_attack), do: nil
+
+  defp format_attack_id(attack_id) when is_atom(attack_id) do
+    attack_id
+    |> Atom.to_string()
+    |> String.replace("_", " ")
+    |> String.split(" ", trim: true)
+    |> Enum.map_join(" ", &String.capitalize/1)
+  end
 
   defp switch_self_with_bench(game_id, player_id, %CardInstance{} = attacker_card, opts) do
     with {:ok, bench_card} <- switch_target(game_id, player_id, opts) do
@@ -1661,6 +1857,74 @@ defmodule Prizmo.TcgEngine.AttackEffects do
          cannot_attack_card_instance_id: attacker_card.id,
          blocked_turn_number: turn.turn_number + 2
        }}
+    end
+  end
+
+  defp defender_cannot_use_selected_attack_next_turn(
+         game_id,
+         %CardInstance{} = defender_card,
+         opts
+       ) do
+    case selected_blocked_attack_id(defender_card, opts) do
+      {:ok, nil} ->
+        {:ok,
+         %{
+           effect_type: "defending_pokemon_cannot_use_selected_attack_next_turn",
+           blocked_card_instance_id: defender_card.id,
+           blocked_card_id: defender_card.card_id,
+           attack_lock_applied?: false
+         }}
+
+      {:ok, selected_attack_id} ->
+        with {:ok, turn} <- TurnStore.current_turn(game_id),
+             {:ok, current_defender_card} <- get_card(game_id, defender_card.id),
+             markers =
+               AttackLocks.put_cannot_use_attack_next_turn_marker(
+                 current_defender_card,
+                 turn,
+                 selected_attack_id
+               ),
+             {:ok, _defender_card} <-
+               update(current_defender_card, :set_markers, %{markers: markers}) do
+          {:ok,
+           %{
+             effect_type: "defending_pokemon_cannot_use_selected_attack_next_turn",
+             blocked_card_instance_id: current_defender_card.id,
+             blocked_card_id: current_defender_card.card_id,
+             blocked_attack_id: selected_attack_id,
+             blocked_turn_number: turn.turn_number + 1,
+             attack_lock_applied?: true
+           }}
+        end
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  defp selected_blocked_attack_id(%CardInstance{} = defender_card, opts) do
+    with {:ok, choices} <- blockable_attack_choices(defender_card) do
+      case blocked_attack_id(opts) do
+        nil -> implicit_blocked_attack_id(choices)
+        attack_id when is_binary(attack_id) -> explicit_blocked_attack_id(choices, attack_id)
+        _invalid -> {:error, :invalid_blocked_attack_id}
+      end
+    end
+  end
+
+  defp blocked_attack_id(opts) do
+    Map.get(opts, :blocked_attack_id) || Map.get(opts, "blocked_attack_id")
+  end
+
+  defp implicit_blocked_attack_id([]), do: {:ok, nil}
+  defp implicit_blocked_attack_id([choice]), do: {:ok, Map.fetch!(choice, :attack_id)}
+  defp implicit_blocked_attack_id([_first | _rest]), do: {:error, :blocked_attack_requires_choice}
+
+  defp explicit_blocked_attack_id(choices, attack_id) do
+    if Enum.any?(choices, &(Map.get(&1, :attack_id) == attack_id)) do
+      {:ok, attack_id}
+    else
+      {:error, :invalid_blocked_attack_choice}
     end
   end
 

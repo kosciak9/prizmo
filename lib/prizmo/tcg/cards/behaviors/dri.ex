@@ -79,6 +79,15 @@ defmodule Prizmo.Tcg.Cards.Behaviors.DRI do
     )
   end
 
+  card "DRI-127" do
+    attack(:deceit, effect: %{type: :search_supporter_to_hand})
+
+    attack(:torment,
+      damage: 30,
+      effect: %{type: :defending_pokemon_cannot_use_selected_attack_next_turn}
+    )
+  end
+
   card "DRI-170" do
     card_effect(
       effect: %{

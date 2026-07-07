@@ -490,6 +490,9 @@ defmodule Prizmo.TcgEngine.AttackDamage do
   defp apply_effect(damage, _attacker_card, _defender_card, %{type: :search_pokemon_to_hand}),
     do: {:ok, damage}
 
+  defp apply_effect(damage, _attacker_card, _defender_card, %{type: :search_supporter_to_hand}),
+    do: {:ok, damage}
+
   defp apply_effect(damage, _attacker_card, _defender_card, %{
          type: :recover_trainer_from_discard_to_hand
        }),
@@ -524,6 +527,11 @@ defmodule Prizmo.TcgEngine.AttackDamage do
   defp apply_effect(damage, _attacker_card, _defender_card, %{
          type: :attacker_cannot_attack_next_turn
        }), do: {:ok, damage}
+
+  defp apply_effect(damage, _attacker_card, _defender_card, %{
+         type: :defending_pokemon_cannot_use_selected_attack_next_turn
+       }),
+       do: {:ok, damage}
 
   defp apply_effect(damage, _attacker_card, _defender_card, %{type: :confuse_defender_active}),
     do: {:ok, damage}

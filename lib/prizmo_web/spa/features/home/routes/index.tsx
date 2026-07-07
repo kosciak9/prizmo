@@ -79,6 +79,8 @@ const DAMAGE_TWO_OPPONENT_POKEMON_UNAFFECTED_EFFECT =
 const SHUFFLE_ATTACHED_ENERGY_INTO_DECK_THEN_DAMAGE_OPPONENT_BENCH_EFFECT =
   'shuffle_attached_energy_into_deck_then_damage_opponent_bench'
 const COPY_OPPONENT_ACTIVE_TERA_POKEMON_ATTACK_EFFECT = 'copy_opponent_active_tera_pokemon_attack'
+const DEFENDING_POKEMON_CANNOT_USE_SELECTED_ATTACK_NEXT_TURN_EFFECT =
+  'defending_pokemon_cannot_use_selected_attack_next_turn'
 const DISCARD_ONE_CARD_FROM_OPPONENT_HAND_EFFECT = 'discard_one_card_from_opponent_hand'
 const ULTRA_BALL_CARD_ID = 'MEG-131'
 const CRUSHING_HAMMER_CARD_ID = 'POR-071'
@@ -226,6 +228,8 @@ const GAME_STATE_FIELDS = [
       'pendingAttackRequiresHeadsCount',
       'pendingAttackRequiresCopiedAttack',
       { pendingAttackCopyChoices: ['attackId', 'attackName', 'attackDamage', 'attackEffectType'] },
+      'pendingAttackRequiresBlockedAttack',
+      { pendingAttackBlockedAttackChoices: ['attackId', 'attackName', 'attackDamage', 'attackEffectType'] },
       'pendingAttackRequiresOpponentHandDiscard',
       { pendingAttackOpponentHandDiscardChoices: ['id', 'cardId', 'name', 'image', 'category', 'stage'] },
       'pendingAttackerCardInstanceId',
@@ -1019,6 +1023,7 @@ type ResolveDeclaredAttackInput = {
   coinResult?: CoinResult | null
   headsCount?: number | null
   copiedAttackId?: string | null
+  blockedAttackId?: string | null
   opponentHandCardInstanceId?: string | null
 }
 
@@ -1043,6 +1048,7 @@ type ResolveDeclaredAttackCommand = {
   coinResult?: CoinResult | null
   headsCount?: number | null
   copiedAttackId?: string | null
+  blockedAttackId?: string | null
   opponentHandCardInstanceId?: string | null
 }
 
@@ -1144,6 +1150,8 @@ type GameState = {
     pendingAttackRequiresHeadsCount: boolean
     pendingAttackRequiresCopiedAttack: boolean
     pendingAttackCopyChoices: AttackCopyChoice[]
+    pendingAttackRequiresBlockedAttack: boolean
+    pendingAttackBlockedAttackChoices: AttackCopyChoice[]
     pendingAttackRequiresOpponentHandDiscard: boolean
     pendingAttackOpponentHandDiscardChoices: PendingAttackCardChoice[]
     pendingAttackerCardInstanceId: string | null
@@ -2423,6 +2431,7 @@ export function HomeRoute() {
                   coinResult,
                   headsCount,
                   copiedAttackId,
+                  blockedAttackId,
                   opponentHandCardInstanceId
                 }) => {
                   if (isPlayerId(playerId)) {
@@ -2442,6 +2451,7 @@ export function HomeRoute() {
                       coinResult,
                       headsCount,
                       copiedAttackId,
+                      blockedAttackId,
                       opponentHandCardInstanceId
                     })
                   }
@@ -5623,6 +5633,7 @@ function AttackProgressPanel({
   const [selectedCoinResult, setSelectedCoinResult] = useState<CoinResult | ''>('')
   const [selectedHeadsCount, setSelectedHeadsCount] = useState('')
   const [selectedCopiedAttackId, setSelectedCopiedAttackId] = useState('')
+  const [selectedBlockedAttackId, setSelectedBlockedAttackId] = useState('')
   const [selectedOpponentHandCardInstanceId, setSelectedOpponentHandCardInstanceId] = useState('')
   const turn = gameState.currentTurn
   const activePlayer = turn ? gameState.players.find(player => player.playerId === turn.activePlayerId) : undefined
@@ -5634,6 +5645,16 @@ function AttackProgressPanel({
     ? (copiedAttackChoiceForResolve?.attackId ?? null)
     : null
   const resolutionEffectType = copiedAttackChoiceForResolve?.attackEffectType ?? turn?.pendingAttackEffectType ?? null
+  const pendingAttackRequiresBlockedAttack = Boolean(
+    turn?.pendingAttackRequiresBlockedAttack ||
+      resolutionEffectType === DEFENDING_POKEMON_CANNOT_USE_SELECTED_ATTACK_NEXT_TURN_EFFECT
+  )
+  const blockedAttackOptions = pendingAttackRequiresBlockedAttack ? (turn?.pendingAttackBlockedAttackChoices ?? []) : []
+  const selectedBlockedAttackChoice = blockedAttackOptions.find(choice => choice.attackId === selectedBlockedAttackId)
+  const blockedAttackChoiceForResolve = selectedBlockedAttackChoice ?? (blockedAttackOptions.length === 1 ? blockedAttackOptions[0] : null)
+  const blockedAttackIdForResolve = pendingAttackRequiresBlockedAttack
+    ? (blockedAttackChoiceForResolve?.attackId ?? null)
+    : null
   const pendingAttackRequiresSwitchTarget = Boolean(
     turn?.pendingAttackRequiresSwitchTarget || resolutionEffectType === 'switch_self_with_bench'
   )
@@ -5968,6 +5989,7 @@ function AttackProgressPanel({
     setSelectedCoinResult('')
     setSelectedHeadsCount('')
     setSelectedCopiedAttackId('')
+    setSelectedBlockedAttackId('')
     setSelectedOpponentHandCardInstanceId('')
   }, [turn?.id, turn?.pendingAttackId])
 
@@ -5976,6 +5998,12 @@ function AttackProgressPanel({
       setSelectedCopiedAttackId('')
     }
   }, [selectedCopiedAttackChoice, selectedCopiedAttackId])
+
+  useEffect(() => {
+    if (selectedBlockedAttackId && !selectedBlockedAttackChoice) {
+      setSelectedBlockedAttackId('')
+    }
+  }, [selectedBlockedAttackChoice, selectedBlockedAttackId])
 
   useEffect(() => {
     if (selectedOpponentHandCardInstanceId && !selectedOpponentHandCardIsValid) {
@@ -6067,6 +6095,8 @@ function AttackProgressPanel({
   const attackFlowManaged = ['turn_attack_declared', 'turn_attack_resolving'].includes(gameState.flowState)
   const copiedAttackUnavailable = turn.pendingAttackRequiresCopiedAttack && copiedAttackOptions.length === 0
   const copiedAttackRequiresChoice = turn.pendingAttackRequiresCopiedAttack && copiedAttackOptions.length > 1 && !selectedCopiedAttackChoice
+  const blockedAttackRequiresChoice =
+    pendingAttackRequiresBlockedAttack && blockedAttackOptions.length > 1 && !selectedBlockedAttackChoice
   const switchTargetRequired = pendingAttackRequiresSwitchTarget && switchTargetOptions.length > 1
   const movedOpponentEnergyRequiresChoice =
     movedOpponentEnergyLegalMoveAvailable && movedOpponentEnergyOptions.length > 1 && !selectedMovedOpponentEnergyIsValid
@@ -6140,6 +6170,7 @@ function AttackProgressPanel({
   const manualResolveNeededInFlowManagedState =
     (pendingAttackRequiresDamageCounterMoves && damageCounterMoveSourceOptions.length > 0) ||
     opponentPokemonDamageTargetSelectionRequired ||
+    blockedAttackRequiresChoice ||
     opponentHandDiscardRequiresChoice
   const missingActivePlayers = gameState.players.filter(player => !player.active)
   const awaitingPromptPlayerIds = gameState.awaitingPromptPlayerIds
@@ -6160,6 +6191,7 @@ function AttackProgressPanel({
     commandPending ||
     copiedAttackUnavailable ||
     copiedAttackRequiresChoice ||
+    blockedAttackRequiresChoice ||
     (switchTargetRequired && !selectedSwitchTargetIsValid) ||
     movedOpponentEnergyRequiresChoice ||
     movedOpponentEnergyTargetUnavailable ||
@@ -6182,6 +6214,8 @@ function AttackProgressPanel({
       ? `No copyable Tera attacks for ${attackLabel}`
       : copiedAttackRequiresChoice
         ? `Choose a copied attack for ${attackLabel}`
+        : blockedAttackRequiresChoice
+          ? `Choose a blocked attack for ${attackLabel}`
         : switchTargetRequired && !selectedSwitchTargetIsValid
           ? `Choose a switch target for ${attackLabel}`
           : movedOpponentEnergyRequiresChoice
@@ -6238,6 +6272,21 @@ function AttackProgressPanel({
           : selectedCopiedAttackChoice
             ? selectedCopiedAttackChoice.attackName
             : `${copiedAttackOptions.length} copy choices`
+    })
+  }
+
+  if (pendingAttackRequiresBlockedAttack) {
+    resolutionChecklistItems.push({
+      label: 'Blocked attack',
+      tone: blockedAttackRequiresChoice ? 'waiting' : 'ready',
+      value:
+        blockedAttackOptions.length > 1
+          ? selectedBlockedAttackChoice
+            ? selectedBlockedAttackChoice.attackName
+            : `${blockedAttackOptions.length} attack choices`
+          : blockedAttackOptions.length === 1
+            ? `Auto: ${blockedAttackOptions[0]?.attackName ?? 'only attack'}`
+            : 'No defender attacks; effect skipped'
     })
   }
 
@@ -6610,6 +6659,64 @@ function AttackProgressPanel({
             ) : (
               <p className="mt-3 rounded-lg border border-cyan-200 bg-stone-50 px-3 py-2 text-xs text-cyan-900">
                 The opponent's Active Pokémon has no engine-executable Tera attacks available to copy.
+              </p>
+            )}
+          </div>
+        ) : null}
+
+        {pendingAttackRequiresBlockedAttack ? (
+          <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3">
+            <div className="space-y-1">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-900">Blocked attack</p>
+              <p className="text-xs leading-5 text-slate-900/80">
+                Torment chooses one attack on the opponent&apos;s Active Pokémon. That Pokémon can&apos;t use the chosen
+                attack during the opponent&apos;s next turn.
+              </p>
+            </div>
+
+            {blockedAttackOptions.length > 1 ? (
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                {blockedAttackOptions.map(choice => {
+                  const selected = choice.attackId === selectedBlockedAttackId
+
+                  return (
+                    <label
+                      className={`flex cursor-pointer items-start gap-2 rounded-lg border px-3 py-2 text-xs transition ${
+                        selected
+                          ? 'border-slate-700 bg-slate-100 text-slate-950'
+                          : 'border-slate-200 bg-stone-50 text-stone-700 hover:border-slate-400'
+                      }`}
+                      key={choice.attackId}
+                    >
+                      <input
+                        checked={selected}
+                        className="mt-0.5"
+                        disabled={!viewerCanAdvanceAttack || commandPending}
+                        name="blocked-attack-id"
+                        onChange={() => setSelectedBlockedAttackId(choice.attackId)}
+                        type="radio"
+                      />
+                      <span className="min-w-0">
+                        <span className="block font-medium">{choice.attackName}</span>
+                        <span className="mt-0.5 block font-mono text-[0.68rem] opacity-70">
+                          {choice.attackId}
+                          {choice.attackDamage ? ` · ${choice.attackDamage} damage` : ''}
+                          {choice.attackEffectType ? ` · ${formatEventType(choice.attackEffectType)}` : ''}
+                        </span>
+                      </span>
+                    </label>
+                  )
+                })}
+              </div>
+            ) : blockedAttackOptions.length === 1 ? (
+              <p className="mt-3 rounded-lg border border-slate-200 bg-stone-50 px-3 py-2 text-xs text-slate-900">
+                Only {blockedAttackOptions[0]?.attackName ?? 'one attack'} is available, so Torment will choose it
+                automatically.
+              </p>
+            ) : (
+              <p className="mt-3 rounded-lg border border-slate-200 bg-stone-50 px-3 py-2 text-xs text-slate-900">
+                The opponent&apos;s Active Pokémon has no attacks to choose, so Torment&apos;s attack-lock effect will be
+                skipped.
               </p>
             )}
           </div>
@@ -7366,6 +7473,7 @@ function AttackProgressPanel({
                 coinResult: coinResultForResolve,
                 headsCount: headsCountForResolve,
                 copiedAttackId: copiedAttackIdForResolve,
+                blockedAttackId: blockedAttackIdForResolve,
                 opponentHandCardInstanceId: opponentHandCardInstanceIdForResolve
               })
             }

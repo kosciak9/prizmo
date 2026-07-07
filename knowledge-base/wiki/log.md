@@ -1,5 +1,12 @@
 # Wiki Log
 
+## [2026-07-07] codebase update | Goal 2 Team Rocket's Murkrow support
+
+- Task attempted: closed `DRI-127` Team Rocket's Murkrow as the highest-share shared unimplemented Goal 2 card after the Hydrapple/Ogerpon Grass cluster. Added committed TCGdex metadata, authored `Deceit` as a Supporter deck-search prompt, authored `Torment` as selected-attack next-turn lock on the defending Pokémon, and exposed the new Torment choice through GameView, Ash RPC, and the temporary React resolver.
+- Files changed: `lib/prizmo/tcg/cards/behaviors/dri.ex`, `lib/prizmo/tcg_engine/attack_damage.ex`, `lib/prizmo/tcg_engine/attack_effects.ex`, `lib/prizmo/tcg_engine/attack_locks.ex`, `lib/prizmo/tcg_engine/game/action_commands.ex`, `lib/prizmo/tcg_engine/game_view.ex`, `lib/prizmo/tcg_engine/game_view/action_affordances.ex`, `lib/prizmo/tcg_engine/game_view/fields.ex`, `lib/prizmo/tcg_engine/mechanics.ex`, `lib/prizmo/tcg_engine/requirements.ex`, `lib/prizmo_web/spa/features/home/routes/index.tsx`, `priv/tcg/cards/tcgdex/cards/DRI-127.json`, `test/prizmo/tcg_engine/mechanics_test.exs`, `knowledge-base/wiki/engine/goal-2-top-30-latest-limitless-coverage-scope.md`, `knowledge-base/wiki/engine/ash-backed-tcg-engine-playtest-handoff.md`, `knowledge-base/wiki/log.md`.
+- Validation: `mix format`; `mix test test/prizmo/tcg_engine/mechanics_test.exs --only describe:"DRI-127 Team Rocket's Murkrow support"`; `mix test test/prizmo/tcg/cards/metadata_test.exs`; `mix test test/prizmo/tcg_engine/mechanics_test.exs`; `mix ash_typescript.codegen`; `node_modules/.bin/tsc --noEmit`; `mix prizmo.goal2.corpus` confirmed `supported=178` / `generic-supported=8` / `partial=10` / `unimplemented=181` and `cached=198` / `missing=179`; `mix compile --warnings-as-errors`; `mix ash_typescript.codegen --check`; final `mix check` passed.
+- Remaining/blocking notes: `DRI-127` is no longer in the shared incomplete queue. The default next Goal 2 priority is now `SSP-174` Drayton, followed by `MEG-124` Premium Power Pro and `JTG-156` Redeemable Ticket unless the live corpus re-ranks the queue.
+
 ## [2026-07-07] codebase update | Goal 2 Hydrapple/Ogerpon Grass cluster support
 
 - Task attempted: closed the shared Hydrapple/Ogerpon Grass-line Goal 2 queue after Regigigas. Added committed TCGdex metadata and executable Ash engine behavior for `ASC-008`, `MEG-008`, `MEG-009`, `MEG-010`, `SFA-006`, and `TEF-126`, including Growl-style next-turn damage reduction, Meganium Wild Growth Basic Grass Energy doubling, Tapu Bulu self-damage, and Hoothoot opponent-hand reveal.

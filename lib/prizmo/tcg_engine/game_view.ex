@@ -141,6 +141,9 @@ defmodule Prizmo.TcgEngine.GameView do
     pending_attack_copy_choices =
       pending_attack_copy_choices(turn, cards, pending_attack_effect_type)
 
+    pending_attack_blocked_attack_choices =
+      pending_attack_blocked_attack_choices(turn, cards, pending_attack_effect_type)
+
     pending_attack_opponent_hand_discard_choices =
       pending_attack_opponent_hand_discard_choices(
         turn,
@@ -201,6 +204,9 @@ defmodule Prizmo.TcgEngine.GameView do
       pending_attack_requires_copied_attack:
         pending_attack_effect_type == :copy_opponent_active_tera_pokemon_attack,
       pending_attack_copy_choices: pending_attack_copy_choices,
+      pending_attack_requires_blocked_attack:
+        pending_attack_effect_type == :defending_pokemon_cannot_use_selected_attack_next_turn,
+      pending_attack_blocked_attack_choices: pending_attack_blocked_attack_choices,
       pending_attack_requires_opponent_hand_discard:
         pending_attack_effect_type == :discard_one_card_from_opponent_hand,
       pending_attack_opponent_hand_discard_choices: pending_attack_opponent_hand_discard_choices,
@@ -240,6 +246,22 @@ defmodule Prizmo.TcgEngine.GameView do
   end
 
   defp pending_attack_copy_choices(%Turn{}, _cards, _pending_attack_effect_type), do: []
+
+  defp pending_attack_blocked_attack_choices(
+         %Turn{pending_defender_card_instance_id: defender_id},
+         cards,
+         :defending_pokemon_cannot_use_selected_attack_next_turn
+       )
+       when not is_nil(defender_id) do
+    with %CardInstance{} = defender_card <- Enum.find(cards, &(&1.id == defender_id)),
+         {:ok, choices} <- AttackEffects.blockable_attack_choices(defender_card) do
+      choices
+    else
+      _other -> []
+    end
+  end
+
+  defp pending_attack_blocked_attack_choices(%Turn{}, _cards, _pending_attack_effect_type), do: []
 
   defp pending_attack_opponent_hand_discard_choices(
          %Turn{active_player_id: active_player_id},

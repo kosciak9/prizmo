@@ -771,6 +771,7 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
       |> Enum.flat_map(fn {attack_id, attack} ->
         maybe_attack_affordance(
           player,
+          current_turn,
           active_card,
           defender_card,
           opponent_target_cards,
@@ -1050,6 +1051,7 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
 
   defp maybe_attack_affordance(
          player,
+         current_turn,
          active_card,
          defender_card,
          opponent_target_cards,
@@ -1058,6 +1060,7 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
          attack
        ) do
     with true <- attack |> AttackCosts.attack_cost() |> AttackCosts.paid?(attached_cards),
+         false <- AttackLocks.blocked_this_turn?(active_card, current_turn, attack_id),
          {:ok, executable_attack} <- CardCatalog.fetch_attack(active_card.card_id, attack_id),
          :ok <- AttackEffects.require_declarable_attack(executable_attack, defender_card) do
       [

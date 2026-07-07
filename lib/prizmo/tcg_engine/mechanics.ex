@@ -2494,11 +2494,11 @@ defmodule Prizmo.TcgEngine.Mechanics do
       with {:ok, game} <- get_game(game_or_id),
            {:ok, turn} <- require_action_window_for_player(game, player_id),
            {:ok, attacker_card} <- active_card(game.id, player_id),
-           :ok <- require_can_attack(attacker_card, turn),
-           :ok <- AttackRequirements.require_card_attack_restrictions(game.id, attacker_card),
            {:ok, defender_player_id} <- opponent_player_id(game.id, player_id),
            {:ok, defender_card} <- active_card(game.id, defender_player_id),
            {:ok, attack} <- CardCatalog.fetch_attack(attacker_card.card_id, attack_id),
+           :ok <- require_can_attack(attacker_card, turn, attack.id),
+           :ok <- AttackRequirements.require_card_attack_restrictions(game.id, attacker_card),
            :ok <- AttackEffects.require_declarable_attack(attack, defender_card),
            :ok <- require_attack_cost_paid(game.id, attacker_card, attack),
            {:ok, turn} <-

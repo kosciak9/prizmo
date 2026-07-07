@@ -232,6 +232,16 @@ defmodule Prizmo.TcgEngine.Requirements do
     end
   end
 
+  def require_can_attack(%CardInstance{} = card, %Turn{} = turn, attack_id) do
+    with :ok <- require_can_attack(card, turn) do
+      if AttackLocks.blocked_this_turn?(card, turn, attack_id) do
+        {:error, {:attacker_cannot_use_attack_this_turn, attack_id}}
+      else
+        :ok
+      end
+    end
+  end
+
   def require_can_retreat(%CardInstance{status: status}) when status in [:asleep, :paralyzed] do
     {:error, {:cannot_retreat_while, status}}
   end

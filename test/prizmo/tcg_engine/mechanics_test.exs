@@ -3506,6 +3506,91 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
     end
   end
 
+  describe "DRI-127 Team Rocket's Murkrow support" do
+    test "Deceit searches a Supporter from deck to hand" do
+      assert CardCoverage.summarize("DRI-127").coverage_status == :supported
+
+      assert {:ok, deceit} = CardCatalog.fetch_attack("DRI-127", :deceit)
+      assert deceit.cost == [:colorless]
+      assert deceit.effect == %{type: :search_supporter_to_hand}
+
+      {:ok, game} = create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147)
+      attacker = promote_custom_basic_to_active(game.id, "player_1", "DRI-127")
+      attach_direct_energy(game.id, "player_1", attacker, "MEE-007", 1)
+
+      {:ok, supporter} = create_custom_owned_card(game.id, "player_1", "DRI-171", 260)
+
+      assert {:ok, game} = Mechanics.declare_attack(game, "player_1", :deceit)
+
+      assert [prompt] = awaiting_prompts(game.id)
+      assert prompt.player_id == "player_1"
+      assert prompt.payload["choice_key"] == "search_supporter_to_hand"
+      assert prompt.payload["min"] == 1
+      assert prompt.payload["max"] == 1
+      assert supporter.id in prompt.payload["legal_choices"]
+
+      assert {:ok, _game} = Mechanics.choose_prompt(game, "player_1", prompt.id, [supporter.id])
+      assert zone(supporter.id) == :hand
+
+      completed_event = game.id |> game_events_by_type("attack_effect_completed") |> List.last()
+      assert completed_event.payload["effect_key"] == "search_supporter_to_hand"
+      assert completed_event.payload["selected_card_instance_id"] == supporter.id
+    end
+
+    test "Torment locks only the chosen defender attack on the opponent's next turn" do
+      assert {:ok, torment} = CardCatalog.fetch_attack("DRI-127", :torment)
+      assert torment.damage == 30
+      assert torment.cost == [:darkness, :colorless]
+
+      assert torment.effect == %{
+               type: :defending_pokemon_cannot_use_selected_attack_next_turn
+             }
+
+      {:ok, game} = create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147)
+      attacker = promote_custom_basic_to_active(game.id, "player_1", "DRI-127")
+      defender = promote_custom_basic_to_active(game.id, "player_2", "DRI-127")
+
+      attach_direct_energy(game.id, "player_1", attacker, "MEE-007", 1)
+      attach_direct_energy(game.id, "player_1", attacker, "MEE-007", 2)
+      attach_direct_energy(game.id, "player_2", defender, "MEE-007", 1)
+
+      assert {:ok, game} = Mechanics.declare_attack(game, "player_1", :torment)
+
+      assert {:ok, view} = GameView.for_player(game.id, "player_1")
+      assert view.current_turn.pending_attack_requires_blocked_attack
+
+      assert Enum.map(view.current_turn.pending_attack_blocked_attack_choices, & &1.attack_id) ==
+               [
+                 "deceit",
+                 "torment"
+               ]
+
+      assert {:error, :blocked_attack_requires_choice} =
+               Mechanics.resolve_declared_attack(game, "player_1", %{})
+
+      assert {:ok, game} =
+               Mechanics.resolve_declared_attack(game, "player_1", %{blocked_attack_id: "torment"})
+
+      resolve_event = game.id |> game_events_by_type("resolve_declared_attack") |> List.last()
+
+      assert resolve_event.payload["effect_type"] ==
+               "defending_pokemon_cannot_use_selected_attack_next_turn"
+
+      assert resolve_event.payload["blocked_card_instance_id"] == defender.id
+      assert resolve_event.payload["blocked_attack_id"] == "torment"
+      assert resolve_event.payload["attack_lock_applied?"]
+
+      assert {:ok, game} = Prizmo.TcgEngine.Flow.Interpreter.stabilize(game)
+      assert current_turn(game.id).active_player_id == "player_2"
+      assert current_turn(game.id).status == :action_window
+
+      assert {:error, {:attacker_cannot_use_attack_this_turn, :torment}} =
+               Mechanics.declare_attack(game, "player_2", :torment)
+
+      assert {:ok, _game} = Mechanics.declare_attack(game, "player_2", :deceit)
+    end
+  end
+
   describe "POR-020 Staryu and POR-021 Mega Starmie ex support" do
     test "Staryu Water Gun and Mega Starmie ex attacks are executable" do
       assert CardCoverage.summarize("POR-020").coverage_status == :supported
