@@ -96,6 +96,7 @@ defmodule Prizmo.TcgEngine.AttackEffects do
     :damage_per_opponent_pokemon_ex_in_play,
     :damage_per_opponent_prize_taken,
     :damage_per_own_prize_taken,
+    :damage_per_defender_damage_counter,
     :base_damage_if_defender_has_damage_counters,
     :knock_out_defender_if_exact_damage_counters,
     :damage_only_if_stadium_in_play,
@@ -131,6 +132,7 @@ defmodule Prizmo.TcgEngine.AttackEffects do
     :self_damage,
     :opponent_bench_damage_counters,
     :discard_attached_energy_for_bonus_damage,
+    :discard_attached_energy_from_attacker,
     :switch_opponent_active_with_bench_chosen_by_opponent,
     :prevent_damage_and_effects_from_attacks_next_turn_on_coin_heads,
     :put_up_to_3_duskull_from_discard_to_bench,
@@ -205,6 +207,16 @@ defmodule Prizmo.TcgEngine.AttackEffects do
         case active_card(game_id, player_id) do
           {:ok, %CardInstance{} = attacker_card} ->
             legal_attached_energy_count(game_id, attacker_card, energy_type) < discard_count
+
+          {:error, _reason} ->
+            true
+        end
+
+      %{type: :discard_attached_energy_from_attacker, discard_count: discard_count}
+      when is_integer(discard_count) and discard_count > 0 ->
+        case active_card(game_id, player_id) do
+          {:ok, %CardInstance{} = attacker_card} ->
+            legal_attached_energy_count(game_id, attacker_card) <= discard_count
 
           {:error, _reason} ->
             true
@@ -513,6 +525,15 @@ defmodule Prizmo.TcgEngine.AttackEffects do
       %{type: :damage_per_own_prize_taken} ->
         {:ok, %{}}
 
+      %{type: :damage_per_defender_damage_counter, damage_per_counter: damage_per_counter}
+      when is_integer(damage_per_counter) and damage_per_counter >= 0 ->
+        {:ok,
+         %{
+           effect_type: "damage_per_defender_damage_counter",
+           defender_damage_counters_before_attack: div(max(defender_card.damage, 0), 10),
+           damage_per_counter: damage_per_counter
+         }}
+
       %{type: :base_damage_if_defender_has_damage_counters} ->
         {:ok, %{}}
 
@@ -554,6 +575,16 @@ defmodule Prizmo.TcgEngine.AttackEffects do
           discard_count,
           damage,
           target_count
+        )
+
+      %{type: :discard_attached_energy_from_attacker, discard_count: discard_count}
+      when is_integer(discard_count) and discard_count > 0 ->
+        discard_attached_energy_from_attacker(
+          game_id,
+          player_id,
+          attacker_card,
+          opts,
+          discard_count
         )
 
       %{type: :discard_hand_then_draw, count: count} when is_integer(count) and count >= 0 ->
@@ -1452,6 +1483,13 @@ defmodule Prizmo.TcgEngine.AttackEffects do
 
       {:error, _reason} ->
         0
+    end
+  end
+
+  defp legal_attached_energy_count(game_id, %CardInstance{} = attacker_card) do
+    case attached_cards(game_id, attacker_card.id) do
+      {:ok, attached_cards} -> Enum.count(attached_cards, &energy_card?/1)
+      {:error, _reason} -> 0
     end
   end
 
@@ -2603,6 +2641,79 @@ defmodule Prizmo.TcgEngine.AttackEffects do
          discarded_energy_type: Atom.to_string(energy_type),
          bonus_damage_applied?: length(discarded_cards) == discard_count
        }}
+    end
+  end
+
+  defp discard_attached_energy_from_attacker(
+         game_id,
+         player_id,
+         %CardInstance{} = attacker_card,
+         opts,
+         discard_count
+       ) do
+    with {:ok, energy_card_instance_ids} <- discarded_energy_card_instance_ids(opts),
+         {:ok, energy_cards} <-
+           discard_attached_energy_from_attacker_cards(
+             game_id,
+             player_id,
+             attacker_card,
+             energy_card_instance_ids,
+             discard_count
+           ),
+         {:ok, discarded_cards} <-
+           BattleActions.discard_retreat_energy(game_id, player_id, energy_cards) do
+      {:ok,
+       %{
+         effect_type: "discard_attached_energy_from_attacker",
+         discarded_energy_card_instance_ids: Enum.map(discarded_cards, & &1.id),
+         discarded_energy_count: length(discarded_cards),
+         discarded_energy_required_count: discard_count,
+         energy_discarded?: discarded_cards != []
+       }}
+    end
+  end
+
+  defp discard_attached_energy_from_attacker_cards(
+         game_id,
+         player_id,
+         %CardInstance{} = attacker_card,
+         [],
+         discard_count
+       ) do
+    with {:ok, energy_cards} <-
+           returnable_attached_energy_cards(game_id, player_id, attacker_card) do
+      cond do
+        energy_cards == [] ->
+          {:ok, []}
+
+        length(energy_cards) <= discard_count ->
+          {:ok, energy_cards}
+
+        true ->
+          {:error, :discard_attached_energy_requires_target}
+      end
+    end
+  end
+
+  defp discard_attached_energy_from_attacker_cards(
+         game_id,
+         player_id,
+         %CardInstance{} = attacker_card,
+         energy_card_instance_ids,
+         discard_count
+       ) do
+    with :ok <-
+           require_exact_count(
+             energy_card_instance_ids,
+             discard_count,
+             :wrong_discarded_energy_count
+           ) do
+      discardable_attached_energy_cards(
+        game_id,
+        player_id,
+        attacker_card,
+        energy_card_instance_ids
+      )
     end
   end
 

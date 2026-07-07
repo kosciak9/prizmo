@@ -313,6 +313,16 @@ defmodule Prizmo.TcgEngine.AttackDamage do
     end
   end
 
+  defp apply_effect(_damage, _attacker_card, %CardInstance{damage: defender_damage}, %{
+         type: :damage_per_defender_damage_counter,
+         damage_per_counter: damage_per_counter
+       })
+       when is_integer(defender_damage) and defender_damage >= 0 and
+              is_integer(damage_per_counter) and
+              damage_per_counter >= 0 do
+    {:ok, div(defender_damage, 10) * damage_per_counter}
+  end
+
   defp apply_effect(damage, %CardInstance{} = attacker_card, %CardInstance{} = defender_card, %{
          type: :damage_per_opponent_pokemon_ex_in_play,
          damage_per_pokemon: damage_per_pokemon
@@ -490,6 +500,11 @@ defmodule Prizmo.TcgEngine.AttackDamage do
     do: {:ok, damage}
 
   defp apply_effect(damage, _attacker_card, _defender_card, %{
+         type: :damage_per_defender_damage_counter
+       }),
+       do: {:ok, damage}
+
+  defp apply_effect(damage, _attacker_card, _defender_card, %{
          type: :base_damage_if_defender_has_damage_counters
        }),
        do: {:ok, damage}
@@ -531,6 +546,11 @@ defmodule Prizmo.TcgEngine.AttackDamage do
   defp apply_effect(damage, _attacker_card, _defender_card, %{
          type:
            :discard_attached_energy_then_damage_two_opponent_pokemon_unaffected_by_weakness_resistance_or_effects
+       }),
+       do: {:ok, damage}
+
+  defp apply_effect(damage, _attacker_card, _defender_card, %{
+         type: :discard_attached_energy_from_attacker
        }),
        do: {:ok, damage}
 

@@ -176,6 +176,7 @@ defmodule Prizmo.TcgEngine.GameView do
           :discard_defending_energy_on_coin_heads,
           :discard_energy_from_own_bench_for_bonus_damage,
           :discard_attached_energy_for_bonus_damage,
+          :discard_attached_energy_from_attacker,
           :discard_attached_energy_then_damage_two_opponent_pokemon_unaffected_by_weakness_resistance_or_effects
         ],
       pending_attack_requires_returned_energy:

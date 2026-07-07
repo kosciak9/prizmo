@@ -66,6 +66,17 @@ defmodule Prizmo.Tcg.Cards.Behaviors.TWM do
     )
   end
 
+  card "TWM-052" do
+    attack(:damage_beat,
+      damage: 0,
+      effect: %{type: :damage_per_defender_damage_counter, damage_per_counter: 20}
+    )
+
+    attack(:crazy_headbutt,
+      effect: %{type: :discard_attached_energy_from_attacker, discard_count: 1}
+    )
+  end
+
   card "TWM-053" do
     ability(:freezing_shroud,
       effect: %{

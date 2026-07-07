@@ -73,6 +73,7 @@ const ULTRA_BALL_POST_SEARCH_HANDOFF_STORAGE_KEY = 'prizmo:tcg-ultra-ball-post-s
 const DISCARD_OWN_BASIC_ENERGY_FOR_DAMAGE_EFFECT = 'damage_per_discarded_own_basic_energy'
 const DISCARD_OWN_BENCH_ENERGY_FOR_BONUS_DAMAGE_EFFECT = 'discard_energy_from_own_bench_for_bonus_damage'
 const DISCARD_ATTACHED_ENERGY_FOR_BONUS_DAMAGE_EFFECT = 'discard_attached_energy_for_bonus_damage'
+const DISCARD_ATTACHED_ENERGY_FROM_ATTACKER_EFFECT = 'discard_attached_energy_from_attacker'
 const DISCARD_DEFENDING_ENERGY_ON_COIN_HEADS_EFFECT = 'discard_defending_energy_on_coin_heads'
 const MOVE_OPPONENT_ATTACHED_ENERGY_BETWEEN_POKEMON_EFFECT = 'move_opponent_attached_energy_between_pokemon'
 const STRANGE_HACKING_EFFECT = 'confuse_defender_active_then_move_opponent_damage_counters'
@@ -5935,6 +5936,7 @@ function AttackProgressPanel({
       resolutionEffectType === DISCARD_OWN_BASIC_ENERGY_FOR_DAMAGE_EFFECT ||
       resolutionEffectType === DISCARD_OWN_BENCH_ENERGY_FOR_BONUS_DAMAGE_EFFECT ||
       resolutionEffectType === DISCARD_ATTACHED_ENERGY_FOR_BONUS_DAMAGE_EFFECT ||
+      resolutionEffectType === DISCARD_ATTACHED_ENERGY_FROM_ATTACKER_EFFECT ||
       resolutionEffectType === DISCARD_DEFENDING_ENERGY_ON_COIN_HEADS_EFFECT
   )
   const pendingAttackRequiresMovedOpponentEnergy =
@@ -5985,7 +5987,8 @@ function AttackProgressPanel({
           ? opponentPlayer?.active
             ? [opponentPlayer.active]
             : []
-        : resolutionEffectType === DISCARD_ATTACHED_ENERGY_FOR_BONUS_DAMAGE_EFFECT
+        : resolutionEffectType === DISCARD_ATTACHED_ENERGY_FOR_BONUS_DAMAGE_EFFECT ||
+            resolutionEffectType === DISCARD_ATTACHED_ENERGY_FROM_ATTACKER_EFFECT
           ? activePlayer.active
             ? [activePlayer.active]
             : []
@@ -6384,7 +6387,8 @@ function AttackProgressPanel({
   const discardedEnergyMaxSelection =
     resolutionEffectType === DISCARD_OWN_BENCH_ENERGY_FOR_BONUS_DAMAGE_EFFECT
       ? 2
-      : resolutionEffectType === DISCARD_DEFENDING_ENERGY_ON_COIN_HEADS_EFFECT
+      : resolutionEffectType === DISCARD_DEFENDING_ENERGY_ON_COIN_HEADS_EFFECT ||
+          resolutionEffectType === DISCARD_ATTACHED_ENERGY_FROM_ATTACKER_EFFECT
         ? 1
         : null
   const discardedEnergyDescription =
@@ -6392,12 +6396,16 @@ function AttackProgressPanel({
       ? 'This attack does 60 more damage for each selected Energy attached to Benched Pokémon, then discards those Energy cards during resolution. Select up to 2, or select none for no bonus damage.'
       : resolutionEffectType === DISCARD_DEFENDING_ENERGY_ON_COIN_HEADS_EFFECT
         ? "On Heads, this attack discards one Energy attached to the opponent's Active Pokémon after damage. If exactly one Energy is attached, resolution will discard it automatically. Tails discards none."
+      : resolutionEffectType === DISCARD_ATTACHED_ENERGY_FROM_ATTACKER_EFFECT
+        ? 'This attack discards one Energy attached to the attacking Active Pokémon after damage. If exactly one Energy is attached, resolution will discard it automatically.'
       : resolutionEffectType === DISCARD_OWN_BASIC_ENERGY_FOR_DAMAGE_EFFECT
         ? 'This attack does damage for each selected own Basic Energy attached to Pokémon in play, then discards those Energy cards during resolution. Selecting none resolves it for zero bonus damage.'
         : 'This attack resolves with the selected discarded Energy cards.'
   const discardedEnergyEmptyDescription =
     resolutionEffectType === DISCARD_DEFENDING_ENERGY_ON_COIN_HEADS_EFFECT
       ? `No Energy cards are visible on the opponent's Active Pokémon, so Heads will discard none.`
+      : resolutionEffectType === DISCARD_ATTACHED_ENERGY_FROM_ATTACKER_EFFECT
+        ? `No Energy cards are visible on ${attacker?.name ?? 'the attacking Active Pokémon'}, so resolution will discard none.`
       : `No attached Energy cards are visible for ${formatPlayerId(turn.activePlayerId)}, so resolution will deal zero damage from this effect.`
   const returnedEnergyRequiresChoice = pendingAttackRequiresReturnedEnergy && returnedEnergyOptions.length > 1
   const returnedEnergyUnavailable = pendingAttackRequiresReturnedEnergy && returnedEnergyOptions.length === 0
@@ -6434,6 +6442,10 @@ function AttackProgressPanel({
     coinResultForResolve === 'heads' &&
     discardedEnergyOptions.length > 1 &&
     selectedDiscardedEnergyIdsForResolve.length !== 1
+  const attackerEnergyDiscardRequiresChoice =
+    resolutionEffectType === DISCARD_ATTACHED_ENERGY_FROM_ATTACKER_EFFECT &&
+    discardedEnergyOptions.length > 1 &&
+    selectedDiscardedEnergyIdsForResolve.length !== 1
   const headsCountRequired = pendingAttackRequiresHeadsCount && headsCountForResolve === null
   const opponentHandDiscardRequiresChoice =
     pendingAttackRequiresOpponentHandDiscard &&
@@ -6443,6 +6455,7 @@ function AttackProgressPanel({
     (pendingAttackRequiresDamageCounterMoves && damageCounterMoveSourceOptions.length > 0) ||
     opponentPokemonDamageTargetSelectionRequired ||
     blockedAttackRequiresChoice ||
+    attackerEnergyDiscardRequiresChoice ||
     opponentHandDiscardRequiresChoice
   const missingActivePlayers = gameState.players.filter(player => !player.active)
   const awaitingPromptPlayerIds = gameState.awaitingPromptPlayerIds
@@ -6478,6 +6491,7 @@ function AttackProgressPanel({
     Boolean(damageCounterMoveOverallocationSource) ||
     coinResultRequired ||
     defendingEnergyDiscardRequiresChoice ||
+    attackerEnergyDiscardRequiresChoice ||
     headsCountRequired ||
     opponentHandDiscardRequiresChoice
   const resolveButtonLabel = resolveDeclaredAttackPendingPlayerId === turn.activePlayerId
@@ -6516,6 +6530,8 @@ function AttackProgressPanel({
                         ? `Choose a coin result for ${attackLabel}`
                         : defendingEnergyDiscardRequiresChoice
                           ? `Choose an Energy to discard for ${attackLabel}`
+                          : attackerEnergyDiscardRequiresChoice
+                            ? `Choose an Energy to discard from the attacker for ${attackLabel}`
                           : headsCountRequired
                             ? `Enter a heads count for ${attackLabel}`
                             : opponentHandDiscardRequiresChoice
@@ -6657,7 +6673,7 @@ function AttackProgressPanel({
 
     resolutionChecklistItems.push({
       label: 'Discarded Energy',
-      tone: defendingEnergyDiscardRequiresChoice ? 'waiting' : 'ready',
+      tone: defendingEnergyDiscardRequiresChoice || attackerEnergyDiscardRequiresChoice ? 'waiting' : 'ready',
       value: discardedEnergyValue
     })
   }

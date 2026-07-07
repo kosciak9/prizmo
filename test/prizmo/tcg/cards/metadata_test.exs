@@ -58,6 +58,38 @@ defmodule Prizmo.Tcg.Cards.MetadataTest do
            }
   end
 
+  test "normalizes cached TWM-052 Glalie metadata" do
+    metadata = Metadata.fetch!("TWM-052")
+
+    assert metadata.tcgdex_id == "sv06-052"
+    assert metadata.name == "Glalie"
+    assert metadata.category == :pokemon
+    assert metadata.types == [:water]
+    assert metadata.hp == 120
+    assert metadata.stage == :stage_1
+    assert metadata.evolves_from == "Snorunt"
+    refute metadata.rule_box?
+    assert metadata.retreat_count == 2
+    assert metadata.weaknesses == [%{type: :metal, value: "×2"}]
+
+    assert metadata.attacks["damage_beat"] == %{
+             cost: [:water],
+             damage: "20×",
+             id: "damage_beat",
+             name: "Damage Beat",
+             raw_effect:
+               "This attack does 20 damage for each damage counter on your opponent's Active Pokémon."
+           }
+
+    assert metadata.attacks["crazy_headbutt"] == %{
+             cost: [:water, :colorless, :colorless],
+             damage: 140,
+             id: "crazy_headbutt",
+             name: "Crazy Headbutt",
+             raw_effect: "Discard an Energy from this Pokémon."
+           }
+  end
+
   test "normalizes cached Greninja shared cluster metadata" do
     froakie = Metadata.fetch!("CRI-020")
     frogadier = Metadata.fetch!("CRI-021")

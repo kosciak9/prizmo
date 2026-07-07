@@ -1,5 +1,12 @@
 # Wiki Log
 
+## [2026-07-07] codebase update | Goal 2 Glalie support
+
+- Task attempted: closed `TWM-052` Glalie as the default shared Goal 2 unimplemented card after the Greninja/Grand Tree batch. Added cached TCGdex metadata, authored `Damage Beat` as 20 damage per existing damage counter on the opponent's Active Pokémon, authored `Crazy Headbutt` as 140 damage plus mandatory one attached-Energy discard from the attacking Pokémon, and wired the new attacker-attached Energy discard through `GameView` and the temporary React resolver when multiple attached Energy choices exist.
+- Files changed: `lib/prizmo/tcg/cards/behaviors/twm.ex`, `lib/prizmo/tcg_engine/attack_damage.ex`, `lib/prizmo/tcg_engine/attack_effects.ex`, `lib/prizmo/tcg_engine/game_view.ex`, `lib/prizmo_web/spa/features/home/routes/index.tsx`, `priv/tcg/cards/tcgdex/cards/TWM-052.json`, `test/prizmo/tcg/cards/metadata_test.exs`, `test/prizmo/tcg_engine/mechanics_test.exs`, `knowledge-base/wiki/engine/goal-2-top-30-latest-limitless-coverage-scope.md`, `knowledge-base/wiki/engine/ash-backed-tcg-engine-playtest-handoff.md`, `knowledge-base/wiki/log.md`.
+- Validation: `mix test test/prizmo/tcg/cards/metadata_test.exs test/prizmo/tcg_engine/mechanics_test.exs:3346`; `mix format`; `mix compile --warnings-as-errors`; `node_modules/.bin/tsc --noEmit`; `mix prizmo.goal2.corpus` confirmed `supported=197` / `generic-supported=8` / `partial=9` / `unimplemented=163` and `cached=217` / `missing=160`; final `mix check` passed.
+- Remaining/blocking notes: `TWM-052` is no longer in the shared incomplete queue. The default next Goal 2 priority is now `TEF-147` Explorer's Guidance unless the live corpus re-ranks the queue; keep Dragapult-only `TWM-099` / `TWM-100` as deliberate high-share single-archetype cleanup.
+
 ## [2026-07-07] codebase update | Goal 2 Greninja and Grand Tree support
 
 - Task attempted: closed the shared Greninja/Mega Greninja Goal 2 cluster after Genesect ex. Added committed TCGdex metadata for `CRI-020` Froakie, `CRI-021` Frogadier, `CRI-022` Mega Greninja ex, `SCR-136` Grand Tree, `TWM-057` Frogadier, and `TWM-106` Greninja ex; authored executable behavior for Froakie `Collect`, Frogadier `Summoning Jutsu` / `Aqua Edge`, TWM Frogadier `Numbing Water`, Greninja ex `Shinobi Blade` / `Mirage Barrage`, and Grand Tree as a once-per-turn Stadium evolution command exposed through `GameView`, Ash RPC/codegen, and the temporary React action rail.

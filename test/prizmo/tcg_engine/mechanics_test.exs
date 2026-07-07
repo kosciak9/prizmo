@@ -3343,6 +3343,78 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
       assert resolve_event.payload["defender_status_applied?"] == true
     end
 
+    test "TWM-052 Damage Beat scales from defender counters and Crazy Headbutt discards attached Energy" do
+      {:ok, damage_game} =
+        create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147)
+
+      damage_attacker = promote_custom_card_to_active(damage_game.id, "player_1", "TWM-052")
+      damage_defender = promote_custom_basic_to_active(damage_game.id, "player_2", "BLK-067")
+
+      assert CardCoverage.summarize("TWM-052").coverage_status == :supported
+
+      assert {:ok, damage_beat} = CardCatalog.fetch_attack("TWM-052", :damage_beat)
+
+      assert damage_beat.effect == %{
+               type: :damage_per_defender_damage_counter,
+               damage_per_counter: 20
+             }
+
+      assert damage_beat.damage == 0
+      assert {:ok, 0} = AttackDamage.damage_for(damage_attacker, damage_defender, damage_beat)
+
+      {:ok, damaged_defender} = ash_update(damage_defender, :set_damage, %{damage: 30})
+      assert {:ok, 60} = AttackDamage.damage_for(damage_attacker, damaged_defender, damage_beat)
+
+      {:ok, discard_game} =
+        create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147)
+
+      discard_attacker = promote_custom_card_to_active(discard_game.id, "player_1", "TWM-052")
+      discard_defender = promote_custom_basic_to_active(discard_game.id, "player_2", "BLK-067")
+
+      water_energy =
+        attach_direct_energy(discard_game.id, "player_1", discard_attacker, "MEE-003", 1)
+
+      psychic_energy =
+        attach_direct_energy(discard_game.id, "player_1", discard_attacker, "MEE-005", 2)
+
+      fighting_energy =
+        attach_direct_energy(discard_game.id, "player_1", discard_attacker, "MEE-006", 3)
+
+      assert {:ok, crazy_headbutt} = CardCatalog.fetch_attack("TWM-052", :crazy_headbutt)
+
+      assert crazy_headbutt.effect == %{
+               type: :discard_attached_energy_from_attacker,
+               discard_count: 1
+             }
+
+      assert {:ok, discard_game} =
+               Mechanics.declare_attack(discard_game, "player_1", :crazy_headbutt)
+
+      assert discard_game.flow_state == :turn_attack_declared
+
+      assert {:ok, view} = GameView.for_player(discard_game.id, "player_1")
+      assert view.current_turn.pending_attack_requires_discarded_energy
+
+      assert {:ok, _game} =
+               Mechanics.resolve_declared_attack(discard_game, "player_1", %{
+                 discarded_energy_card_instance_ids: [psychic_energy.id]
+               })
+
+      assert card(discard_defender.id).damage == 140
+      assert zone(water_energy.id) == :attached
+      assert zone(psychic_energy.id) == :discard
+      assert zone(fighting_energy.id) == :attached
+
+      resolve_event =
+        discard_game.id |> game_events_by_type("resolve_declared_attack") |> List.last()
+
+      assert resolve_event.payload["effect_type"] == "discard_attached_energy_from_attacker"
+      assert resolve_event.payload["discarded_energy_count"] == 1
+      assert resolve_event.payload["discarded_energy_required_count"] == 1
+      assert resolve_event.payload["discarded_energy_card_instance_ids"] == [psychic_energy.id]
+      assert resolve_event.payload["energy_discarded?"] == true
+    end
+
     test "TWM-106 Shinobi Blade damages then optionally searches any card from deck" do
       {:ok, game} =
         create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147)
