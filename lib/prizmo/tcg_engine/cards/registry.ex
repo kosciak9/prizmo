@@ -443,6 +443,27 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     ]
   }
 
+  @philippe %CardDefinition{
+    id: "CRI-079",
+    kind: :trainer,
+    trainer_type: :supporter,
+    play_window: :action_window,
+    effects: [
+      %Effect{
+        key: :attach_basic_metal_energy_from_discard_to_metal_pokemon,
+        type: :attach_basic_energy_from_discard_to_pokemon,
+        params: %{
+          energy_filter: %{kind: :energy, energy_type: :basic, provides: :metal},
+          max_count: 3,
+          max_energy_count: 2,
+          min_count: 2,
+          target_filter: %{kind: :pokemon, type: :metal},
+          target_zones: [:active, :bench]
+        }
+      }
+    ]
+  }
+
   @boss_orders %CardDefinition{
     id: "MEG-114",
     kind: :trainer,
@@ -1460,6 +1481,7 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     @lucian.id => @lucian,
     @max_rod.id => @max_rod,
     @night_stretcher.id => @night_stretcher,
+    @philippe.id => @philippe,
     @poke_pad.id => @poke_pad,
     @pokegear_3_0.id => @pokegear_3_0,
     @pokemon_catcher.id => @pokemon_catcher,

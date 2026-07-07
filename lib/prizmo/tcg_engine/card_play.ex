@@ -1479,6 +1479,35 @@ defmodule Prizmo.TcgEngine.CardPlay do
          turn,
          player,
          card,
+         %{type: :attach_basic_energy_from_discard_to_pokemon} = effect,
+         target_ids
+       ) do
+    with {:ok, {energy_cards, target_card}} <-
+           validate_attach_basic_energy_from_discard_to_pokemon_effect(
+             game.id,
+             player.player_id,
+             effect,
+             target_ids
+           ),
+         target_cards = List.duplicate(target_card, length(energy_cards)),
+         :ok <- attach_basic_energy_from_discard(game.id, energy_cards, target_cards),
+         {:ok, _event} <-
+           write_event_and_snapshot(game.id, :cards_moved, player.player_id, %{
+             reason: :effect_resolution,
+             source: EventPayloads.card_source(card),
+             effect_key: effect.key,
+             affected_player_id: player.player_id,
+             cards: attached_energy_from_discard_payloads(energy_cards, target_cards)
+           }) do
+      complete_play_card_resolution(game, turn, player, card, effect)
+    end
+  end
+
+  defp complete_play_card_effect(
+         game,
+         turn,
+         player,
+         card,
          %{type: :attach_basic_energy_from_discard_to_stage2_if_more_prizes} = effect,
          target_ids
        ) do
@@ -1772,6 +1801,13 @@ defmodule Prizmo.TcgEngine.CardPlay do
       {:ok, %{type: :shuffle_prizes_to_bottom_then_replace_from_deck} = effect} ->
         require_shuffle_prizes_to_bottom_effect_available(game.id, player.player_id, effect)
 
+      {:ok, %{type: :attach_basic_energy_from_discard_to_pokemon} = effect} ->
+        require_attach_basic_energy_from_discard_to_pokemon_effect_available(
+          game.id,
+          player.player_id,
+          effect
+        )
+
       {:ok, %{type: :attach_basic_energy_from_discard_to_stage2_if_more_prizes} = effect} ->
         require_rosa_effect_available(game.id, player.player_id, effect)
 
@@ -2008,6 +2044,31 @@ defmodule Prizmo.TcgEngine.CardPlay do
         :ok
       else
         {:error, :each_player_discards_to_hand_size_has_no_effect}
+      end
+    end
+  end
+
+  defp require_attach_basic_energy_from_discard_to_pokemon_effect_available(
+         game_id,
+         player_id,
+         effect
+       ) do
+    with {:ok, cards} <- CardStore.list_cards(game_id) do
+      energy_cards =
+        attach_basic_energy_from_discard_energy_choice_cards(cards, player_id, effect)
+
+      target_cards =
+        attach_basic_energy_from_discard_target_choice_cards(cards, player_id, effect)
+
+      cond do
+        energy_cards == [] ->
+          {:error, :attach_basic_energy_from_discard_requires_energy_in_discard}
+
+        target_cards == [] ->
+          {:error, :attach_basic_energy_from_discard_requires_target_pokemon}
+
+        true ->
+          :ok
       end
     end
   end
@@ -2330,6 +2391,23 @@ defmodule Prizmo.TcgEngine.CardPlay do
     end
   end
 
+  defp validate_attach_basic_energy_from_discard_to_pokemon_effect(
+         game_id,
+         player_id,
+         effect,
+         target_ids
+       ) do
+    with {:ok, target_ids} <-
+           EffectRunner.validate_choice_selection(
+             effect,
+             target_ids,
+             :wrong_attach_basic_energy_from_discard_choice_count
+           ),
+         {:ok, target_cards} <- CardStore.get_cards(game_id, target_ids) do
+      selected_attach_basic_energy_from_discard_to_pokemon_cards(target_cards, player_id, effect)
+    end
+  end
+
   defp validate_rosa_effect(game_id, player_id, effect, target_ids) do
     with :ok <- require_more_prizes_than_opponent(game_id, player_id, effect),
          {:ok, target_ids} <-
@@ -2494,6 +2572,18 @@ defmodule Prizmo.TcgEngine.CardPlay do
        ) do
     cards
     |> eri_opponent_item_choice_cards(player_id)
+    |> Enum.map(& &1.id)
+    |> then(&{:ok, &1})
+  end
+
+  defp effect_choice_ids(
+         cards,
+         player_id,
+         %{type: :attach_basic_energy_from_discard_to_pokemon} = choice_step,
+         _current_turn
+       ) do
+    cards
+    |> attach_basic_energy_from_discard_to_pokemon_choice_cards(player_id, choice_step)
     |> Enum.map(& &1.id)
     |> then(&{:ok, &1})
   end
@@ -2812,6 +2902,25 @@ defmodule Prizmo.TcgEngine.CardPlay do
           _other -> :error
         end
 
+      %{type: :attach_basic_energy_from_discard_to_pokemon} = effect ->
+        case CardStore.list_cards(game_id) do
+          {:ok, cards} ->
+            energy_count =
+              cards
+              |> attach_basic_energy_from_discard_energy_choice_cards(player_id, effect)
+              |> length()
+              |> min(Map.get(effect.params, :max_energy_count, 1))
+
+            if energy_count > 0 and legal_choice_ids != [] do
+              {:ok, {2, energy_count + 1}}
+            else
+              :error
+            end
+
+          _other ->
+            :error
+        end
+
       %{type: :attach_basic_energy_from_discard_to_stage2_if_more_prizes} = effect ->
         case CardStore.list_cards(game_id) do
           {:ok, cards} ->
@@ -3079,6 +3188,29 @@ defmodule Prizmo.TcgEngine.CardPlay do
     else
       energy_cards ++ target_cards
     end
+  end
+
+  defp attach_basic_energy_from_discard_to_pokemon_choice_cards(cards, player_id, effect) do
+    energy_cards = attach_basic_energy_from_discard_energy_choice_cards(cards, player_id, effect)
+    target_cards = attach_basic_energy_from_discard_target_choice_cards(cards, player_id, effect)
+
+    if energy_cards == [] or target_cards == [] do
+      []
+    else
+      energy_cards ++ target_cards
+    end
+  end
+
+  defp attach_basic_energy_from_discard_energy_choice_cards(cards, player_id, effect) do
+    cards
+    |> Enum.filter(&attach_basic_energy_from_discard_energy_card?(&1, player_id, effect))
+    |> Enum.sort_by(&{&1.position, &1.instance_id})
+  end
+
+  defp attach_basic_energy_from_discard_target_choice_cards(cards, player_id, effect) do
+    cards
+    |> Enum.filter(&attach_basic_energy_from_discard_target_card?(&1, player_id, effect))
+    |> Enum.sort_by(&{in_play_zone_sort(&1.zone), &1.position, &1.instance_id})
   end
 
   defp rosa_discard_energy_choice_cards(cards, player_id) do
@@ -3695,6 +3827,18 @@ defmodule Prizmo.TcgEngine.CardPlay do
       require_stage_2_pokemon(card.card_id) == :ok
   end
 
+  defp attach_basic_energy_from_discard_energy_card?(%CardInstance{} = card, player_id, effect) do
+    card.owner_player_id == player_id and card.zone == :discard and
+      require_search_filter(card, Map.fetch!(effect.params, :energy_filter)) == :ok
+  end
+
+  defp attach_basic_energy_from_discard_target_card?(%CardInstance{} = card, player_id, effect) do
+    target_zones = Map.get(effect.params, :target_zones, [:active, :bench])
+
+    card.owner_player_id == player_id and card.zone in target_zones and
+      require_search_filter(card, Map.fetch!(effect.params, :target_filter)) == :ok
+  end
+
   defp wondrous_patch_basic_psychic_energy_card?(%CardInstance{} = card, player_id) do
     card.owner_player_id == player_id and card.zone == :discard and
       require_search_filter(card, %{kind: :energy, energy_type: :basic, provides: :psychic}) ==
@@ -3776,6 +3920,45 @@ defmodule Prizmo.TcgEngine.CardPlay do
 
       _other ->
         {:error, :invalid_crispin_choices}
+    end
+  end
+
+  defp selected_attach_basic_energy_from_discard_to_pokemon_cards(cards, player_id, effect) do
+    energy_cards =
+      Enum.filter(cards, &attach_basic_energy_from_discard_energy_card?(&1, player_id, effect))
+
+    target_cards =
+      Enum.filter(cards, &attach_basic_energy_from_discard_target_card?(&1, player_id, effect))
+
+    max_energy_count = Map.get(effect.params, :max_energy_count, 1)
+
+    if length(cards) == length(energy_cards) + length(target_cards) do
+      case {energy_cards, target_cards} do
+        {[], [_target_card]} ->
+          {:error, :missing_basic_energy_from_discard_choice}
+
+        {[_energy_card | _rest], []} ->
+          {:error, :missing_energy_attachment_target_pokemon}
+
+        {energy_cards, [target_card]}
+        when length(energy_cards) >= 1 and length(energy_cards) <= max_energy_count ->
+          {:ok, {energy_cards, target_card}}
+
+        {energy_cards, [_target_card]} when length(energy_cards) > max_energy_count ->
+          {:error,
+           {:too_many_basic_energy_from_discard_choices, length(energy_cards), max_energy_count}}
+
+        {[_energy_card | _rest], target_cards} when length(target_cards) > 1 ->
+          {:error, {:too_many_energy_attachment_target_pokemon, length(target_cards)}}
+
+        {[], []} ->
+          {:error, :missing_energy_attachment_choices}
+
+        _other ->
+          {:error, :invalid_energy_attachment_choices}
+      end
+    else
+      {:error, :invalid_energy_attachment_choices}
     end
   end
 
@@ -4218,6 +4401,16 @@ defmodule Prizmo.TcgEngine.CardPlay do
     ]
   end
 
+  defp attached_energy_from_discard_payloads(energy_cards, target_cards) do
+    energy_cards
+    |> Enum.zip(target_cards)
+    |> Enum.map(fn {energy_card, target_card} ->
+      moved_card_payload(energy_card, :discard, :attached,
+        to_attached_to_card_instance_id: target_card.id
+      )
+    end)
+  end
+
   defp rosa_attached_energy_payloads(energy_cards, target_cards) do
     energy_cards
     |> Enum.zip(target_cards)
@@ -4477,6 +4670,30 @@ defmodule Prizmo.TcgEngine.CardPlay do
           |> Enum.map(&Map.get(cards_by_id, &1))
           |> Enum.reject(&is_nil/1)
           |> Enum.map(&eri_choice_label/1)
+
+        Map.put(payload, :legal_choice_labels, labels)
+
+      {:error, _reason} ->
+        payload
+    end
+  end
+
+  defp maybe_put_prompt_choice_labels(
+         payload,
+         game_id,
+         _player_id,
+         :attach_basic_metal_energy_from_discard_to_metal_pokemon,
+         legal_choice_ids
+       ) do
+    case CardStore.list_cards(game_id) do
+      {:ok, cards} ->
+        cards_by_id = Map.new(cards, &{&1.id, &1})
+
+        labels =
+          legal_choice_ids
+          |> Enum.map(&Map.get(cards_by_id, &1))
+          |> Enum.reject(&is_nil/1)
+          |> Enum.map(&attach_basic_metal_energy_from_discard_choice_label/1)
 
         Map.put(payload, :legal_choice_labels, labels)
 
@@ -4998,6 +5215,23 @@ defmodule Prizmo.TcgEngine.CardPlay do
       label: card_name(card, card.card_id),
       detail:
         "Your Stage 2 Pokémon in #{Atom.to_string(card.zone)} to receive all selected Basic Energy cards."
+    }
+  end
+
+  defp attach_basic_metal_energy_from_discard_choice_label(%CardInstance{zone: :discard} = card) do
+    %{
+      id: card.id,
+      label: card_name(card, card.card_id),
+      detail: "Basic Metal Energy in your discard pile to attach with Philippe."
+    }
+  end
+
+  defp attach_basic_metal_energy_from_discard_choice_label(%CardInstance{} = card) do
+    %{
+      id: card.id,
+      label: card_name(card, card.card_id),
+      detail:
+        "Your Metal Pokémon in #{Atom.to_string(card.zone)} to receive all selected Basic Metal Energy cards."
     }
   end
 

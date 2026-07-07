@@ -1,5 +1,12 @@
 # Wiki Log
 
+## [2026-07-07] codebase update | Goal 2 Philippe support
+
+- Task attempted: closed `CRI-079` Philippe as the highest-share shared unimplemented Goal 2 card after Surfing Beach. Added committed TCGdex metadata, authored Philippe as an engine-defined Supporter using a reusable filtered discard-Energy attachment choice path, and validated that it attaches one or two Basic Metal Energy cards from discard to one in-play Metal Pokémon while filtering illegal Energy/Pokémon choices.
+- Files changed: `lib/prizmo/tcg_engine/card_play.ex`, `lib/prizmo/tcg_engine/cards/registry.ex`, `lib/prizmo/tcg_engine/effect_runner.ex`, `priv/tcg/cards/tcgdex/cards/CRI-079.json`, `knowledge-base/wiki/engine/goal-2-top-30-latest-limitless-coverage-scope.md`, `knowledge-base/wiki/engine/ash-backed-tcg-engine-playtest-handoff.md`, `knowledge-base/wiki/log.md`.
+- Validation: TCGdex `me04-079` endpoint confirmed metadata/text; `mix format`; `mix compile --warnings-as-errors`; `mix test test/prizmo/tcg/cards/metadata_test.exs`; Tidewave runtime validation confirmed supported coverage, play affordance exposure, legal prompt bounds/filters, successful discard-to-attachment resolution, and event payloads; `mix test test/prizmo/tcg_engine/mechanics_test.exs`; `mix prizmo.goal2.corpus` confirmed `supported=188` / `generic-supported=8` / `partial=10` / `unimplemented=171` and `cached=208` / `missing=169`; final `mix check` passed.
+- Remaining/blocking notes: `CRI-079` is no longer in the shared incomplete queue. The default next Goal 2 priority is now the tied `BLK-067` Genesect ex / `DRI-164` Energy Recycler pair, followed by the shared Greninja/Mega Greninja missing-metadata cluster unless the live corpus re-ranks the queue.
+
 ## [2026-07-07] codebase update | Goal 2 Surfing Beach support
 
 - Task attempted: closed `MEG-129` Surfing Beach as the highest-share shared unimplemented Goal 2 card after Relicanth. Added committed TCGdex metadata, authored Surfing Beach as an engine-defined Stadium that switches the active player's Active Water Pokémon with a selected Benched Water Pokémon once during that player's turn, exposed the command through `GameView`, Ash RPC/codegen, and the temporary React play surface, and fixed Stadium Special Condition correctness so only Festival Grounds-style Stadium text recovers/prevents Special Conditions.

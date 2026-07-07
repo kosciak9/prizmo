@@ -12,6 +12,7 @@ defmodule Prizmo.TcgEngine.EffectRunner do
     :each_player_discards_to_hand_size,
     :opponent_discards_to_hand_size,
     :discard_opponent_item_cards_from_hand,
+    :attach_basic_energy_from_discard_to_pokemon,
     :attach_basic_energy_from_discard_to_stage2_if_more_prizes,
     :attach_basic_psychic_energy_from_discard_to_benched_psychic_pokemon,
     :heal_mega_evolution_pokemon_ex_then_return_attached_energy_to_hand,

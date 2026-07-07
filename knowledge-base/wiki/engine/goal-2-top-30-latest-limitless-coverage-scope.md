@@ -104,13 +104,15 @@ The newest Goal 2 engine batch closed `TEF-084` Relicanth as the prior highest-s
 
 The latest Goal 2 engine batch closed `MEG-129` Surfing Beach as the prior highest-share shared unimplemented card. It now has committed TCGdex metadata and executable Ash engine behavior as a Stadium: once during each player's turn, the active player may switch their Active Water Pokémon with one of their Benched Water Pokémon through `GameView`, Ash RPC, and the temporary React resolver path. The batch also fixed Stadium correctness so only Festival Grounds-style Stadium text, not every supported Stadium, recovers or prevents Special Conditions.
 
+The newest Goal 2 engine batch closed `CRI-079` Philippe as the prior highest-share shared unimplemented card. It now has committed TCGdex metadata and executable Ash engine behavior as a Supporter: after normal Supporter timing checks, it opens a private selection prompt over Basic Metal Energy cards in the acting player's discard pile plus one of that player's in-play Metal Pokémon, attaches one or two selected Basic Metal Energy cards to the selected Metal Pokémon, filters out non-Metal Energy and non-Metal Pokémon, and records the attachment movement event through the shared discard-Energy attachment path.
+
 ### Highest-priority remaining `unimplemented` cards from current report
 
 | Card | Archetypes | Total share | Notes |
 | --- | --- | --- | --- |
-| `CRI-079` Philippe | `2` | `0.68%` | New highest-share shared unimplemented card after closing Surfing Beach; confirm metadata/text and exact Supporter semantics before implementation. |
-| `BLK-067` Genesect ex | `2` | `0.55%` | Shared Metagross Metal Maker / Steven's Metagross ex Pokémon candidate tied with `DRI-164` Energy Recycler by weighted share. |
-| `DRI-164` Energy Recycler | `2` | `0.55%` | Shared Metagross Metal Maker / Steven's Metagross ex Item candidate tied with `BLK-067` Genesect ex by weighted share. |
+| `BLK-067` Genesect ex | `2` | `0.55%` | New highest-share shared unimplemented Pokémon candidate after closing Philippe; tied with `DRI-164` Energy Recycler across Metagross Metal Maker / Steven's Metagross ex. |
+| `DRI-164` Energy Recycler | `2` | `0.55%` | New highest-share shared unimplemented Item candidate after closing Philippe; tied with `BLK-067` Genesect ex across Metagross Metal Maker / Steven's Metagross ex. |
+| `CRI-020` Froakie | `2` | `0.50%` | Next shared Greninja/Mega Greninja metadata-missing card after the Metagross tied pair; likely belongs with `CRI-021`, `SCR-136`, and `TWM-106` follow-up analysis. |
 
 ### Shared `partial` cards worth finishing after the broad unimplemented slice
 
@@ -137,8 +139,8 @@ That means prior Goal 1 and six-deck coverage was not wasted; it now acts as see
 
 ## Recommended next implementation order
 
-1. Treat `CRI-079` Philippe as the next default shared unimplemented card unless the live corpus re-ranks the queue; confirm metadata/text and exact Supporter semantics before selecting the implementation shape.
-2. Keep the `BLK-067` Genesect ex / `DRI-164` Energy Recycler tied pair behind Philippe as the next shared metadata-missing candidates by weighted share.
+1. Treat the `BLK-067` Genesect ex / `DRI-164` Energy Recycler tied pair as the next default shared unimplemented queue unless the live corpus re-ranks the blockers; confirm both metadata/text entries and choose the smaller coherent implementation slice first.
+2. Keep the shared Greninja/Mega Greninja metadata-missing cluster (`CRI-020`, `CRI-021`, `SCR-136`, `TWM-106`, plus adjacent single-archetype Greninja cards) behind the Metagross tied pair.
 3. Keep the remaining Dragapult-only cached pair `TWM-099` / `TWM-100` as deliberate single-archetype cleanup, not the default autonomous queue.
 4. Finish the remaining shared partials only after the broad unimplemented slice unless another batch naturally extends the new HP infrastructure; if returning to HP work soon, `POR-086` Growing Grass Energy remains the strongest follow-up.
 5. Keep using `mix prizmo.goal2.corpus` after each batch to re-rank the next blockers by archetype count and weighted share.
