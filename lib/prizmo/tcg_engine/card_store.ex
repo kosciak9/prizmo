@@ -170,6 +170,16 @@ defmodule Prizmo.TcgEngine.CardStore do
     |> collect_results()
   end
 
+  def discard_cards_from_deck(game_id, player_id, cards) do
+    cards
+    |> Enum.map(fn card ->
+      with {:ok, position} <- next_discard_position(game_id, player_id) do
+        update(card, :discard, %{position: position})
+      end
+    end)
+    |> collect_results()
+  end
+
   def move_deck_card_to_hand(game_id, player_id, %CardInstance{} = card) do
     with {:ok, position} <- next_hand_position_result(game_id, player_id) do
       update(card, :draw_to_hand, %{position: position})

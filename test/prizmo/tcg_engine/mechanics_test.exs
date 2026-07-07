@@ -4761,6 +4761,86 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
     end
   end
 
+  describe "TEF-147 Explorer's Guidance" do
+    test "puts two of the top six cards into hand and discards the rest" do
+      {:ok, game} = create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147)
+      assert {:ok, game} = Mechanics.pass_turn(game, "player_1")
+      explorers_guidance = move_owned_or_custom_card_to_hand(game.id, "player_2", "TEF-147", 1)
+
+      top_cards =
+        stage_top_deck_cards(game.id, "player_2", [
+          "TWM-129",
+          "SCR-133",
+          "MEE-001",
+          "TWM-128",
+          "POR-071",
+          "MEE-002"
+        ])
+
+      inspected_ids = Enum.map(top_cards, & &1.id)
+      selected = [List.first(inspected_ids), List.last(inspected_ids)]
+      discarded = inspected_ids -- selected
+
+      assert CardCoverage.summarize("TEF-147").coverage_status == :supported
+
+      assert {:ok, game} = Mechanics.play_card(game, "player_2", explorers_guidance.id, %{})
+
+      [prompt] = awaiting_prompts(game.id)
+      assert prompt.player_id == "player_2"
+      assert prompt.prompt_type == "select_cards"
+      assert prompt.payload["choice_key"] == "search_top_6_for_2_cards_then_discard_rest"
+      assert prompt.payload["min"] == 2
+      assert prompt.payload["max"] == 2
+      assert prompt.payload["look_count"] == 6
+      assert prompt.payload["deck_slice_position"] == "top"
+      assert prompt.payload["inspected_card_count"] == 6
+      assert prompt.payload["inspected_card_ids"] == inspected_ids
+      assert Enum.sort(prompt.payload["legal_choices"]) == Enum.sort(inspected_ids)
+
+      assert {:ok, view_with_prompt} = GameView.for_player(game.id, "player_2")
+      [view_prompt] = view_with_prompt.prompts
+
+      assert Enum.sort(Enum.map(view_prompt.payload["legal_choice_cards"], & &1.id)) ==
+               Enum.sort(inspected_ids)
+
+      assert Enum.map(view_prompt.payload["inspected_cards"], & &1.id) == inspected_ids
+
+      hand_before = cards_in_zone(game.id, "player_2", :hand)
+      deck_before = cards_in_zone(game.id, "player_2", :deck)
+
+      assert {:ok, game} = Mechanics.choose_prompt(game, "player_2", prompt.id, selected)
+
+      assert Enum.all?(selected, &(zone(&1) == :hand))
+      assert Enum.all?(discarded, &(zone(&1) == :discard))
+      assert zone(explorers_guidance.id) == :discard
+      assert length(cards_in_zone(game.id, "player_2", :hand)) == length(hand_before) + 2
+      assert length(cards_in_zone(game.id, "player_2", :deck)) == length(deck_before) - 6
+
+      cards_moved_event =
+        game.id
+        |> game_events_by_type("cards_moved")
+        |> Enum.find(&(&1.payload["effect_key"] == "search_top_6_for_2_cards_then_discard_rest"))
+
+      assert Enum.sort(Enum.map(cards_moved_event.payload["cards"], & &1["instance_id"])) ==
+               Enum.sort(selected)
+
+      assert Enum.sort(
+               Enum.map(cards_moved_event.payload["discarded_cards"], & &1["instance_id"])
+             ) ==
+               Enum.sort(discarded)
+
+      assert cards_moved_event.payload["public_reveal"] == true
+
+      assert Enum.sort(Enum.map(cards_moved_event.payload["revealed_cards"], & &1["instance_id"])) ==
+               Enum.sort(discarded)
+
+      refute Enum.any?(
+               game_events_by_type(game.id, "deck_shuffled"),
+               &(&1.payload["effect_key"] == "search_top_6_for_2_cards_then_discard_rest")
+             )
+    end
+  end
+
   describe "TWM-151 Hassel" do
     test "requires an own Pokémon knockout during the opponent's last turn" do
       {:ok, game} = create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147)

@@ -992,13 +992,22 @@ defmodule Prizmo.TcgEngine.CardPlay do
        ) do
     with {:ok, target_cards} <-
            validate_search_top_deck_effect(game.id, player.player_id, effect, target_ids),
+         {:ok, unselected_inspected_cards} <-
+           unselected_inspected_deck_cards(game.id, player.player_id, effect, target_cards),
          {:ok, moved_targets} <- move_search_targets(game, turn, player, effect, target_cards),
+         {:ok, discarded_cards} <-
+           maybe_discard_unselected_inspected_cards(
+             game.id,
+             player.player_id,
+             effect,
+             unselected_inspected_cards
+           ),
          {:ok, _event} <-
            write_event_and_snapshot(
              game.id,
              :cards_moved,
              player.player_id,
-             search_cards_moved_payload(card, effect, moved_targets)
+             search_cards_moved_payload(card, effect, moved_targets, discarded_cards)
            ),
          {:ok, _event} <- maybe_shuffle_and_write_deck_shuffled(game, turn, player, card, effect) do
       complete_play_card_resolution(game, turn, player, card, effect)
@@ -1638,6 +1647,33 @@ defmodule Prizmo.TcgEngine.CardPlay do
              }) do
         {:ok, discarded_cards}
       end
+    else
+      {:ok, []}
+    end
+  end
+
+  defp unselected_inspected_deck_cards(game_id, player_id, effect, selected_cards) do
+    if Map.get(effect.params, :discard_unselected_inspected?, false) do
+      source_position = deck_slice_position(effect)
+      look_count = Map.fetch!(effect.params, :look_count)
+      selected_card_ids = MapSet.new(selected_cards, & &1.id)
+
+      with {:ok, deck_cards} <- CardStore.cards_in_zone(game_id, player_id, :deck) do
+        deck_cards
+        |> deck_slice_cards(source_position, look_count)
+        |> Enum.reject(&MapSet.member?(selected_card_ids, &1.id))
+        |> then(&{:ok, &1})
+      end
+    else
+      {:ok, []}
+    end
+  end
+
+  defp maybe_discard_unselected_inspected_cards(_game_id, _player_id, _effect, []), do: {:ok, []}
+
+  defp maybe_discard_unselected_inspected_cards(game_id, player_id, effect, cards) do
+    if Map.get(effect.params, :discard_unselected_inspected?, false) do
+      CardStore.discard_cards_from_deck(game_id, player_id, cards)
     else
       {:ok, []}
     end
@@ -4491,21 +4527,22 @@ defmodule Prizmo.TcgEngine.CardPlay do
     ]
   end
 
-  defp search_cards_moved_payload(card, effect, moved_targets) do
+  defp search_cards_moved_payload(card, effect, moved_targets, discarded_cards \\ []) do
     moved_cards =
       EventPayloads.moved_cards(moved_targets, :deck, search_effect_destination_zone(effect))
 
-    maybe_put_reveal_payload(
-      %{
-        reason: :effect_resolution,
-        source: EventPayloads.card_source(card),
-        effect_key: effect.key,
-        cards: moved_cards
-      },
+    %{
+      reason: :effect_resolution,
+      source: EventPayloads.card_source(card),
+      effect_key: effect.key,
+      cards: moved_cards
+    }
+    |> maybe_put_reveal_payload(
       card,
       effect,
       moved_cards
     )
+    |> maybe_put_discarded_inspected_payload(card, discarded_cards)
   end
 
   defp maybe_put_reveal_payload(payload, card, %{params: %{reveal: true}}, moved_cards) do
@@ -4516,6 +4553,28 @@ defmodule Prizmo.TcgEngine.CardPlay do
   end
 
   defp maybe_put_reveal_payload(payload, _card, _effect, _moved_cards), do: payload
+
+  defp maybe_put_discarded_inspected_payload(payload, _card, []), do: payload
+
+  defp maybe_put_discarded_inspected_payload(payload, card, discarded_cards) do
+    discarded_payloads = EventPayloads.moved_cards(discarded_cards, :deck, :discard)
+    revealed_cards = Map.get(payload, :revealed_cards, []) ++ discarded_payloads
+    card_name = card_name(card, card.card_id)
+    discarded_count = length(discarded_payloads)
+
+    payload
+    |> Map.put(:discarded_cards, discarded_payloads)
+    |> Map.put(:public_reveal, revealed_cards != [])
+    |> Map.put(:source_card_id, card.card_id)
+    |> Map.put(:revealed_cards, revealed_cards)
+    |> Map.put(
+      :public_note,
+      "#{card_name} discarded #{discarded_count} #{card_word(discarded_count)} from the inspected deck cards."
+    )
+  end
+
+  defp card_word(1), do: "card"
+  defp card_word(_count), do: "cards"
 
   defp recover_discard_to_deck_public_note(%CardInstance{card_id: "DRI-168"}, 1),
     do: "Sacred Ash shuffled 1 Pokémon from discard into the deck."
@@ -4864,6 +4923,7 @@ defmodule Prizmo.TcgEngine.CardPlay do
               :search_top_7_for_pokemon_and_trainer_to_hand,
               :search_top_8_for_up_to_3_cards_if_own_pokemon_knocked_out,
               :search_top_7_for_grass_pokemon_or_basic_grass_energy,
+              :search_top_6_for_2_cards_then_discard_rest,
               :search_bottom_7_for_pokemon_to_hand
             ] do
     case CardStore.list_cards(game_id) do
@@ -5101,6 +5161,10 @@ defmodule Prizmo.TcgEngine.CardPlay do
 
   defp search_top_deck_choice_step(:search_top_7_for_grass_pokemon_or_basic_grass_energy) do
     %{params: %{look_count: 7}}
+  end
+
+  defp search_top_deck_choice_step(:search_top_6_for_2_cards_then_discard_rest) do
+    %{params: %{look_count: 6}}
   end
 
   defp search_top_deck_choice_step(:search_bottom_7_for_pokemon_to_hand) do

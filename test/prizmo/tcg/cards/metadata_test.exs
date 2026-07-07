@@ -138,6 +138,20 @@ defmodule Prizmo.Tcg.Cards.MetadataTest do
     assert metadata.raw_effect =~ "Each player shuffles their hand into their deck."
   end
 
+  test "normalizes cached TEF-147 Explorer's Guidance metadata" do
+    metadata = Metadata.fetch!("TEF-147")
+
+    assert metadata.tcgdex_id == "sv05-147"
+    assert metadata.name == "Explorer's Guidance"
+    assert metadata.category == :trainer
+    assert metadata.trainer_type == :supporter
+    refute metadata.ace_spec?
+    assert metadata.regulation_mark == "H"
+
+    assert metadata.raw_effect ==
+             "Look at the top 6 cards of your deck and put 2 of them into your hand. Discard the other cards."
+  end
+
   test "normalizes cached Energy metadata" do
     metadata = Metadata.fetch!("POR-088")
 

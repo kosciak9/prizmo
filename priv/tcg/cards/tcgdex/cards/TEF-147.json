@@ -1,0 +1,83 @@
+{
+  "prizmo_id": "TEF-147",
+  "source": {
+    "base_url": "https://api.tcgdex.net/v2/en",
+    "dynamic_fields_removed": [
+      "pricing"
+    ],
+    "language": "en",
+    "provider": "TCGdex"
+  },
+  "tcgdex": {
+    "category": "Trainer",
+    "effect": "Look at the top 6 cards of your deck and put 2 of them into your hand. Discard the other cards.",
+    "id": "sv05-147",
+    "illustrator": "Hideki Ishikawa",
+    "image": "https://assets.tcgdex.net/en/sv/sv05/147",
+    "legal": {
+      "expanded": true,
+      "standard": true
+    },
+    "localId": "147",
+    "name": "Explorer's Guidance",
+    "rarity": "Uncommon",
+    "regulationMark": "H",
+    "set": {
+      "cardCount": {
+        "official": 162,
+        "total": 218
+      },
+      "id": "sv05",
+      "name": "Temporal Forces",
+      "symbol": "https://assets.tcgdex.net/univ/sv/sv05/symbol"
+    },
+    "trainerType": "Supporter",
+    "updated": "2026-05-06T18:45:51Z",
+    "variants": {
+      "firstEdition": false,
+      "holo": true,
+      "normal": true,
+      "reverse": true,
+      "wPromo": false
+    },
+    "variants_detailed": [
+      {
+        "size": "standard",
+        "type": "normal",
+        "variantId": "endfynwn4n10gzq"
+      },
+      {
+        "size": "standard",
+        "type": "reverse",
+        "variantId": "cm4kqul3x1bwlz1f"
+      },
+      {
+        "foil": "cosmos",
+        "size": "standard",
+        "stamp": [
+          "player-rewards-program"
+        ],
+        "type": "holo",
+        "variantId": "6x9wic2vzb5bfzn0gz10e76xy60nqt2vwbzzupgwp6"
+      },
+      {
+        "size": "standard",
+        "stamp": [
+          "regional-championships"
+        ],
+        "type": "normal",
+        "variantId": "gx8bq2hegvl5g45wgglxhz3i120jscen0psbo"
+      },
+      {
+        "size": "standard",
+        "stamp": [
+          "regional-championships",
+          "staff"
+        ],
+        "type": "normal",
+        "variantId": "80gdqxre91h6u93zd18nahawka6ni9aofap3umtkgy"
+      }
+    ]
+  },
+  "tcgdex_id": "sv05-147"
+}

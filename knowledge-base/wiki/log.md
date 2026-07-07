@@ -1,5 +1,12 @@
 # Wiki Log
 
+## [2026-07-07] codebase update | Goal 2 Explorer's Guidance support
+
+- Task attempted: closed `TEF-147` Explorer's Guidance as the remaining two-archetype shared unimplemented Goal 2 Supporter after Glalie. Added committed TCGdex metadata, authored Explorer's Guidance as an engine-defined Supporter that prompts over the top 6 deck cards, moves exactly 2 selected inspected cards to hand without public reveal, discards the other inspected cards, records the discarded cards publicly, and does not shuffle afterward.
+- Files changed: `lib/prizmo/tcg_engine/card_store.ex`, `lib/prizmo/tcg_engine/cards/registry.ex`, `lib/prizmo/tcg_engine/card_play.ex`, `priv/tcg/cards/tcgdex/cards/TEF-147.json`, `test/prizmo/tcg/cards/metadata_test.exs`, `test/prizmo/tcg_engine/mechanics_test.exs`, `knowledge-base/wiki/engine/goal-2-top-30-latest-limitless-coverage-scope.md`, `knowledge-base/wiki/engine/ash-backed-tcg-engine-playtest-handoff.md`, `knowledge-base/wiki/log.md`.
+- Validation: `mix test test/prizmo/tcg_engine/mechanics_test.exs --only "describe:TEF-147 Explorer's Guidance"`; `mix test test/prizmo/tcg/cards/metadata_test.exs`; `mix format`; `mix test test/prizmo/tcg/cards/metadata_test.exs test/prizmo/tcg_engine/mechanics_test.exs`; `mix compile --warnings-as-errors`; `mix prizmo.goal2.corpus` confirmed `supported=198` / `generic-supported=8` / `partial=9` / `unimplemented=162` and `cached=218` / `missing=159`; final `mix check` passed.
+- Remaining/blocking notes: `TEF-147` is no longer in the Archaludon ex / Ceruledge ex incomplete lists. The default next Goal 2 priority is the high-share cached Dragapult pair `TWM-099` / `TWM-100` unless a fresh corpus run re-ranks the queue or the next agent chooses the coherent N's Zoroark ex metadata-missing queue.
+
 ## [2026-07-07] codebase update | Goal 2 Glalie support
 
 - Task attempted: closed `TWM-052` Glalie as the default shared Goal 2 unimplemented card after the Greninja/Grand Tree batch. Added cached TCGdex metadata, authored `Damage Beat` as 20 damage per existing damage counter on the opponent's Active Pokémon, authored `Crazy Headbutt` as 140 damage plus mandatory one attached-Energy discard from the attacking Pokémon, and wired the new attacker-attached Energy discard through `GameView` and the temporary React resolver when multiple attached Energy choices exist.

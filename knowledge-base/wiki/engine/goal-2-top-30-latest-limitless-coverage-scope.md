@@ -64,13 +64,13 @@ Those reports are the canonical starting point for autonomous Goal 2 implementat
 - Tracked top archetypes: `30`
 - Tracked cards with usage greater than `0.00`: `377`
 - Coverage buckets from `mix prizmo.goal2.corpus`:
-  - `supported=197`
+  - `supported=198`
   - `generic-supported=8`
   - `partial=9`
-  - `unimplemented=163`
+  - `unimplemented=162`
 - Metadata buckets:
-  - `cached=217`
-  - `missing=160`
+  - `cached=218`
+  - `missing=159`
 
 Important interpretation:
 
@@ -114,14 +114,16 @@ The latest Goal 2 engine batch closed the shared Greninja/Mega Greninja line clu
 
 The newest Goal 2 engine batch closed `TWM-052` Glalie as the prior default shared unimplemented card. It now has cached TCGdex metadata and executable Ash engine behavior as a Stage 1 Water Pokémon: `Damage Beat` deals 20 damage for each damage counter already on the opponent's Active Pokémon, while `Crazy Headbutt` deals 140 damage and then discards one attached Energy from the attacker. The batch added reusable attack support for `:damage_per_defender_damage_counter` and mandatory `:discard_attached_energy_from_attacker`, including GameView pending-resolution flags and temporary React resolver selection when multiple attached Energy cards are available.
 
+The latest Goal 2 engine batch closed `TEF-147` Explorer's Guidance as the remaining two-archetype shared unimplemented Supporter. It now has committed TCGdex metadata and executable Ash engine behavior as a Supporter: it opens a private prompt over the top 6 cards of the acting player's deck, requires exactly 2 selected cards to move to hand without public reveal, discards the other inspected cards, records those discarded cards publicly, and deliberately does not shuffle afterward.
+
 ### Highest-priority remaining `unimplemented` cards from current report
 
 | Card | Archetypes | Total share | Notes |
 | --- | --- | --- | --- |
-| `TEF-147` Explorer's Guidance | `2` | `0.40%` | Shared Archaludon ex / Ceruledge ex metadata-missing Supporter blocker. |
 | `TWM-099` Hisuian Growlithe | `1` | `49.22%` | Dragapult-only cached Pokémon blocker; high share but not shared. |
 | `TWM-100` Hisuian Arcanine | `1` | `49.22%` | Dragapult-only cached Pokémon blocker adjacent to `TWM-099`; high share but not shared. |
 | `ASC-155` N's Zekrom | `1` | `8.02%` | N's Zoroark ex metadata-missing blocker; first entry in a large coherent N's Zoroark queue. |
+| `CRI-083` Transformation Tome | `1` | `8.02%` | N's Zoroark ex metadata-missing Trainer blocker adjacent to the large N's queue. |
 
 ### Shared `partial` cards worth finishing after the broad unimplemented slice
 
@@ -148,12 +150,11 @@ That means prior Goal 1 and six-deck coverage was not wasted; it now acts as see
 
 ## Recommended next implementation order
 
-1. Treat `TEF-147` Explorer's Guidance as the next default shared queue item unless the live corpus re-ranks the blockers; it is now the remaining two-archetype unimplemented Supporter blocker at `0.40%` total share.
-2. Keep the remaining Dragapult-only cached pair `TWM-099` / `TWM-100` as deliberate high-share single-archetype cleanup, not the default autonomous shared queue.
+1. Treat the remaining Dragapult-only cached pair `TWM-099` / `TWM-100` as the next default high-share cleanup now that `TEF-147` is closed and the current report no longer has a multi-archetype unimplemented card ahead of the partial queue.
+2. Consider the large N's Zoroark ex metadata-missing queue (`ASC-155`, `CRI-083`, `JTG-*`, `MEG-107`, `PFL-*`, `POR-051`, `PRE-*`, `SSP-165`, `TWM-164`, `WHT-055`) after the high-share Dragapult cached pair, or sooner if the next agent prioritizes coherent single-archetype metadata ingestion over Dragapult cleanup.
 3. Treat the remaining Mega Greninja ex single-archetype blockers (`CRI-022`, `PRE-054`, plus partial `WHT-086`) as adjacent but lower-priority cleanup unless a coherent Mega Greninja batch is explicitly selected.
-4. Consider the large N's Zoroark ex metadata-missing queue (`ASC-155`, `JTG-*`, `MEG-107`, `PFL-*`, `POR-051`, `PRE-*`, `SSP-165`, `TWM-164`, `WHT-055`) after the small shared `TEF-147` slice unless the user chooses high-share Dragapult cleanup first.
-5. Finish the remaining shared partials only after the broad unimplemented slice unless another batch naturally extends existing primitives; if returning to Energy work soon, `WHT-086`, `POR-086`, and `TWM-167` are the strongest shared partials.
-6. Keep using `mix prizmo.goal2.corpus` after each batch to re-rank the next blockers by archetype count and weighted share.
+4. Finish the remaining shared partials only after the broad unimplemented slice unless another batch naturally extends existing primitives; if returning to Energy work soon, `WHT-086`, `POR-086`, and `TWM-167` are the strongest shared partials.
+5. Keep using `mix prizmo.goal2.corpus` after each batch to re-rank the next blockers by archetype count and weighted share.
 
 ## See Also
 

@@ -1430,6 +1430,27 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     ]
   }
 
+  @explorers_guidance %CardDefinition{
+    id: "TEF-147",
+    kind: :trainer,
+    trainer_type: :supporter,
+    play_window: :action_window,
+    effects: [
+      %Effect{
+        key: :search_top_6_for_2_cards_then_discard_rest,
+        type: :search_top_deck,
+        params: %{
+          look_count: 6,
+          min_count: 2,
+          max_count: 2,
+          destination: :hand,
+          reveal: false,
+          discard_unselected_inspected?: true
+        }
+      }
+    ]
+  }
+
   @wondrous_patch %CardDefinition{
     id: "PFL-094",
     kind: :trainer,
@@ -1546,6 +1567,7 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     @carmine.id => @carmine,
     @ciphermaniacs_codebreaking.id => @ciphermaniacs_codebreaking,
     @eri.id => @eri,
+    @explorers_guidance.id => @explorers_guidance,
     @mortys_conviction.id => @mortys_conviction,
     @wondrous_patch.id => @wondrous_patch,
     @fan_rotom.id => @fan_rotom
