@@ -130,7 +130,7 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
       prism_tower_affordance(game, player, current_turn, cards, all_cards),
       lumiose_city_affordance(game, player, current_turn, all_cards),
       play_basic_to_bench_affordance(player, cards),
-      attach_energy_affordance(player, cards),
+      attach_energy_affordance(game, player, cards),
       attach_tool_affordance(game, player, cards),
       retreat_affordance(game, player, current_turn, cards)
     ] ++
@@ -288,13 +288,14 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
     end
   end
 
-  defp attach_energy_affordance(%GamePlayer{energy_attached_this_turn?: true}, _cards), do: nil
+  defp attach_energy_affordance(_game, %GamePlayer{energy_attached_this_turn?: true}, _cards),
+    do: nil
 
-  defp attach_energy_affordance(%GamePlayer{} = player, cards) do
+  defp attach_energy_affordance(%Game{} = game, %GamePlayer{} = player, cards) do
     source_ids =
       cards
       |> hand_cards()
-      |> Enum.filter(&energy_card?/1)
+      |> Enum.filter(&generic_energy_attachable?(game, player, &1))
       |> card_ids()
 
     target_ids = cards |> in_play_pokemon_cards() |> card_ids()
@@ -888,6 +889,17 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
 
   defp energy_card?(%CardInstance{card_id: card_id}) do
     match?({:ok, %{supertype: :energy}}, CardCatalog.fetch(card_id))
+  end
+
+  defp generic_energy_attachable?(%Game{} = game, %GamePlayer{} = player, %CardInstance{
+         card_id: card_id
+       }) do
+    with {:ok, %{supertype: :energy} = metadata} <- CardCatalog.fetch(card_id),
+         :ok <- Requirements.require_ace_spec_available(player, metadata, game.id) do
+      true
+    else
+      _other -> false
+    end
   end
 
   defp tool_card?(%CardInstance{card_id: card_id}) do

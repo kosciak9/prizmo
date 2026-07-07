@@ -64,13 +64,13 @@ Those reports are the canonical starting point for autonomous Goal 2 implementat
 - Tracked top archetypes: `30`
 - Tracked cards with usage greater than `0.00`: `377`
 - Coverage buckets from `mix prizmo.goal2.corpus`:
-  - `supported=182`
+  - `supported=184`
   - `generic-supported=8`
   - `partial=10`
-  - `unimplemented=177`
+  - `unimplemented=175`
 - Metadata buckets:
-  - `cached=202`
-  - `missing=175`
+  - `cached=204`
+  - `missing=173`
 
 Important interpretation:
 
@@ -96,13 +96,15 @@ The newest Goal 2 engine batch closed `TWM-151` Hassel as the prior highest-shar
 
 The latest Goal 2 engine batch closed `JTG-149` Iris's Fighting Spirit as the prior highest-share shared unimplemented card. It now has committed TCGdex metadata and executable Ash engine behavior as a Supporter: it requires discarding another card from hand through the shared discard-cost prompt, discards itself through normal Supporter play, then draws until the acting player has 6 cards in hand. The draw-until availability guard now accounts for discard-from-hand costs before deciding whether the effect can draw.
 
+The newest Goal 2 engine batch closed `TEF-162` Neo Upper Energy as the prior highest-share shared unimplemented card. It now has committed TCGdex metadata and executable Ash engine behavior as an ACE SPEC Special Energy: when attached to a non-Stage 2 Pokémon it provides one Colorless Energy, and when attached to a Stage 2 Pokémon it provides two units of any supported basic Energy type for attack-cost payment. The batch also tightened the generic Energy attachment path so ACE SPEC Energy attachments mark ACE SPEC usage and later ACE SPEC plays are rejected server-side.
+
 ### Highest-priority remaining `unimplemented` cards from current report
 
 | Card | Archetypes | Total share | Notes |
 | --- | --- | --- | --- |
-| `TEF-162` Neo Upper Energy | `2` | `0.90%` | New highest-share shared unimplemented card after closing Iris's Fighting Spirit; confirm Special Energy text and attachment/payment semantics before implementation. |
-| `POR-082` Pokémon Catcher | `2` | `0.80%` | Shared Ceruledge ex / Ethan's Typhlosion Item candidate behind Neo Upper Energy. |
+| `POR-082` Pokémon Catcher | `2` | `0.80%` | New highest-share shared unimplemented card after closing Neo Upper Energy; confirm coin-flip switch semantics and existing opponent-Bench replacement paths before implementation. |
 | `TEF-084` Relicanth | `2` | `0.77%` | Shared Archaludon ex / Cynthia's Garchomp ex Pokémon candidate behind Pokémon Catcher. |
+| `MEG-129` Surfing Beach | `2` | `0.70%` | Shared Mega Greninja ex / Mega Starmie ex Stadium candidate behind Relicanth. |
 
 ### Shared `partial` cards worth finishing after the broad unimplemented slice
 
@@ -129,8 +131,8 @@ That means prior Goal 1 and six-deck coverage was not wasted; it now acts as see
 
 ## Recommended next implementation order
 
-1. Treat `TEF-162` Neo Upper Energy as the next default shared unimplemented card unless the live corpus re-ranks the queue; confirm metadata/text and Special Energy semantics before selecting the exact implementation shape.
-2. Keep `POR-082` Pokémon Catcher and `TEF-084` Relicanth behind Neo Upper Energy as the next shared metadata-missing candidates by weighted share.
+1. Treat `POR-082` Pokémon Catcher as the next default shared unimplemented card unless the live corpus re-ranks the queue; confirm metadata/text and coin-flip switching semantics before selecting the exact implementation shape.
+2. Keep `TEF-084` Relicanth and `MEG-129` Surfing Beach behind Pokémon Catcher as the next shared metadata-missing candidates by weighted share.
 3. Keep the remaining Dragapult-only cached pair `TWM-099` / `TWM-100` as deliberate single-archetype cleanup, not the default autonomous queue.
 4. Finish the remaining shared partials only after the broad unimplemented slice unless another batch naturally extends the new HP infrastructure; if returning to HP work soon, `POR-086` Growing Grass Energy remains the strongest follow-up.
 5. Keep using `mix prizmo.goal2.corpus` after each batch to re-rank the next blockers by archetype count and weighted share.

@@ -43,6 +43,18 @@ defmodule Prizmo.TcgEngine.EnergyEffects do
       {:ok,
        %{
          supertype: :energy,
+         effect: %{type: :provides_every_type_when_attached_to_stage_2},
+         provides: provides
+       }} ->
+        if attached_to_stage_2_pokemon?(energy_card, attached_target_card) do
+          @prism_energy_basic_types
+        else
+          normalize_provides(provides)
+        end
+
+      {:ok,
+       %{
+         supertype: :energy,
          effect: %{type: :provides_every_type_when_attached_to_basic},
          provides: provides
        }} ->
@@ -78,6 +90,14 @@ defmodule Prizmo.TcgEngine.EnergyEffects do
   @spec provider_count(CardInstance.t(), CardInstance.t() | nil) :: pos_integer()
   def provider_count(%CardInstance{} = energy_card, attached_target_card \\ nil) do
     case CardCatalog.fetch(energy_card.card_id) do
+      {:ok,
+       %{
+         supertype: :energy,
+         effect: %{type: :provides_every_type_when_attached_to_stage_2, provider_count: count}
+       }}
+      when is_integer(count) and count > 0 ->
+        if attached_to_stage_2_pokemon?(energy_card, attached_target_card), do: count, else: 1
+
       {:ok, %{supertype: :energy, energy_type: :basic, provides: provides}}
       when is_list(provides) ->
         if :grass in provides and wild_growth_applies?(energy_card, attached_target_card) do
@@ -119,6 +139,9 @@ defmodule Prizmo.TcgEngine.EnergyEffects do
 
         %{type: :team_rocket_energy_attachment_and_dual_provides} ->
           require_team_rocket_energy_target(energy_card, target_card)
+
+        %{type: :provides_every_type_when_attached_to_stage_2} ->
+          {:ok, nil}
 
         %{type: :grass_pokemon_hp_plus_20_energy} ->
           {:ok, nil}
@@ -607,9 +630,36 @@ defmodule Prizmo.TcgEngine.EnergyEffects do
 
   defp attached_to_basic_pokemon?(_energy_card, _attached_target_card), do: false
 
+  defp attached_to_stage_2_pokemon?(
+         %CardInstance{
+           game_id: game_id,
+           attached_to_card_instance_id: attached_to_card_instance_id
+         },
+         nil
+       )
+       when is_binary(game_id) and is_binary(attached_to_card_instance_id) do
+    case CardStore.get_card(game_id, attached_to_card_instance_id) do
+      {:ok, attached_target_card} -> stage_2_pokemon?(attached_target_card)
+      _other -> false
+    end
+  end
+
+  defp attached_to_stage_2_pokemon?(_energy_card, %CardInstance{} = attached_target_card) do
+    stage_2_pokemon?(attached_target_card)
+  end
+
+  defp attached_to_stage_2_pokemon?(_energy_card, _attached_target_card), do: false
+
   defp basic_pokemon?(%CardInstance{card_id: card_id}) do
     case CardCatalog.fetch(card_id) do
       {:ok, %{supertype: :pokemon, stage: :basic}} -> true
+      _other -> false
+    end
+  end
+
+  defp stage_2_pokemon?(%CardInstance{card_id: card_id}) do
+    case CardCatalog.fetch(card_id) do
+      {:ok, %{supertype: :pokemon, stage: :stage_2}} -> true
       _other -> false
     end
   end

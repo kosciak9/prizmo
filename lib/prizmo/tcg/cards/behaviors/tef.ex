@@ -119,4 +119,13 @@ defmodule Prizmo.Tcg.Cards.Behaviors.TEF do
   card "TEF-161" do
     card_effect(effect: %{type: :prevent_opponent_attack_effects_to_attached_pokemon})
   end
+
+  card "TEF-162" do
+    card_effect(
+      effect: %{
+        type: :provides_every_type_when_attached_to_stage_2,
+        provider_count: 2
+      }
+    )
+  end
 end

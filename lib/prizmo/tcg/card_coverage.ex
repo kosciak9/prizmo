@@ -241,6 +241,17 @@ defmodule Prizmo.Tcg.CardCoverage do
   defp unsupported_ability_count(_card), do: 0
 
   defp supported_special_energy?(%{
+         effect: %{
+           type: :provides_every_type_when_attached_to_stage_2,
+           provider_count: provider_count
+         },
+         provides: provides
+       })
+       when is_integer(provider_count) and provider_count > 0 and is_list(provides) do
+    :colorless in provides
+  end
+
+  defp supported_special_energy?(%{
          effect: %{type: :provides_every_type_when_attached_to_basic},
          provides: provides
        })

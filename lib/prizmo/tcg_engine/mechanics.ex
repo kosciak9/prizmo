@@ -87,6 +87,7 @@ defmodule Prizmo.TcgEngine.Mechanics do
   alias Prizmo.TcgEngine.EventPayloads
   alias Prizmo.TcgEngine.Flow.Interpreter, as: FlowInterpreter
   alias Prizmo.TcgEngine.Game
+  alias Prizmo.TcgEngine.GamePlayer
   alias Prizmo.TcgEngine.GameSetup
   alias Prizmo.TcgEngine.HpEffects
   alias Prizmo.TcgEngine.PendingEffect
@@ -440,6 +441,8 @@ defmodule Prizmo.TcgEngine.Mechanics do
            :ok <- require_card_zone(energy_card, :hand),
            :ok <- require_in_play_pokemon_zone(target_card),
            :ok <- require_energy(energy_card.card_id),
+           {:ok, energy_metadata} <- CardCatalog.fetch(energy_card.card_id),
+           :ok <- require_ace_spec_available(player, energy_metadata, game.id),
            {:ok, position} <- next_attachment_position(game.id, target_card.id),
            {:ok, _energy_card} <-
              update(energy_card, :attach, %{
@@ -448,7 +451,7 @@ defmodule Prizmo.TcgEngine.Mechanics do
              }),
            {:ok, recovered_special_condition} <-
              StadiumEffects.recover_special_condition(game.id, target_card),
-           {:ok, _player} <- update(player, :mark_energy_attached, %{}),
+           {:ok, _player} <- mark_energy_flags(player, energy_metadata),
            {:ok, _attach_event} <-
              write_event_and_snapshot(
                game.id,
@@ -482,6 +485,18 @@ defmodule Prizmo.TcgEngine.Mechanics do
        }) do
     write_event_and_snapshot(game_id, type, player_id, Map.put(payload, :turn_id, turn_id))
   end
+
+  defp mark_energy_flags(%GamePlayer{} = player, metadata) do
+    with {:ok, player} <- update(player, :mark_energy_attached, %{}) do
+      maybe_mark_energy_ace_spec_played(player, metadata)
+    end
+  end
+
+  defp maybe_mark_energy_ace_spec_played(%GamePlayer{} = player, %{ace_spec?: true}) do
+    update(player, :mark_ace_spec_played, %{})
+  end
+
+  defp maybe_mark_energy_ace_spec_played(%GamePlayer{} = player, _metadata), do: {:ok, player}
 
   defp shuffle_lumiose_city_deck(%Game{} = game, %Turn{} = turn, player_id) do
     context = {:stadium_deck_shuffle, player_id, turn.turn_number, :lumiose_city}

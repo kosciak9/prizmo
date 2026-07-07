@@ -1,5 +1,12 @@
 # Wiki Log
 
+## [2026-07-07] codebase update | Goal 2 Neo Upper Energy support
+
+- Task attempted: closed `TEF-162` Neo Upper Energy as the highest-share shared unimplemented Goal 2 card after Iris's Fighting Spirit. Added committed TCGdex metadata, authored Neo Upper Energy as an ACE SPEC Special Energy that provides one Colorless Energy normally and two units of any supported basic Energy type while attached to a Stage 2 Pokémon, and tightened generic Energy attachment so ACE SPEC Energy attachments enforce and mark ACE SPEC usage.
+- Files changed: `lib/prizmo/tcg/cards/behaviors/tef.ex`, `lib/prizmo/tcg_engine/energy_effects.ex`, `lib/prizmo/tcg/card_coverage.ex`, `lib/prizmo/tcg_engine/game_view.ex`, `lib/prizmo/tcg_engine/game_view/action_affordances.ex`, `lib/prizmo/tcg_engine/mechanics.ex`, `priv/tcg/cards/tcgdex/cards/TEF-162.json`, `test/prizmo/tcg_engine/mechanics_test.exs`, `knowledge-base/wiki/engine/goal-2-top-30-latest-limitless-coverage-scope.md`, `knowledge-base/wiki/engine/ash-backed-tcg-engine-playtest-handoff.md`, `knowledge-base/wiki/log.md`.
+- Validation: `mix format`; `mix test test/prizmo/tcg/cards/metadata_test.exs test/prizmo/tcg_engine/mechanics_test.exs:1352`; `mix test test/prizmo/tcg_engine/mechanics_test.exs:1399`; `mix test test/prizmo/tcg/cards/metadata_test.exs test/prizmo/tcg_engine/mechanics_test.exs`; `mix compile --warnings-as-errors`; `mix prizmo.goal2.corpus` confirmed `supported=184` / `generic-supported=8` / `partial=10` / `unimplemented=175` and `cached=204` / `missing=173`; final `mix check` passed.
+- Remaining/blocking notes: `TEF-162` is no longer in the shared incomplete queue. The default next Goal 2 priority is now `POR-082` Pokémon Catcher, followed by `TEF-084` Relicanth and `MEG-129` Surfing Beach unless the live corpus re-ranks the queue.
+
 ## [2026-07-07] codebase update | Goal 2 Iris's Fighting Spirit support
 
 - Task attempted: closed `JTG-149` Iris's Fighting Spirit as the highest-share shared unimplemented Goal 2 card after Hassel. Added committed TCGdex metadata, authored Iris as an engine-defined Supporter with a discard-one-other-card hand cost followed by draw-until-6 behavior, and made the shared draw-until availability guard account for discard-from-hand costs before deciding whether the effect has a draw.

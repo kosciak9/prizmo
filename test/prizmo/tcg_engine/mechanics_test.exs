@@ -13,11 +13,13 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
   alias Prizmo.Tcg.Goal1.Decks.Dragapult28255
   alias Prizmo.Tcg.Goal1.Decks.Dragapult28268
   alias Prizmo.Tcg.Goal1.Decks.DragapultBlaziken28258
+  alias Prizmo.TcgEngine.AttackCosts
   alias Prizmo.TcgEngine.AttackDamage
   alias Prizmo.TcgEngine.AttackEffects
   alias Prizmo.TcgEngine.BattleActions
   alias Prizmo.TcgEngine.CardCatalog
   alias Prizmo.TcgEngine.CardInstance
+  alias Prizmo.TcgEngine.EnergyEffects
   alias Prizmo.TcgEngine.EventLog
   alias Prizmo.TcgEngine.GameEvent
   alias Prizmo.TcgEngine.GamePlayer
@@ -1345,6 +1347,80 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
       assert metal_energy.provides == [:metal]
 
       assert %{coverage_status: :generic_supported} = CardCoverage.summarize("MEE-008")
+    end
+
+    test "TEF-162 Neo Upper Energy provides Colorless normally and 2 of any type on Stage 2" do
+      assert {:ok, neo_upper} = CardCatalog.fetch("TEF-162")
+      assert neo_upper.name == "Neo Upper Energy"
+      assert neo_upper.energy_type == :special
+      assert neo_upper.ace_spec?
+      assert neo_upper.provides == [:colorless]
+
+      assert neo_upper.effect == %{
+               type: :provides_every_type_when_attached_to_stage_2,
+               provider_count: 2
+             }
+
+      assert CardCoverage.summarize("TEF-162").coverage_status == :supported
+
+      {:ok, game} = create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147)
+      basic_attacker = promote_custom_basic_to_active(game.id, "player_1", "JTG-120")
+      basic_neo = attach_direct_energy(game.id, "player_1", basic_attacker, "TEF-162", 1)
+
+      assert EnergyEffects.provided_types(basic_neo) == [:colorless]
+      assert EnergyEffects.provider_count(basic_neo) == 1
+      assert AttackCosts.paid?([:colorless], [basic_neo])
+      refute AttackCosts.paid?([:colorless, :colorless], [basic_neo])
+      refute AttackCosts.paid?([:fire], [basic_neo])
+
+      stage_2_attacker = promote_custom_card_to_active(game.id, "player_1", "TWM-130")
+      stage_2_neo = attach_direct_energy(game.id, "player_1", stage_2_attacker, "TEF-162", 2)
+
+      assert Enum.sort(EnergyEffects.provided_types(stage_2_neo)) ==
+               Enum.sort([
+                 :grass,
+                 :fire,
+                 :water,
+                 :lightning,
+                 :psychic,
+                 :fighting,
+                 :darkness,
+                 :metal
+               ])
+
+      assert EnergyEffects.provider_count(stage_2_neo) == 2
+      assert AttackCosts.paid?([:fire, :psychic], [stage_2_neo])
+      refute AttackCosts.paid?([:fire, :psychic, :water], [stage_2_neo])
+
+      assert {:ok, phantom_dive} = CardCatalog.fetch_attack("TWM-130", :phantom_dive)
+      assert :ok = AttackCosts.require_attack_cost_paid(game.id, stage_2_attacker, phantom_dive)
+    end
+
+    test "TEF-162 attachment marks ACE SPEC usage and blocks later ACE SPEC play" do
+      {:ok, game} = create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147)
+      target = active_card(game.id, "player_1")
+
+      {:ok, neo_upper} = create_custom_owned_card(game.id, "player_1", "TEF-162", 200)
+      {:ok, neo_upper} = ash_update(neo_upper, :draw_to_hand, %{position: 20})
+
+      assert {:ok, game} = Mechanics.attach_energy(game, "player_1", neo_upper.id, target.id)
+
+      player =
+        GamePlayer
+        |> Ash.Query.filter(game_id == ^game.id and player_id == "player_1")
+        |> Ash.read_one!()
+
+      assert player.energy_attached_this_turn?
+      assert player.ace_spec_played_this_game?
+      assert zone(neo_upper.id) == :attached
+
+      {:ok, max_rod} = create_custom_owned_card(game.id, "player_1", "PRE-116", 201)
+      {:ok, max_rod} = ash_update(max_rod, :draw_to_hand, %{position: 21})
+
+      assert {:error, :ace_spec_already_played_this_game} =
+               Mechanics.play_trainer_to_discard(game, "player_1", max_rod.id)
+
+      assert zone(max_rod.id) == :hand
     end
 
     test "ASC-046 Snorunt metadata makes Chilly executable" do
