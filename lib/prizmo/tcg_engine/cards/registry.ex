@@ -562,6 +562,20 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     ]
   }
 
+  @premium_power_pro %CardDefinition{
+    id: "MEG-124",
+    kind: :trainer,
+    trainer_type: :item,
+    play_window: :action_window,
+    effects: [
+      %Effect{
+        key: :turn_bonus_attack_damage_from_fighting_to_opponent_active,
+        type: :turn_bonus_attack_damage_from_fighting_to_opponent_active,
+        params: %{bonus_damage: 30}
+      }
+    ]
+  }
+
   @switch %CardDefinition{
     id: "MEG-130",
     kind: :trainer,
@@ -1373,6 +1387,7 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     @night_stretcher.id => @night_stretcher,
     @poke_pad.id => @poke_pad,
     @pokegear_3_0.id => @pokegear_3_0,
+    @premium_power_pro.id => @premium_power_pro,
     @precious_trolley.id => @precious_trolley,
     @prime_catcher.id => @prime_catcher,
     @rare_candy.id => @rare_candy,

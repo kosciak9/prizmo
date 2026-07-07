@@ -1272,6 +1272,17 @@ defmodule Prizmo.TcgEngine.CardPlay do
          turn,
          player,
          card,
+         %{type: :turn_bonus_attack_damage_from_fighting_to_opponent_active} = effect,
+         _target_ids
+       ) do
+    complete_play_card_resolution(game, turn, player, card, effect)
+  end
+
+  defp complete_play_card_effect(
+         game,
+         turn,
+         player,
+         card,
          %{type: :turn_bonus_attack_damage_to_opponent_active_pokemon_ex} = effect,
          _target_ids
        ) do

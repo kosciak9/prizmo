@@ -1,5 +1,12 @@
 # Wiki Log
 
+## [2026-07-07] codebase update | Goal 2 Premium Power Pro support
+
+- Task attempted: closed `MEG-124` Premium Power Pro as the highest-share shared unimplemented Goal 2 card after Drayton. Added committed TCGdex metadata, authored Premium Power Pro as an engine-defined Item, and extended the attack-damage pipeline so each Premium Power Pro played this turn adds 30 pre-Weakness/Resistance damage to attacks used by the acting player's Fighting Pokémon against the opponent's Active Pokémon.
+- Files changed: `lib/prizmo/tcg_engine/cards/registry.ex`, `lib/prizmo/tcg_engine/card_play.ex`, `lib/prizmo/tcg_engine/attack_damage.ex`, `priv/tcg/cards/tcgdex/cards/MEG-124.json`, `knowledge-base/wiki/engine/goal-2-top-30-latest-limitless-coverage-scope.md`, `knowledge-base/wiki/engine/ash-backed-tcg-engine-playtest-handoff.md`, `knowledge-base/wiki/log.md`.
+- Validation: `mix format`; `mix compile --warnings-as-errors`; `mix test test/prizmo/tcg/cards/metadata_test.exs`; Tidewave runtime validation confirmed `coverage_status: :supported`, GameView play affordance exposure, `card_play_completed` event completion, Fighting attack damage 50→80, and non-Fighting damage unchanged; `mix test test/prizmo/tcg_engine/mechanics_test.exs`; `mix prizmo.goal2.corpus` confirmed `supported=180` / `generic-supported=8` / `partial=10` / `unimplemented=179` and `cached=200` / `missing=177`; final `mix check` passed.
+- Remaining/blocking notes: `MEG-124` is no longer in the shared incomplete queue. The default next Goal 2 priority is now `JTG-156` Redeemable Ticket, followed by `TWM-151` Hassel and `JTG-149` Iris's Fighting Spirit unless the live corpus re-ranks the queue.
+
 ## [2026-07-07] codebase update | Goal 2 Drayton support
 
 - Task attempted: closed `SSP-174` Drayton as the highest-share shared unimplemented Goal 2 card after Team Rocket's Murkrow. Added committed TCGdex metadata, authored Drayton as an engine-defined Supporter on the reusable top-deck-slice search path, generalized top-deck search resolution to enforce search groups, and proved up to one Pokémon plus up to one Trainer can be selected from the inspected top 7 cards while illegal same-kind selections are rejected.

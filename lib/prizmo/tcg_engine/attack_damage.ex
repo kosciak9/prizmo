@@ -39,6 +39,7 @@ defmodule Prizmo.TcgEngine.AttackDamage do
          {:ok, damage} <-
            apply_black_belts_training_bonus(damage, attacker_card, defender_card),
          {:ok, damage} <- apply_kieran_damage_bonus(damage, attacker_card, defender_card),
+         {:ok, damage} <- apply_premium_power_pro_bonus(damage, attacker_card, defender_card),
          {:ok, damage} <- apply_cobalt_command_bonus(damage, attacker_card, defender_card),
          {:ok, damage} <- apply_outgoing_damage_reduction(damage, attacker_card) do
       if weakness_and_resistance_ignored?(attack) do
@@ -779,6 +780,22 @@ defmodule Prizmo.TcgEngine.AttackDamage do
     end
   end
 
+  defp apply_premium_power_pro_bonus(
+         damage,
+         %CardInstance{} = attacker_card,
+         %CardInstance{} = defender_card
+       ) do
+    with {:ok, attacker_metadata} <- CardCatalog.fetch(attacker_card.card_id),
+         true <- fighting_pokemon?(attacker_metadata),
+         true <- opponent_active_defender?(attacker_card, defender_card),
+         {:ok, bonus_count} <- premium_power_pro_play_count_this_turn(attacker_card) do
+      {:ok, damage + bonus_count * 30}
+    else
+      false -> {:ok, damage}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
   defp apply_cobalt_command_bonus(
          damage,
          %CardInstance{} = attacker_card,
@@ -876,6 +893,15 @@ defmodule Prizmo.TcgEngine.AttackDamage do
     end
   end
 
+  defp premium_power_pro_play_count_this_turn(%CardInstance{
+         game_id: game_id,
+         owner_player_id: player_id
+       }) do
+    with {:ok, events} <- current_turn_card_play_completed_events(game_id, player_id) do
+      {:ok, Enum.count(events, &(&1.payload["card_id"] == "MEG-124"))}
+    end
+  end
+
   defp team_rocket_supporter_played_this_turn?(%CardInstance{
          game_id: game_id,
          owner_player_id: player_id
@@ -922,6 +948,13 @@ defmodule Prizmo.TcgEngine.AttackDamage do
   end
 
   defp pokemon_ex_or_v?(_metadata), do: false
+
+  defp fighting_pokemon?(%{supertype: :pokemon, types: types}) when is_list(types) do
+    :fighting in types
+  end
+
+  defp fighting_pokemon?(%{supertype: :pokemon, type: :fighting}), do: true
+  defp fighting_pokemon?(_metadata), do: false
 
   defp apply_tool_attack_damage_bonus(
          damage,
