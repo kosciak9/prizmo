@@ -263,6 +263,20 @@ defmodule Prizmo.TcgEngine.AttackDamage do
     end
   end
 
+  defp apply_effect(damage, %CardInstance{} = attacker_card, _defender_card, %{
+         type: :bonus_damage_if_own_bench_has_damage_counters,
+         bonus_damage: bonus_damage
+       })
+       when is_integer(bonus_damage) and bonus_damage >= 0 do
+    with {:ok, damaged_bench?} <- own_bench_has_damage_counters?(attacker_card) do
+      if damaged_bench? do
+        {:ok, damage + bonus_damage}
+      else
+        {:ok, damage}
+      end
+    end
+  end
+
   defp apply_effect(damage, %CardInstance{} = attacker_card, %CardInstance{} = defender_card, %{
          type: :bonus_damage_per_benched_pokemon,
          bonus_damage: bonus_damage
@@ -510,6 +524,11 @@ defmodule Prizmo.TcgEngine.AttackDamage do
        do: {:ok, damage}
 
   defp apply_effect(damage, _attacker_card, _defender_card, %{
+         type: :bonus_damage_if_own_bench_has_damage_counters
+       }),
+       do: {:ok, damage}
+
+  defp apply_effect(damage, _attacker_card, _defender_card, %{
          type: :knock_out_defender_if_exact_damage_counters
        }),
        do: {:ok, damage}
@@ -578,6 +597,9 @@ defmodule Prizmo.TcgEngine.AttackDamage do
        do: {:ok, damage}
 
   defp apply_effect(damage, _attacker_card, _defender_card, %{type: :confuse_defender_active}),
+    do: {:ok, damage}
+
+  defp apply_effect(damage, _attacker_card, _defender_card, %{type: :burn_defender_active}),
     do: {:ok, damage}
 
   defp apply_effect(damage, _attacker_card, _defender_card, %{type: :sleep_defender_active}),
@@ -753,6 +775,12 @@ defmodule Prizmo.TcgEngine.AttackDamage do
     case CardStore.cards_in_zone(game_id, player_id, :bench) do
       {:ok, bench_cards} -> Enum.any?(bench_cards, &(&1.card_id == required_card_id))
       {:error, _reason} -> false
+    end
+  end
+
+  defp own_bench_has_damage_counters?(%CardInstance{game_id: game_id, owner_player_id: player_id}) do
+    with {:ok, bench_cards} <- CardStore.cards_in_zone(game_id, player_id, :bench) do
+      {:ok, Enum.any?(bench_cards, &(&1.damage > 0))}
     end
   end
 

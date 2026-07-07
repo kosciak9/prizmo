@@ -146,6 +146,23 @@ defmodule Prizmo.Tcg.Cards.Behaviors.TWM do
     attack(:mind_bend, effect: %{type: :confuse_defender_active})
   end
 
+  card "TWM-099" do
+    attack(:blazing_destruction,
+      effect: %{type: :bonus_damage_if_stadium_in_play_then_discard_stadium, bonus_damage: 0}
+    )
+
+    attack(:take_down, effect: %{type: :self_damage, damage: 10})
+  end
+
+  card "TWM-100" do
+    attack(:proud_fangs,
+      damage: 30,
+      effect: %{type: :bonus_damage_if_own_bench_has_damage_counters, bonus_damage: 90}
+    )
+
+    attack(:searing_flame, effect: %{type: :burn_defender_active})
+  end
+
   card "TWM-106" do
     attack(:shinobi_blade,
       effect: %{type: :search_card_to_hand, min_targets: 0, max_targets: 1}

@@ -1,5 +1,12 @@
 # Wiki Log
 
+## [2026-07-07] codebase update | Goal 2 Hisuian Growlithe line support
+
+- Task attempted: closed the high-share cached Dragapult-only `TWM-099` / `TWM-100` Hisuian Growlithe line after Explorer's Guidance. Authored executable behavior for Growlithe `Blazing Destruction` / `Take Down`, Arcanine `Proud Fangs` / `Searing Flame`, and reusable Burn attack/checkup support with deterministic persisted-RNG Burn recovery coin flips.
+- Files changed: `lib/prizmo/tcg/cards/behaviors/twm.ex`, `lib/prizmo/tcg_engine/attack_damage.ex`, `lib/prizmo/tcg_engine/attack_effects.ex`, `lib/prizmo/tcg_engine/mechanics.ex`, `lib/prizmo/tcg_engine/special_conditions.ex`, `test/prizmo/tcg_engine/mechanics_test.exs`, `knowledge-base/wiki/engine/goal-2-top-30-latest-limitless-coverage-scope.md`, `knowledge-base/wiki/engine/ash-backed-tcg-engine-playtest-handoff.md`, `knowledge-base/wiki/log.md`.
+- Validation: `mix test test/prizmo/tcg_engine/mechanics_test.exs --only describe:"TWM-099/TWM-100 Hisuian Growlithe line"`; `mix format`; `mix test test/prizmo/tcg/cards/metadata_test.exs test/prizmo/tcg_engine/mechanics_test.exs`; `mix compile --warnings-as-errors`; `mix prizmo.goal2.corpus` confirmed `supported=200` / `generic-supported=8` / `partial=9` / `unimplemented=160` and `cached=218` / `missing=159`.
+- Remaining/blocking notes: `TWM-099` and `TWM-100` are no longer in Dragapult ex's incomplete list. The default next Goal 2 target is the coherent N's Zoroark ex metadata-missing queue (`ASC-155`, `CRI-083`, `JTG-*`, `MEG-107`, `PFL-*`, `POR-051`, `PRE-*`, `SSP-165`, `TWM-164`, `WHT-055`) unless a fresh corpus run re-ranks the queue.
+
 ## [2026-07-07] codebase update | Goal 2 Explorer's Guidance support
 
 - Task attempted: closed `TEF-147` Explorer's Guidance as the remaining two-archetype shared unimplemented Goal 2 Supporter after Glalie. Added committed TCGdex metadata, authored Explorer's Guidance as an engine-defined Supporter that prompts over the top 6 deck cards, moves exactly 2 selected inspected cards to hand without public reveal, discards the other inspected cards, records the discarded cards publicly, and does not shuffle afterward.

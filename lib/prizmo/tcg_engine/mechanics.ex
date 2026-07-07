@@ -110,6 +110,8 @@ defmodule Prizmo.TcgEngine.Mechanics do
           module() | %{required(:id) => String.t(), required(:card_ids) => [String.t()]}
   @type player_deck :: {String.t(), player_deck_source()}
 
+  @coin_faces [:heads, :tails]
+
   @spec create_game([player_deck()], keyword()) :: {:ok, Game.t()} | {:error, term()}
   def create_game(player_decks, opts \\ []) when is_list(player_decks) do
     active_player_id =
@@ -3976,25 +3978,26 @@ defmodule Prizmo.TcgEngine.Mechanics do
     end)
   end
 
-  defp apply_pokemon_checkup_effects(game_id) when is_binary(game_id) do
-    with {:ok, cards} <- CardStore.list_cards(game_id) do
+  defp apply_pokemon_checkup_effects(%Game{} = game) do
+    with {:ok, cards} <- CardStore.list_cards(game.id) do
       in_play_cards = Enum.filter(cards, &(&1.zone in [:active, :bench]))
       source_effects = pokemon_checkup_source_effects(in_play_cards)
       poison_bonus_source_effects = pokemon_checkup_poison_bonus_source_effects(in_play_cards)
 
       with {:ok, ability_target_results} <-
-             apply_pokemon_checkup_damage_targets(game_id, in_play_cards, source_effects),
+             apply_pokemon_checkup_damage_targets(game.id, in_play_cards, source_effects),
            {:ok, poison_target_results} <-
              apply_pokemon_checkup_poison_targets(
-               game_id,
+               game.id,
                in_play_cards,
                poison_bonus_source_effects
-             ) do
+             ),
+           {:ok, burn_target_results} <- apply_pokemon_checkup_burn_targets(game, in_play_cards) do
         {:ok,
          %{
            source_effects: source_effects,
            poison_bonus_source_effects: poison_bonus_source_effects,
-           target_results: ability_target_results ++ poison_target_results
+           target_results: ability_target_results ++ poison_target_results ++ burn_target_results
          }}
       end
     end
@@ -4146,6 +4149,101 @@ defmodule Prizmo.TcgEngine.Mechanics do
     end)
   end
 
+  defp apply_pokemon_checkup_burn_targets(%Game{} = game, in_play_cards)
+       when is_list(in_play_cards) do
+    in_play_cards
+    |> Enum.reduce_while({:ok, []}, fn card, {:ok, results} ->
+      case pokemon_checkup_burn_target_result(game, card) do
+        {:ok, nil} -> {:cont, {:ok, results}}
+        {:ok, result} -> {:cont, {:ok, [result | results]}}
+        {:error, reason} -> {:halt, {:error, reason}}
+      end
+    end)
+    |> case do
+      {:ok, results} -> {:ok, Enum.reverse(results)}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp pokemon_checkup_burn_target_result(%Game{} = game, %CardInstance{} = card) do
+    with {:ok, current_card} <- get_card(game.id, card.id) do
+      if current_card.zone == :active and SpecialConditions.burned?(current_card) do
+        damage_counters = 2
+        damage = AbilityEffects.damage_for_counters(damage_counters)
+        resulting_damage = current_card.damage + damage
+
+        with {:ok, knocked_out?} <-
+               HpEffects.damage_knocks_out?(game.id, current_card, resulting_damage),
+             {:ok, damaged_card} <- update(current_card, :set_damage, %{damage: resulting_damage}),
+             {:ok, burn_coin} <- pokemon_checkup_burn_coin_result(game, damaged_card),
+             {:ok, recovered?} <- maybe_recover_burn(damaged_card, burn_coin.result) do
+          {:ok,
+           %{
+             source: :burn,
+             card_instance_id: damaged_card.id,
+             card_id: damaged_card.card_id,
+             owner_player_id: damaged_card.owner_player_id,
+             starting_damage: current_card.damage,
+             damage_counters: damage_counters,
+             applied_damage: damage,
+             resulting_damage: resulting_damage,
+             knocked_out?: knocked_out?,
+             burn_coin_result: burn_coin.result,
+             burn_recovered?: recovered?,
+             rng_context: Map.get(burn_coin, :rng_context),
+             rng_seed_source: Map.get(burn_coin, :rng_seed_source)
+           }}
+        end
+      else
+        {:ok, nil}
+      end
+    end
+  end
+
+  defp pokemon_checkup_burn_coin_result(%Game{rng_seed: seed} = game, %CardInstance{} = card)
+       when is_binary(seed) do
+    with {:ok, turn} <- current_turn(game.id),
+         {:ok, result} <-
+           Rng.choice(@coin_faces, seed, pokemon_checkup_burn_rng_context(card, turn)) do
+      {:ok,
+       %{
+         result: result,
+         rng_context: pokemon_checkup_burn_rng_context_label(card, turn),
+         rng_seed_source: game.rng_seed_source
+       }}
+    end
+  end
+
+  defp pokemon_checkup_burn_coin_result(%Game{}, %CardInstance{}) do
+    {:ok, %{result: Enum.random(@coin_faces)}}
+  end
+
+  defp maybe_recover_burn(%CardInstance{} = card, :heads) do
+    with {:ok, card} <- maybe_clear_burn_status(card),
+         {:ok, _updated_card} <-
+           update(card, :set_markers, %{
+             markers: SpecialConditions.remove_condition_marker(card, :burned)
+           }) do
+      {:ok, true}
+    end
+  end
+
+  defp maybe_recover_burn(%CardInstance{}, :tails), do: {:ok, false}
+
+  defp maybe_clear_burn_status(%CardInstance{status: :burned} = card) do
+    update(card, :set_status, %{status: nil})
+  end
+
+  defp maybe_clear_burn_status(%CardInstance{} = card), do: {:ok, card}
+
+  defp pokemon_checkup_burn_rng_context(%CardInstance{} = card, %Turn{} = turn) do
+    {:pokemon_checkup_burn, card.owner_player_id, turn.turn_number, card.card_id}
+  end
+
+  defp pokemon_checkup_burn_rng_context_label(%CardInstance{} = card, %Turn{} = turn) do
+    "pokemon_checkup_burn:#{card.owner_player_id}:turn_#{turn.turn_number}:#{card.card_id}"
+  end
+
   defp pokemon_checkup_damage_exempt?(%CardInstance{card_id: card_id}, except_names)
        when is_list(except_names) do
     case CardCatalog.fetch(card_id) do
@@ -4187,30 +4285,29 @@ defmodule Prizmo.TcgEngine.Mechanics do
       resulting_damage: result.resulting_damage,
       knocked_out?: result.knocked_out?
     }
+    |> maybe_put(:burn_coin_result, atom_string(Map.get(result, :burn_coin_result)))
+    |> maybe_put(:burn_recovered?, Map.get(result, :burn_recovered?))
+    |> maybe_put(:rng_context, Map.get(result, :rng_context))
+    |> maybe_put(:rng_seed_source, Map.get(result, :rng_seed_source))
   end
 
   defp pokemon_checkup_public_note(%{
          source_effects: source_effects,
          target_results: target_results
        }) do
-    ability_target_results = Enum.reject(target_results, &(&1.source == :poison))
+    ability_target_results = Enum.filter(target_results, &(&1.source == :ability))
     poison_target_results = Enum.filter(target_results, &(&1.source == :poison))
+    burn_target_results = Enum.filter(target_results, &(&1.source == :burn))
 
     ability_note = pokemon_checkup_ability_public_note(source_effects, ability_target_results)
     poison_note = pokemon_checkup_poison_public_note(poison_target_results)
+    burn_note = pokemon_checkup_burn_public_note(burn_target_results)
 
-    cond do
-      is_binary(ability_note) and is_binary(poison_note) ->
-        ability_note <> " " <> poison_note
-
-      is_binary(ability_note) ->
-        ability_note
-
-      is_binary(poison_note) ->
-        poison_note
-
-      true ->
-        "Pokémon Checkup resolved supported effects."
+    [ability_note, poison_note, burn_note]
+    |> Enum.filter(&(is_binary(&1) and &1 != ""))
+    |> case do
+      [] -> "Pokémon Checkup resolved supported effects."
+      notes -> Enum.join(notes, " ")
     end
   end
 
@@ -4254,6 +4351,27 @@ defmodule Prizmo.TcgEngine.Mechanics do
     else
       "Poison placed 1 damage counter on each Poisoned Active Pokémon."
     end
+  end
+
+  defp pokemon_checkup_burn_public_note([]), do: nil
+
+  defp pokemon_checkup_burn_public_note(burn_target_results) do
+    recovered_count = Enum.count(burn_target_results, &Map.get(&1, :burn_recovered?, false))
+    affected_count = length(burn_target_results)
+
+    recovery_note =
+      cond do
+        recovered_count == 0 ->
+          ""
+
+        recovered_count == affected_count ->
+          " All affected Pokémon recovered from Burn."
+
+        true ->
+          " #{recovered_count} affected Pokémon recovered from Burn."
+      end
+
+    "Burn placed 2 damage counters on each Burned Active Pokémon." <> recovery_note
   end
 
   defp resolve_pokemon_checkup_knockouts(%Game{} = game, %{target_results: []}) do
@@ -5001,6 +5119,9 @@ defmodule Prizmo.TcgEngine.Mechanics do
   defp maybe_put(map, _key, nil), do: map
   defp maybe_put(map, key, value), do: Map.put(map, key, value)
 
+  defp atom_string(value) when is_atom(value), do: Atom.to_string(value)
+  defp atom_string(value), do: value
+
   defp maybe_put_non_empty(map, _key, []), do: map
   defp maybe_put_non_empty(map, key, value), do: maybe_put(map, key, value)
 
@@ -5103,7 +5224,7 @@ defmodule Prizmo.TcgEngine.Mechanics do
     transaction(fn ->
       with {:ok, game} <- get_game(game_or_id),
            :ok <- require_game_status(game, :in_progress),
-           {:ok, result} <- apply_pokemon_checkup_effects(game.id),
+           {:ok, result} <- apply_pokemon_checkup_effects(game),
            {:ok, _event} <- maybe_write_pokemon_checkup_event(game, result),
            {:ok, game} <- resolve_pokemon_checkup_knockouts(game, result) do
         get_game(game.id)

@@ -29,6 +29,7 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
   alias Prizmo.TcgEngine.PendingEffect
   alias Prizmo.TcgEngine.Prompt
   alias Prizmo.TcgEngine.Setup
+  alias Prizmo.TcgEngine.SpecialConditions
   alias Prizmo.TcgEngine.ToolEffects
   alias Prizmo.TcgEngine.Turn
 
@@ -3272,6 +3273,116 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
 
       assert {:ok, 40} =
                AttackDamage.damage_for(grass_attacker, refreshed_attacker, %{damage: 100})
+    end
+  end
+
+  describe "TWM-099/TWM-100 Hisuian Growlithe line" do
+    test "TWM-099 discards the active Stadium and damages itself with Take Down" do
+      {:ok, game} = create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147)
+      _attacker = promote_custom_basic_to_active(game.id, "player_1", "TWM-099")
+      defender = promote_custom_basic_to_active(game.id, "player_2", "BLK-067")
+
+      {:ok, stadium} = create_custom_owned_card(game.id, "player_1", "SCR-131", 300)
+      {:ok, stadium} = ash_update(stadium, :draw_to_hand, %{position: 30})
+      assert {:ok, game} = Mechanics.play_stadium(game, "player_1", stadium.id)
+
+      assert CardCoverage.summarize("TWM-099").coverage_status == :supported
+
+      assert {:ok, game} = Mechanics.declare_attack(game, "player_1", :blazing_destruction)
+
+      assert zone(stadium.id) == :discard
+      assert card(defender.id).damage == 0
+
+      resolve_event = game.id |> game_events_by_type("resolve_declared_attack") |> List.last()
+
+      assert resolve_event.payload["effect_type"] ==
+               "bonus_damage_if_stadium_in_play_then_discard_stadium"
+
+      assert resolve_event.payload["stadium_discarded?"] == true
+      assert resolve_event.payload["discarded_stadium_card_instance_ids"] == [stadium.id]
+
+      {:ok, take_down_game} =
+        create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147)
+
+      take_down_attacker =
+        promote_custom_basic_to_active(take_down_game.id, "player_1", "TWM-099")
+
+      take_down_defender =
+        promote_custom_basic_to_active(take_down_game.id, "player_2", "BLK-067")
+
+      attach_direct_energy(take_down_game.id, "player_1", take_down_attacker, "MEE-006", 1)
+      attach_direct_energy(take_down_game.id, "player_1", take_down_attacker, "MEE-005", 2)
+
+      assert {:ok, take_down_game} =
+               Mechanics.declare_attack(take_down_game, "player_1", :take_down)
+
+      assert card(take_down_defender.id).damage == 40
+      assert card(take_down_attacker.id).damage == 10
+
+      take_down_event =
+        take_down_game.id |> game_events_by_type("resolve_declared_attack") |> List.last()
+
+      assert take_down_event.payload["effect_type"] == "self_damage"
+      assert take_down_event.payload["self_damage"] == 10
+    end
+
+    test "TWM-100 gains Proud Fangs damage from damaged Bench and applies Burn" do
+      {:ok, game} =
+        create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147,
+          rng_seed: "hisuian-arcanine-burn-checkup"
+        )
+
+      attacker = promote_custom_card_to_active(game.id, "player_1", "TWM-100")
+      defender = promote_custom_card_to_active(game.id, "player_2", "TWM-130")
+
+      assert CardCoverage.summarize("TWM-100").coverage_status == :supported
+
+      assert {:ok, proud_fangs} = CardCatalog.fetch_attack("TWM-100", :proud_fangs)
+
+      assert proud_fangs.effect == %{
+               type: :bonus_damage_if_own_bench_has_damage_counters,
+               bonus_damage: 90
+             }
+
+      assert {:ok, 30} = AttackDamage.damage_for(attacker, defender, proud_fangs)
+
+      damaged_bench = game.id |> cards_in_zone("player_1", :bench) |> List.first()
+      {:ok, _damaged_bench} = ash_update(damaged_bench, :set_damage, %{damage: 10})
+      assert {:ok, 120} = AttackDamage.damage_for(attacker, defender, proud_fangs)
+
+      attach_direct_energy(game.id, "player_1", attacker, "MEE-006", 1)
+      attach_direct_energy(game.id, "player_1", attacker, "MEE-006", 2)
+      attach_direct_energy(game.id, "player_1", attacker, "MEE-005", 3)
+
+      assert {:ok, game} = Mechanics.declare_attack(game, "player_1", :searing_flame)
+
+      resolve_event = game.id |> game_events_by_type("resolve_declared_attack") |> List.last()
+      assert resolve_event.payload["effect_type"] == "burn_defender_active"
+      assert resolve_event.payload["defender_card_instance_id"] == defender.id
+      assert resolve_event.payload["defender_status_card_instance_id"] == defender.id
+      assert resolve_event.payload["defender_status"] == "burned"
+      assert resolve_event.payload["defender_status_applied?"] == true
+
+      checkup_event =
+        game.id |> game_events_by_type("pokemon_checkup_effect_resolved") |> List.last()
+
+      assert checkup_event.payload["public_note"] =~ "Burn placed 2 damage counters"
+
+      burn_target =
+        Enum.find(checkup_event.payload["targets"], &(Map.get(&1, "source") == "burn"))
+
+      assert burn_target["damage_counters"] == 2
+      assert burn_target["burn_coin_result"] in ["heads", "tails"]
+      assert burn_target["rng_context"] =~ "pokemon_checkup_burn:player_2:"
+
+      checked_defender = card(defender.id)
+      assert checked_defender.damage == resolve_event.payload["damage"] + 20
+
+      if burn_target["burn_recovered?"] do
+        refute :burned in SpecialConditions.conditions(checked_defender)
+      else
+        assert :burned in SpecialConditions.conditions(checked_defender)
+      end
     end
   end
 

@@ -81,11 +81,13 @@ defmodule Prizmo.TcgEngine.AttackEffects do
     :bonus_damage_if_team_rocket_supporter_played_this_turn,
     :bonus_damage_if_own_pokemon_knocked_out_last_turn,
     :bonus_damage_if_moved_from_bench_to_active_this_turn,
+    :bonus_damage_if_own_bench_has_damage_counters,
     :bonus_damage_per_energy_attached_to_both_active,
     :bonus_damage_per_energy_attached_to_defender,
     :attacker_cannot_attack_next_turn,
     :defending_pokemon_cannot_use_selected_attack_next_turn,
     :confuse_defender_active,
+    :burn_defender_active,
     :sleep_defender_active,
     :paralyze_defender_on_coin_heads,
     :confuse_defender_active_then_move_opponent_damage_counters,
@@ -382,6 +384,9 @@ defmodule Prizmo.TcgEngine.AttackEffects do
       %{type: :bonus_damage_if_moved_from_bench_to_active_this_turn} ->
         {:ok, %{}}
 
+      %{type: :bonus_damage_if_own_bench_has_damage_counters} ->
+        {:ok, %{}}
+
       %{type: :bonus_damage_per_benched_pokemon} ->
         {:ok, %{}}
 
@@ -402,6 +407,9 @@ defmodule Prizmo.TcgEngine.AttackEffects do
 
       %{type: :confuse_defender_active} ->
         set_defender_status(game_id, player_id, defender_card, :confused)
+
+      %{type: :burn_defender_active} ->
+        set_defender_status(game_id, player_id, defender_card, :burned)
 
       %{type: :sleep_defender_active} ->
         set_defender_status(game_id, player_id, defender_card, :asleep)
@@ -3607,6 +3615,7 @@ defmodule Prizmo.TcgEngine.AttackEffects do
   defp pluralize_damage_counter(_count), do: "damage counters"
 
   defp special_condition_effect_type(:asleep), do: "sleep_defender_active"
+  defp special_condition_effect_type(:burned), do: "burn_defender_active"
   defp special_condition_effect_type(:confused), do: "confuse_defender_active"
   defp special_condition_effect_type(:paralyzed), do: "paralyze_defender_active"
   defp special_condition_effect_type(:poisoned), do: "poison_defender_active"

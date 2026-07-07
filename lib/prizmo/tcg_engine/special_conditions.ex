@@ -4,7 +4,7 @@ defmodule Prizmo.TcgEngine.SpecialConditions do
   alias Prizmo.TcgEngine.CardInstance
 
   @special_conditions_key "special_conditions"
-  @marker_backed_conditions [:poisoned]
+  @marker_backed_conditions [:burned, :poisoned]
 
   @spec put_condition_marker(CardInstance.t(), atom()) :: map()
   def put_condition_marker(%CardInstance{markers: markers}, condition)
@@ -18,6 +18,27 @@ defmodule Prizmo.TcgEngine.SpecialConditions do
       |> Enum.uniq()
     end)
     |> Map.delete(:special_conditions)
+  end
+
+  @spec remove_condition_marker(CardInstance.t(), atom()) :: map()
+  def remove_condition_marker(%CardInstance{markers: markers}, condition)
+      when condition in @marker_backed_conditions do
+    markers = normalize_markers(markers)
+
+    updated_conditions =
+      markers
+      |> persisted_conditions()
+      |> normalize_conditions()
+      |> Enum.reject(&condition_matches?(&1, condition))
+      |> Enum.map(&condition_string/1)
+      |> Enum.uniq()
+
+    markers = Map.delete(markers, :special_conditions)
+
+    case updated_conditions do
+      [] -> Map.delete(markers, @special_conditions_key)
+      conditions -> Map.put(markers, @special_conditions_key, conditions)
+    end
   end
 
   @spec clear_condition_markers(CardInstance.t()) :: map()
@@ -37,6 +58,9 @@ defmodule Prizmo.TcgEngine.SpecialConditions do
 
   @spec poisoned?(CardInstance.t()) :: boolean()
   def poisoned?(%CardInstance{} = card), do: :poisoned in conditions(card)
+
+  @spec burned?(CardInstance.t()) :: boolean()
+  def burned?(%CardInstance{} = card), do: :burned in conditions(card)
 
   defp marker_conditions(markers) do
     markers
@@ -66,6 +90,19 @@ defmodule Prizmo.TcgEngine.SpecialConditions do
   end
 
   defp condition_atom(_condition), do: nil
+
+  defp condition_matches?(condition, expected_condition) when is_atom(condition) do
+    condition == expected_condition
+  end
+
+  defp condition_matches?(condition, expected_condition) when is_binary(condition) do
+    condition == Atom.to_string(expected_condition)
+  end
+
+  defp condition_matches?(_condition, _expected_condition), do: false
+
+  defp condition_string(condition) when is_atom(condition), do: Atom.to_string(condition)
+  defp condition_string(condition) when is_binary(condition), do: condition
 
   defp normalize_markers(markers) when is_map(markers), do: markers
   defp normalize_markers(_markers), do: %{}
