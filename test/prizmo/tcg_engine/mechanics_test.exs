@@ -1134,6 +1134,91 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
       assert length(cards_moved_event.payload["cards"]) == 4
     end
 
+    test "POR-082 Pokémon Catcher flips heads, prompts for an opponent Bench target, and switches it Active" do
+      {:ok, game} =
+        create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147,
+          rng_seed: "pokemon-catcher-heads"
+        )
+
+      {:ok, pokemon_catcher} = create_custom_owned_card(game.id, "player_1", "POR-082", 200)
+      {:ok, pokemon_catcher} = ash_update(pokemon_catcher, :draw_to_hand, %{position: 20})
+
+      {:ok, opponent_bench} = create_custom_owned_card(game.id, "player_2", "PRE-035", 201)
+      {:ok, opponent_bench} = ash_update(opponent_bench, :draw_to_hand, %{position: 21})
+
+      {:ok, opponent_bench} =
+        ash_update(opponent_bench, :play_to_bench, %{position: 1, turn_entered_play: 1})
+
+      original_opponent_active = active_card(game.id, "player_2")
+
+      assert {:ok, view} = GameView.for_player(game.id, "player_1")
+      play_card = Enum.find(view.action_affordances, &(&1.key == "play_card"))
+      assert pokemon_catcher.id in play_card.source_card_instance_ids
+
+      assert {:ok, game} = Mechanics.play_card(game, "player_1", pokemon_catcher.id, %{})
+
+      coin_event = List.last(game_events_by_type(game.id, "coin_flipped"))
+      assert coin_event.payload["source_card_id"] == "POR-082"
+      assert coin_event.payload["effect_key"] == "flip_coin_then_switch_opponent_bench_to_active"
+      assert coin_event.payload["result"] == "heads"
+
+      [prompt] = awaiting_prompts(game.id)
+      assert prompt.player_id == "player_1"
+      assert prompt.payload["choice_key"] == "flip_coin_then_switch_opponent_bench_to_active"
+      assert prompt.payload["legal_choices"] == [opponent_bench.id]
+
+      assert {:ok, _game} =
+               Mechanics.choose_prompt(game, "player_1", prompt.id, [opponent_bench.id])
+
+      assert zone(pokemon_catcher.id) == :discard
+      assert active_card(game.id, "player_2").id == opponent_bench.id
+      assert zone(original_opponent_active.id) == :bench
+
+      cards_moved_event =
+        game.id
+        |> game_events_by_type("cards_moved")
+        |> Enum.find(
+          &(&1.payload["effect_key"] == "flip_coin_then_switch_opponent_bench_to_active")
+        )
+
+      assert length(cards_moved_event.payload["cards"]) == 2
+    end
+
+    test "POR-082 Pokémon Catcher flips tails and completes without switching" do
+      {:ok, game} =
+        create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147,
+          rng_seed: "pokemon-catcher-tails"
+        )
+
+      {:ok, pokemon_catcher} = create_custom_owned_card(game.id, "player_1", "POR-082", 200)
+      {:ok, pokemon_catcher} = ash_update(pokemon_catcher, :draw_to_hand, %{position: 20})
+
+      {:ok, opponent_bench} = create_custom_owned_card(game.id, "player_2", "PRE-035", 201)
+      {:ok, opponent_bench} = ash_update(opponent_bench, :draw_to_hand, %{position: 21})
+
+      {:ok, opponent_bench} =
+        ash_update(opponent_bench, :play_to_bench, %{position: 1, turn_entered_play: 1})
+
+      original_opponent_active = active_card(game.id, "player_2")
+
+      assert {:ok, game} = Mechanics.play_card(game, "player_1", pokemon_catcher.id, %{})
+
+      coin_event = List.last(game_events_by_type(game.id, "coin_flipped"))
+      assert coin_event.payload["source_card_id"] == "POR-082"
+      assert coin_event.payload["effect_key"] == "flip_coin_then_switch_opponent_bench_to_active"
+      assert coin_event.payload["result"] == "tails"
+
+      assert awaiting_prompts(game.id) == []
+      assert zone(pokemon_catcher.id) == :discard
+      assert active_card(game.id, "player_2").id == original_opponent_active.id
+      assert zone(opponent_bench.id) == :bench
+
+      refute Enum.any?(
+               game_events_by_type(game.id, "cards_moved"),
+               &(&1.payload["effect_key"] == "flip_coin_then_switch_opponent_bench_to_active")
+             )
+    end
+
     test "SFA-064 Xerosic's Machinations resolves opponent_discards_to_hand_size effect" do
       {:ok, game} = create_flow_action_window_game_with_decks(Alakazam27147, DragapultPlain28256)
 

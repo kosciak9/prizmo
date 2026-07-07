@@ -312,6 +312,17 @@ defmodule Prizmo.TcgEngine.CardPlay do
             choices
           )
 
+        :flip_coin_then_switch_opponent_bench_to_active ->
+          resolve_coin_flip_then_switch_opponent_bench_to_active(
+            game,
+            turn,
+            player,
+            card,
+            definition,
+            effect,
+            choices
+          )
+
         _other ->
           case EffectRunner.selected_choice(choices, effect) do
             {:ok, target_ids} ->
@@ -334,6 +345,43 @@ defmodule Prizmo.TcgEngine.CardPlay do
   end
 
   defp resolve_coin_flip_then_discard_opponent_attached_energy(
+         game,
+         turn,
+         player,
+         card,
+         definition,
+         effect,
+         choices
+       ) do
+    with {:ok, result} <- flip_coin_for_effect(game, turn, player, card, effect),
+         {:ok, _event} <-
+           write_effect_coin_flipped(game, turn, player.player_id, card, effect, result) do
+      case result do
+        :heads ->
+          case EffectRunner.selected_choice(choices, effect) do
+            {:ok, target_ids} ->
+              complete_play_card_effect(game, turn, player, card, effect, target_ids)
+
+            :missing ->
+              suspend_play_card_for_choice(
+                game,
+                turn,
+                player,
+                card,
+                definition,
+                choices,
+                :resolving_effect,
+                effect.key
+              )
+          end
+
+        :tails ->
+          complete_play_card_resolution(game, turn, player, card, effect)
+      end
+    end
+  end
+
+  defp resolve_coin_flip_then_switch_opponent_bench_to_active(
          game,
          turn,
          player,
@@ -397,6 +445,24 @@ defmodule Prizmo.TcgEngine.CardPlay do
            }) do
       complete_play_card_resolution(game, turn, player, card, effect)
     end
+  end
+
+  defp complete_play_card_effect(
+         game,
+         turn,
+         player,
+         card,
+         %{type: :flip_coin_then_switch_opponent_bench_to_active} = effect,
+         target_ids
+       ) do
+    complete_play_card_effect(
+      game,
+      turn,
+      player,
+      card,
+      %{effect | type: :switch_opponent_bench_to_active},
+      target_ids
+    )
   end
 
   defp complete_play_card_effect(
@@ -2380,6 +2446,18 @@ defmodule Prizmo.TcgEngine.CardPlay do
        ) do
     cards
     |> opponent_attached_energy_choice_cards(player_id)
+    |> Enum.map(& &1.id)
+    |> then(&{:ok, &1})
+  end
+
+  defp effect_choice_ids(
+         cards,
+         player_id,
+         %{type: :flip_coin_then_switch_opponent_bench_to_active},
+         _current_turn
+       ) do
+    cards
+    |> opponent_bench_choice_cards(player_id)
     |> Enum.map(& &1.id)
     |> then(&{:ok, &1})
   end

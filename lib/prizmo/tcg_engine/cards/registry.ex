@@ -457,6 +457,20 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     ]
   }
 
+  @pokemon_catcher %CardDefinition{
+    id: "POR-082",
+    kind: :trainer,
+    trainer_type: :item,
+    play_window: :action_window,
+    effects: [
+      %Effect{
+        key: :flip_coin_then_switch_opponent_bench_to_active,
+        type: :flip_coin_then_switch_opponent_bench_to_active,
+        params: %{count: 1}
+      }
+    ]
+  }
+
   @prime_catcher %CardDefinition{
     id: "TEF-157",
     kind: :trainer,
@@ -1448,6 +1462,7 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     @night_stretcher.id => @night_stretcher,
     @poke_pad.id => @poke_pad,
     @pokegear_3_0.id => @pokegear_3_0,
+    @pokemon_catcher.id => @pokemon_catcher,
     @premium_power_pro.id => @premium_power_pro,
     @precious_trolley.id => @precious_trolley,
     @prime_catcher.id => @prime_catcher,

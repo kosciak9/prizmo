@@ -8,6 +8,7 @@ defmodule Prizmo.TcgEngine.EffectRunner do
     :search_top_deck,
     :search_basic_energy_split_hand_attach,
     :flip_coin_then_discard_opponent_attached_energy,
+    :flip_coin_then_switch_opponent_bench_to_active,
     :each_player_discards_to_hand_size,
     :opponent_discards_to_hand_size,
     :discard_opponent_item_cards_from_hand,

@@ -1,5 +1,12 @@
 # Wiki Log
 
+## [2026-07-07] codebase update | Goal 2 Pokémon Catcher support
+
+- Task attempted: closed `POR-082` Pokémon Catcher as the highest-share shared unimplemented Goal 2 card after Neo Upper Energy. Added committed TCGdex metadata and authored Pokémon Catcher as an engine-defined Item that flips a persisted trainer-effect coin, completes with no switch on tails, and prompts the acting player to choose an opponent Benched Pokémon to switch Active on heads.
+- Files changed: `lib/prizmo/tcg_engine/cards/registry.ex`, `lib/prizmo/tcg_engine/effect_runner.ex`, `lib/prizmo/tcg_engine/card_play.ex`, `priv/tcg/cards/tcgdex/cards/POR-082.json`, `test/prizmo/tcg_engine/mechanics_test.exs`, `knowledge-base/wiki/engine/goal-2-top-30-latest-limitless-coverage-scope.md`, `knowledge-base/wiki/engine/ash-backed-tcg-engine-playtest-handoff.md`, `knowledge-base/wiki/log.md`.
+- Validation: TCGdex `me03-082` endpoint confirmed the printed text and metadata; `mix format`; `mix test test/prizmo/tcg_engine/mechanics_test.exs:1137`; `mix test test/prizmo/tcg_engine/mechanics_test.exs:1186`; `mix test test/prizmo/tcg/cards/metadata_test.exs`; `mix test test/prizmo/tcg/cards/metadata_test.exs test/prizmo/tcg_engine/mechanics_test.exs`; `mix compile --warnings-as-errors`; `mix prizmo.goal2.corpus` confirmed `supported=185` / `generic-supported=8` / `partial=10` / `unimplemented=174` and `cached=205` / `missing=172`; final `mix check` passed.
+- Remaining/blocking notes: `POR-082` is no longer in the shared incomplete queue. The default next Goal 2 priority is now `TEF-084` Relicanth, followed by `MEG-129` Surfing Beach and `CRI-079` Philippe unless the live corpus re-ranks the queue.
+
 ## [2026-07-07] codebase update | Goal 2 Neo Upper Energy support
 
 - Task attempted: closed `TEF-162` Neo Upper Energy as the highest-share shared unimplemented Goal 2 card after Iris's Fighting Spirit. Added committed TCGdex metadata, authored Neo Upper Energy as an ACE SPEC Special Energy that provides one Colorless Energy normally and two units of any supported basic Energy type while attached to a Stage 2 Pokémon, and tightened generic Energy attachment so ACE SPEC Energy attachments enforce and mark ACE SPEC usage.

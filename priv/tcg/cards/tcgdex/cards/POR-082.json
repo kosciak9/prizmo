@@ -1,0 +1,58 @@
+{
+  "prizmo_id": "POR-082",
+  "source": {
+    "base_url": "https://api.tcgdex.net/v2/en",
+    "dynamic_fields_removed": [
+      "pricing"
+    ],
+    "language": "en",
+    "provider": "TCGdex"
+  },
+  "tcgdex": {
+    "category": "Trainer",
+    "effect": "Flip a coin. If heads, switch in 1 of your opponent's Benched Pokémon to the Active Spot.",
+    "id": "me03-082",
+    "illustrator": "Studio Bora Inc.",
+    "image": "https://assets.tcgdex.net/en/me/me03/082",
+    "legal": {
+      "expanded": true,
+      "standard": true
+    },
+    "localId": "082",
+    "name": "Pokémon Catcher",
+    "rarity": "Common",
+    "regulationMark": "J",
+    "set": {
+      "cardCount": {
+        "official": 88,
+        "total": 124
+      },
+      "id": "me03",
+      "logo": "https://assets.tcgdex.net/en/me/me03/logo",
+      "name": "Perfect Order",
+      "symbol": "https://assets.tcgdex.net/univ/me/me03/symbol"
+    },
+    "trainerType": "Item",
+    "updated": "2026-06-26T15:48:19+01:00",
+    "variants": {
+      "firstEdition": false,
+      "holo": false,
+      "normal": true,
+      "reverse": true,
+      "wPromo": false
+    },
+    "variants_detailed": [
+      {
+        "size": "standard",
+        "type": "normal",
+        "variantId": "endfynwn4n10gzq"
+      },
+      {
+        "size": "standard",
+        "type": "reverse",
+        "variantId": "cm4kqul3x1bwlz1f"
+      }
+    ]
+  },
+  "tcgdex_id": "me03-082"
+}
