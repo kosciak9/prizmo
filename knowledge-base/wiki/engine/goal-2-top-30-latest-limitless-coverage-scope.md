@@ -64,13 +64,13 @@ Those reports are the canonical starting point for autonomous Goal 2 implementat
 - Tracked top archetypes: `30`
 - Tracked cards with usage greater than `0.00`: `377`
 - Coverage buckets from `mix prizmo.goal2.corpus`:
-  - `supported=186`
+  - `supported=187`
   - `generic-supported=8`
   - `partial=10`
-  - `unimplemented=173`
+  - `unimplemented=172`
 - Metadata buckets:
-  - `cached=206`
-  - `missing=171`
+  - `cached=207`
+  - `missing=170`
 
 Important interpretation:
 
@@ -102,13 +102,15 @@ The latest Goal 2 engine batch closed `POR-082` Pokémon Catcher as the prior hi
 
 The newest Goal 2 engine batch closed `TEF-084` Relicanth as the prior highest-share shared unimplemented card. It now has committed TCGdex metadata and executable Ash engine behavior as a Basic Fighting Pokémon: `Razor Fin` resolves as plain 30 damage, and `Memory Dive` is modeled as a passive in-play Ability that lets the owner's evolved Active Pokémon declare executable attacks from their previous Evolution stack while still using normal Energy costs, attack locks, restrictions, declaration, resolution, and `GameView` affordances through the shared `AttackAccess` path. Runtime validation confirmed a Dragapult ex evolution stack can see and declare Dreepy/Drakloak attacks only while Relicanth is in play.
 
+The latest Goal 2 engine batch closed `MEG-129` Surfing Beach as the prior highest-share shared unimplemented card. It now has committed TCGdex metadata and executable Ash engine behavior as a Stadium: once during each player's turn, the active player may switch their Active Water Pokémon with one of their Benched Water Pokémon through `GameView`, Ash RPC, and the temporary React resolver path. The batch also fixed Stadium correctness so only Festival Grounds-style Stadium text, not every supported Stadium, recovers or prevents Special Conditions.
+
 ### Highest-priority remaining `unimplemented` cards from current report
 
 | Card | Archetypes | Total share | Notes |
 | --- | --- | --- | --- |
-| `MEG-129` Surfing Beach | `2` | `0.70%` | New highest-share shared unimplemented card after closing Relicanth; confirm metadata/text and exact Stadium semantics before implementation. |
-| `CRI-079` Philippe | `2` | `0.68%` | Shared Archaludon ex / Metagross Metal Maker Supporter candidate behind Surfing Beach. |
+| `CRI-079` Philippe | `2` | `0.68%` | New highest-share shared unimplemented card after closing Surfing Beach; confirm metadata/text and exact Supporter semantics before implementation. |
 | `BLK-067` Genesect ex | `2` | `0.55%` | Shared Metagross Metal Maker / Steven's Metagross ex Pokémon candidate tied with `DRI-164` Energy Recycler by weighted share. |
+| `DRI-164` Energy Recycler | `2` | `0.55%` | Shared Metagross Metal Maker / Steven's Metagross ex Item candidate tied with `BLK-067` Genesect ex by weighted share. |
 
 ### Shared `partial` cards worth finishing after the broad unimplemented slice
 
@@ -135,8 +137,8 @@ That means prior Goal 1 and six-deck coverage was not wasted; it now acts as see
 
 ## Recommended next implementation order
 
-1. Treat `MEG-129` Surfing Beach as the next default shared unimplemented card unless the live corpus re-ranks the queue; confirm metadata/text and the exact Stadium semantics before selecting the implementation shape.
-2. Keep `CRI-079` Philippe and the `BLK-067` Genesect ex / `DRI-164` Energy Recycler tied pair behind Surfing Beach as the next shared metadata-missing candidates by weighted share.
+1. Treat `CRI-079` Philippe as the next default shared unimplemented card unless the live corpus re-ranks the queue; confirm metadata/text and exact Supporter semantics before selecting the implementation shape.
+2. Keep the `BLK-067` Genesect ex / `DRI-164` Energy Recycler tied pair behind Philippe as the next shared metadata-missing candidates by weighted share.
 3. Keep the remaining Dragapult-only cached pair `TWM-099` / `TWM-100` as deliberate single-archetype cleanup, not the default autonomous queue.
 4. Finish the remaining shared partials only after the broad unimplemented slice unless another batch naturally extends the new HP infrastructure; if returning to HP work soon, `POR-086` Growing Grass Energy remains the strongest follow-up.
 5. Keep using `mix prizmo.goal2.corpus` after each batch to re-rank the next blockers by archetype count and weighted share.

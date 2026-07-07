@@ -17,7 +17,6 @@ defmodule Prizmo.TcgEngine.Game do
   alias Prizmo.TcgEngine.Game
   alias Prizmo.TcgEngine.GameView
   alias Prizmo.TcgEngine.GameView.Fields, as: GameViewFields
-  alias Prizmo.TcgEngine.SupportedDecks
 
   @player_deck_selection_fields [
     player_id: [type: :string, allow_nil?: false],
@@ -99,6 +98,7 @@ defmodule Prizmo.TcgEngine.Game do
     define :use_team_rockets_factory_command, args: [:game_id, :player_id]
     define :use_prism_tower_command, args: [:game_id, :player_id, :discard_card_instance_ids]
     define :use_lumiose_city_command, args: [:game_id, :player_id, :target_card_instance_id]
+    define :use_surfing_beach_command, args: [:game_id, :player_id, :target_card_instance_id]
 
     define :use_munkidori_adrena_brain_command,
       args: [
@@ -185,7 +185,7 @@ defmodule Prizmo.TcgEngine.Game do
           |> maybe_put_opt(:active_player_id, Map.get(input.arguments, :active_player_id))
           |> maybe_put_opt(:rng_seed, Map.get(input.arguments, :rng_seed))
 
-        SupportedDecks.create_game(input.arguments.players, opts)
+        Prizmo.TcgEngine.SupportedDecks.create_game(input.arguments.players, opts)
       end
     end
 

@@ -1237,6 +1237,50 @@ defmodule Prizmo.TcgEngine.Mechanics do
     end)
   end
 
+  @spec use_surfing_beach(Game.t() | String.t(), String.t(), String.t()) ::
+          {:ok, Game.t()} | {:error, term()}
+  def use_surfing_beach(game_or_id, player_id, target_card_instance_id)
+      when is_binary(player_id) and is_binary(target_card_instance_id) do
+    transaction(fn ->
+      with {:ok, game} <- get_game(game_or_id),
+           :ok <- require_game_status(game, :in_progress),
+           :ok <- require_active_player(game, player_id),
+           {:ok, turn} <- require_current_turn_status(game.id, :action_window),
+           :ok <- CardPlay.require_no_awaiting_pending_effect(game.id),
+           {:ok, %CardInstance{} = stadium_card} <- StadiumEffects.active_surfing_beach(game.id),
+           :ok <- StadiumEffects.require_surfing_beach_available(game.id, turn.id, player_id),
+           {:ok, active_card} <- active_card(game.id, player_id),
+           {:ok, target_card} <- get_card(game.id, target_card_instance_id),
+           :ok <- require_card_owned_by_player(target_card, player_id),
+           :ok <- require_card_zone(target_card, :bench),
+           :ok <- StadiumEffects.require_surfing_beach_target(target_card),
+           bench_position = target_card.position,
+           {:ok, _active_card} <-
+             update(
+               active_card,
+               :move_active_to_bench,
+               move_active_to_bench_attrs(active_card, bench_position)
+             ),
+           {:ok, promoted_card} <-
+             update(target_card, :promote_to_active, %{position: 1, status: nil}),
+           {:ok, _event} <-
+             write_event_and_snapshot(game.id, :stadium_effect_used, player_id, %{
+               turn_id: turn.id,
+               source: EventPayloads.card_source(stadium_card),
+               source_card_id: stadium_card.card_id,
+               source_card_instance_id: stadium_card.id,
+               effect_key: :switch_active_water_with_benched_water_once_per_turn,
+               affected_player_id: player_id,
+               active_card_instance_id: active_card.id,
+               bench_card_instance_id: promoted_card.id,
+               public_note:
+                 surfing_beach_public_note(player_id, active_card.card_id, promoted_card.card_id)
+             }) do
+        get_game(game.id)
+      end
+    end)
+  end
+
   @spec use_munkidori_adrena_brain(
           Game.t() | String.t(),
           String.t(),
@@ -4334,6 +4378,10 @@ defmodule Prizmo.TcgEngine.Mechanics do
 
   defp lumiose_city_public_note(player_id, card_id) do
     "Lumiose City let #{String.replace(player_id, "_", " ")} search for #{card_id}, put it onto the Bench, and end their turn."
+  end
+
+  defp surfing_beach_public_note(player_id, active_card_id, promoted_card_id) do
+    "Surfing Beach let #{String.replace(player_id, "_", " ")} switch #{active_card_id} with #{promoted_card_id}."
   end
 
   defp adrena_brain_public_note(1), do: "Adrena-Brain moved 1 damage counter."

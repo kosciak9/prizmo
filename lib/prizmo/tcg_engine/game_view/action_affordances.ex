@@ -130,6 +130,7 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
       team_rockets_factory_affordance(game, player, current_turn, all_cards),
       prism_tower_affordance(game, player, current_turn, cards, all_cards),
       lumiose_city_affordance(game, player, current_turn, all_cards),
+      surfing_beach_affordance(game, player, current_turn, all_cards),
       play_basic_to_bench_affordance(player, cards),
       attach_energy_affordance(game, player, cards),
       attach_tool_affordance(game, player, cards),
@@ -271,6 +272,32 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
   end
 
   defp lumiose_city_affordance(_game, _player, _current_turn, _all_cards), do: nil
+
+  defp surfing_beach_affordance(
+         %Game{} = game,
+         %GamePlayer{} = player,
+         %Turn{id: turn_id},
+         all_cards
+       ) do
+    with %CardInstance{} = stadium_card <- active_surfing_beach_card(all_cards),
+         :ok <- StadiumEffects.require_surfing_beach_available(game.id, turn_id, player.player_id),
+         {:ok, target_cards} <-
+           StadiumEffects.surfing_beach_target_cards(game.id, player.player_id),
+         target_ids when target_ids != [] <- card_ids(target_cards) do
+      affordance(:surfing_beach, "Use Surfing Beach", :command, player.player_id,
+        source_card_instance_ids: [stadium_card.id],
+        target_card_instance_ids: target_ids,
+        required_source_count: 1,
+        choice_keys: ["target_card_instance_id"],
+        note:
+          "Once this turn from the active Stadium, switch your Active Water Pokémon with a Benched Water Pokémon."
+      )
+    else
+      _other -> nil
+    end
+  end
+
+  defp surfing_beach_affordance(_game, _player, _current_turn, _all_cards), do: nil
 
   defp play_basic_to_bench_affordance(%GamePlayer{} = player, cards) do
     source_ids =
@@ -929,6 +956,10 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
 
   defp active_lumiose_city_card(cards) do
     Enum.find(cards, &(&1.zone == :stadium and StadiumEffects.lumiose_city_card?(&1)))
+  end
+
+  defp active_surfing_beach_card(cards) do
+    Enum.find(cards, &(&1.zone == :stadium and StadiumEffects.surfing_beach_card?(&1)))
   end
 
   defp generic_tool_attachable?(%Game{} = game, %GamePlayer{} = player, %CardInstance{

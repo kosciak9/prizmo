@@ -33,6 +33,9 @@ defmodule Prizmo.TcgEngine.StadiumEffects do
   @prism_tower_discard_count 2
   @lumiose_city_effect :search_basic_pokemon_to_bench_then_end_turn
   @lumiose_city_card_id "POR-077"
+  @surfing_beach_effect :switch_active_water_with_benched_water_once_per_turn
+  @surfing_beach_card_id "MEG-129"
+  @surfing_beach_required_type :water
 
   def supported_stadium?(%{
         supertype: :trainer,
@@ -113,6 +116,12 @@ defmodule Prizmo.TcgEngine.StadiumEffects do
         effect: %{type: @lumiose_city_effect}
       }), do: true
 
+  def supported_stadium?(%{
+        supertype: :trainer,
+        trainer_type: :stadium,
+        effect: %{type: @surfing_beach_effect}
+      }), do: true
+
   def supported_stadium?(_card), do: false
 
   def supported_stadium_card?(card_id) when is_binary(card_id) do
@@ -148,6 +157,16 @@ defmodule Prizmo.TcgEngine.StadiumEffects do
   def lumiose_city_card?(card_id) when is_binary(card_id) do
     case CardCatalog.fetch(card_id) do
       {:ok, %{effect: %{type: @lumiose_city_effect}}} -> true
+      {:ok, _card} -> false
+      {:error, _reason} -> false
+    end
+  end
+
+  def surfing_beach_card?(%CardInstance{card_id: card_id}), do: surfing_beach_card?(card_id)
+
+  def surfing_beach_card?(card_id) when is_binary(card_id) do
+    case CardCatalog.fetch(card_id) do
+      {:ok, %{effect: %{type: @surfing_beach_effect}}} -> true
       {:ok, _card} -> false
       {:error, _reason} -> false
     end
@@ -206,6 +225,25 @@ defmodule Prizmo.TcgEngine.StadiumEffects do
 
         _multiple ->
           {:error, {:stadium_not_in_play, @lumiose_city_card_id}}
+      end
+    end
+  end
+
+  def active_surfing_beach(game_id) when is_binary(game_id) do
+    with {:ok, stadiums} <- CardStore.cards_in_zone(game_id, :stadium) do
+      case stadiums do
+        [%CardInstance{} = stadium] ->
+          if surfing_beach_card?(stadium) do
+            {:ok, stadium}
+          else
+            {:error, {:wrong_stadium_in_play, @surfing_beach_card_id, stadium.card_id}}
+          end
+
+        [] ->
+          {:error, {:stadium_not_in_play, @surfing_beach_card_id}}
+
+        _multiple ->
+          {:error, {:stadium_not_in_play, @surfing_beach_card_id}}
       end
     end
   end
@@ -346,6 +384,20 @@ defmodule Prizmo.TcgEngine.StadiumEffects do
     end
   end
 
+  def require_surfing_beach_available(game_id, turn_id, player_id)
+      when is_binary(game_id) and is_binary(turn_id) and is_binary(player_id) do
+    with :ok <- require_surfing_beach_unused_this_turn(game_id, turn_id, player_id),
+         {:ok, cards} <- CardStore.list_cards(game_id),
+         {:ok, active_card} <- active_pokemon_card(cards, player_id),
+         :ok <- require_pokemon_type(active_card, @surfing_beach_required_type, :active),
+         true <-
+           Enum.any?(cards, &surfing_beach_target_card?(&1, player_id)) ||
+             {:error,
+              {:surfing_beach_requires_benched_pokemon_type, @surfing_beach_required_type}} do
+      :ok
+    end
+  end
+
   def lumiose_city_target_cards(game_id, player_id)
       when is_binary(game_id) and is_binary(player_id) do
     with {:ok, cards} <- CardStore.list_cards(game_id) do
@@ -358,6 +410,27 @@ defmodule Prizmo.TcgEngine.StadiumEffects do
         {:ok, []}
       end
     end
+  end
+
+  def surfing_beach_target_cards(game_id, player_id)
+      when is_binary(game_id) and is_binary(player_id) do
+    with {:ok, cards} <- CardStore.list_cards(game_id),
+         {:ok, active_card} <- active_pokemon_card(cards, player_id) do
+      if pokemon_type?(active_card, @surfing_beach_required_type) do
+        {:ok,
+         cards
+         |> Enum.filter(&surfing_beach_target_card?(&1, player_id))
+         |> Enum.sort_by(&{&1.position, &1.instance_id})}
+      else
+        {:ok, []}
+      end
+    else
+      {:error, _reason} -> {:ok, []}
+    end
+  end
+
+  def require_surfing_beach_target(%CardInstance{} = card) do
+    require_pokemon_type(card, @surfing_beach_required_type, :bench)
   end
 
   def recover_special_conditions(game_id) when is_binary(game_id) do
@@ -508,6 +581,16 @@ defmodule Prizmo.TcgEngine.StadiumEffects do
     end
   end
 
+  defp require_surfing_beach_unused_this_turn(game_id, turn_id, player_id) do
+    with {:ok, events} <- stadium_effect_used_events_for_turn(game_id, turn_id, player_id) do
+      if Enum.any?(events, &surfing_beach_effect_used?/1) do
+        {:error, :surfing_beach_already_used_this_turn}
+      else
+        :ok
+      end
+    end
+  end
+
   defp card_play_completed_events_for_turn(game_id, turn_id, player_id) do
     GameEvent
     |> Ash.Query.filter(
@@ -550,6 +633,11 @@ defmodule Prizmo.TcgEngine.StadiumEffects do
       payload_value(payload, "source_card_id") == @lumiose_city_card_id
   end
 
+  defp surfing_beach_effect_used?(%GameEvent{payload: payload}) do
+    payload_value(payload, "effect_key") == Atom.to_string(@surfing_beach_effect) or
+      payload_value(payload, "source_card_id") == @surfing_beach_card_id
+  end
+
   defp team_rocket_supporter_card_id?(card_id) when is_binary(card_id) do
     case CardCatalog.fetch(card_id) do
       {:ok, %{trainer_type: :supporter, name: "Team Rocket" <> _rest}} -> true
@@ -584,12 +672,63 @@ defmodule Prizmo.TcgEngine.StadiumEffects do
 
   defp lumiose_city_target_card?(%CardInstance{}, _player_id), do: false
 
+  defp surfing_beach_target_card?(
+         %CardInstance{owner_player_id: player_id, zone: :bench} = card,
+         player_id
+       ) do
+    pokemon_type?(card, @surfing_beach_required_type)
+  end
+
+  defp surfing_beach_target_card?(%CardInstance{}, _player_id), do: false
+
+  defp active_pokemon_card(cards, player_id) do
+    case Enum.find(cards, &(&1.owner_player_id == player_id and &1.zone == :active)) do
+      %CardInstance{} = card -> {:ok, card}
+      nil -> {:error, :surfing_beach_requires_active_water_pokemon}
+    end
+  end
+
+  defp require_pokemon_type(%CardInstance{} = card, type, zone) do
+    if pokemon_type?(card, type) do
+      :ok
+    else
+      {:error, {:surfing_beach_requires_pokemon_type, card.card_id, zone, type}}
+    end
+  end
+
+  defp pokemon_type?(%CardInstance{card_id: card_id}, type) when is_atom(type) do
+    case CardCatalog.fetch(card_id) do
+      {:ok, %{supertype: :pokemon, types: types}} when is_list(types) ->
+        type in types
+
+      {:ok, %{supertype: :pokemon, type: ^type}} ->
+        true
+
+      {:ok, _card} ->
+        false
+
+      {:error, _reason} ->
+        false
+    end
+  end
+
   defp special_condition_immunity_stadium?(%CardInstance{card_id: card_id}) do
     card_id
     |> CardCatalog.fetch()
     |> case do
-      {:ok, card} -> supported_stadium?(card)
-      {:error, _reason} -> false
+      {:ok,
+       %{
+         supertype: :trainer,
+         trainer_type: :stadium,
+         effect: %{type: @special_condition_immunity_effect}
+       }} ->
+        true
+
+      {:ok, _card} ->
+        false
+
+      {:error, _reason} ->
+        false
     end
   end
 

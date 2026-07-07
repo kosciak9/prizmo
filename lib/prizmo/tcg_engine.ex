@@ -39,6 +39,7 @@ defmodule Prizmo.TcgEngine do
       rpc_action :use_tcg_engine_team_rockets_factory, :use_team_rockets_factory_command
       rpc_action :use_tcg_engine_prism_tower, :use_prism_tower_command
       rpc_action :use_tcg_engine_lumiose_city, :use_lumiose_city_command
+      rpc_action :use_tcg_engine_surfing_beach, :use_surfing_beach_command
       rpc_action :use_tcg_engine_munkidori_adrena_brain, :use_munkidori_adrena_brain_command
       rpc_action :use_tcg_engine_teal_dance, :use_teal_mask_ogerpon_teal_dance_command
       rpc_action :use_tcg_engine_seething_spirit, :use_blaziken_ex_seething_spirit_command
@@ -154,6 +155,10 @@ defmodule Prizmo.TcgEngine do
 
       define :use_lumiose_city_for_game,
         action: :use_lumiose_city_command,
+        args: [:game_id, :player_id, :target_card_instance_id]
+
+      define :use_surfing_beach_for_game,
+        action: :use_surfing_beach_command,
         args: [:game_id, :player_id, :target_card_instance_id]
 
       define :use_munkidori_adrena_brain_for_game,

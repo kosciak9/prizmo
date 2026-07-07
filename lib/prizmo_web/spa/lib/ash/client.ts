@@ -50,6 +50,7 @@ export {
   useTcgEngineReconDirective as runUseTcgEngineReconDirective,
   useTcgEngineRunAwayDraw as runUseTcgEngineRunAwayDraw,
   useTcgEngineSeethingSpirit as runUseTcgEngineSeethingSpirit,
+  useTcgEngineSurfingBeach as runUseTcgEngineSurfingBeach,
   useTcgEngineSubjugatingChains as runUseTcgEngineSubjugatingChains,
   useTcgEngineTealDance as runUseTcgEngineTealDance,
   useTcgEngineTeamRocketsFactory as runUseTcgEngineTeamRocketsFactory,
@@ -150,6 +151,8 @@ export type {
   UseTcgEngineSubjugatingChainsResult,
   UseTcgEngineSeethingSpiritInput,
   UseTcgEngineSeethingSpiritResult,
+  UseTcgEngineSurfingBeachInput,
+  UseTcgEngineSurfingBeachResult,
   UseTcgEngineTeamRocketsFactoryInput,
   UseTcgEngineTeamRocketsFactoryResult,
 } from './generated/ash_rpc'

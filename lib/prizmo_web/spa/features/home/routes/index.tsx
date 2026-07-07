@@ -52,6 +52,7 @@ import {
   runUseTcgEngineReconDirective,
   runUseTcgEngineRunAwayDraw,
   runUseTcgEngineSeethingSpirit,
+  runUseTcgEngineSurfingBeach,
   runUseTcgEngineSubjugatingChains,
   runUseTcgEngineTealDance,
   runUseTcgEngineTeamRocketsFactory,
@@ -624,6 +625,12 @@ type LumioseCityCommandOption = {
   targetCard: CardSummary | undefined
 }
 
+type SurfingBeachCommandOption = {
+  key: string
+  targetCardInstanceId: string
+  targetCard: CardSummary | undefined
+}
+
 type ActionRenderEntry = {
   key: string
   action: ActionAffordance
@@ -746,6 +753,17 @@ type LumioseCityInput = {
 }
 
 type LumioseCityCommand = {
+  playerId: string
+  targetCardInstanceId: string
+}
+
+type SurfingBeachInput = {
+  gameId: string
+  playerId: PlayerId
+  targetCardInstanceId: string
+}
+
+type SurfingBeachCommand = {
   playerId: string
   targetCardInstanceId: string
 }
@@ -1508,6 +1526,14 @@ export function HomeRoute() {
     }
   })
 
+  const surfingBeachMutation = useMutation({
+    mutationFn: (input: SurfingBeachInput) => useSurfingBeach(input),
+    onSuccess: async (_game, input) => {
+      clearUltraBallPostSearchHandoff(input.gameId, input.playerId)
+      await queryClient.invalidateQueries({ queryKey: ['tcg-engine', 'game-state'] })
+    }
+  })
+
   const cursedBlastMutation = useMutation({
     mutationFn: (input: CursedBlastInput) => useCursedBlast(input),
     onSuccess: async (_game, input) => {
@@ -1856,6 +1882,11 @@ export function HomeRoute() {
       lumioseCityMutation.error,
       'Lumiose City failed',
       'No Pokémon was Benched. Refresh state and confirm Lumiose City is active, the target is still a Basic Pokémon in deck, and this viewer has an open Bench slot.'
+    ) ??
+    commandErrorNotice(
+      surfingBeachMutation.error,
+      'Surfing Beach failed',
+      'No Pokémon was switched. Refresh state and confirm Surfing Beach is active, the Active Pokémon is Water, and the target is a Benched Water Pokémon.'
     ) ??
     commandErrorNotice(
       cursedBlastMutation.error,
@@ -2508,6 +2539,15 @@ export function HomeRoute() {
                     })
                   }
                 }}
+                onUseSurfingBeach={({ playerId, targetCardInstanceId }) => {
+                  if (isPlayerId(playerId)) {
+                    surfingBeachMutation.mutate({
+                      gameId: normalisedGameId,
+                      playerId,
+                      targetCardInstanceId
+                    })
+                  }
+                }}
                 onUseCursedBlast={({ playerId, sourceCardInstanceId, targetCardInstanceId }) => {
                   if (isPlayerId(playerId)) {
                     cursedBlastMutation.mutate({
@@ -2728,6 +2768,9 @@ export function HomeRoute() {
                 }
                 lumioseCityPendingTargetId={
                   lumioseCityMutation.isPending ? lumioseCityMutation.variables?.targetCardInstanceId ?? null : null
+                }
+                surfingBeachPendingTargetId={
+                  surfingBeachMutation.isPending ? surfingBeachMutation.variables?.targetCardInstanceId ?? null : null
                 }
                 cursedBlastPendingKey={
                   cursedBlastMutation.isPending && cursedBlastMutation.variables
@@ -3478,6 +3521,20 @@ async function useLumioseCity(input: LumioseCityInput): Promise<CreatedGame> {
   return result.data as CreatedGame
 }
 
+async function useSurfingBeach(input: SurfingBeachInput): Promise<CreatedGame> {
+  const result = await runUseTcgEngineSurfingBeach({
+    input,
+    fields: GAME_RESOURCE_FIELDS,
+    headers: buildAshRpcHeaders()
+  })
+
+  if (!result.success) {
+    throw new Error(rpcErrorMessage(result.errors))
+  }
+
+  return result.data as CreatedGame
+}
+
 async function useCursedBlast(input: CursedBlastInput): Promise<CreatedGame> {
   const result = await runUseTcgEngineCursedBlast({
     input,
@@ -3872,6 +3929,7 @@ function GameStateWorkbench({
   onUseTeamRocketsFactory,
   onUsePrismTower,
   onUseLumioseCity,
+  onUseSurfingBeach,
   onRetreat,
   onResolveDeclaredAttack,
   onUndo,
@@ -3910,6 +3968,7 @@ function GameStateWorkbench({
   teamRocketsFactoryPendingPlayerId,
   prismTowerPendingKey,
   lumioseCityPendingTargetId,
+  surfingBeachPendingTargetId,
   resolveDeclaredAttackPendingPlayerId,
   retreatPendingKey
 }: {
@@ -3956,6 +4015,7 @@ function GameStateWorkbench({
   onUseTeamRocketsFactory: (input: TeamRocketsFactoryCommand) => void
   onUsePrismTower: (input: PrismTowerCommand) => void
   onUseLumioseCity: (input: LumioseCityCommand) => void
+  onUseSurfingBeach: (input: SurfingBeachCommand) => void
   onRetreat: (input: RetreatCommand) => void
   onResolveDeclaredAttack: (input: ResolveDeclaredAttackCommand) => void
   onUndo: () => void
@@ -3994,6 +4054,7 @@ function GameStateWorkbench({
   teamRocketsFactoryPendingPlayerId: string | null
   prismTowerPendingKey: string | null
   lumioseCityPendingTargetId: string | null
+  surfingBeachPendingTargetId: string | null
   resolveDeclaredAttackPendingPlayerId: string | null
   retreatPendingKey: string | null
 }) {
@@ -4004,6 +4065,7 @@ function GameStateWorkbench({
       teamRocketsFactoryPendingPlayerId ||
       prismTowerPendingKey ||
       lumioseCityPendingTargetId ||
+      surfingBeachPendingTargetId ||
       cursedBlastPendingKey ||
       subjugatingChainsPendingKey ||
       munkidoriAdrenaBrainPendingKey ||
@@ -4048,6 +4110,7 @@ function GameStateWorkbench({
     onUseTeamRocketsFactory,
     onUsePrismTower,
     onUseLumioseCity,
+    onUseSurfingBeach,
     onRetreat,
     playBasicToBenchPendingCardId,
     playCardPendingCardId,
@@ -4055,6 +4118,7 @@ function GameStateWorkbench({
     teamRocketsFactoryPendingPlayerId,
     prismTowerPendingKey,
     lumioseCityPendingTargetId,
+    surfingBeachPendingTargetId,
     retreatPendingKey,
     viewerPlayerId
   })
@@ -4155,6 +4219,7 @@ function GameStateWorkbench({
             onUseTeamRocketsFactory={onUseTeamRocketsFactory}
             onUsePrismTower={onUsePrismTower}
             onUseLumioseCity={onUseLumioseCity}
+            onUseSurfingBeach={onUseSurfingBeach}
             onRetreat={onRetreat}
             attachEnergyPendingKey={attachEnergyPendingKey}
             attachToolPendingKey={attachToolPendingKey}
@@ -4180,6 +4245,7 @@ function GameStateWorkbench({
             teamRocketsFactoryPendingPlayerId={teamRocketsFactoryPendingPlayerId}
             prismTowerPendingKey={prismTowerPendingKey}
             lumioseCityPendingTargetId={lumioseCityPendingTargetId}
+            surfingBeachPendingTargetId={surfingBeachPendingTargetId}
             retreatPendingKey={retreatPendingKey}
             ultraBallPostSearchHandoff={ultraBallPostSearchHandoff}
             viewerPlayerId={viewerPlayerId}
@@ -4218,6 +4284,7 @@ function buildCardInteractionModel({
   onUseTeamRocketsFactory,
   onUsePrismTower,
   onUseLumioseCity,
+  onUseSurfingBeach,
   onRetreat,
   playBasicToBenchPendingCardId,
   playCardPendingCardId,
@@ -4225,6 +4292,7 @@ function buildCardInteractionModel({
   teamRocketsFactoryPendingPlayerId,
   prismTowerPendingKey,
   lumioseCityPendingTargetId,
+  surfingBeachPendingTargetId,
   retreatPendingKey,
   viewerPlayerId
 }: {
@@ -4251,6 +4319,7 @@ function buildCardInteractionModel({
   onUseTeamRocketsFactory: (input: TeamRocketsFactoryCommand) => void
   onUsePrismTower: (input: PrismTowerCommand) => void
   onUseLumioseCity: (input: LumioseCityCommand) => void
+  onUseSurfingBeach: (input: SurfingBeachCommand) => void
   onRetreat: (input: RetreatCommand) => void
   playBasicToBenchPendingCardId: string | null
   playCardPendingCardId: string | null
@@ -4258,6 +4327,7 @@ function buildCardInteractionModel({
   teamRocketsFactoryPendingPlayerId: string | null
   prismTowerPendingKey: string | null
   lumioseCityPendingTargetId: string | null
+  surfingBeachPendingTargetId: string | null
   retreatPendingKey: string | null
   viewerPlayerId: PlayerId
 }): CardInteractionModel {
@@ -4417,6 +4487,33 @@ function buildCardInteractionModel({
       }
 
       if (hasCardDirectedLumioseOption) {
+        cardDirectedActionKeys.add(actionKeyValue)
+      }
+    }
+
+    if (action.key === 'surfing_beach') {
+      let hasCardDirectedSurfingBeachOption = false
+
+      for (const option of surfingBeachCommandOptions(action, cardsById)) {
+        const targetCard = cardsById.get(option.targetCardInstanceId)
+
+        if (!targetCard) {
+          continue
+        }
+
+        hasCardDirectedSurfingBeachOption = true
+
+        setCardIntent(option.targetCardInstanceId, {
+          badge: 'Stadium',
+          disabled: !canRunAction,
+          label: `Use Surfing Beach for ${targetCard?.name ?? formatCardInstanceId(option.targetCardInstanceId)}`,
+          pending: surfingBeachPendingTargetId === option.targetCardInstanceId,
+          tone: 'primary',
+          onClick: () => onUseSurfingBeach({ playerId: action.playerId, targetCardInstanceId: option.targetCardInstanceId })
+        })
+      }
+
+      if (hasCardDirectedSurfingBeachOption) {
         cardDirectedActionKeys.add(actionKeyValue)
       }
     }
@@ -7547,6 +7644,7 @@ function ActionAffordancesPanel({
   onUseTeamRocketsFactory,
   onUsePrismTower,
   onUseLumioseCity,
+  onUseSurfingBeach,
   onRetreat,
   attachEnergyPendingKey,
   attachToolPendingKey,
@@ -7572,6 +7670,7 @@ function ActionAffordancesPanel({
   teamRocketsFactoryPendingPlayerId,
   prismTowerPendingKey,
   lumioseCityPendingTargetId,
+  surfingBeachPendingTargetId,
   retreatPendingKey,
   ultraBallPostSearchHandoff,
   viewerPlayerId
@@ -7606,6 +7705,7 @@ function ActionAffordancesPanel({
   onUseTeamRocketsFactory: (input: TeamRocketsFactoryCommand) => void
   onUsePrismTower: (input: PrismTowerCommand) => void
   onUseLumioseCity: (input: LumioseCityCommand) => void
+  onUseSurfingBeach: (input: SurfingBeachCommand) => void
   onRetreat: (input: RetreatCommand) => void
   attachEnergyPendingKey: string | null
   attachToolPendingKey: string | null
@@ -7631,6 +7731,7 @@ function ActionAffordancesPanel({
   teamRocketsFactoryPendingPlayerId: string | null
   prismTowerPendingKey: string | null
   lumioseCityPendingTargetId: string | null
+  surfingBeachPendingTargetId: string | null
   retreatPendingKey: string | null
   ultraBallPostSearchHandoff: UltraBallPostSearchHandoff | null
   viewerPlayerId: PlayerId
@@ -7641,6 +7742,7 @@ function ActionAffordancesPanel({
       teamRocketsFactoryPendingPlayerId ||
       prismTowerPendingKey ||
       lumioseCityPendingTargetId ||
+      surfingBeachPendingTargetId ||
       cursedBlastPendingKey ||
       subjugatingChainsPendingKey ||
       munkidoriAdrenaBrainPendingKey ||
@@ -7755,6 +7857,7 @@ function ActionAffordancesPanel({
                     onUseTeamRocketsFactory={onUseTeamRocketsFactory}
                     onUsePrismTower={onUsePrismTower}
                     onUseLumioseCity={onUseLumioseCity}
+                    onUseSurfingBeach={onUseSurfingBeach}
                     onRetreat={onRetreat}
                     playBasicToBenchPendingCardId={playBasicToBenchPendingCardId}
                     playCardPendingCardId={playCardPendingCardId}
@@ -7775,6 +7878,7 @@ function ActionAffordancesPanel({
                     teamRocketsFactoryPendingPlayerId={teamRocketsFactoryPendingPlayerId}
                     prismTowerPendingKey={prismTowerPendingKey}
                     lumioseCityPendingTargetId={lumioseCityPendingTargetId}
+                    surfingBeachPendingTargetId={surfingBeachPendingTargetId}
                     postSearchBattleAttackIds={postSearchHandoff?.battleAttackIds ?? []}
                     postSearchBenchCardInstanceIds={postSearchHandoff?.benchableCardInstanceIds ?? []}
                     postSearchEndTurnPlayerIds={postSearchHandoff?.endTurnPlayerIds ?? []}
@@ -8243,6 +8347,8 @@ function handActionChoiceCount(handGroup: ActionGroup, cardsById: Map<string, Ca
         return count + seethingSpiritCommandOptions(action, cardsById).length
       case 'lumiose_city':
         return count + lumioseCityCommandOptions(action, cardsById).length
+      case 'surfing_beach':
+        return count + surfingBeachCommandOptions(action, cardsById).length
       case 'play_stadium':
         return count + action.sourceCardInstanceIds.length
       case 'play_card':
@@ -8376,6 +8482,7 @@ function ActionAffordanceCard({
   onUseTeamRocketsFactory,
   onUsePrismTower,
   onUseLumioseCity,
+  onUseSurfingBeach,
   onRetreat,
   playBasicToBenchPendingCardId,
   playCardPendingCardId,
@@ -8396,6 +8503,7 @@ function ActionAffordanceCard({
   teamRocketsFactoryPendingPlayerId,
   prismTowerPendingKey,
   lumioseCityPendingTargetId,
+  surfingBeachPendingTargetId,
   postSearchBattleAttackIds,
   postSearchBenchCardInstanceIds,
   postSearchEndTurnPlayerIds,
@@ -8437,6 +8545,7 @@ function ActionAffordanceCard({
   onUseTeamRocketsFactory: (input: TeamRocketsFactoryCommand) => void
   onUsePrismTower: (input: PrismTowerCommand) => void
   onUseLumioseCity: (input: LumioseCityCommand) => void
+  onUseSurfingBeach: (input: SurfingBeachCommand) => void
   onRetreat: (input: RetreatCommand) => void
   playBasicToBenchPendingCardId: string | null
   playCardPendingCardId: string | null
@@ -8457,6 +8566,7 @@ function ActionAffordanceCard({
   teamRocketsFactoryPendingPlayerId: string | null
   prismTowerPendingKey: string | null
   lumioseCityPendingTargetId: string | null
+  surfingBeachPendingTargetId: string | null
   postSearchBattleAttackIds: string[]
   postSearchBenchCardInstanceIds: string[]
   postSearchEndTurnPlayerIds: PlayerId[]
@@ -8487,6 +8597,7 @@ function ActionAffordanceCard({
   const runAwayDrawOptions = runAwayDrawCommandOptions(action, cardsById)
   const prismTowerOptions = prismTowerCommandOptions(action, cardsById)
   const lumioseCityOptions = lumioseCityCommandOptions(action, cardsById)
+  const surfingBeachOptions = surfingBeachCommandOptions(action, cardsById)
 
   return (
     <li className={`rounded-xl border px-3 py-2 text-sm ${actionSurfaceClassName(action)}`}>
@@ -8634,6 +8745,30 @@ function ActionAffordanceCard({
                 tone="primary"
               >
                 {isPending ? lumioseCityPendingLabel(option) : lumioseCityButtonLabel(option)}
+              </ActionCommandButton>
+            )
+          })}
+        </div>
+      ) : null}
+
+      {surfingBeachOptions.length > 0 ? (
+        <div className="mt-2 space-y-1.5">
+          {surfingBeachOptions.map(option => {
+            const isPending = surfingBeachPendingTargetId === option.targetCardInstanceId
+
+            return (
+              <ActionCommandButton
+                disabled={!canRunAction}
+                key={option.key}
+                onClick={() =>
+                  onUseSurfingBeach({
+                    playerId: action.playerId,
+                    targetCardInstanceId: option.targetCardInstanceId
+                  })
+                }
+                tone="primary"
+              >
+                {isPending ? surfingBeachPendingLabel(option) : surfingBeachButtonLabel(option)}
               </ActionCommandButton>
             )
           })}
@@ -9294,6 +9429,7 @@ function actionSurfaceClassName(action: ActionAffordance) {
     case 'run_away_draw':
     case 'prism_tower':
     case 'lumiose_city':
+    case 'surfing_beach':
     case 'declare_attack':
       return 'border-accent-mint/30 bg-accent-mint/10'
     case 'unsupported_attack':
@@ -9362,6 +9498,8 @@ function actionSummary(action: ActionAffordance) {
       return `Discard 2 cards from hand to draw 1 card with the active Stadium.`
     case 'lumiose_city':
       return 'Search your deck for 1 Basic Pokémon, put it onto your Bench, shuffle, then end your turn.'
+    case 'surfing_beach':
+      return 'Switch your Active Water Pokémon with 1 of your Benched Water Pokémon.'
     case 'declare_attack':
       return `${action.attackName ?? (action.attackId ? formatAttackId(action.attackId) : 'Attack')}: ${attackCostSummary(
         action.attackCost
@@ -9737,6 +9875,30 @@ function lumioseCityButtonLabel(option: LumioseCityCommandOption) {
 }
 
 function lumioseCityTargetLabel(option: LumioseCityCommandOption) {
+  return option.targetCard?.name ?? formatCardInstanceId(option.targetCardInstanceId)
+}
+
+function surfingBeachCommandOptions(action: ActionAffordance, cardsById: Map<string, CardSummary>): SurfingBeachCommandOption[] {
+  if (action.key !== 'surfing_beach' || action.targetCardInstanceIds.length === 0) {
+    return []
+  }
+
+  return action.targetCardInstanceIds.map(targetCardInstanceId => ({
+    key: surfingBeachKey(targetCardInstanceId),
+    targetCardInstanceId,
+    targetCard: cardsById.get(targetCardInstanceId)
+  }))
+}
+
+function surfingBeachPendingLabel(option: SurfingBeachCommandOption) {
+  return `Using Surfing Beach: switching with ${surfingBeachTargetLabel(option)}...`
+}
+
+function surfingBeachButtonLabel(option: SurfingBeachCommandOption) {
+  return `Surfing Beach: switch with ${surfingBeachTargetLabel(option)}`
+}
+
+function surfingBeachTargetLabel(option: SurfingBeachCommandOption) {
   return option.targetCard?.name ?? formatCardInstanceId(option.targetCardInstanceId)
 }
 
@@ -10205,6 +10367,7 @@ function actionGroupId(action: ActionAffordance): ActionGroupId {
     case 'run_away_draw':
     case 'prism_tower':
     case 'lumiose_city':
+    case 'surfing_beach':
       return 'hand'
     case 'retreat':
     case 'cursed_blast':
@@ -13269,6 +13432,10 @@ function prismTowerKey(discardCardInstanceIds: string[]) {
 }
 
 function lumioseCityKey(targetCardInstanceId: string) {
+  return targetCardInstanceId
+}
+
+function surfingBeachKey(targetCardInstanceId: string) {
   return targetCardInstanceId
 }
 

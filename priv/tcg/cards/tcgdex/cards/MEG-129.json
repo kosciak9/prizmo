@@ -1,0 +1,66 @@
+{
+  "prizmo_id": "MEG-129",
+  "source": {
+    "base_url": "https://api.tcgdex.net/v2/en",
+    "dynamic_fields_removed": [
+      "pricing"
+    ],
+    "language": "en",
+    "provider": "TCGdex"
+  },
+  "tcgdex": {
+    "category": "Trainer",
+    "effect": "Once during each player's turn, that player may switch their Active {W} Pokémon with 1 of their Benched {W} Pokémon.",
+    "id": "me01-129",
+    "illustrator": "AYUMI ODASHIMA",
+    "image": "https://assets.tcgdex.net/en/me/me01/129",
+    "legal": {
+      "expanded": true,
+      "standard": true
+    },
+    "localId": "129",
+    "name": "Surfing Beach",
+    "rarity": "Uncommon",
+    "regulationMark": "I",
+    "set": {
+      "cardCount": {
+        "official": 132,
+        "total": 188
+      },
+      "id": "me01",
+      "logo": "https://assets.tcgdex.net/en/me/me01/logo",
+      "name": "Mega Evolution",
+      "symbol": "https://assets.tcgdex.net/univ/me/me01/symbol"
+    },
+    "trainerType": "Stadium",
+    "updated": "2026-04-21T19:02:59Z",
+    "variants": {
+      "firstEdition": false,
+      "holo": false,
+      "normal": true,
+      "reverse": true,
+      "wPromo": false
+    },
+    "variants_detailed": [
+      {
+        "size": "standard",
+        "type": "normal",
+        "variantId": "endfynwn4n10gzq"
+      },
+      {
+        "size": "standard",
+        "type": "reverse",
+        "variantId": "cm4kqul3x1bwlz1f"
+      },
+      {
+        "size": "standard",
+        "stamp": [
+          "player-rewards-program"
+        ],
+        "type": "normal",
+        "variantId": "gx8bq2hegum3q6irsxlvqxm955ikw9gd1h311"
+      }
+    ]
+  },
+  "tcgdex_id": "me01-129"
+}

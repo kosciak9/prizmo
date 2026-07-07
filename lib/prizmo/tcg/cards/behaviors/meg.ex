@@ -107,6 +107,15 @@ defmodule Prizmo.Tcg.Cards.Behaviors.MEG do
     card_effect(effect: %{type: :damage_on_bench_for_basic_non_darkness})
   end
 
+  card "MEG-129" do
+    card_effect(
+      effect: %{
+        type: :switch_active_water_with_benched_water_once_per_turn,
+        required_pokemon_type: :water
+      }
+    )
+  end
+
   card "MEG-130" do
     card_effect(effect: %{type: :switch_own_active_with_bench})
   end
