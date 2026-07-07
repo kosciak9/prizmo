@@ -18,6 +18,7 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
   alias Prizmo.TcgEngine.BattleActions
   alias Prizmo.TcgEngine.CardCatalog
   alias Prizmo.TcgEngine.CardInstance
+  alias Prizmo.TcgEngine.EventLog
   alias Prizmo.TcgEngine.GameEvent
   alias Prizmo.TcgEngine.GamePlayer
   alias Prizmo.TcgEngine.GameSnapshot
@@ -4010,6 +4011,114 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
       assert zone(drayton.id) == :discard
       [still_awaiting] = awaiting_prompts(game.id)
       assert still_awaiting.id == prompt.id
+    end
+  end
+
+  describe "TWM-151 Hassel" do
+    test "requires an own Pokémon knockout during the opponent's last turn" do
+      {:ok, game} = create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147)
+      assert {:ok, game} = Mechanics.pass_turn(game, "player_1")
+      hassel = move_owned_or_custom_card_to_hand(game.id, "player_2", "TWM-151", 1)
+
+      assert {:ok, view} = GameView.for_player(game.id, "player_2")
+      play_card = Enum.find(view.action_affordances, &(&1.key == "play_card"))
+      play_card_source_ids = if play_card, do: play_card.source_card_instance_ids, else: []
+      refute hassel.id in play_card_source_ids
+
+      assert {:error, :hassel_requires_own_pokemon_ko_during_opponents_last_turn} =
+               Mechanics.play_card(game, "player_2", hassel.id, %{})
+
+      assert zone(hassel.id) == :hand
+    end
+
+    test "creates a top-eight any-card prompt and resolves up to three cards to hand" do
+      {:ok, game} = create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147)
+      previous_turn = current_turn(game.id)
+      active = active_card(game.id, "player_2")
+
+      assert {:ok, game} = Mechanics.pass_turn(game, "player_1")
+      hassel = move_owned_or_custom_card_to_hand(game.id, "player_2", "TWM-151", 1)
+
+      top_cards =
+        stage_top_deck_cards(game.id, "player_2", [
+          "TWM-129",
+          "SCR-133",
+          "MEE-001",
+          "TWM-128",
+          "POR-071",
+          "MEE-002",
+          "MEE-003",
+          "TWM-130"
+        ])
+
+      inspected_ids = Enum.map(top_cards, & &1.id)
+
+      assert {:ok, _event} =
+               EventLog.write_event_and_snapshot(game.id, :take_knockout_prizes, "player_1", %{
+                 turn_id: previous_turn.id,
+                 prize_count: 1,
+                 taken_prize_card_instance_ids: [],
+                 knockouts: [
+                   %{
+                     knocked_out_player_id: "player_2",
+                     knocked_out_card_id: active.card_id,
+                     knocked_out_card_instance_id: active.id,
+                     prize_count: 1
+                   }
+                 ]
+               })
+
+      assert {:ok, view} = GameView.for_player(game.id, "player_2")
+      play_card = Enum.find(view.action_affordances, &(&1.key == "play_card"))
+      assert hassel.id in play_card.source_card_instance_ids
+
+      assert {:ok, game} = Mechanics.play_card(game, "player_2", hassel.id, %{})
+
+      [prompt] = awaiting_prompts(game.id)
+      assert prompt.player_id == "player_2"
+      assert prompt.prompt_type == "select_cards"
+
+      assert prompt.payload["choice_key"] ==
+               "search_top_8_for_up_to_3_cards_if_own_pokemon_knocked_out"
+
+      assert prompt.payload["min"] == 0
+      assert prompt.payload["max"] == 3
+      assert prompt.payload["look_count"] == 8
+      assert prompt.payload["deck_slice_position"] == "top"
+      assert prompt.payload["inspected_card_count"] == 8
+      assert prompt.payload["inspected_card_ids"] == inspected_ids
+      assert Enum.sort(prompt.payload["legal_choices"]) == Enum.sort(inspected_ids)
+
+      assert {:ok, view_with_prompt} = GameView.for_player(game.id, "player_2")
+      [view_prompt] = view_with_prompt.prompts
+
+      assert Enum.sort(Enum.map(view_prompt.payload["legal_choice_cards"], & &1.id)) ==
+               Enum.sort(inspected_ids)
+
+      assert Enum.map(view_prompt.payload["inspected_cards"], & &1.id) == inspected_ids
+
+      selected = Enum.take(inspected_ids, 3)
+      hand_before = cards_in_zone(game.id, "player_2", :hand)
+      deck_before = cards_in_zone(game.id, "player_2", :deck)
+
+      assert {:ok, game} = Mechanics.choose_prompt(game, "player_2", prompt.id, selected)
+
+      assert Enum.all?(selected, &(zone(&1) == :hand))
+      assert zone(hassel.id) == :discard
+      assert length(cards_in_zone(game.id, "player_2", :hand)) == length(hand_before) + 3
+      assert length(cards_in_zone(game.id, "player_2", :deck)) == length(deck_before) - 3
+
+      cards_moved_event =
+        game.id
+        |> game_events_by_type("cards_moved")
+        |> Enum.find(
+          &(&1.payload["effect_key"] ==
+              "search_top_8_for_up_to_3_cards_if_own_pokemon_knocked_out")
+        )
+
+      refute Map.has_key?(cards_moved_event.payload, "public_reveal")
+      refute Map.has_key?(cards_moved_event.payload, "revealed_cards")
+      assert game_events_by_type(game.id, "deck_shuffled") != []
     end
   end
 

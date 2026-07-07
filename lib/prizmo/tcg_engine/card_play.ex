@@ -1677,6 +1677,9 @@ defmodule Prizmo.TcgEngine.CardPlay do
             :ok
         end
 
+      {:ok, %{type: :search_top_deck} = effect} ->
+        require_search_top_deck_effect_available(game.id, turn, player.player_id, effect)
+
       {:ok, %{type: :each_player_hand_to_bottom_then_coin_draw_if_any} = effect} ->
         require_each_player_hand_to_bottom_coin_draw_effect_available(game, player, effect)
 
@@ -1783,11 +1786,24 @@ defmodule Prizmo.TcgEngine.CardPlay do
     end
   end
 
+  defp require_search_top_deck_effect_available(
+         game_id,
+         %Turn{} = turn,
+         player_id,
+         %{params: %{requires_own_pokemon_knocked_out_last_turn: true}} = effect
+       ) do
+    require_previous_turn_own_knockout(game_id, turn, player_id, effect)
+  end
+
+  defp require_search_top_deck_effect_available(_game_id, %Turn{}, _player_id, _effect), do: :ok
+
   defp require_previous_turn_team_rocket_knockout(game_id, %Turn{} = turn, player_id, %{
          params: %{requires_team_rocket_knockout_last_turn: true}
        }) do
-    with {:ok, previous_turn} <- previous_turn(game_id, turn.turn_number),
-         :ok <- require_previous_turn_was_opponents_turn(previous_turn, player_id),
+    error_reason = :team_rockets_archer_requires_team_rocket_ko_during_opponents_last_turn
+
+    with {:ok, previous_turn} <- previous_turn(game_id, turn.turn_number, error_reason),
+         :ok <- require_previous_turn_was_opponents_turn(previous_turn, player_id, error_reason),
          {:ok, previous_turn_knockout_events} <-
            knockout_prize_events_for_turn(game_id, previous_turn.id) do
       if Enum.any?(
@@ -1803,11 +1819,16 @@ defmodule Prizmo.TcgEngine.CardPlay do
 
   defp require_previous_turn_team_rocket_knockout(_game_id, _turn, _player_id, _effect), do: :ok
 
-  defp require_previous_turn_own_knockout(game_id, %Turn{} = turn, player_id, %{
-         params: %{requires_own_pokemon_knocked_out_last_turn: true}
-       }) do
-    with {:ok, previous_turn} <- previous_turn(game_id, turn.turn_number),
-         :ok <- require_previous_turn_was_opponents_turn(previous_turn, player_id),
+  defp require_previous_turn_own_knockout(
+         game_id,
+         %Turn{} = turn,
+         player_id,
+         %{params: %{requires_own_pokemon_knocked_out_last_turn: true}} = effect
+       ) do
+    error_reason = own_knockout_requirement_error(effect)
+
+    with {:ok, previous_turn} <- previous_turn(game_id, turn.turn_number, error_reason),
+         :ok <- require_previous_turn_was_opponents_turn(previous_turn, player_id, error_reason),
          {:ok, previous_turn_knockout_events} <-
            knockout_prize_events_for_turn(game_id, previous_turn.id) do
       if Enum.any?(
@@ -1816,12 +1837,21 @@ defmodule Prizmo.TcgEngine.CardPlay do
          ) do
         :ok
       else
-        {:error, :unfair_stamp_requires_own_pokemon_ko_during_opponents_last_turn}
+        {:error, error_reason}
       end
     end
   end
 
   defp require_previous_turn_own_knockout(_game_id, _turn, _player_id, _effect), do: :ok
+
+  defp own_knockout_requirement_error(%{
+         params: %{own_pokemon_knocked_out_last_turn_error: reason}
+       })
+       when is_atom(reason),
+       do: reason
+
+  defp own_knockout_requirement_error(_effect),
+    do: :unfair_stamp_requires_own_pokemon_ko_during_opponents_last_turn
 
   defp require_opponent_prize_count_at_most(game_id, player_id, %{
          params: %{requires_opponent_prize_count_at_most: max_prize_count}
@@ -1930,10 +1960,10 @@ defmodule Prizmo.TcgEngine.CardPlay do
     end)
   end
 
-  defp previous_turn(_game_id, turn_number) when turn_number <= 1,
-    do: {:error, :team_rockets_archer_requires_team_rocket_ko_during_opponents_last_turn}
+  defp previous_turn(_game_id, turn_number, error_reason) when turn_number <= 1,
+    do: {:error, error_reason}
 
-  defp previous_turn(game_id, turn_number) do
+  defp previous_turn(game_id, turn_number, error_reason) do
     case TurnStore.list_all_turns(game_id) do
       {:ok, turns} ->
         turns
@@ -1943,7 +1973,7 @@ defmodule Prizmo.TcgEngine.CardPlay do
             {:ok, turn}
 
           nil ->
-            {:error, :team_rockets_archer_requires_team_rocket_ko_during_opponents_last_turn}
+            {:error, error_reason}
         end
 
       {:error, reason} ->
@@ -1953,10 +1983,11 @@ defmodule Prizmo.TcgEngine.CardPlay do
 
   defp require_previous_turn_was_opponents_turn(
          %Turn{active_player_id: active_player_id},
-         player_id
+         player_id,
+         error_reason
        ) do
     if active_player_id == player_id do
-      {:error, :team_rockets_archer_requires_team_rocket_ko_during_opponents_last_turn}
+      {:error, error_reason}
     else
       :ok
     end
@@ -4509,6 +4540,7 @@ defmodule Prizmo.TcgEngine.CardPlay do
        when choice_key in [
               :search_top_7_for_supporter_to_hand,
               :search_top_7_for_pokemon_and_trainer_to_hand,
+              :search_top_8_for_up_to_3_cards_if_own_pokemon_knocked_out,
               :search_top_7_for_grass_pokemon_or_basic_grass_energy,
               :search_bottom_7_for_pokemon_to_hand
             ] do
@@ -4739,6 +4771,10 @@ defmodule Prizmo.TcgEngine.CardPlay do
 
   defp search_top_deck_choice_step(:search_top_7_for_pokemon_and_trainer_to_hand) do
     %{params: %{look_count: 7}}
+  end
+
+  defp search_top_deck_choice_step(:search_top_8_for_up_to_3_cards_if_own_pokemon_knocked_out) do
+    %{params: %{look_count: 8}}
   end
 
   defp search_top_deck_choice_step(:search_top_7_for_grass_pokemon_or_basic_grass_energy) do

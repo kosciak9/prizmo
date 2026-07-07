@@ -154,6 +154,30 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     ]
   }
 
+  @hassel %CardDefinition{
+    id: "TWM-151",
+    kind: :trainer,
+    trainer_type: :supporter,
+    play_window: :action_window,
+    effects: [
+      %Effect{
+        key: :search_top_8_for_up_to_3_cards_if_own_pokemon_knocked_out,
+        type: :search_top_deck,
+        params: %{
+          look_count: 8,
+          min_count: 0,
+          max_count: 3,
+          destination: :hand,
+          reveal: false,
+          shuffle_after: true,
+          requires_own_pokemon_knocked_out_last_turn: true,
+          own_pokemon_knocked_out_last_turn_error:
+            :hassel_requires_own_pokemon_ko_during_opponents_last_turn
+        }
+      }
+    ]
+  }
+
   @max_rod %CardDefinition{
     id: "PRE-116",
     kind: :trainer,
@@ -1390,6 +1414,7 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     @switch.id => @switch,
     @surfer.id => @surfer,
     @hand_trimmer.id => @hand_trimmer,
+    @hassel.id => @hassel,
     @hilda.id => @hilda,
     @judge.id => @judge,
     @jumbo_ice_cream.id => @jumbo_ice_cream,

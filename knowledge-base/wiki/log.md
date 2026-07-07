@@ -1,5 +1,12 @@
 # Wiki Log
 
+## [2026-07-07] codebase update | Goal 2 Hassel support
+
+- Task attempted: closed `TWM-151` Hassel as the highest-share shared unimplemented Goal 2 card after Redeemable Ticket. Added committed TCGdex metadata, authored Hassel as an engine-defined Supporter, and extended top-deck search support so the Supporter can enforce the prior-opponent-turn own-Pokémon Knock Out prerequisite before opening a private top-8 any-card prompt for up to three cards to hand without public reveal.
+- Files changed: `lib/prizmo/tcg_engine/cards/registry.ex`, `lib/prizmo/tcg_engine/card_play.ex`, `priv/tcg/cards/tcgdex/cards/TWM-151.json`, `test/prizmo/tcg_engine/mechanics_test.exs`, `knowledge-base/wiki/engine/goal-2-top-30-latest-limitless-coverage-scope.md`, `knowledge-base/wiki/engine/ash-backed-tcg-engine-playtest-handoff.md`, `knowledge-base/wiki/log.md`.
+- Validation: `mix format`; `mix test test/prizmo/tcg/cards/metadata_test.exs test/prizmo/tcg_engine/mechanics_test.exs --only describe:"TWM-151 Hassel"`; `mix test test/prizmo/tcg/cards/metadata_test.exs test/prizmo/tcg_engine/mechanics_test.exs`; `mix compile --warnings-as-errors`; `mix prizmo.goal2.corpus` confirmed `supported=182` / `generic-supported=8` / `partial=10` / `unimplemented=177` and `cached=202` / `missing=175`; Tidewave runtime eval confirmed cached metadata and supported coverage; final `mix check` passed.
+- Remaining/blocking notes: `TWM-151` is no longer in the shared incomplete queue. The default next Goal 2 priority is now `JTG-149` Iris's Fighting Spirit, followed by `TEF-162` Neo Upper Energy and `POR-082` Pokémon Catcher unless the live corpus re-ranks the queue.
+
 ## [2026-07-07] codebase update | Goal 2 Redeemable Ticket support
 
 - Task attempted: closed `JTG-156` Redeemable Ticket as the highest-share shared unimplemented Goal 2 card after Premium Power Pro. Added committed TCGdex metadata, authored Redeemable Ticket as an engine-defined Item, and extended the CardInstance/CardPlay path so Prize cards can be shuffled back to the bottom of deck before replacement Prize cards are placed from the deck top.
