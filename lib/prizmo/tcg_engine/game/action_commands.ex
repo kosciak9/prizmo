@@ -871,6 +871,32 @@ defmodule Prizmo.TcgEngine.Game.ActionCommands do
       end
     end
 
+    action :use_genesect_ex_metallic_signal_command, :struct do
+      description "Use Genesect ex's Metallic Signal Ability to search up to 2 Evolution Metal Pokémon from deck to hand."
+
+      constraints instance_of: Game
+
+      argument :game_id, :uuid do
+        allow_nil? false
+      end
+
+      argument :player_id, :string do
+        allow_nil? false
+      end
+
+      argument :source_card_instance_id, :uuid do
+        allow_nil? false
+      end
+
+      run fn input, _context ->
+        Mechanics.use_genesect_ex_metallic_signal(
+          input.arguments.game_id,
+          input.arguments.player_id,
+          input.arguments.source_card_instance_id
+        )
+      end
+    end
+
     action :play_basic_to_bench_command, :struct do
       description "Play a Basic Pokémon from hand to the Bench through the mechanics layer."
 

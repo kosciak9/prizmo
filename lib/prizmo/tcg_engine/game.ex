@@ -139,10 +139,9 @@ defmodule Prizmo.TcgEngine.Game do
       args: [:game_id, :player_id, :source_card_instance_id, :chosen_card_instance_id]
 
     define :use_dudunsparce_run_away_draw_command, args: @source_ability_args
-
     define :use_fan_rotom_fan_call_command, args: @source_ability_args
-
     define :use_tatsugiri_attract_customers_command, args: @source_ability_args
+    define :use_genesect_ex_metallic_signal_command, args: @source_ability_args
 
     define :play_basic_to_bench_command, args: [:game_id, :player_id, :card_instance_id]
 

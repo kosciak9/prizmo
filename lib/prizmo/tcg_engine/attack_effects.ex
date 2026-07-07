@@ -107,6 +107,7 @@ defmodule Prizmo.TcgEngine.AttackEffects do
     :discard_one_card_from_opponent_hand,
     :reveal_opponent_hand,
     :defending_pokemon_attacks_do_less_damage_next_turn,
+    :attacker_takes_less_damage_from_attacks_next_turn,
     :discard_energy_from_own_bench_for_bonus_damage,
     :defending_pokemon_cannot_retreat_next_turn,
     :discard_hand_then_draw,
@@ -449,6 +450,10 @@ defmodule Prizmo.TcgEngine.AttackEffects do
           attack,
           reduction
         )
+
+      %{type: :attacker_takes_less_damage_from_attacks_next_turn, reduction: reduction}
+      when is_integer(reduction) and reduction >= 0 ->
+        reduce_attacker_damage_taken_next_turn(game_id, attacker_card, attack, reduction)
 
       %{type: :move_opponent_attached_energy_between_pokemon} ->
         move_opponent_attached_energy_between_pokemon(game_id, player_id, opts)
@@ -1532,6 +1537,51 @@ defmodule Prizmo.TcgEngine.AttackEffects do
                  damage_reduction_applied?: false
                }}
           end
+      end
+    end
+  end
+
+  defp reduce_attacker_damage_taken_next_turn(
+         game_id,
+         %CardInstance{} = attacker_card,
+         attack,
+         reduction
+       ) do
+    with {:ok, turn} <- TurnStore.current_turn(game_id),
+         {:ok, current_attacker_card} <- get_card(game_id, attacker_card.id) do
+      case current_attacker_card.zone do
+        :active ->
+          markers =
+            AttackDamageReductions.put_incoming_reduction_next_turn_marker(
+              current_attacker_card,
+              turn,
+              reduction,
+              Map.fetch!(attack, :id)
+            )
+
+          with {:ok, _attacker_card} <-
+                 update(current_attacker_card, :set_markers, %{markers: markers}) do
+            {:ok,
+             %{
+               effect_type: "attacker_takes_less_damage_from_attacks_next_turn",
+               damage_reduction_card_instance_id: current_attacker_card.id,
+               damage_reduction_amount: reduction,
+               damage_reduction_turn_number: turn.turn_number + 1,
+               damage_reduction_applied?: true,
+               public_note:
+                 "During the opponent's next turn, this Pokémon takes #{reduction} less damage from attacks."
+             }}
+          end
+
+        _other_zone ->
+          {:ok,
+           %{
+             effect_type: "attacker_takes_less_damage_from_attacks_next_turn",
+             damage_reduction_card_instance_id: current_attacker_card.id,
+             damage_reduction_amount: reduction,
+             damage_reduction_turn_number: turn.turn_number + 1,
+             damage_reduction_applied?: false
+           }}
       end
     end
   end

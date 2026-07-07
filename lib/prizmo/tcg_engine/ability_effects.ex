@@ -79,6 +79,10 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
   @attract_customers_ability_id :attract_customers
   @attract_customers_effect_type :top_six_choose_supporter_to_hand_then_shuffle
   @attract_customers_look_count 6
+  @metallic_signal_card_id "BLK-067"
+  @metallic_signal_ability_id :metallic_signal
+  @metallic_signal_effect_type :search_evolution_metal_pokemon_to_hand
+  @metallic_signal_max_targets 2
   @lunar_cycle_card_id "MEG-074"
   @lunar_cycle_ability_id :lunar_cycle
   @lunar_cycle_effect_type :discard_basic_fighting_energy_from_hand_then_draw_if_solrock_in_play
@@ -114,6 +118,9 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
   def attract_customers_card_id, do: @attract_customers_card_id
   def attract_customers_ability_id, do: @attract_customers_ability_id
   def attract_customers_look_count, do: @attract_customers_look_count
+  def metallic_signal_card_id, do: @metallic_signal_card_id
+  def metallic_signal_ability_id, do: @metallic_signal_ability_id
+  def metallic_signal_max_targets, do: @metallic_signal_max_targets
   def lunar_cycle_card_id, do: @lunar_cycle_card_id
   def lunar_cycle_ability_id, do: @lunar_cycle_ability_id
 
@@ -167,6 +174,9 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
 
   def attract_customers_source?(%CardInstance{card_id: @attract_customers_card_id}), do: true
   def attract_customers_source?(%CardInstance{}), do: false
+
+  def metallic_signal_source?(%CardInstance{card_id: @metallic_signal_card_id}), do: true
+  def metallic_signal_source?(%CardInstance{}), do: false
 
   def lunar_cycle_source?(%CardInstance{} = source) do
     match?({:ok, _effect}, lunar_cycle_effect(source))
@@ -490,6 +500,30 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
     end)
   end
 
+  def metallic_signal_available?(%CardInstance{} = source, %Turn{} = turn) do
+    require_metallic_signal_available(source, turn) == :ok
+  end
+
+  def require_metallic_signal_available(%CardInstance{} = source, %Turn{} = turn) do
+    with {:ok, _effect} <- metallic_signal_effect(source),
+         :ok <- require_in_play(source) do
+      require_ability_unused(source, turn, @metallic_signal_ability_id)
+    end
+  end
+
+  def metallic_signal_legal_choice_cards(cards) when is_list(cards) do
+    Enum.filter(cards, &metallic_signal_target?/1)
+  end
+
+  def metallic_signal_choice_labels(cards) when is_list(cards) do
+    Enum.map(cards, fn card ->
+      case CardCatalog.fetch(card.card_id) do
+        {:ok, %{name: name}} -> name
+        _ -> card.card_id
+      end
+    end)
+  end
+
   def lunar_cycle_available?(game_id, %CardInstance{} = source, hand_cards, %Turn{} = turn)
       when is_binary(game_id) and is_list(hand_cards) do
     lunar_cycle_source?(source) and in_play?(source) and
@@ -669,6 +703,10 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
     put_ability_used_marker(source, turn, @attract_customers_ability_id)
   end
 
+  def put_metallic_signal_used_marker(%CardInstance{} = source, %Turn{} = turn) do
+    put_ability_used_marker(source, turn, @metallic_signal_ability_id)
+  end
+
   def put_lunar_cycle_used_marker(%CardInstance{} = source, %Turn{} = turn) do
     put_ability_used_marker(source, turn, @lunar_cycle_ability_id)
   end
@@ -808,6 +846,46 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
            }),
          {:ok, _shuffled_deck} <-
            shuffle_deck_after_ability_search(game, player_id, @attract_customers_ability_id),
+         {:ok, _event} <-
+           write_event_and_snapshot(game.id, :deck_shuffled, player_id, %{
+             source: pending_effect_source_payload(pending_effect),
+             effect_key: pending_effect.effect_key
+           }),
+         {:ok, _game} <- complete_pending_effect(pending_effect, selected_card_instance_ids) do
+      GameStore.get_game(game.id)
+    end
+  end
+
+  def resume_pending_effect(
+        %Game{} = game,
+        %Prompt{} = prompt,
+        %PendingEffect{source_type: :ability_effect, effect_key: @metallic_signal_ability_id} =
+          pending_effect,
+        player_id,
+        _choice_key,
+        selected_card_instance_ids
+      )
+      when is_binary(player_id) and is_list(selected_card_instance_ids) do
+    with :ok <- require_max_target_count(selected_card_instance_ids, @metallic_signal_max_targets),
+         :ok <- require_unique_ids(selected_card_instance_ids),
+         :ok <- require_prompt_legal_choices(prompt, selected_card_instance_ids),
+         {:ok, target_cards} <- CardStore.get_cards(game.id, selected_card_instance_ids),
+         :ok <- require_all_owned_in_zone(target_cards, player_id, :deck),
+         :ok <- require_all_metallic_signal_targets(target_cards),
+         {:ok, moved_cards} <- move_deck_targets_to_hand(game.id, player_id, target_cards),
+         moved_cards_payload = EventPayloads.moved_cards(moved_cards, :deck, :hand),
+         {:ok, _event} <-
+           write_event_and_snapshot(game.id, :cards_moved, player_id, %{
+             reason: :ability_effect_resolution,
+             source: pending_effect_source_payload(pending_effect),
+             source_card_id: pending_effect.source_card_id,
+             effect_key: pending_effect.effect_key,
+             cards: moved_cards_payload,
+             public_reveal: moved_cards != [],
+             revealed_cards: moved_cards_payload
+           }),
+         {:ok, _shuffled_deck} <-
+           shuffle_deck_after_ability_search(game, player_id, @metallic_signal_ability_id),
          {:ok, _event} <-
            write_event_and_snapshot(game.id, :deck_shuffled, player_id, %{
              source: pending_effect_source_payload(pending_effect),
@@ -1394,6 +1472,22 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
     end
   end
 
+  defp metallic_signal_effect(%CardInstance{card_id: card_id}) do
+    with {:ok, %{abilities: abilities}} <- CardCatalog.fetch(card_id),
+         %{effect: effect} <- Map.get(abilities, @metallic_signal_ability_id),
+         %{
+           type: @metallic_signal_effect_type,
+           max_targets: @metallic_signal_max_targets
+         } <- effect do
+      {:ok, %{}}
+    else
+      _other ->
+        {:error,
+         {:unsupported_ability_effect, card_id, @metallic_signal_ability_id,
+          @metallic_signal_effect_type}}
+    end
+  end
+
   defp subjugating_chains_effect(%CardInstance{card_id: card_id}) do
     with {:ok, %{abilities: abilities}} <- CardCatalog.fetch(card_id),
          %{effect: %{type: @subjugating_chains_effect_type}} <-
@@ -1636,6 +1730,26 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
     end
   end
 
+  defp require_all_metallic_signal_targets(cards) when is_list(cards) do
+    results = Enum.map(cards, &require_metallic_signal_target/1)
+
+    if Enum.all?(results, &(&1 == :ok)) do
+      :ok
+    else
+      first_error = Enum.find(results, &match?({:error, _}, &1))
+      first_error || :ok
+    end
+  end
+
+  defp require_metallic_signal_target(%CardInstance{} = card) do
+    with {:ok, metadata} <- CardCatalog.fetch(card.card_id),
+         true <- metadata.supertype == :pokemon || {:error, {:not_pokemon, card.card_id}},
+         true <- evolution_pokemon?(metadata) || {:error, {:not_evolution_pokemon, card.card_id}},
+         true <- metal_pokemon?(metadata) || {:error, {:not_metal, card.card_id}} do
+      :ok
+    end
+  end
+
   defp require_all_jewel_seeker_targets(cards) when is_list(cards) do
     results = Enum.map(cards, &require_jewel_seeker_target/1)
 
@@ -1661,6 +1775,20 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
   defp colorless_pokemon?(%{supertype: :pokemon, type: :colorless}), do: true
   defp colorless_pokemon?(_), do: false
 
+  defp evolution_pokemon?(%{supertype: :pokemon, stage: stage})
+       when stage in [:stage_1, :stage_2], do: true
+
+  defp evolution_pokemon?(%{supertype: :pokemon, evolves_from: evolves_from})
+       when is_binary(evolves_from), do: true
+
+  defp evolution_pokemon?(_metadata), do: false
+
+  defp metal_pokemon?(%{supertype: :pokemon, types: types}) when is_list(types),
+    do: :metal in types
+
+  defp metal_pokemon?(%{supertype: :pokemon, type: :metal}), do: true
+  defp metal_pokemon?(_metadata), do: false
+
   defp darkness_pokemon?(%{supertype: :pokemon, types: types}) when is_list(types),
     do: :darkness in types
 
@@ -1677,6 +1805,13 @@ defmodule Prizmo.TcgEngine.AbilityEffects do
   end
 
   defp attract_customers_target?(%CardInstance{} = card), do: last_ditch_catch_target?(card)
+
+  defp metallic_signal_target?(%CardInstance{} = card) do
+    case CardCatalog.fetch(card.card_id) do
+      {:ok, metadata} -> evolution_pokemon?(metadata) and metal_pokemon?(metadata)
+      _other -> false
+    end
+  end
 
   defp subjugating_chains_target?(%CardInstance{zone: :bench} = card) do
     case CardCatalog.fetch(card.card_id) do

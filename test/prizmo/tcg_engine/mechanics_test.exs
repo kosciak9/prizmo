@@ -3180,6 +3180,101 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
     end
   end
 
+  describe "BLK-067 Genesect ex" do
+    test "Metallic Signal searches up to 2 Evolution Metal Pokémon from deck" do
+      {:ok, game} = create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147)
+      genesect = play_direct_basic_to_bench(game.id, "player_1", "BLK-067", 4)
+
+      staged_cards =
+        stage_top_deck_cards(game.id, "player_1", [
+          "CRI-061",
+          "TWM-129",
+          "TWM-130"
+        ])
+
+      metagross = Enum.find(staged_cards, &(&1.card_id == "CRI-061"))
+      invalid_targets = Enum.reject(staged_cards, &(&1.card_id == "CRI-061"))
+
+      assert {:ok, view} = GameView.for_player(game.id, "player_1")
+      affordance = Enum.find(view.action_affordances, &(&1.key == "metallic_signal"))
+      assert is_map(affordance)
+      assert affordance.source_card_instance_ids == [genesect.id]
+
+      assert {:ok, game} =
+               Mechanics.use_genesect_ex_metallic_signal(game, "player_1", genesect.id)
+
+      [prompt] = awaiting_prompts(game.id)
+      assert prompt.player_id == "player_1"
+      assert prompt.prompt_type == "select_cards"
+      assert prompt.payload["choice_key"] == "metallic_signal"
+      assert prompt.payload["min"] == 0
+      assert prompt.payload["max"] == 2
+      assert metagross.id in prompt.payload["legal_choices"]
+      refute Enum.any?(invalid_targets, &(&1.id in prompt.payload["legal_choices"]))
+
+      hand_before = cards_in_zone(game.id, "player_1", :hand)
+      deck_before = cards_in_zone(game.id, "player_1", :deck)
+      selected = [metagross.id]
+
+      assert {:ok, game} = Mechanics.choose_prompt(game, "player_1", prompt.id, selected)
+
+      assert zone(metagross.id) == :hand
+      assert length(cards_in_zone(game.id, "player_1", :hand)) == length(hand_before) + 1
+      assert length(cards_in_zone(game.id, "player_1", :deck)) == length(deck_before) - 1
+
+      cards_moved_event =
+        game.id
+        |> game_events_by_type("cards_moved")
+        |> Enum.find(&(&1.payload["effect_key"] == "metallic_signal"))
+
+      assert cards_moved_event.payload["public_reveal"] == true
+
+      assert Enum.map(cards_moved_event.payload["revealed_cards"], & &1["instance_id"]) ==
+               selected
+
+      assert game_events_by_type(game.id, "deck_shuffled") != []
+
+      assert {:error, {:ability_already_used_this_turn, _, :metallic_signal}} =
+               Mechanics.use_genesect_ex_metallic_signal(game, "player_1", genesect.id)
+    end
+
+    test "Protect Charge reduces damage taken from attacks during the opponent's next turn" do
+      {:ok, game} = create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147)
+      attacker = promote_custom_basic_to_active(game.id, "player_1", "BLK-067")
+      defender = promote_custom_basic_to_active(game.id, "player_2", "BLK-067")
+
+      attach_direct_energy(game.id, "player_1", attacker, "MEE-008", 1)
+      attach_direct_energy(game.id, "player_1", attacker, "MEE-008", 2)
+      attach_direct_energy(game.id, "player_1", attacker, "MEE-008", 3)
+
+      assert {:ok, game} = Mechanics.declare_attack(game, "player_1", :protect_charge)
+
+      assert card(defender.id).damage == 150
+      assert current_turn(game.id).active_player_id == "player_2"
+      assert current_turn(game.id).turn_number == 2
+
+      resolve_event = game.id |> game_events_by_type("resolve_declared_attack") |> List.last()
+
+      assert resolve_event.payload["effect_type"] ==
+               "attacker_takes_less_damage_from_attacks_next_turn"
+
+      assert resolve_event.payload["damage_reduction_amount"] == 30
+      assert resolve_event.payload["damage_reduction_applied?"] == true
+
+      refreshed_attacker = card(attacker.id)
+
+      assert Map.has_key?(
+               refreshed_attacker.markers,
+               "incoming_attack_damage_reduction_next_turn"
+             )
+
+      grass_attacker = play_direct_basic_to_bench(game.id, "player_2", "TWM-025", 1)
+
+      assert {:ok, 40} =
+               AttackDamage.damage_for(grass_attacker, refreshed_attacker, %{damage: 100})
+    end
+  end
+
   describe "TEF-081 Iron Crown ex" do
     test "Cobalt Command boosts Future Pokémon except Iron Crown ex" do
       {:ok, game} = create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147)

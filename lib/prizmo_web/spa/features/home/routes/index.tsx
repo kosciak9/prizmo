@@ -45,6 +45,7 @@ import {
   runUseTcgEngineFlipTheScript,
   runUseTcgEngineJewelSeeker,
   runUseTcgEngineLunarCycle,
+  runUseTcgEngineMetallicSignal,
   runUseTcgEngineLumioseCity,
   runUseTcgEngineMunkidoriAdrenaBrain,
   runUseTcgEnginePrismTower,
@@ -573,6 +574,12 @@ type AttractCustomersCommandOption = {
   sourceCard: CardSummary | undefined
 }
 
+type MetallicSignalCommandOption = {
+  key: string
+  sourceCardInstanceId: string
+  sourceCard: CardSummary | undefined
+}
+
 type JewelSeekerCommandOption = {
   key: string
   sourceCardInstanceId: string
@@ -857,6 +864,17 @@ type AttractCustomersInput = {
 }
 
 type AttractCustomersCommand = {
+  playerId: string
+  sourceCardInstanceId: string
+}
+
+type MetallicSignalInput = {
+  gameId: string
+  playerId: PlayerId
+  sourceCardInstanceId: string
+}
+
+type MetallicSignalCommand = {
   playerId: string
   sourceCardInstanceId: string
 }
@@ -1584,6 +1602,14 @@ export function HomeRoute() {
 
   const attractCustomersMutation = useMutation({
     mutationFn: (input: AttractCustomersInput) => useAttractCustomers(input),
+    onSuccess: async (_game, input) => {
+      clearUltraBallPostSearchHandoff(input.gameId, input.playerId)
+      await queryClient.invalidateQueries({ queryKey: ['tcg-engine', 'game-state'] })
+    }
+  })
+
+  const metallicSignalMutation = useMutation({
+    mutationFn: (input: MetallicSignalInput) => useMetallicSignal(input),
     onSuccess: async (_game, input) => {
       clearUltraBallPostSearchHandoff(input.gameId, input.playerId)
       await queryClient.invalidateQueries({ queryKey: ['tcg-engine', 'game-state'] })
@@ -2625,6 +2651,15 @@ export function HomeRoute() {
                     })
                   }
                 }}
+                onUseMetallicSignal={({ playerId, sourceCardInstanceId }) => {
+                  if (isPlayerId(playerId)) {
+                    metallicSignalMutation.mutate({
+                      gameId: normalisedGameId,
+                      playerId,
+                      sourceCardInstanceId
+                    })
+                  }
+                }}
                 onUseJewelSeeker={({ playerId, sourceCardInstanceId }) => {
                   if (isPlayerId(playerId)) {
                     jewelSeekerMutation.mutate({
@@ -2823,6 +2858,11 @@ export function HomeRoute() {
                 attractCustomersPendingKey={
                   attractCustomersMutation.isPending && attractCustomersMutation.variables
                     ? attractCustomersKey(attractCustomersMutation.variables.sourceCardInstanceId)
+                    : null
+                }
+                metallicSignalPendingKey={
+                  metallicSignalMutation.isPending && metallicSignalMutation.variables
+                    ? metallicSignalKey(metallicSignalMutation.variables.sourceCardInstanceId)
                     : null
                 }
                 jewelSeekerPendingKey={
@@ -3633,6 +3673,20 @@ async function useAttractCustomers(input: AttractCustomersInput): Promise<Create
   return result.data as CreatedGame
 }
 
+async function useMetallicSignal(input: MetallicSignalInput): Promise<CreatedGame> {
+  const result = await runUseTcgEngineMetallicSignal({
+    input,
+    fields: GAME_RESOURCE_FIELDS,
+    headers: buildAshRpcHeaders()
+  })
+
+  if (!result.success) {
+    throw new Error(rpcErrorMessage(result.errors))
+  }
+
+  return result.data as CreatedGame
+}
+
 async function useJewelSeeker(input: JewelSeekerInput): Promise<CreatedGame> {
   const result = await runUseTcgEngineJewelSeeker({
     input,
@@ -3920,6 +3974,7 @@ function GameStateWorkbench({
   onUseSeethingSpirit,
   onUseFanCall,
   onUseAttractCustomers,
+  onUseMetallicSignal,
   onUseJewelSeeker,
   onUseFlipTheScript,
   onUsePsychicDraw,
@@ -3959,6 +4014,7 @@ function GameStateWorkbench({
   seethingSpiritPendingKey,
   fanCallPendingKey,
   attractCustomersPendingKey,
+  metallicSignalPendingKey,
   jewelSeekerPendingKey,
   flipTheScriptPendingKey,
   psychicDrawPendingKey,
@@ -4006,6 +4062,7 @@ function GameStateWorkbench({
   onUseSeethingSpirit: (input: SeethingSpiritCommand) => void
   onUseFanCall: (input: FanCallCommand) => void
   onUseAttractCustomers: (input: AttractCustomersCommand) => void
+  onUseMetallicSignal: (input: MetallicSignalCommand) => void
   onUseJewelSeeker: (input: JewelSeekerCommand) => void
   onUseFlipTheScript: (input: FlipTheScriptCommand) => void
   onUsePsychicDraw: (input: PsychicDrawCommand) => void
@@ -4045,6 +4102,7 @@ function GameStateWorkbench({
   seethingSpiritPendingKey: string | null
   fanCallPendingKey: string | null
   attractCustomersPendingKey: string | null
+  metallicSignalPendingKey: string | null
   jewelSeekerPendingKey: string | null
   flipTheScriptPendingKey: string | null
   psychicDrawPendingKey: string | null
@@ -4210,6 +4268,7 @@ function GameStateWorkbench({
             onUseSeethingSpirit={onUseSeethingSpirit}
             onUseFanCall={onUseFanCall}
             onUseAttractCustomers={onUseAttractCustomers}
+            onUseMetallicSignal={onUseMetallicSignal}
             onUseJewelSeeker={onUseJewelSeeker}
             onUseFlipTheScript={onUseFlipTheScript}
             onUsePsychicDraw={onUsePsychicDraw}
@@ -4236,6 +4295,7 @@ function GameStateWorkbench({
             seethingSpiritPendingKey={seethingSpiritPendingKey}
             fanCallPendingKey={fanCallPendingKey}
             attractCustomersPendingKey={attractCustomersPendingKey}
+            metallicSignalPendingKey={metallicSignalPendingKey}
             jewelSeekerPendingKey={jewelSeekerPendingKey}
             flipTheScriptPendingKey={flipTheScriptPendingKey}
             psychicDrawPendingKey={psychicDrawPendingKey}
@@ -7635,6 +7695,7 @@ function ActionAffordancesPanel({
   onUseSeethingSpirit,
   onUseFanCall,
   onUseAttractCustomers,
+  onUseMetallicSignal,
   onUseJewelSeeker,
   onUseFlipTheScript,
   onUsePsychicDraw,
@@ -7661,6 +7722,7 @@ function ActionAffordancesPanel({
   seethingSpiritPendingKey,
   fanCallPendingKey,
   attractCustomersPendingKey,
+  metallicSignalPendingKey,
   jewelSeekerPendingKey,
   flipTheScriptPendingKey,
   psychicDrawPendingKey,
@@ -7696,6 +7758,7 @@ function ActionAffordancesPanel({
   onUseSeethingSpirit: (input: SeethingSpiritCommand) => void
   onUseFanCall: (input: FanCallCommand) => void
   onUseAttractCustomers: (input: AttractCustomersCommand) => void
+  onUseMetallicSignal: (input: MetallicSignalCommand) => void
   onUseJewelSeeker: (input: JewelSeekerCommand) => void
   onUseFlipTheScript: (input: FlipTheScriptCommand) => void
   onUsePsychicDraw: (input: PsychicDrawCommand) => void
@@ -7722,6 +7785,7 @@ function ActionAffordancesPanel({
   seethingSpiritPendingKey: string | null
   fanCallPendingKey: string | null
   attractCustomersPendingKey: string | null
+  metallicSignalPendingKey: string | null
   jewelSeekerPendingKey: string | null
   flipTheScriptPendingKey: string | null
   psychicDrawPendingKey: string | null
@@ -7750,6 +7814,7 @@ function ActionAffordancesPanel({
       seethingSpiritPendingKey ||
       fanCallPendingKey ||
       attractCustomersPendingKey ||
+      metallicSignalPendingKey ||
       jewelSeekerPendingKey ||
       flipTheScriptPendingKey ||
       psychicDrawPendingKey ||
@@ -7848,6 +7913,7 @@ function ActionAffordancesPanel({
                     onUseSeethingSpirit={onUseSeethingSpirit}
                     onUseFanCall={onUseFanCall}
                     onUseAttractCustomers={onUseAttractCustomers}
+                    onUseMetallicSignal={onUseMetallicSignal}
                     onUseJewelSeeker={onUseJewelSeeker}
                     onUseFlipTheScript={onUseFlipTheScript}
                     onUsePsychicDraw={onUsePsychicDraw}
@@ -7869,6 +7935,7 @@ function ActionAffordancesPanel({
                     seethingSpiritPendingKey={seethingSpiritPendingKey}
                     fanCallPendingKey={fanCallPendingKey}
                     attractCustomersPendingKey={attractCustomersPendingKey}
+                    metallicSignalPendingKey={metallicSignalPendingKey}
                     jewelSeekerPendingKey={jewelSeekerPendingKey}
                     flipTheScriptPendingKey={flipTheScriptPendingKey}
                     psychicDrawPendingKey={psychicDrawPendingKey}
@@ -8473,6 +8540,7 @@ function ActionAffordanceCard({
   onUseSeethingSpirit,
   onUseFanCall,
   onUseAttractCustomers,
+  onUseMetallicSignal,
   onUseJewelSeeker,
   onUseFlipTheScript,
   onUsePsychicDraw,
@@ -8494,6 +8562,7 @@ function ActionAffordanceCard({
   seethingSpiritPendingKey,
   fanCallPendingKey,
   attractCustomersPendingKey,
+  metallicSignalPendingKey,
   jewelSeekerPendingKey,
   flipTheScriptPendingKey,
   psychicDrawPendingKey,
@@ -8536,6 +8605,7 @@ function ActionAffordanceCard({
   onUseSeethingSpirit: (input: SeethingSpiritCommand) => void
   onUseFanCall: (input: FanCallCommand) => void
   onUseAttractCustomers: (input: AttractCustomersCommand) => void
+  onUseMetallicSignal: (input: MetallicSignalCommand) => void
   onUseJewelSeeker: (input: JewelSeekerCommand) => void
   onUseFlipTheScript: (input: FlipTheScriptCommand) => void
   onUsePsychicDraw: (input: PsychicDrawCommand) => void
@@ -8557,6 +8627,7 @@ function ActionAffordanceCard({
   seethingSpiritPendingKey: string | null
   fanCallPendingKey: string | null
   attractCustomersPendingKey: string | null
+  metallicSignalPendingKey: string | null
   jewelSeekerPendingKey: string | null
   flipTheScriptPendingKey: string | null
   psychicDrawPendingKey: string | null
@@ -8589,6 +8660,7 @@ function ActionAffordanceCard({
   const seethingSpiritOptions = seethingSpiritCommandOptions(action, cardsById)
   const fanCallOptions = fanCallCommandOptions(action, cardsById)
   const attractCustomersOptions = attractCustomersCommandOptions(action, cardsById)
+  const metallicSignalOptions = metallicSignalCommandOptions(action, cardsById)
   const jewelSeekerOptions = jewelSeekerCommandOptions(action, cardsById)
   const flipTheScriptOptions = flipTheScriptCommandOptions(action, cardsById)
   const psychicDrawOptions = psychicDrawCommandOptions(action, cardsById)
@@ -8945,6 +9017,30 @@ function ActionAffordanceCard({
                 tone="primary"
               >
                 {isPending ? attractCustomersPendingLabel(option) : attractCustomersButtonLabel(option)}
+              </ActionCommandButton>
+            )
+          })}
+        </div>
+      ) : null}
+
+      {metallicSignalOptions.length > 0 ? (
+        <div className="mt-2 space-y-1.5">
+          {metallicSignalOptions.map(option => {
+            const isPending = metallicSignalPendingKey === option.key
+
+            return (
+              <ActionCommandButton
+                disabled={!canRunAction}
+                key={option.key}
+                onClick={() =>
+                  onUseMetallicSignal({
+                    playerId: action.playerId,
+                    sourceCardInstanceId: option.sourceCardInstanceId
+                  })
+                }
+                tone="primary"
+              >
+                {isPending ? metallicSignalPendingLabel(option) : metallicSignalButtonLabel(option)}
               </ActionCommandButton>
             )
           })}
@@ -9423,6 +9519,7 @@ function actionSurfaceClassName(action: ActionAffordance) {
     case 'seething_spirit':
     case 'subjugating_chains':
     case 'fan_call':
+    case 'metallic_signal':
     case 'jewel_seeker':
     case 'psychic_draw':
     case 'recon_directive':
@@ -9484,6 +9581,8 @@ function actionSummary(action: ActionAffordance) {
       return 'Attach a Basic Energy from discard to 1 of your Pokémon.'
     case 'fan_call':
       return 'Search your deck for up to 3 Colorless Pokémon with 100 HP or less and put them into your hand. Then, shuffle your deck.'
+    case 'metallic_signal':
+      return 'Search your deck for up to 2 Evolution Metal Pokémon, reveal them, and put them into your hand. Then, shuffle your deck.'
     case 'jewel_seeker':
       return 'If Noctowl evolved from hand this turn and you have a Tera Pokémon in play, search your deck for up to 2 Trainer cards and put them into your hand.'
     case 'psychic_draw':
@@ -9740,6 +9839,25 @@ function attractCustomersCommandOptions(
   ]
 }
 
+function metallicSignalCommandOptions(
+  action: ActionAffordance,
+  cardsById: Map<string, CardSummary>
+): MetallicSignalCommandOption[] {
+  if (action.key !== 'metallic_signal' || action.sourceCardInstanceIds.length < 1) {
+    return []
+  }
+
+  const sourceCardInstanceId = action.sourceCardInstanceIds[0]!
+
+  return [
+    {
+      key: metallicSignalKey(sourceCardInstanceId),
+      sourceCardInstanceId,
+      sourceCard: cardsById.get(sourceCardInstanceId)
+    }
+  ]
+}
+
 function jewelSeekerCommandOptions(
   action: ActionAffordance,
   cardsById: Map<string, CardSummary>
@@ -9936,6 +10054,14 @@ function attractCustomersPendingLabel(option: AttractCustomersCommandOption) {
 
 function attractCustomersButtonLabel(option: AttractCustomersCommandOption) {
   return `Attract Customers with ${option.sourceCard?.name ?? formatCardInstanceId(option.sourceCardInstanceId)}`
+}
+
+function metallicSignalPendingLabel(option: MetallicSignalCommandOption) {
+  return `Using ${option.sourceCard?.name ?? 'Metallic Signal'}...`
+}
+
+function metallicSignalButtonLabel(option: MetallicSignalCommandOption) {
+  return `Metallic Signal with ${option.sourceCard?.name ?? formatCardInstanceId(option.sourceCardInstanceId)}`
 }
 
 function jewelSeekerPendingLabel(option: JewelSeekerCommandOption) {
@@ -10360,6 +10486,7 @@ function actionGroupId(action: ActionAffordance): ActionGroupId {
     case 'lunar_cycle':
     case 'seething_spirit':
     case 'fan_call':
+    case 'metallic_signal':
     case 'jewel_seeker':
     case 'flip_the_script':
     case 'psychic_draw':
@@ -13400,6 +13527,10 @@ function fanCallKey(sourceCardInstanceId: string) {
 }
 
 function attractCustomersKey(sourceCardInstanceId: string) {
+  return sourceCardInstanceId
+}
+
+function metallicSignalKey(sourceCardInstanceId: string) {
   return sourceCardInstanceId
 }
 

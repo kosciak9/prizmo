@@ -1,0 +1,92 @@
+{
+  "prizmo_id": "BLK-067",
+  "source": {
+    "base_url": "https://api.tcgdex.net/v2/en",
+    "dynamic_fields_removed": [
+      "pricing"
+    ],
+    "language": "en",
+    "provider": "TCGdex"
+  },
+  "tcgdex": {
+    "abilities": [
+      {
+        "effect": "Once during your turn, you may search your deck for up to 2 Evolution {M} Pokémon, reveal them, and put them into your hand. Then, shuffle your deck.",
+        "name": "Metallic Signal",
+        "type": "Ability"
+      }
+    ],
+    "attacks": [
+      {
+        "cost": [
+          "Metal",
+          "Metal",
+          "Colorless"
+        ],
+        "damage": 150,
+        "effect": "During your opponent's next turn, this Pokémon takes 30 less damage from attacks (after applying Weakness and Resistance).",
+        "name": "Protect Charge"
+      }
+    ],
+    "category": "Pokemon",
+    "dexId": [
+      649
+    ],
+    "hp": 220,
+    "id": "sv10.5b-067",
+    "illustrator": "5ban Graphics",
+    "image": "https://assets.tcgdex.net/en/sv/sv10.5b/067",
+    "legal": {
+      "expanded": true,
+      "standard": true
+    },
+    "localId": "067",
+    "name": "Genesect ex",
+    "rarity": "Double rare",
+    "regulationMark": "I",
+    "resistances": [
+      {
+        "type": "Grass",
+        "value": "-30"
+      }
+    ],
+    "retreat": 2,
+    "set": {
+      "cardCount": {
+        "official": 86,
+        "total": 172
+      },
+      "id": "sv10.5b",
+      "logo": "https://assets.tcgdex.net/en/sv/sv10.5b/logo",
+      "name": "Black Bolt",
+      "symbol": "https://assets.tcgdex.net/univ/sv/sv10.5b/symbol"
+    },
+    "stage": "Basic",
+    "suffix": "ex",
+    "types": [
+      "Metal"
+    ],
+    "updated": "2026-04-25T21:46:36+01:00",
+    "variants": {
+      "firstEdition": false,
+      "holo": true,
+      "normal": false,
+      "reverse": false,
+      "wPromo": false
+    },
+    "variants_detailed": [
+      {
+        "size": "standard",
+        "type": "holo",
+        "variantId": "jr7oetx1mqug9"
+      }
+    ],
+    "weaknesses": [
+      {
+        "type": "Fire",
+        "value": "x2"
+      }
+    ]
+  },
+  "tcgdex_id": "sv10.5b-067"
+}

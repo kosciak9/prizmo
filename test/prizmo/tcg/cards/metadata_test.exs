@@ -30,6 +30,34 @@ defmodule Prizmo.Tcg.Cards.MetadataTest do
            }
   end
 
+  test "normalizes BLK-067 Genesect ex metadata" do
+    metadata = Metadata.fetch!("BLK-067")
+
+    assert metadata.tcgdex_id == "sv10.5b-067"
+    assert metadata.name == "Genesect ex"
+    assert metadata.category == :pokemon
+    assert metadata.types == [:metal]
+    assert metadata.hp == 220
+    assert metadata.stage == :basic
+    assert metadata.suffix == "ex"
+    assert metadata.rule_box?
+    assert metadata.retreat_count == 2
+    assert metadata.resistances == [%{type: :grass, value: "-30"}]
+    assert metadata.weaknesses == [%{type: :fire, value: "x2"}]
+
+    assert metadata.abilities["metallic_signal"].raw_effect =~
+             "search your deck for up to 2 Evolution {M} Pokémon"
+
+    assert metadata.attacks["protect_charge"] == %{
+             cost: [:metal, :metal, :colorless],
+             damage: 150,
+             id: "protect_charge",
+             name: "Protect Charge",
+             raw_effect:
+               "During your opponent's next turn, this Pokémon takes 30 less damage from attacks (after applying Weakness and Resistance)."
+           }
+  end
+
   test "normalizes cached Trainer metadata and preserves raw printed effect" do
     metadata = Metadata.fetch!("TWM-165")
 

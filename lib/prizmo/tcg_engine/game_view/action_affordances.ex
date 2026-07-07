@@ -148,6 +148,7 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
       cursed_blast_affordances(game, player, current_turn, cards, all_cards) ++
       fan_call_affordances(player, current_turn, cards) ++
       attract_customers_affordances(player, current_turn, cards) ++
+      metallic_signal_affordances(player, current_turn, cards) ++
       adrena_brain_affordances(game, player, current_turn, cards, all_cards) ++
       evolve_from_hand_affordances(game, player, current_turn, cards, all_cards) ++
       declare_attack_affordances(player, current_turn, cards, all_cards) ++
@@ -777,6 +778,23 @@ defmodule Prizmo.TcgEngine.GameView.ActionAffordances do
   end
 
   defp attract_customers_affordances(_player, _current_turn, _cards), do: []
+
+  defp metallic_signal_affordances(%GamePlayer{} = player, %Turn{} = current_turn, cards) do
+    for source_card <- in_play_pokemon_cards(cards),
+        AbilityEffects.metallic_signal_available?(source_card, current_turn) do
+      affordance(
+        :metallic_signal,
+        "Use Metallic Signal",
+        :command,
+        player.player_id,
+        source_card_instance_ids: [source_card.id],
+        note:
+          "Search your deck for up to 2 Evolution Metal Pokémon, reveal them, and put them into your hand. Then, shuffle your deck."
+      )
+    end
+  end
+
+  defp metallic_signal_affordances(_player, _current_turn, _cards), do: []
 
   defp declare_attack_affordances(
          %GamePlayer{} = player,

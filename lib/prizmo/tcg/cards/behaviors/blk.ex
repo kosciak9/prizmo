@@ -10,4 +10,20 @@ defmodule Prizmo.Tcg.Cards.Behaviors.BLK do
 
     attack(:beam, effect: nil)
   end
+
+  card "BLK-067" do
+    ability(:metallic_signal,
+      effect: %{
+        type: :search_evolution_metal_pokemon_to_hand,
+        max_targets: 2
+      }
+    )
+
+    attack(:protect_charge,
+      effect: %{
+        type: :attacker_takes_less_damage_from_attacks_next_turn,
+        reduction: 30
+      }
+    )
+  end
 end

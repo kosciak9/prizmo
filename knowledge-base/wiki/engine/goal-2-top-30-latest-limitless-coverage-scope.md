@@ -64,13 +64,13 @@ Those reports are the canonical starting point for autonomous Goal 2 implementat
 - Tracked top archetypes: `30`
 - Tracked cards with usage greater than `0.00`: `377`
 - Coverage buckets from `mix prizmo.goal2.corpus`:
-  - `supported=189`
+  - `supported=190`
   - `generic-supported=8`
   - `partial=10`
-  - `unimplemented=170`
+  - `unimplemented=169`
 - Metadata buckets:
-  - `cached=209`
-  - `missing=168`
+  - `cached=210`
+  - `missing=167`
 
 Important interpretation:
 
@@ -108,12 +108,17 @@ The newest Goal 2 engine batch closed `CRI-079` Philippe as the prior highest-sh
 
 The latest Goal 2 engine batch closed `DRI-164` Energy Recycler as the prior tied highest-share shared unimplemented Item. It now has committed TCGdex metadata and executable Ash engine behavior as an Item: it opens a private selection prompt over Basic Energy cards in the acting player's discard pile, shuffles one to five selected Basic Energy cards into that player's deck through the shared recover-discard-to-deck path, filters out Special Energy and Pokémon, records public movement/reveal details, and writes the expected deck-shuffled event.
 
+The newest Goal 2 engine batch closed `BLK-067` Genesect ex as the prior highest-share shared unimplemented card. It now has committed TCGdex metadata and executable Ash engine behavior as a Basic Metal Pokémon ex: `Metallic Signal` is an in-play once-per-turn Ability that searches the player's deck for up to two Evolution Metal Pokémon, publicly reveals selected cards, moves them to hand, shuffles afterward, and is exposed through `GameView`, Ash RPC/codegen, and the temporary React action rail. `Protect Charge` deals 150 damage and records an incoming next-turn damage-reduction marker so, during the opponent's next turn, Genesect ex takes 30 less damage from attacks after Weakness and Resistance.
+
 ### Highest-priority remaining `unimplemented` cards from current report
 
 | Card | Archetypes | Total share | Notes |
 | --- | --- | --- | --- |
-| `BLK-067` Genesect ex | `2` | `0.55%` | Highest-share shared unimplemented card after closing Energy Recycler; still shared across Metagross Metal Maker / Steven's Metagross ex. |
-| `CRI-020` Froakie | `2` | `0.50%` | Next shared Greninja/Mega Greninja metadata-missing card after Genesect ex; likely belongs with `CRI-021`, `SCR-136`, and `TWM-106` follow-up analysis. |
+| `CRI-020` Froakie | `2` | `0.50%` | Highest-share shared unimplemented card after closing Genesect ex; metadata missing and likely belongs with the Greninja/Mega Greninja cluster. |
+| `CRI-021` Frogadier | `2` | `0.50%` | Shared Greninja/Mega Greninja metadata-missing follow-up; evaluate with `CRI-020`, `SCR-136`, and `TWM-106`. |
+| `SCR-136` Grand Tree | `2` | `0.50%` | Shared Greninja/Mega Greninja metadata-missing Trainer/Stadium blocker adjacent to the Froakie/Frogadier line. |
+| `TWM-052` Glalie | `2` | `0.50%` | Shared Greninja ex / Mega Starmie ex metadata-missing blocker; separate from the core Greninja line unless a coherent Water/Psychic batch emerges. |
+| `TWM-106` Greninja ex | `2` | `0.50%` | Shared Greninja/Mega Greninja metadata-missing Pokémon ex target; likely pair with `CRI-020`, `CRI-021`, and `SCR-136`. |
 
 ### Shared `partial` cards worth finishing after the broad unimplemented slice
 
@@ -140,8 +145,8 @@ That means prior Goal 1 and six-deck coverage was not wasted; it now acts as see
 
 ## Recommended next implementation order
 
-1. Treat `BLK-067` Genesect ex as the next default shared unimplemented queue unless the live corpus re-ranks the blockers; confirm metadata/text before implementation.
-2. Keep the shared Greninja/Mega Greninja metadata-missing cluster (`CRI-020`, `CRI-021`, `SCR-136`, `TWM-106`, plus adjacent single-archetype Greninja cards) behind Genesect ex.
+1. Treat the shared Greninja/Mega Greninja metadata-missing cluster (`CRI-020`, `CRI-021`, `SCR-136`, `TWM-106`, plus adjacent single-archetype Greninja cards) as the next default queue unless the live corpus re-ranks the blockers; confirm TCGdex IDs/text before implementation.
+2. Keep `TWM-052` Glalie and `TEF-147` Explorer's Guidance as nearby shared follow-ups, but do not mix them into the Greninja line unless they form a coherent batch.
 3. Keep the remaining Dragapult-only cached pair `TWM-099` / `TWM-100` as deliberate single-archetype cleanup, not the default autonomous queue.
 4. Finish the remaining shared partials only after the broad unimplemented slice unless another batch naturally extends the new HP infrastructure; if returning to HP work soon, `POR-086` Growing Grass Energy remains the strongest follow-up.
 5. Keep using `mix prizmo.goal2.corpus` after each batch to re-rank the next blockers by archetype count and weighted share.

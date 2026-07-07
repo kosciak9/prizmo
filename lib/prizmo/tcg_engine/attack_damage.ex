@@ -43,9 +43,11 @@ defmodule Prizmo.TcgEngine.AttackDamage do
          {:ok, damage} <- apply_cobalt_command_bonus(damage, attacker_card, defender_card),
          {:ok, damage} <- apply_outgoing_damage_reduction(damage, attacker_card) do
       if weakness_and_resistance_ignored?(attack) do
-        {:ok, max(damage, 0)}
+        apply_incoming_damage_reduction(max(damage, 0), defender_card)
       else
-        apply_weakness_and_resistance(damage, attacker_card, defender_card)
+        with {:ok, damage} <- apply_weakness_and_resistance(damage, attacker_card, defender_card) do
+          apply_incoming_damage_reduction(damage, defender_card)
+        end
       end
     end
   end
@@ -603,6 +605,11 @@ defmodule Prizmo.TcgEngine.AttackDamage do
        }),
        do: {:ok, damage}
 
+  defp apply_effect(damage, _attacker_card, _defender_card, %{
+         type: :attacker_takes_less_damage_from_attacks_next_turn
+       }),
+       do: {:ok, damage}
+
   defp apply_effect(_damage, _attacker_card, _defender_card, effect) do
     {:error, {:unsupported_attack_effect, AttackEffects.type(effect)}}
   end
@@ -620,6 +627,20 @@ defmodule Prizmo.TcgEngine.AttackDamage do
   end
 
   defp apply_outgoing_damage_reduction(damage, %CardInstance{}), do: {:ok, damage}
+
+  defp apply_incoming_damage_reduction(damage, %CardInstance{game_id: game_id} = defender_card)
+       when is_integer(damage) and damage >= 0 and is_binary(game_id) do
+    case TurnStore.current_turn(game_id) do
+      {:ok, turn} ->
+        reduction = AttackDamageReductions.incoming_reduction_this_turn(defender_card, turn)
+        {:ok, max(damage - reduction, 0)}
+
+      {:error, _reason} ->
+        {:ok, damage}
+    end
+  end
+
+  defp apply_incoming_damage_reduction(damage, %CardInstance{}), do: {:ok, damage}
 
   defp apply_weakness_and_resistance(0, %CardInstance{}, %CardInstance{}), do: {:ok, 0}
 
