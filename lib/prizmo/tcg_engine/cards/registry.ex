@@ -331,6 +331,27 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     ]
   }
 
+  @iriss_fighting_spirit %CardDefinition{
+    id: "JTG-149",
+    kind: :trainer,
+    trainer_type: :supporter,
+    play_window: :action_window,
+    costs: [
+      %Cost{
+        key: :discard_one_from_hand,
+        type: :discard_from_hand,
+        params: %{count: 1}
+      }
+    ],
+    effects: [
+      %Effect{
+        key: :discard_one_then_draw_until_6,
+        type: :draw_until_hand_size,
+        params: %{hand_size: 6}
+      }
+    ]
+  }
+
   @mortys_conviction %CardDefinition{
     id: "TEF-155",
     kind: :trainer,
@@ -1416,6 +1437,7 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     @hand_trimmer.id => @hand_trimmer,
     @hassel.id => @hassel,
     @hilda.id => @hilda,
+    @iriss_fighting_spirit.id => @iriss_fighting_spirit,
     @judge.id => @judge,
     @jumbo_ice_cream.id => @jumbo_ice_cream,
     @larrys_skill.id => @larrys_skill,

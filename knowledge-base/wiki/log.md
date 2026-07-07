@@ -1,5 +1,12 @@
 # Wiki Log
 
+## [2026-07-07] codebase update | Goal 2 Iris's Fighting Spirit support
+
+- Task attempted: closed `JTG-149` Iris's Fighting Spirit as the highest-share shared unimplemented Goal 2 card after Hassel. Added committed TCGdex metadata, authored Iris as an engine-defined Supporter with a discard-one-other-card hand cost followed by draw-until-6 behavior, and made the shared draw-until availability guard account for discard-from-hand costs before deciding whether the effect has a draw.
+- Files changed: `lib/prizmo/tcg_engine/cards/registry.ex`, `lib/prizmo/tcg_engine/card_play.ex`, `priv/tcg/cards/tcgdex/cards/JTG-149.json`, `test/prizmo/tcg_engine/mechanics_test.exs`, `knowledge-base/wiki/engine/goal-2-top-30-latest-limitless-coverage-scope.md`, `knowledge-base/wiki/engine/ash-backed-tcg-engine-playtest-handoff.md`, `knowledge-base/wiki/log.md`.
+- Validation: `mix format`; `mix test test/prizmo/tcg/cards/metadata_test.exs test/prizmo/tcg_engine/mechanics_test.exs:621`; `mix test test/prizmo/tcg/cards/metadata_test.exs test/prizmo/tcg_engine/mechanics_test.exs`; `mix compile --warnings-as-errors`; `mix prizmo.goal2.corpus` confirmed `supported=183` / `generic-supported=8` / `partial=10` / `unimplemented=176` and `cached=203` / `missing=174`.
+- Remaining/blocking notes: `JTG-149` is no longer in the shared incomplete queue. The default next Goal 2 priority is now `TEF-162` Neo Upper Energy, followed by `POR-082` Pokémon Catcher and `TEF-084` Relicanth unless the live corpus re-ranks the queue.
+
 ## [2026-07-07] codebase update | Goal 2 Hassel support
 
 - Task attempted: closed `TWM-151` Hassel as the highest-share shared unimplemented Goal 2 card after Redeemable Ticket. Added committed TCGdex metadata, authored Hassel as an engine-defined Supporter, and extended top-deck search support so the Supporter can enforce the prior-opponent-turn own-Pokémon Knock Out prerequisite before opening a private top-8 any-card prompt for up to three cards to hand without public reveal.

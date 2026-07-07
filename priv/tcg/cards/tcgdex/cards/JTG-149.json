@@ -1,0 +1,99 @@
+{
+  "prizmo_id": "JTG-149",
+  "source": {
+    "base_url": "https://api.tcgdex.net/v2/en",
+    "dynamic_fields_removed": [
+      "pricing"
+    ],
+    "language": "en",
+    "provider": "TCGdex"
+  },
+  "tcgdex": {
+    "category": "Trainer",
+    "effect": "You can use this card only if you discard another card from your hand.\n\nDraw cards until you have 6 cards in your hand.",
+    "id": "sv09-149",
+    "illustrator": "yuu",
+    "image": "https://assets.tcgdex.net/en/sv/sv09/149",
+    "legal": {
+      "expanded": true,
+      "standard": true
+    },
+    "localId": "149",
+    "name": "Iris's Fighting Spirit",
+    "rarity": "Uncommon",
+    "regulationMark": "I",
+    "set": {
+      "cardCount": {
+        "official": 159,
+        "total": 190
+      },
+      "id": "sv09",
+      "logo": "https://assets.tcgdex.net/en/sv/sv09/logo",
+      "name": "Journey Together",
+      "symbol": "https://assets.tcgdex.net/univ/sv/sv09/symbol"
+    },
+    "trainerType": "Supporter",
+    "updated": "2026-04-15T20:30:14+01:00",
+    "variants": {
+      "firstEdition": false,
+      "holo": false,
+      "normal": true,
+      "reverse": true,
+      "wPromo": false
+    },
+    "variants_detailed": [
+      {
+        "size": "standard",
+        "type": "normal",
+        "variantId": "endfynwn4n10gzq"
+      },
+      {
+        "size": "standard",
+        "type": "reverse",
+        "variantId": "cm4kqul3x1bwlz1f"
+      },
+      {
+        "size": "standard",
+        "stamp": [
+          "gym-challenge"
+        ],
+        "type": "normal",
+        "variantId": "1t06ikeqvuekyvnt4u9307a5qjm1d"
+      },
+      {
+        "size": "standard",
+        "stamp": [
+          "player-rewards-program"
+        ],
+        "type": "normal",
+        "variantId": "gx8bq2hegum3q6irsxlvqxm955ikw9gd1h311"
+      },
+      {
+        "size": "standard",
+        "stamp": [
+          "regional-championships"
+        ],
+        "type": "normal",
+        "variantId": "gx8bq2hegvl5g45wgglxhz3i120jscen0psbo"
+      },
+      {
+        "size": "standard",
+        "stamp": [
+          "regional-championships",
+          "staff"
+        ],
+        "type": "normal",
+        "variantId": "80gdqxre91h6u93zd18nahawka6ni9aofap3umtkgy"
+      },
+      {
+        "size": "standard",
+        "stamp": [
+          "ultra-ball-league"
+        ],
+        "type": "normal",
+        "variantId": "zqq5g2u9p9bu04acctfyef98d6j1dqg6"
+      }
+    ]
+  },
+  "tcgdex_id": "sv09-149"
+}

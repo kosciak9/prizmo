@@ -618,6 +618,62 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
              end)
     end
 
+    test "Iris's Fighting Spirit discards another card then draws until 6" do
+      {:ok, game} = create_flow_action_window_game()
+      assert {:ok, game} = Mechanics.pass_turn(game, "player_1")
+
+      discard_all_hand_cards_except(game.id, "player_2", [])
+
+      {:ok, iris} = create_custom_owned_card(game.id, "player_2", "JTG-149", 220)
+      {:ok, iris} = ash_update(iris, :draw_to_hand, %{position: 1})
+
+      hand_cards =
+        for position <- 2..7 do
+          {:ok, hand_card} =
+            create_custom_owned_card(game.id, "player_2", "MEE-005", 220 + position)
+
+          {:ok, hand_card} = ash_update(hand_card, :draw_to_hand, %{position: position})
+          hand_card
+        end
+
+      [discard_card | kept_hand_cards] = hand_cards
+      draw_target = game.id |> deck_cards_except("player_2", [iris.id]) |> List.first()
+
+      assert CardCoverage.summarize("JTG-149").coverage_status == :supported
+
+      assert {:ok, view} = GameView.for_player(game.id, "player_2")
+      play_card = Enum.find(view.action_affordances, &(&1.key == "play_card"))
+      assert is_map(play_card)
+      assert iris.id in play_card.source_card_instance_ids
+
+      assert {:ok, game} =
+               Mechanics.play_card(game, "player_2", iris.id, %{
+                 choices: %{discard_one_from_hand: [discard_card.id]}
+               })
+
+      assert zone(iris.id) == :discard
+      assert zone(discard_card.id) == :discard
+      assert Enum.all?(kept_hand_cards, &(zone(&1.id) == :hand))
+      assert zone(draw_target.id) == :hand
+      assert card_count_in_zone(game.id, "player_2", :hand) == 6
+
+      cost_event =
+        game.id
+        |> game_events_by_type("cards_moved")
+        |> Enum.find(&(&1.payload["cost_key"] == "discard_one_from_hand"))
+
+      assert [%{"instance_id" => discarded_card_id}] = cost_event.payload["cards"]
+      assert discarded_card_id == discard_card.id
+
+      effect_event = game.id |> game_events_by_type("cards_moved") |> List.last()
+      assert effect_event.payload["effect_key"] == "discard_one_then_draw_until_6"
+
+      assert [%{"instance_id" => drawn_card_id, "from_zone" => "deck", "to_zone" => "hand"}] =
+               effect_event.payload["cards"]
+
+      assert drawn_card_id == draw_target.id
+    end
+
     test "Carmine can be played on the first turn and discards hand before drawing 5" do
       {:ok, game} = create_flow_action_window_game()
 

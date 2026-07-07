@@ -1663,7 +1663,7 @@ defmodule Prizmo.TcgEngine.CardPlay do
         require_discard_hand_then_draw_effect_available(game.id, player.player_id, effect)
 
       {:ok, %{type: :draw_until_hand_size} = effect} ->
-        require_draw_until_hand_size_effect(game.id, player.player_id, effect)
+        require_draw_until_hand_size_effect(game.id, player.player_id, definition, effect)
 
       {:ok, %{type: :shuffle_each_player_hand_into_deck_then_draw} = effect} ->
         case effect.params do
@@ -1723,11 +1723,13 @@ defmodule Prizmo.TcgEngine.CardPlay do
     end
   end
 
-  defp require_draw_until_hand_size_effect(game_id, player_id, effect) do
+  defp require_draw_until_hand_size_effect(game_id, player_id, definition, effect) do
     with {:ok, target_hand_size} <- draw_until_hand_size_target(game_id, player_id, effect),
          {:ok, hand_cards} <- CardStore.cards_in_zone(game_id, player_id, :hand),
          {:ok, deck_count} <- CardStore.deck_count(game_id, player_id) do
-      remaining_hand_size_after_play = max(length(hand_cards) - 1, 0)
+      remaining_hand_size_after_play =
+        remaining_hand_size_after_play_costs(hand_cards, definition)
+
       required_draw_count = max(target_hand_size - remaining_hand_size_after_play, 0)
 
       if required_draw_count > 0 and deck_count > 0 do
@@ -1736,6 +1738,18 @@ defmodule Prizmo.TcgEngine.CardPlay do
         {:error, :draw_until_hand_size_has_no_effect}
       end
     end
+  end
+
+  defp remaining_hand_size_after_play_costs(hand_cards, definition) do
+    hand_size_after_play = max(length(hand_cards) - 1, 0)
+
+    Enum.reduce(definition.costs, hand_size_after_play, fn
+      %{type: :discard_from_hand, params: %{count: count}}, remaining when is_integer(count) ->
+        max(remaining - count, 0)
+
+      _cost, remaining ->
+        remaining
+    end)
   end
 
   defp require_draw_cards_effect_available(game_id, player_id, effect) do
