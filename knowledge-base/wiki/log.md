@@ -1,5 +1,12 @@
 # Wiki Log
 
+## [2026-07-07] codebase update | Goal 2 Transformation Tome support
+
+- Task attempted: closed `CRI-083` Transformation Tome as the top cached-but-unimplemented N's Zoroark ex blocker by implementing its paired-Item replacement effect: two Tome copies are played at once, a Basic Pokémon from discard replaces an in-play Basic Pokémon, attached cards/damage/Special Conditions/markers/turn-entered-play are preserved, both Tome copies are discarded, the replacement Pokémon is publicly revealed, and post-replacement state-based Knock Outs are checked.
+- Files changed: `lib/prizmo/tcg_engine/card_instance.ex`, `lib/prizmo/tcg_engine/effect_runner.ex`, `lib/prizmo/tcg_engine/cards/registry.ex`, `lib/prizmo/tcg_engine/card_play.ex`, `knowledge-base/wiki/engine/goal-2-top-30-latest-limitless-coverage-scope.md`, `knowledge-base/wiki/engine/ash-backed-tcg-engine-playtest-handoff.md`, `knowledge-base/wiki/log.md`.
+- Validation: `mix format`; `mix compile --warnings-as-errors`; Tidewave rollback runtime validation for GameView affordance, paired Tome discard, replacement state preservation, attachment reparenting, replaced Basic cleanup, public reveal event, and `coverage_status: :supported`; `mix test test/prizmo/tcg/cards/metadata_test.exs test/prizmo/tcg_engine/mechanics_test.exs`; `mix prizmo.goal2.corpus` confirmed `supported=204` / `generic-supported=8` / `partial=9` / `unimplemented=156` and `cached=222` / `missing=155`.
+- Remaining/blocking notes: `CRI-083` no longer appears in N's Zoroark ex's incomplete list. Continue the N's Zoroark ex queue with missing-metadata `JTG-064`, `JTG-097`, `JTG-098`, and `JTG-116`; the `JTG-097` / `JTG-098` Zorua/Zoroark ex pair is the likely coherent line batch.
+
 ## [2026-07-07] codebase update | Goal 2 N's Zoroark queue opener support
 
 - Task attempted: opened the large N's Zoroark ex Goal 2 queue by caching `ASC-155`, `CRI-083`, `JTG-026`, and `JTG-027`; authored executable behavior for N's Zekrom, N's Darumaka, and N's Darmanitan; added reusable Back Draft-style opponent-discard Basic Energy damage and Flamebody Cannon-style all-attached-Energy discard plus opponent-Bench damage support; left Transformation Tome intentionally unimplemented pending a paired-Item replacement primitive.

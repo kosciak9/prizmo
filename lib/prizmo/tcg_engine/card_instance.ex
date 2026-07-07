@@ -10,6 +10,16 @@ defmodule Prizmo.TcgEngine.CardInstance do
 
   alias Prizmo.TcgEngine.CardInstance
 
+  @replace_or_discard_attrs [
+    :position,
+    :damage,
+    :status,
+    :markers,
+    :attached_to_card_instance_id,
+    :evolves_from_card_instance_id,
+    :turn_entered_play
+  ]
+
   postgres do
     table "tcg_engine_card_instances"
     repo Prizmo.Repo
@@ -29,6 +39,8 @@ defmodule Prizmo.TcgEngine.CardInstance do
       transition(:move_active_to_bench, from: :active, to: :bench)
       transition(:put_basic_from_deck_to_bench, from: :deck, to: :bench)
       transition(:put_basic_from_discard_to_bench, from: :discard, to: :bench)
+      transition(:replace_from_discard_to_active, from: :discard, to: :active)
+      transition(:replace_from_discard_to_bench, from: :discard, to: :bench)
       transition(:place_prize, from: :deck, to: :prize)
       transition(:attach, from: :hand, to: :attached)
       transition(:attach_from_deck, from: :deck, to: :attached)
@@ -66,6 +78,8 @@ defmodule Prizmo.TcgEngine.CardInstance do
     define :move_active_to_bench
     define :put_basic_from_deck_to_bench
     define :put_basic_from_discard_to_bench
+    define :replace_from_discard_to_active
+    define :replace_from_discard_to_bench
     define :place_prize
     define :attach
     define :attach_from_deck
@@ -147,6 +161,16 @@ defmodule Prizmo.TcgEngine.CardInstance do
       change transition_state(:bench)
     end
 
+    update :replace_from_discard_to_active do
+      accept @replace_or_discard_attrs
+      change transition_state(:active)
+    end
+
+    update :replace_from_discard_to_bench do
+      accept @replace_or_discard_attrs
+      change transition_state(:bench)
+    end
+
     update :place_prize do
       accept [:position]
       change transition_state(:prize)
@@ -221,14 +245,7 @@ defmodule Prizmo.TcgEngine.CardInstance do
     end
 
     update :discard do
-      accept [
-        :position,
-        :damage,
-        :status,
-        :attached_to_card_instance_id,
-        :evolves_from_card_instance_id
-      ]
-
+      accept @replace_or_discard_attrs
       change transition_state(:discard)
     end
 

@@ -29,6 +29,7 @@ defmodule Prizmo.TcgEngine.EffectRunner do
     :discard_opponent_tool_and_special_energy_from_same_pokemon,
     :discard_attached_tools,
     :move_basic_energy_between_own_pokemon,
+    :transform_basic_pokemon_from_discard,
     :recover_discard_to_hand,
     :recover_discard_to_deck,
     :rare_candy_evolve,

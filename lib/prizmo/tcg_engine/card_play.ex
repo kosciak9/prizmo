@@ -81,7 +81,7 @@ defmodule Prizmo.TcgEngine.CardPlay do
            ),
          :ok <- ItemLocks.require_item_unlocked_if_item(metadata, game.id, player_id, turn),
          :ok <- require_ace_spec_available(player, metadata, game.id),
-         :ok <- require_effect_available(game, turn, player, definition) do
+         :ok <- require_effect_available(game, turn, player, card, definition) do
       {:ok, metadata}
     end
   end
@@ -1131,6 +1131,51 @@ defmodule Prizmo.TcgEngine.CardPlay do
          turn,
          player,
          card,
+         %{type: :transform_basic_pokemon_from_discard} = effect,
+         target_ids
+       ) do
+    with {:ok, {second_tome, discard_basic, in_play_basic}} <-
+           validate_transformation_tome_effect(game.id, player.player_id, effect, target_ids),
+         {:ok, [discarded_second_tome]} <-
+           CardStore.discard_cards_from_hand(game.id, player.player_id, [second_tome]),
+         {:ok, replacement_card} <- replace_basic_from_discard(discard_basic, in_play_basic),
+         {:ok, reparented_attachments} <-
+           reparent_attached_cards_preserving_positions(
+             game.id,
+             in_play_basic.id,
+             replacement_card.id
+           ),
+         {:ok, discarded_in_play_basic} <- discard_replaced_basic(game.id, in_play_basic),
+         replacement_payload = moved_card_payload(replacement_card, :discard, in_play_basic.zone),
+         {:ok, _event} <-
+           write_event_and_snapshot(game.id, :cards_moved, player.player_id, %{
+             reason: :effect_resolution,
+             source: EventPayloads.card_source(card),
+             effect_key: effect.key,
+             affected_player_id: player.player_id,
+             cards:
+               transformation_tome_payloads(
+                 discarded_second_tome,
+                 replacement_card,
+                 discarded_in_play_basic,
+                 in_play_basic,
+                 reparented_attachments
+               ),
+             public_reveal: true,
+             revealed_cards: [replacement_payload],
+             public_note:
+               "Transformation Tome switched a Basic Pokémon from discard with a Basic Pokémon in play."
+           }),
+         {:ok, _game} <- Mechanics.resolve_hp_state_based_knockouts(game.id) do
+      complete_play_card_resolution(game, turn, player, card, effect)
+    end
+  end
+
+  defp complete_play_card_effect(
+         game,
+         turn,
+         player,
+         card,
          %{type: :heal_mega_evolution_pokemon_ex_then_return_attached_energy_to_hand} = effect,
          target_ids
        ) do
@@ -1784,6 +1829,7 @@ defmodule Prizmo.TcgEngine.CardPlay do
          %Game{} = game,
          %Turn{} = turn,
          %GamePlayer{} = player,
+         %CardInstance{} = card,
          definition
        ) do
     case EffectRunner.first_effect(definition) do
@@ -1846,6 +1892,9 @@ defmodule Prizmo.TcgEngine.CardPlay do
 
       {:ok, %{type: :attach_basic_energy_from_discard_to_stage2_if_more_prizes} = effect} ->
         require_rosa_effect_available(game.id, player.player_id, effect)
+
+      {:ok, %{type: :transform_basic_pokemon_from_discard} = effect} ->
+        require_transformation_tome_effect_available(game.id, player.player_id, card.id, effect)
 
       {:ok, %{type: :extra_prize_if_tera_attack_knocks_out_opponent_active} = effect} ->
         require_opponent_prize_count_exactly(game.id, player.player_id, effect)
@@ -1934,6 +1983,17 @@ defmodule Prizmo.TcgEngine.CardPlay do
         {:error, :redeemable_ticket_has_no_prizes_to_replace}
       else
         :ok
+      end
+    end
+  end
+
+  defp require_transformation_tome_effect_available(game_id, player_id, action_card_id, effect) do
+    with {:ok, cards} <- CardStore.list_cards(game_id) do
+      cards
+      |> transformation_tome_choice_cards(player_id, action_card_id, effect)
+      |> case do
+        [] -> {:error, :transformation_tome_requires_second_copy_discard_basic_and_in_play_basic}
+        _choices -> :ok
       end
     end
   end
@@ -2478,6 +2538,13 @@ defmodule Prizmo.TcgEngine.CardPlay do
     end
   end
 
+  defp validate_transformation_tome_effect(game_id, player_id, effect, target_ids) do
+    with {:ok, target_ids} <- EffectRunner.validate_choice_selection(effect, target_ids),
+         {:ok, target_cards} <- CardStore.get_cards(game_id, target_ids) do
+      selected_transformation_tome_cards(target_cards, player_id)
+    end
+  end
+
   defp move_search_targets(game, _turn, player, %{params: %{destination: :hand}}, target_cards) do
     target_cards
     |> Enum.map(&CardStore.move_deck_card_to_hand(game.id, player.player_id, &1))
@@ -2511,6 +2578,23 @@ defmodule Prizmo.TcgEngine.CardPlay do
   defp search_effect_destination_zone(%{params: %{destination: :bench}}), do: :bench
   defp search_effect_destination_zone(%{params: %{destination: :deck_top}}), do: :deck
   defp search_effect_destination_zone(%{params: %{destination: :hand}}), do: :hand
+
+  defp effect_choice_ids(
+         cards,
+         player_id,
+         %{type: :transform_basic_pokemon_from_discard} = choice_step,
+         _current_turn,
+         action_card_id
+       ) do
+    cards
+    |> transformation_tome_choice_cards(player_id, action_card_id, choice_step)
+    |> Enum.map(& &1.id)
+    |> then(&{:ok, &1})
+  end
+
+  defp effect_choice_ids(cards, player_id, choice_step, current_turn, _action_card_id) do
+    effect_choice_ids(cards, player_id, choice_step, current_turn)
+  end
 
   defp effect_choice_ids(cards, player_id, choice_step, current_turn)
 
@@ -2846,7 +2930,13 @@ defmodule Prizmo.TcgEngine.CardPlay do
 
       Enum.any?(definition.effects, &(&1.key == choice_key)) ->
         with {:ok, cards} <- CardStore.list_cards(game_id) do
-          effect_choice_ids(cards, player_id, effect_step(definition, choice_key), current_turn)
+          effect_choice_ids(
+            cards,
+            player_id,
+            effect_step(definition, choice_key),
+            current_turn,
+            action_card_id
+          )
         end
 
       true ->
@@ -2864,7 +2954,7 @@ defmodule Prizmo.TcgEngine.CardPlay do
         |> then(&{:ok, &1})
 
       _other ->
-        effect_choice_ids(cards, player_id, choice_step, current_turn)
+        effect_choice_ids(cards, player_id, choice_step, current_turn, action_card_id)
     end
   end
 
@@ -3235,6 +3325,36 @@ defmodule Prizmo.TcgEngine.CardPlay do
     else
       energy_cards ++ target_cards
     end
+  end
+
+  defp transformation_tome_choice_cards(cards, player_id, action_card_id, _effect) do
+    second_copies = transformation_tome_second_copy_cards(cards, player_id, action_card_id)
+    discard_basics = transformation_tome_discard_basic_cards(cards, player_id)
+    in_play_basics = transformation_tome_in_play_basic_cards(cards, player_id)
+
+    if second_copies == [] or discard_basics == [] or in_play_basics == [] do
+      []
+    else
+      second_copies ++ discard_basics ++ in_play_basics
+    end
+  end
+
+  defp transformation_tome_second_copy_cards(cards, player_id, action_card_id) do
+    cards
+    |> Enum.filter(&transformation_tome_second_copy_card?(&1, player_id, action_card_id))
+    |> Enum.sort_by(&{&1.position, &1.instance_id})
+  end
+
+  defp transformation_tome_discard_basic_cards(cards, player_id) do
+    cards
+    |> Enum.filter(&transformation_tome_discard_basic_card?(&1, player_id))
+    |> Enum.sort_by(&{&1.position, &1.instance_id})
+  end
+
+  defp transformation_tome_in_play_basic_cards(cards, player_id) do
+    cards
+    |> Enum.filter(&transformation_tome_in_play_basic_card?(&1, player_id))
+    |> Enum.sort_by(&{in_play_zone_sort(&1.zone), &1.position, &1.instance_id})
   end
 
   defp attach_basic_energy_from_discard_energy_choice_cards(cards, player_id, effect) do
@@ -4136,9 +4256,60 @@ defmodule Prizmo.TcgEngine.CardPlay do
     end
   end
 
+  defp selected_transformation_tome_cards(cards, player_id) do
+    second_copies = Enum.filter(cards, &transformation_tome_second_copy_card?(&1, player_id, nil))
+    discard_basics = Enum.filter(cards, &transformation_tome_discard_basic_card?(&1, player_id))
+    in_play_basics = Enum.filter(cards, &transformation_tome_in_play_basic_card?(&1, player_id))
+
+    if length(cards) == length(second_copies) + length(discard_basics) + length(in_play_basics) do
+      case {second_copies, discard_basics, in_play_basics} do
+        {[second_copy], [discard_basic], [in_play_basic]} ->
+          {:ok, {second_copy, discard_basic, in_play_basic}}
+
+        {[], [_discard_basic], [_in_play_basic]} ->
+          {:error, :transformation_tome_requires_second_copy}
+
+        {[_second_copy], [], [_in_play_basic]} ->
+          {:error, :transformation_tome_requires_basic_pokemon_in_discard}
+
+        {[_second_copy], [_discard_basic], []} ->
+          {:error, :transformation_tome_requires_basic_pokemon_in_play}
+
+        {second_copies, [_discard_basic], [_in_play_basic]} when length(second_copies) > 1 ->
+          {:error, {:too_many_transformation_tome_second_copies, length(second_copies)}}
+
+        {[_second_copy], discard_basics, [_in_play_basic]} when length(discard_basics) > 1 ->
+          {:error, {:too_many_transformation_tome_discard_basics, length(discard_basics)}}
+
+        {[_second_copy], [_discard_basic], in_play_basics} when length(in_play_basics) > 1 ->
+          {:error, {:too_many_transformation_tome_in_play_basics, length(in_play_basics)}}
+
+        _other ->
+          {:error, :invalid_transformation_tome_choices}
+      end
+    else
+      {:error, :invalid_transformation_tome_choices}
+    end
+  end
+
   defp rare_candy_stage_2_card?(%CardInstance{} = card, player_id) do
     card.owner_player_id == player_id and card.zone == :hand and
       require_stage_2_pokemon(card.card_id) == :ok
+  end
+
+  defp transformation_tome_second_copy_card?(%CardInstance{} = card, player_id, action_card_id) do
+    card.owner_player_id == player_id and card.zone == :hand and card.card_id == "CRI-083" and
+      card.id != action_card_id
+  end
+
+  defp transformation_tome_discard_basic_card?(%CardInstance{} = card, player_id) do
+    card.owner_player_id == player_id and card.zone == :discard and
+      require_basic_pokemon(card.card_id) == :ok
+  end
+
+  defp transformation_tome_in_play_basic_card?(%CardInstance{} = card, player_id) do
+    card.owner_player_id == player_id and card.zone in [:active, :bench] and
+      require_basic_pokemon(card.card_id) == :ok
   end
 
   defp team_rockets_giovanni_own_bench_card?(%CardInstance{} = card, player_id) do
@@ -4420,6 +4591,59 @@ defmodule Prizmo.TcgEngine.CardPlay do
     end
   end
 
+  defp replace_basic_from_discard(
+         %CardInstance{} = discard_basic,
+         %CardInstance{} = in_play_basic
+       ) do
+    action =
+      case in_play_basic.zone do
+        :active -> :replace_from_discard_to_active
+        :bench -> :replace_from_discard_to_bench
+      end
+
+    update(discard_basic, action, %{
+      position: in_play_basic.position,
+      damage: in_play_basic.damage,
+      status: in_play_basic.status,
+      markers: in_play_basic.markers || %{},
+      attached_to_card_instance_id: nil,
+      evolves_from_card_instance_id: nil,
+      turn_entered_play: in_play_basic.turn_entered_play
+    })
+  end
+
+  defp reparent_attached_cards_preserving_positions(
+         game_id,
+         from_target_card_instance_id,
+         to_target_card_instance_id
+       ) do
+    with {:ok, attachments} <- CardStore.attached_cards(game_id, from_target_card_instance_id) do
+      attachments
+      |> Enum.map(fn attachment ->
+        update(attachment, :reparent_attachment, %{
+          attached_to_card_instance_id: to_target_card_instance_id,
+          position: attachment.position
+        })
+      end)
+      |> collect_results()
+    end
+  end
+
+  defp discard_replaced_basic(game_id, %CardInstance{} = in_play_basic) do
+    with {:ok, position} <-
+           CardStore.next_discard_position(game_id, in_play_basic.owner_player_id) do
+      update(in_play_basic, :discard, %{
+        position: position,
+        damage: 0,
+        status: nil,
+        markers: %{},
+        attached_to_card_instance_id: nil,
+        evolves_from_card_instance_id: nil,
+        turn_entered_play: nil
+      })
+    end
+  end
+
   defp crispin_moved_card_payloads(moved_hand_energy_card, nil, nil) do
     [moved_card_payload(moved_hand_energy_card, :deck, :hand)]
   end
@@ -4486,6 +4710,31 @@ defmodule Prizmo.TcgEngine.CardPlay do
         moved_card_payload(attachment, :attached, :attached,
           from_attached_to_card_instance_id: source_target_card_instance_id,
           to_attached_to_card_instance_id: evolved_card.id
+        )
+      end)
+  end
+
+  defp transformation_tome_payloads(
+         discarded_second_tome,
+         replacement_card,
+         discarded_in_play_basic,
+         original_in_play_basic,
+         reparented_attachments
+       ) do
+    [
+      moved_card_payload(discarded_second_tome, :hand, :discard),
+      moved_card_payload(replacement_card, :discard, original_in_play_basic.zone,
+        preserved_damage: replacement_card.damage,
+        preserved_status: replacement_card.status,
+        preserved_markers: replacement_card.markers,
+        preserved_turn_entered_play: replacement_card.turn_entered_play
+      ),
+      moved_card_payload(discarded_in_play_basic, original_in_play_basic.zone, :discard)
+    ] ++
+      Enum.map(reparented_attachments, fn attachment ->
+        moved_card_payload(attachment, :attached, :attached,
+          from_attached_to_card_instance_id: original_in_play_basic.id,
+          to_attached_to_card_instance_id: replacement_card.id
         )
       end)
   end
@@ -4909,6 +5158,30 @@ defmodule Prizmo.TcgEngine.CardPlay do
           |> Enum.map(&Map.get(cards_by_id, &1))
           |> Enum.reject(&is_nil/1)
           |> Enum.map(&rare_candy_choice_label/1)
+
+        Map.put(payload, :legal_choice_labels, labels)
+
+      {:error, _reason} ->
+        payload
+    end
+  end
+
+  defp maybe_put_prompt_choice_labels(
+         payload,
+         game_id,
+         player_id,
+         :transform_basic_pokemon_from_discard,
+         legal_choice_ids
+       ) do
+    case CardStore.list_cards(game_id) do
+      {:ok, cards} ->
+        cards_by_id = Map.new(cards, &{&1.id, &1})
+
+        labels =
+          legal_choice_ids
+          |> Enum.map(&Map.get(cards_by_id, &1))
+          |> Enum.reject(&is_nil/1)
+          |> Enum.map(&transformation_tome_choice_label(&1, player_id))
 
         Map.put(payload, :legal_choice_labels, labels)
 
@@ -5434,6 +5707,31 @@ defmodule Prizmo.TcgEngine.CardPlay do
       label: card_name(card, card.card_id),
       detail:
         "Basic Pokémon in #{Atom.to_string(card.zone)}. Select it with a compatible Stage 2 card from hand."
+    }
+  end
+
+  defp transformation_tome_choice_label(%CardInstance{zone: :hand} = card, _player_id) do
+    %{
+      id: card.id,
+      label: card_name(card, card.card_id),
+      detail: "Second Transformation Tome copy to play at the same time."
+    }
+  end
+
+  defp transformation_tome_choice_label(%CardInstance{zone: :discard} = card, _player_id) do
+    %{
+      id: card.id,
+      label: card_name(card, card.card_id),
+      detail: "Basic Pokémon in your discard pile to become the new in-play Pokémon."
+    }
+  end
+
+  defp transformation_tome_choice_label(%CardInstance{} = card, _player_id) do
+    %{
+      id: card.id,
+      label: card_name(card, card.card_id),
+      detail:
+        "Basic Pokémon in #{Atom.to_string(card.zone)} to switch with the selected discard Pokémon."
     }
   end
 

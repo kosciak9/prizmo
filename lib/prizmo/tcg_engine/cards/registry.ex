@@ -401,6 +401,20 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     ]
   }
 
+  @transformation_tome %CardDefinition{
+    id: "CRI-083",
+    kind: :trainer,
+    trainer_type: :item,
+    play_window: :action_window,
+    effects: [
+      %Effect{
+        key: :transform_basic_pokemon_from_discard,
+        type: :transform_basic_pokemon_from_discard,
+        params: %{count: 3}
+      }
+    ]
+  }
+
   @lillies_determination %CardDefinition{
     id: "MEG-119",
     kind: :trainer,
@@ -1547,6 +1561,7 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     @team_rockets_giovanni.id => @team_rockets_giovanni,
     @team_rockets_proton.id => @team_rockets_proton,
     @team_rockets_transceiver.id => @team_rockets_transceiver,
+    @transformation_tome.id => @transformation_tome,
     @wallys_compassion.id => @wallys_compassion,
     @ultra_ball.id => @ultra_ball,
     @dunsparce.id => @dunsparce,
