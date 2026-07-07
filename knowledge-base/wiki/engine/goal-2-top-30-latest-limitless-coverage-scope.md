@@ -64,13 +64,13 @@ Those reports are the canonical starting point for autonomous Goal 2 implementat
 - Tracked top archetypes: `30`
 - Tracked cards with usage greater than `0.00`: `377`
 - Coverage buckets from `mix prizmo.goal2.corpus`:
-  - `supported=178`
+  - `supported=179`
   - `generic-supported=8`
   - `partial=10`
-  - `unimplemented=181`
+  - `unimplemented=180`
 - Metadata buckets:
-  - `cached=198`
-  - `missing=179`
+  - `cached=199`
+  - `missing=178`
 
 Important interpretation:
 
@@ -86,13 +86,15 @@ The latest Goal 2 engine batch closed the Hydrapple/Ogerpon Grass-line shared qu
 
 The newest Goal 2 engine batch closed `DRI-127` Team Rocket's Murkrow as the prior highest-share shared unimplemented card. It now has committed TCGdex metadata and executable Ash engine behavior: `Deceit` creates a Supporter-search prompt from deck to hand, and `Torment` deals 30 damage while locking one selected attack on the defending Pokémon for the opponent's next turn through the GameView/Ash RPC/temporary React resolver path.
 
+The latest Goal 2 engine batch closed `SSP-174` Drayton as the prior highest-share shared unimplemented card. It now has committed TCGdex metadata and executable Ash engine behavior as a Supporter: it inspects the top 7 cards of the deck, opens a private select-cards prompt over Pokémon and Trainer cards in that slice, allows up to one Pokémon and up to one Trainer to be publicly revealed and moved to hand, shuffles afterward, and validates the one-per-kind rule server-side.
+
 ### Highest-priority remaining `unimplemented` cards from current report
 
 | Card | Archetypes | Total share | Notes |
 | --- | --- | --- | --- |
-| `SSP-174` Drayton | `2` | `2.41%` | New highest-share shared unimplemented card after closing Murkrow; confirm metadata/text before selecting the exact Supporter batch. |
-| `MEG-124` Premium Power Pro | `2` | `2.01%` | Shared Cynthia's Garchomp / Mega Lucario Tool/Trainer candidate behind Drayton. |
+| `MEG-124` Premium Power Pro | `2` | `2.01%` | New highest-share shared unimplemented card after closing Drayton; confirm metadata/text before selecting the exact Tool/Trainer implementation shape. |
 | `JTG-156` Redeemable Ticket | `2` | `1.37%` | Shared Beedrill ex / Ethan's Typhlosion Trainer candidate behind Premium Power Pro. |
+| `TWM-151` Hassel | `2` | `1.26%` | Shared Hop's Trevenant / Metagross Metal Maker Supporter candidate behind Redeemable Ticket. |
 
 ### Shared `partial` cards worth finishing after the broad unimplemented slice
 
@@ -119,8 +121,8 @@ That means prior Goal 1 and six-deck coverage was not wasted; it now acts as see
 
 ## Recommended next implementation order
 
-1. Treat `SSP-174` Drayton as the next default shared unimplemented card unless the live corpus re-ranks the queue; confirm metadata/text before selecting the exact Supporter implementation shape.
-2. Keep `MEG-124` Premium Power Pro and `JTG-156` Redeemable Ticket behind Drayton as the next shared metadata-missing candidates by weighted share.
+1. Treat `MEG-124` Premium Power Pro as the next default shared unimplemented card unless the live corpus re-ranks the queue; confirm metadata/text before selecting the exact Tool/Trainer implementation shape.
+2. Keep `JTG-156` Redeemable Ticket and `TWM-151` Hassel behind Premium Power Pro as the next shared metadata-missing candidates by weighted share.
 3. Keep the remaining Dragapult-only cached pair `TWM-099` / `TWM-100` as deliberate single-archetype cleanup, not the default autonomous queue.
 4. Finish the remaining shared partials only after the broad unimplemented slice unless another batch naturally extends the new HP infrastructure; if returning to HP work soon, `POR-086` Growing Grass Energy remains the strongest follow-up.
 5. Keep using `mix prizmo.goal2.corpus` after each batch to re-rank the next blockers by archetype count and weighted share.

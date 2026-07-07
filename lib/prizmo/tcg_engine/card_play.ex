@@ -1965,7 +1965,15 @@ defmodule Prizmo.TcgEngine.CardPlay do
              source_position,
              effect.key
            ),
-         :ok <- require_all_search_filters(target_cards, Map.get(effect.params, :filter)) do
+         :ok <- require_all_search_filters(target_cards, Map.get(effect.params, :filter)),
+         :ok <-
+           require_required_search_groups(target_cards, Map.get(effect.params, :required_groups)),
+         :ok <-
+           require_exclusive_search_groups(
+             target_cards,
+             Map.get(effect.params, :exclusive_groups)
+           ),
+         :ok <- require_max_search_groups(target_cards, Map.get(effect.params, :max_groups)) do
       {:ok, target_cards}
     end
   end
@@ -4443,6 +4451,7 @@ defmodule Prizmo.TcgEngine.CardPlay do
   defp maybe_put_prompt_choice_labels(payload, game_id, player_id, choice_key, legal_choice_ids)
        when choice_key in [
               :search_top_7_for_supporter_to_hand,
+              :search_top_7_for_pokemon_and_trainer_to_hand,
               :search_top_7_for_grass_pokemon_or_basic_grass_energy,
               :search_bottom_7_for_pokemon_to_hand
             ] do
@@ -4668,6 +4677,10 @@ defmodule Prizmo.TcgEngine.CardPlay do
        ), do: payload
 
   defp search_top_deck_choice_step(:search_top_7_for_supporter_to_hand) do
+    %{params: %{look_count: 7}}
+  end
+
+  defp search_top_deck_choice_step(:search_top_7_for_pokemon_and_trainer_to_hand) do
     %{params: %{look_count: 7}}
   end
 

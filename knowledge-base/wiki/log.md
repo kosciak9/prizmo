@@ -1,5 +1,12 @@
 # Wiki Log
 
+## [2026-07-07] codebase update | Goal 2 Drayton support
+
+- Task attempted: closed `SSP-174` Drayton as the highest-share shared unimplemented Goal 2 card after Team Rocket's Murkrow. Added committed TCGdex metadata, authored Drayton as an engine-defined Supporter on the reusable top-deck-slice search path, generalized top-deck search resolution to enforce search groups, and proved up to one Pokémon plus up to one Trainer can be selected from the inspected top 7 cards while illegal same-kind selections are rejected.
+- Files changed: `lib/prizmo/tcg_engine/cards/registry.ex`, `lib/prizmo/tcg_engine/card_play.ex`, `priv/tcg/cards/tcgdex/cards/SSP-174.json`, `test/prizmo/tcg_engine/mechanics_test.exs`, `knowledge-base/wiki/engine/goal-2-top-30-latest-limitless-coverage-scope.md`, `knowledge-base/wiki/engine/ash-backed-tcg-engine-playtest-handoff.md`, `knowledge-base/wiki/log.md`.
+- Validation: `mix format`; `mix test test/prizmo/tcg_engine/mechanics_test.exs --only describe:"SSP-174 Drayton"`; `mix test test/prizmo/tcg/cards/metadata_test.exs`; `mix test test/prizmo/tcg/cards/metadata_test.exs test/prizmo/tcg_engine/mechanics_test.exs`; Tidewave runtime validation confirmed `SSP-174` reports `coverage_status: :supported`; `mix compile --warnings-as-errors`; `mix prizmo.goal2.corpus` confirmed `supported=179` / `generic-supported=8` / `partial=10` / `unimplemented=180` and `cached=199` / `missing=178`; final `mix check` passed.
+- Remaining/blocking notes: `SSP-174` is no longer in the shared incomplete queue. The default next Goal 2 priority is now `MEG-124` Premium Power Pro, followed by `JTG-156` Redeemable Ticket and `TWM-151` Hassel unless the live corpus re-ranks the queue.
+
 ## [2026-07-07] codebase update | Goal 2 Team Rocket's Murkrow support
 
 - Task attempted: closed `DRI-127` Team Rocket's Murkrow as the highest-share shared unimplemented Goal 2 card after the Hydrapple/Ogerpon Grass cluster. Added committed TCGdex metadata, authored `Deceit` as a Supporter deck-search prompt, authored `Torment` as selected-attack next-turn lock on the defending Pokémon, and exposed the new Torment choice through GameView, Ash RPC, and the temporary React resolver.

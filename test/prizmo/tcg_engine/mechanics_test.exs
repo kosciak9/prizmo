@@ -3908,6 +3908,111 @@ defmodule Prizmo.TcgEngine.MechanicsTest do
     end
   end
 
+  describe "SSP-174 Drayton" do
+    test "creates a top-seven Pokémon/Trainer prompt and resolves one of each to hand" do
+      {:ok, game} = create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147)
+      assert {:ok, game} = Mechanics.pass_turn(game, "player_1")
+      drayton = move_owned_or_custom_card_to_hand(game.id, "player_2", "SSP-174", 1)
+
+      top_cards =
+        stage_top_deck_cards(game.id, "player_2", [
+          "TWM-129",
+          "SCR-133",
+          "MEE-001",
+          "TWM-128",
+          "POR-071",
+          "MEE-002",
+          "MEE-003"
+        ])
+
+      legal_ids =
+        top_cards
+        |> Enum.filter(&(&1.card_id in ["TWM-129", "SCR-133", "TWM-128", "POR-071"]))
+        |> Enum.map(& &1.id)
+
+      inspected_ids = Enum.map(top_cards, & &1.id)
+
+      assert {:ok, game} = Mechanics.play_card(game, "player_2", drayton.id, %{})
+
+      [prompt] = awaiting_prompts(game.id)
+      assert prompt.player_id == "player_2"
+      assert prompt.prompt_type == "select_cards"
+      assert prompt.payload["choice_key"] == "search_top_7_for_pokemon_and_trainer_to_hand"
+      assert prompt.payload["min"] == 0
+      assert prompt.payload["max"] == 2
+      assert prompt.payload["look_count"] == 7
+      assert prompt.payload["deck_slice_position"] == "top"
+      assert prompt.payload["inspected_card_count"] == 7
+      assert prompt.payload["inspected_card_ids"] == inspected_ids
+      assert Enum.sort(prompt.payload["legal_choices"]) == Enum.sort(legal_ids)
+
+      assert {:ok, view_with_prompt} = GameView.for_player(game.id, "player_2")
+      [view_prompt] = view_with_prompt.prompts
+
+      assert Enum.sort(Enum.map(view_prompt.payload["legal_choice_cards"], & &1.id)) ==
+               Enum.sort(legal_ids)
+
+      assert Enum.map(view_prompt.payload["inspected_cards"], & &1.id) == inspected_ids
+
+      selected = [List.first(legal_ids), List.last(legal_ids)]
+      hand_before = cards_in_zone(game.id, "player_2", :hand)
+      deck_before = cards_in_zone(game.id, "player_2", :deck)
+
+      assert {:ok, game} = Mechanics.choose_prompt(game, "player_2", prompt.id, selected)
+
+      assert Enum.all?(selected, &(zone(&1) == :hand))
+      assert zone(drayton.id) == :discard
+      assert length(cards_in_zone(game.id, "player_2", :hand)) == length(hand_before) + 2
+      assert length(cards_in_zone(game.id, "player_2", :deck)) == length(deck_before) - 2
+
+      cards_moved_event =
+        game.id
+        |> game_events_by_type("cards_moved")
+        |> Enum.find(
+          &(&1.payload["effect_key"] == "search_top_7_for_pokemon_and_trainer_to_hand")
+        )
+
+      assert cards_moved_event.payload["public_reveal"] == true
+
+      assert Enum.sort(Enum.map(cards_moved_event.payload["revealed_cards"], & &1["instance_id"])) ==
+               Enum.sort(selected)
+
+      assert game_events_by_type(game.id, "deck_shuffled") != []
+    end
+
+    test "rejects selecting two Pokémon from the top-seven Drayton prompt" do
+      {:ok, game} = create_flow_action_window_game_with_decks(Dragapult27431, Alakazam27147)
+      assert {:ok, game} = Mechanics.pass_turn(game, "player_1")
+      drayton = move_owned_or_custom_card_to_hand(game.id, "player_2", "SSP-174", 1)
+
+      top_cards =
+        stage_top_deck_cards(game.id, "player_2", [
+          "TWM-129",
+          "TWM-128",
+          "SCR-133",
+          "POR-071",
+          "MEE-001",
+          "MEE-002",
+          "MEE-003"
+        ])
+
+      [pokemon_1, pokemon_2] = Enum.filter(top_cards, &(&1.card_id in ["TWM-129", "TWM-128"]))
+
+      assert {:ok, game} = Mechanics.play_card(game, "player_2", drayton.id, %{})
+
+      [prompt] = awaiting_prompts(game.id)
+
+      assert {:error, {:too_many_search_group_targets, %{kind: :pokemon}, 2, 1}} =
+               Mechanics.choose_prompt(game, "player_2", prompt.id, [pokemon_1.id, pokemon_2.id])
+
+      assert zone(pokemon_1.id) == :deck
+      assert zone(pokemon_2.id) == :deck
+      assert zone(drayton.id) == :discard
+      [still_awaiting] = awaiting_prompts(game.id)
+      assert still_awaiting.id == prompt.id
+    end
+  end
+
   defp create_game do
     Mechanics.create_game([
       {"player_1", Alakazam27147},

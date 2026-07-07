@@ -455,6 +455,32 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     ]
   }
 
+  @drayton %CardDefinition{
+    id: "SSP-174",
+    kind: :trainer,
+    trainer_type: :supporter,
+    play_window: :action_window,
+    effects: [
+      %Effect{
+        key: :search_top_7_for_pokemon_and_trainer_to_hand,
+        type: :search_top_deck,
+        params: %{
+          look_count: 7,
+          filter: %{any: [%{kind: :pokemon}, %{kind: :trainer}]},
+          min_count: 0,
+          max_count: 2,
+          max_groups: [
+            %{filter: %{kind: :pokemon}, count: 1},
+            %{filter: %{kind: :trainer}, count: 1}
+          ],
+          destination: :hand,
+          reveal: true,
+          shuffle_after: true
+        }
+      }
+    ]
+  }
+
   @enhanced_hammer %CardDefinition{
     id: "TWM-148",
     kind: :trainer,
@@ -1325,6 +1351,7 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     @crispin.id => @crispin,
     @dawn.id => @dawn,
     @briar.id => @briar,
+    @drayton.id => @drayton,
     @dusk_ball.id => @dusk_ball,
     @enhanced_hammer.id => @enhanced_hammer,
     @energy_search.id => @energy_search,
