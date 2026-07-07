@@ -64,13 +64,13 @@ Those reports are the canonical starting point for autonomous Goal 2 implementat
 - Tracked top archetypes: `30`
 - Tracked cards with usage greater than `0.00`: `377`
 - Coverage buckets from `mix prizmo.goal2.corpus`:
-  - `supported=180`
+  - `supported=181`
   - `generic-supported=8`
   - `partial=10`
-  - `unimplemented=179`
+  - `unimplemented=178`
 - Metadata buckets:
-  - `cached=200`
-  - `missing=177`
+  - `cached=201`
+  - `missing=176`
 
 Important interpretation:
 
@@ -90,13 +90,15 @@ The latest Goal 2 engine batch closed `SSP-174` Drayton as the prior highest-sha
 
 The newest Goal 2 engine batch closed `MEG-124` Premium Power Pro as the prior highest-share shared unimplemented card. It now has committed TCGdex metadata and executable Ash engine behavior as an Item: after being played from hand, it records the normal `card_play_completed` event and the attack-damage pipeline adds 30 pre-Weakness/Resistance damage per copy played this turn to attacks used by the acting player's Fighting Pokémon against the opponent's Active Pokémon. Runtime validation confirmed `MEG-074` Lunatone's `Power Gem` changes from 50 to 80 damage after Premium Power Pro while a non-Fighting attack in the same turn remains unchanged.
 
+The latest Goal 2 engine batch closed `JTG-156` Redeemable Ticket as the prior highest-share shared unimplemented card. It now has committed TCGdex metadata and executable Ash engine behavior as an Item: playing it counts the acting player's current Prize cards, deterministically shuffles that Prize stack to the bottom of the player's deck through the persisted RNG context, then places the same number of cards from the top of that deck face down as the new Prize cards. Runtime validation confirmed the card appears in `play_card` affordances, discards itself after play, moves the old Prize cards back into the deck, replaces them with the prior top-deck cards, and records the expected movement events.
+
 ### Highest-priority remaining `unimplemented` cards from current report
 
 | Card | Archetypes | Total share | Notes |
 | --- | --- | --- | --- |
-| `JTG-156` Redeemable Ticket | `2` | `1.37%` | New highest-share shared unimplemented card after closing Premium Power Pro; confirm metadata/text before selecting the exact Trainer implementation shape. |
-| `TWM-151` Hassel | `2` | `1.26%` | Shared Hop's Trevenant / Metagross Metal Maker Supporter candidate behind Redeemable Ticket. |
+| `TWM-151` Hassel | `2` | `1.26%` | New highest-share shared unimplemented card after closing Redeemable Ticket; confirm metadata/text before selecting the exact Supporter implementation shape. |
 | `JTG-149` Iris's Fighting Spirit | `2` | `1.15%` | Shared Hop's Trevenant / Marnie's Grimmsnarl ex Supporter candidate behind Hassel. |
+| `TEF-162` Neo Upper Energy | `2` | `0.90%` | Shared Cynthia's Garchomp ex / Mega Greninja ex Special Energy candidate behind Iris's Fighting Spirit. |
 
 ### Shared `partial` cards worth finishing after the broad unimplemented slice
 
@@ -123,8 +125,8 @@ That means prior Goal 1 and six-deck coverage was not wasted; it now acts as see
 
 ## Recommended next implementation order
 
-1. Treat `JTG-156` Redeemable Ticket as the next default shared unimplemented card unless the live corpus re-ranks the queue; confirm metadata/text before selecting the exact Trainer implementation shape.
-2. Keep `TWM-151` Hassel and `JTG-149` Iris's Fighting Spirit behind Redeemable Ticket as the next shared metadata-missing candidates by weighted share.
+1. Treat `TWM-151` Hassel as the next default shared unimplemented card unless the live corpus re-ranks the queue; confirm metadata/text before selecting the exact Supporter implementation shape.
+2. Keep `JTG-149` Iris's Fighting Spirit and `TEF-162` Neo Upper Energy behind Hassel as the next shared metadata-missing candidates by weighted share.
 3. Keep the remaining Dragapult-only cached pair `TWM-099` / `TWM-100` as deliberate single-archetype cleanup, not the default autonomous queue.
 4. Finish the remaining shared partials only after the broad unimplemented slice unless another batch naturally extends the new HP infrastructure; if returning to HP work soon, `POR-086` Growing Grass Energy remains the strongest follow-up.
 5. Keep using `mix prizmo.goal2.corpus` after each batch to re-rank the next blockers by archetype count and weighted share.

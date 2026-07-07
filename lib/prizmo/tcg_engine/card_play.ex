@@ -705,6 +705,39 @@ defmodule Prizmo.TcgEngine.CardPlay do
          turn,
          player,
          card,
+         %{type: :shuffle_prizes_to_bottom_then_replace_from_deck} = effect,
+         _target_ids
+       ) do
+    with {:ok, prize_cards} <- CardStore.cards_in_zone(game.id, player.player_id, :prize),
+         prize_count = length(prize_cards),
+         {:ok, returned_prize_cards} <-
+           shuffle_prize_cards_to_bottom_of_deck(game, turn, player, card, effect, prize_cards),
+         {:ok, _event} <-
+           write_event_and_snapshot(
+             game.id,
+             :cards_moved,
+             player.player_id,
+             prize_cards_to_bottom_payload(game, turn, player, card, effect, returned_prize_cards)
+           ),
+         {:ok, new_prize_cards} <- replace_prizes_from_deck(player, prize_count),
+         {:ok, _event} <-
+           write_event_and_snapshot(game.id, :cards_moved, player.player_id, %{
+             reason: :effect_resolution,
+             source: EventPayloads.card_source(card),
+             effect_key: effect.key,
+             affected_player_id: player.player_id,
+             prize_count: prize_count,
+             cards: EventPayloads.moved_cards(new_prize_cards, :deck, :prize)
+           }) do
+      complete_play_card_resolution(game, turn, player, card, effect)
+    end
+  end
+
+  defp complete_play_card_effect(
+         game,
+         turn,
+         player,
+         card,
          %{type: :opponent_hand_to_bottom_then_draw_if_any} = effect,
          _target_ids
        ) do
@@ -1667,6 +1700,9 @@ defmodule Prizmo.TcgEngine.CardPlay do
           effect
         )
 
+      {:ok, %{type: :shuffle_prizes_to_bottom_then_replace_from_deck} = effect} ->
+        require_shuffle_prizes_to_bottom_effect_available(game.id, player.player_id, effect)
+
       {:ok, %{type: :attach_basic_energy_from_discard_to_stage2_if_more_prizes} = effect} ->
         require_rosa_effect_available(game.id, player.player_id, effect)
 
@@ -1733,6 +1769,16 @@ defmodule Prizmo.TcgEngine.CardPlay do
       case healable_damage(active_card, effect) do
         {:ok, _healed_damage} -> :ok
         {:error, reason} -> {:error, reason}
+      end
+    end
+  end
+
+  defp require_shuffle_prizes_to_bottom_effect_available(game_id, player_id, _effect) do
+    with {:ok, prizes} <- CardStore.cards_in_zone(game_id, player_id, :prize) do
+      if prizes == [] do
+        {:error, :redeemable_ticket_has_no_prizes_to_replace}
+      else
+        :ok
       end
     end
   end
@@ -5046,6 +5092,64 @@ defmodule Prizmo.TcgEngine.CardPlay do
       |> Enum.map(fn {card, position} ->
         update(card, :shuffle_into_deck, %{attached_to_card_instance_id: nil, position: position})
       end)
+      |> collect_results()
+    end
+  end
+
+  defp shuffle_prize_cards_to_bottom_of_deck(
+         %Game{} = game,
+         turn,
+         %GamePlayer{} = player,
+         card,
+         effect,
+         prize_cards
+       ) do
+    context = effect_rng_context(player.player_id, turn, card, effect)
+
+    with {:ok, deck_count} <- CardStore.deck_count(game.id, player.player_id) do
+      prize_cards
+      |> shuffle_cards(game.rng_seed, context)
+      |> Enum.with_index(deck_count + 1)
+      |> Enum.map(fn {card, position} ->
+        update(card, :shuffle_into_deck, %{attached_to_card_instance_id: nil, position: position})
+      end)
+      |> collect_results()
+    end
+  end
+
+  defp prize_cards_to_bottom_payload(
+         %Game{} = game,
+         turn,
+         %GamePlayer{} = player,
+         card,
+         effect,
+         returned_prize_cards
+       ) do
+    maybe_put_effect_rng_payload(
+      %{
+        reason: :effect_resolution,
+        source: EventPayloads.card_source(card),
+        effect_key: effect.key,
+        affected_player_id: player.player_id,
+        prize_count: length(returned_prize_cards),
+        cards: EventPayloads.moved_cards(returned_prize_cards, :prize, :deck),
+        destination: :deck_bottom,
+        shuffle: "trainer_effect_prize_stack"
+      },
+      game,
+      turn,
+      player.player_id,
+      card,
+      effect
+    )
+  end
+
+  defp replace_prizes_from_deck(%GamePlayer{} = player, prize_count) when prize_count > 0 do
+    with {:ok, cards} <- CardStore.deck_cards_for_player(player.id, prize_count),
+         :ok <- require_enough_deck_cards(cards, prize_count) do
+      cards
+      |> Enum.with_index(1)
+      |> Enum.map(fn {card, position} -> update(card, :place_prize, %{position: position}) end)
       |> collect_results()
     end
   end

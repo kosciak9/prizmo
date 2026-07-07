@@ -36,7 +36,7 @@ defmodule Prizmo.TcgEngine.CardInstance do
       transition(:return_to_hand, from: [:active, :bench, :attached], to: :hand)
 
       transition(:shuffle_into_deck,
-        from: [:active, :bench, :attached, :discard, :hand],
+        from: [:active, :bench, :attached, :discard, :hand, :prize],
         to: :deck
       )
 

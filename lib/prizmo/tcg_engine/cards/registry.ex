@@ -342,6 +342,20 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     ]
   }
 
+  @redeemable_ticket %CardDefinition{
+    id: "JTG-156",
+    kind: :trainer,
+    trainer_type: :item,
+    play_window: :action_window,
+    effects: [
+      %Effect{
+        key: :shuffle_prizes_to_bottom_then_replace_from_deck,
+        type: :shuffle_prizes_to_bottom_then_replace_from_deck,
+        params: %{}
+      }
+    ]
+  }
+
   @lillies_determination %CardDefinition{
     id: "MEG-119",
     kind: :trainer,
@@ -1391,6 +1405,7 @@ defmodule Prizmo.TcgEngine.Cards.Registry do
     @precious_trolley.id => @precious_trolley,
     @prime_catcher.id => @prime_catcher,
     @rare_candy.id => @rare_candy,
+    @redeemable_ticket.id => @redeemable_ticket,
     @ruffian.id => @ruffian,
     @sacred_ash.id => @sacred_ash,
     @secret_box.id => @secret_box,

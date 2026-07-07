@@ -1,5 +1,12 @@
 # Wiki Log
 
+## [2026-07-07] codebase update | Goal 2 Redeemable Ticket support
+
+- Task attempted: closed `JTG-156` Redeemable Ticket as the highest-share shared unimplemented Goal 2 card after Premium Power Pro. Added committed TCGdex metadata, authored Redeemable Ticket as an engine-defined Item, and extended the CardInstance/CardPlay path so Prize cards can be shuffled back to the bottom of deck before replacement Prize cards are placed from the deck top.
+- Files changed: `lib/prizmo/tcg_engine/cards/registry.ex`, `lib/prizmo/tcg_engine/card_instance.ex`, `lib/prizmo/tcg_engine/card_play.ex`, `priv/tcg/cards/tcgdex/cards/JTG-156.json`, `knowledge-base/wiki/engine/goal-2-top-30-latest-limitless-coverage-scope.md`, `knowledge-base/wiki/engine/ash-backed-tcg-engine-playtest-handoff.md`, `knowledge-base/wiki/log.md`.
+- Validation: `mix format`; `mix compile --warnings-as-errors`; Tidewave runtime validation confirmed supported classification, GameView play affordance exposure, self-discard after play, old Prize cards returning to deck, top-deck cards becoming replacement Prize cards, and expected movement events with RNG context; `mix test test/prizmo/tcg/cards/metadata_test.exs`; `mix test test/prizmo/tcg_engine/mechanics_test.exs`; `mix prizmo.goal2.corpus` confirmed `supported=181` / `generic-supported=8` / `partial=10` / `unimplemented=178` and `cached=201` / `missing=176`.
+- Remaining/blocking notes: `JTG-156` is no longer in the shared incomplete queue. The default next Goal 2 priority is now `TWM-151` Hassel, followed by `JTG-149` Iris's Fighting Spirit and `TEF-162` Neo Upper Energy unless the live corpus re-ranks the queue.
+
 ## [2026-07-07] codebase update | Goal 2 Premium Power Pro support
 
 - Task attempted: closed `MEG-124` Premium Power Pro as the highest-share shared unimplemented Goal 2 card after Drayton. Added committed TCGdex metadata, authored Premium Power Pro as an engine-defined Item, and extended the attack-damage pipeline so each Premium Power Pro played this turn adds 30 pre-Weakness/Resistance damage to attacks used by the acting player's Fighting Pokémon against the opponent's Active Pokémon.
