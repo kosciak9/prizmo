@@ -82,6 +82,8 @@ const DAMAGE_TWO_OPPONENT_POKEMON_UNAFFECTED_EFFECT =
   'damage_two_opponent_pokemon_unaffected_by_weakness_resistance_or_effects'
 const SHUFFLE_ATTACHED_ENERGY_INTO_DECK_THEN_DAMAGE_OPPONENT_BENCH_EFFECT =
   'shuffle_attached_energy_into_deck_then_damage_opponent_bench'
+const DISCARD_ALL_ATTACHED_ENERGY_THEN_DAMAGE_OPPONENT_BENCH_EFFECT =
+  'discard_all_attached_energy_then_damage_opponent_bench'
 const COPY_OPPONENT_ACTIVE_TERA_POKEMON_ATTACK_EFFECT = 'copy_opponent_active_tera_pokemon_attack'
 const DEFENDING_POKEMON_CANNOT_USE_SELECTED_ATTACK_NEXT_TURN_EFFECT =
   'defending_pokemon_cannot_use_selected_attack_next_turn'
@@ -5951,7 +5953,8 @@ function AttackProgressPanel({
   const pendingAttackRequiresBenchDamageTarget = Boolean(
     turn?.pendingAttackRequiresBenchDamageTarget ||
       resolutionEffectType === DAMAGE_OPPONENT_BENCH_EFFECT ||
-      resolutionEffectType === SHUFFLE_ATTACHED_ENERGY_INTO_DECK_THEN_DAMAGE_OPPONENT_BENCH_EFFECT
+      resolutionEffectType === SHUFFLE_ATTACHED_ENERGY_INTO_DECK_THEN_DAMAGE_OPPONENT_BENCH_EFFECT ||
+      resolutionEffectType === DISCARD_ALL_ATTACHED_ENERGY_THEN_DAMAGE_OPPONENT_BENCH_EFFECT
   )
   const pendingAttackRequiresBenchDamageCounters = Boolean(
     turn?.pendingAttackRequiresBenchDamageCounters || resolutionEffectType === 'opponent_bench_damage_counters'
@@ -6453,6 +6456,7 @@ function AttackProgressPanel({
     !selectedOpponentHandCardIsValid
   const manualResolveNeededInFlowManagedState =
     (pendingAttackRequiresDamageCounterMoves && damageCounterMoveSourceOptions.length > 0) ||
+    benchDamageTargetRequired ||
     opponentPokemonDamageTargetSelectionRequired ||
     blockedAttackRequiresChoice ||
     attackerEnergyDiscardRequiresChoice ||
@@ -7502,6 +7506,64 @@ function AttackProgressPanel({
                 )}
               </div>
             ) : null}
+          </div>
+        ) : null}
+
+        {pendingAttackRequiresBenchDamageTarget && !pendingAttackRequiresShuffledEnergy ? (
+          <div className="rounded-xl border border-violet-200 bg-violet-50/70 p-3">
+            <div className="space-y-1">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-violet-900">
+                Opponent Bench target
+              </p>
+              <p className="text-xs leading-5 text-violet-900/80">
+                This attack does additional damage to 1 of the opponent&apos;s Benched Pokémon. If there is exactly one
+                opponent Benched Pokémon, resolution targets it automatically. If there are no opponent Benched Pokémon,
+                the Bench damage part is skipped.
+              </p>
+            </div>
+
+            {benchDamageTargetOptions.length > 1 ? (
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                {benchDamageTargetOptions.map(card => {
+                  const selected = card.id === selectedBenchDamageTargetCardInstanceId
+
+                  return (
+                    <label
+                      className={`flex cursor-pointer items-start gap-2 rounded-lg border px-3 py-2 text-xs transition ${
+                        selected
+                          ? 'border-violet-700 bg-violet-100 text-violet-950'
+                          : 'border-violet-200 bg-stone-50 text-stone-700 hover:border-violet-400'
+                      }`}
+                      key={card.id}
+                    >
+                      <input
+                        checked={selected}
+                        className="mt-0.5"
+                        disabled={!viewerCanAdvanceAttack || commandPending}
+                        name="bench-damage-target-card-instance-id"
+                        onChange={() => setSelectedBenchDamageTargetCardInstanceId(card.id)}
+                        type="radio"
+                      />
+                      <span className="min-w-0">
+                        <span className="block font-medium">{card.name}</span>
+                        <span className="mt-0.5 block font-mono text-[0.68rem] opacity-70">
+                          {card.damage} damage · {card.cardId}
+                        </span>
+                      </span>
+                    </label>
+                  )
+                })}
+              </div>
+            ) : benchDamageTargetOptions.length === 1 ? (
+              <p className="mt-3 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-xs text-violet-900">
+                Only {benchDamageTargetOptions[0]?.name} is on the opponent Bench, so resolution will target it
+                automatically.
+              </p>
+            ) : (
+              <p className="mt-3 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-xs text-violet-900">
+                No opponent Benched Pokémon are available, so this attack will resolve without Bench damage.
+              </p>
+            )}
           </div>
         ) : null}
 

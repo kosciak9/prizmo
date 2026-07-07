@@ -11,6 +11,25 @@ defmodule Prizmo.Tcg.Cards.Behaviors.JTG do
     attack(:smolder_sault, effect: %{type: :attacker_cannot_attack_next_turn})
   end
 
+  card "JTG-026" do
+    attack(:rolling_tackle, effect: nil)
+    attack(:flare, effect: nil)
+  end
+
+  card "JTG-027" do
+    attack(:back_draft,
+      damage: 0,
+      effect: %{type: :damage_per_opponent_discard_basic_energy, damage_per_energy: 30}
+    )
+
+    attack(:flamebody_cannon,
+      effect: %{
+        type: :discard_all_attached_energy_then_damage_opponent_bench,
+        bench_damage: 90
+      }
+    )
+  end
+
   card "JTG-056" do
     ability(:fairy_zone,
       effect: %{type: :opponent_darkness_pokemon_weakness_becomes_psychic}

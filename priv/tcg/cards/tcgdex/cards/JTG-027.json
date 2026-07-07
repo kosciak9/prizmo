@@ -1,0 +1,102 @@
+{
+  "prizmo_id": "JTG-027",
+  "source": {
+    "base_url": "https://api.tcgdex.net/v2/en",
+    "dynamic_fields_removed": [
+      "pricing"
+    ],
+    "language": "en",
+    "provider": "TCGdex"
+  },
+  "tcgdex": {
+    "attacks": [
+      {
+        "cost": [
+          "Colorless",
+          "Colorless"
+        ],
+        "damage": "30×",
+        "effect": "This attack does 30 damage for each Basic Energy card in your opponent's discard pile.",
+        "name": "Back Draft"
+      },
+      {
+        "cost": [
+          "Fire",
+          "Fire",
+          "Colorless"
+        ],
+        "damage": 90,
+        "effect": "Discard all Energy from this Pokémon, and this attack also does 90 damage to 1 of your opponent's Benched Pokémon. (Don't apply Weakness and Resistance for Benched Pokémon.)",
+        "name": "Flamebody Cannon"
+      }
+    ],
+    "category": "Pokemon",
+    "dexId": [
+      555
+    ],
+    "evolveFrom": "N's Darumaka",
+    "hp": 140,
+    "id": "sv09-027",
+    "illustrator": "nagimiso",
+    "image": "https://assets.tcgdex.net/en/sv/sv09/027",
+    "legal": {
+      "expanded": true,
+      "standard": true
+    },
+    "localId": "027",
+    "name": "N's Darmanitan",
+    "rarity": "Uncommon",
+    "regulationMark": "I",
+    "retreat": 3,
+    "set": {
+      "cardCount": {
+        "official": 159,
+        "total": 190
+      },
+      "id": "sv09",
+      "logo": "https://assets.tcgdex.net/en/sv/sv09/logo",
+      "name": "Journey Together",
+      "symbol": "https://assets.tcgdex.net/univ/sv/sv09/symbol"
+    },
+    "stage": "Stage1",
+    "types": [
+      "Fire"
+    ],
+    "updated": "2026-06-14T19:09:31+01:00",
+    "variants": {
+      "firstEdition": false,
+      "holo": true,
+      "normal": true,
+      "reverse": true,
+      "wPromo": false
+    },
+    "variants_detailed": [
+      {
+        "size": "standard",
+        "type": "normal",
+        "variantId": "endfynwn4n10gzq"
+      },
+      {
+        "size": "standard",
+        "type": "reverse",
+        "variantId": "cm4kqul3x1bwlz1f"
+      },
+      {
+        "foil": "cosmos",
+        "size": "standard",
+        "stamp": [
+          "player-rewards-program"
+        ],
+        "type": "holo",
+        "variantId": "6x9wic2vzb5bfzn0gz10e76xy60nqt2vwbzzupgwp6"
+      }
+    ],
+    "weaknesses": [
+      {
+        "type": "Water",
+        "value": "×2"
+      }
+    ]
+  },
+  "tcgdex_id": "sv09-027"
+}

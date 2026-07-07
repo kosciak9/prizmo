@@ -327,6 +327,16 @@ defmodule Prizmo.TcgEngine.AttackDamage do
     end
   end
 
+  defp apply_effect(damage, _attacker_card, %CardInstance{} = defender_card, %{
+         type: :damage_per_opponent_discard_basic_energy,
+         damage_per_energy: damage_per_energy
+       })
+       when is_integer(damage_per_energy) and damage_per_energy >= 0 do
+    with {:ok, basic_energy_count} <- discard_basic_energy_count(defender_card) do
+      {:ok, damage + damage_per_energy * basic_energy_count}
+    end
+  end
+
   defp apply_effect(_damage, _attacker_card, %CardInstance{damage: defender_damage}, %{
          type: :damage_per_defender_damage_counter,
          damage_per_counter: damage_per_counter
@@ -1184,6 +1194,30 @@ defmodule Prizmo.TcgEngine.AttackDamage do
   end
 
   defp collect_team_rocket_pokemon_count(results) do
+    Enum.reduce_while(results, {:ok, 0}, fn
+      {:ok, true}, {:ok, count} -> {:cont, {:ok, count + 1}}
+      {:ok, false}, {:ok, count} -> {:cont, {:ok, count}}
+      {:error, reason}, _acc -> {:halt, {:error, reason}}
+    end)
+  end
+
+  defp discard_basic_energy_count(%CardInstance{game_id: game_id, owner_player_id: player_id}) do
+    with {:ok, discard_cards} <- CardStore.cards_in_zone(game_id, player_id, :discard) do
+      discard_cards
+      |> Enum.map(&basic_energy_card?/1)
+      |> collect_basic_energy_count()
+    end
+  end
+
+  defp basic_energy_card?(%CardInstance{card_id: card_id}) do
+    case CardCatalog.fetch(card_id) do
+      {:ok, %{supertype: :energy, energy_type: :basic}} -> {:ok, true}
+      {:ok, _card} -> {:ok, false}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp collect_basic_energy_count(results) do
     Enum.reduce_while(results, {:ok, 0}, fn
       {:ok, true}, {:ok, count} -> {:cont, {:ok, count + 1}}
       {:ok, false}, {:ok, count} -> {:cont, {:ok, count}}

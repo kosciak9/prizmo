@@ -1,0 +1,53 @@
+{
+  "prizmo_id": "CRI-083",
+  "source": {
+    "base_url": "https://api.tcgdex.net/v2/en",
+    "dynamic_fields_removed": [
+      "pricing"
+    ],
+    "language": "en",
+    "provider": "TCGdex"
+  },
+  "tcgdex": {
+    "category": "Trainer",
+    "effect": "You must play 2 Transformation Tome cards at once. (This effect works one time for 2 cards.)\n\nChoose a Basic Pokémon in your discard pile and switch it with 1 of your Basic Pokémon in play. Any attached cards, damage counters, Special Conditions, turns in play, and any other effects remain on the new Pokémon.",
+    "id": "me04-083",
+    "illustrator": "Toyste Beach",
+    "image": "https://assets.tcgdex.net/en/me/me04/083",
+    "legal": {
+      "expanded": true,
+      "standard": true
+    },
+    "localId": "083",
+    "name": "Transformation Tome",
+    "rarity": "Uncommon",
+    "regulationMark": "J",
+    "set": {
+      "cardCount": {
+        "official": 86,
+        "total": 122
+      },
+      "id": "me04",
+      "logo": "https://assets.tcgdex.net/en/me/me04/logo",
+      "name": "Chaos Rising",
+      "symbol": "https://assets.tcgdex.net/univ/me/me04/symbol"
+    },
+    "trainerType": "Item",
+    "updated": "2026-06-11T22:15:34Z",
+    "variants": {
+      "firstEdition": false,
+      "holo": false,
+      "normal": true,
+      "reverse": false,
+      "wPromo": false
+    },
+    "variants_detailed": [
+      {
+        "size": "standard",
+        "type": "normal",
+        "variantId": "endfynwn4n10gzq"
+      }
+    ]
+  },
+  "tcgdex_id": "me04-083"
+}

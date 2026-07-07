@@ -96,6 +96,7 @@ defmodule Prizmo.TcgEngine.AttackEffects do
     :damage_unaffected_by_effects_on_opponent_active,
     :damage_unaffected_by_weakness_resistance_and_effects_on_opponent_active,
     :damage_per_opponent_pokemon_ex_in_play,
+    :damage_per_opponent_discard_basic_energy,
     :damage_per_opponent_prize_taken,
     :damage_per_own_prize_taken,
     :damage_per_defender_damage_counter,
@@ -135,6 +136,7 @@ defmodule Prizmo.TcgEngine.AttackEffects do
     :opponent_bench_damage_counters,
     :discard_attached_energy_for_bonus_damage,
     :discard_attached_energy_from_attacker,
+    :discard_all_attached_energy_then_damage_opponent_bench,
     :switch_opponent_active_with_bench_chosen_by_opponent,
     :prevent_damage_and_effects_from_attacks_next_turn_on_coin_heads,
     :put_up_to_3_duskull_from_discard_to_bench,
@@ -193,6 +195,12 @@ defmodule Prizmo.TcgEngine.AttackEffects do
           :discard_attached_energy_then_damage_two_opponent_pokemon_unaffected_by_weakness_resistance_or_effects
       } ->
         false
+
+      %{type: :discard_all_attached_energy_then_damage_opponent_bench} ->
+        case opponent_bench_cards(game_id, player_id) do
+          {:ok, bench_cards} -> length(bench_cards) <= 1
+          {:error, _reason} -> true
+        end
 
       %{type: :defending_pokemon_cannot_use_selected_attack_next_turn} ->
         case blockable_attack_choices(defender_card) do
@@ -524,6 +532,17 @@ defmodule Prizmo.TcgEngine.AttackEffects do
       %{type: :damage_per_opponent_pokemon_ex_in_play} ->
         {:ok, %{}}
 
+      %{type: :damage_per_opponent_discard_basic_energy, damage_per_energy: damage_per_energy}
+      when is_integer(damage_per_energy) and damage_per_energy >= 0 ->
+        with {:ok, basic_energy_count} <- discard_basic_energy_count(defender_card) do
+          {:ok,
+           %{
+             effect_type: "damage_per_opponent_discard_basic_energy",
+             opponent_discard_basic_energy_count: basic_energy_count,
+             damage_per_energy: damage_per_energy
+           }}
+        end
+
       %{type: :damage_per_opponent_hand_card} ->
         {:ok, %{}}
 
@@ -593,6 +612,19 @@ defmodule Prizmo.TcgEngine.AttackEffects do
           attacker_card,
           opts,
           discard_count
+        )
+
+      %{
+        type: :discard_all_attached_energy_then_damage_opponent_bench,
+        bench_damage: bench_damage
+      }
+      when is_integer(bench_damage) and bench_damage >= 0 ->
+        discard_all_attached_energy_then_damage_opponent_bench(
+          game_id,
+          player_id,
+          attacker_card,
+          opts,
+          bench_damage
         )
 
       %{type: :discard_hand_then_draw, count: count} when is_integer(count) and count >= 0 ->
@@ -3248,6 +3280,29 @@ defmodule Prizmo.TcgEngine.AttackEffects do
     end
   end
 
+  defp discard_all_attached_energy_then_damage_opponent_bench(
+         game_id,
+         player_id,
+         %CardInstance{} = attacker_card,
+         opts,
+         bench_damage
+       ) do
+    with {:ok, energy_cards} <-
+           returnable_attached_energy_cards(game_id, player_id, attacker_card),
+         {:ok, discarded_cards} <-
+           BattleActions.discard_retreat_energy(game_id, player_id, energy_cards),
+         {:ok, bench_payload} <- damage_opponent_bench(game_id, player_id, opts, bench_damage) do
+      {:ok,
+       bench_payload
+       |> Map.delete(:effect_type)
+       |> Map.merge(%{
+         effect_type: "discard_all_attached_energy_then_damage_opponent_bench",
+         discarded_energy_card_instance_ids: Enum.map(discarded_cards, & &1.id),
+         discarded_energy_count: length(discarded_cards)
+       })}
+    end
+  end
+
   defp opponent_pokemon_damage_targets(game_id, player_id, opts, target_count) do
     with {:ok, opponent_cards} <- opponent_in_play_pokemon_cards(game_id, player_id) do
       required_count = min(target_count, length(opponent_cards))
@@ -4041,6 +4096,12 @@ defmodule Prizmo.TcgEngine.AttackEffects do
     end
   end
 
+  defp opponent_bench_cards(game_id, player_id) do
+    with {:ok, opponent_player_id} <- opponent_player_id(game_id, player_id) do
+      cards_in_zone(game_id, opponent_player_id, :bench)
+    end
+  end
+
   defp opponent_hand_cards(game_id, player_id) do
     with {:ok, opponent_player_id} <- opponent_player_id(game_id, player_id) do
       cards_in_zone(game_id, opponent_player_id, :hand)
@@ -4048,6 +4109,24 @@ defmodule Prizmo.TcgEngine.AttackEffects do
   end
 
   defp energy_card?(%CardInstance{card_id: card_id}), do: match?(:ok, require_energy(card_id))
+
+  defp discard_basic_energy_count(%CardInstance{game_id: game_id, owner_player_id: player_id}) do
+    with {:ok, discard_cards} <- cards_in_zone(game_id, player_id, :discard) do
+      discard_cards
+      |> Enum.map(&basic_energy_card?/1)
+      |> collect_basic_energy_count()
+    end
+  end
+
+  defp basic_energy_card?(%CardInstance{card_id: card_id}),
+    do: match?(:ok, require_basic_energy(card_id))
+
+  defp collect_basic_energy_count(results) do
+    Enum.reduce_while(results, {:ok, 0}, fn
+      true, {:ok, count} -> {:cont, {:ok, count + 1}}
+      false, {:ok, count} -> {:cont, {:ok, count}}
+    end)
+  end
 
   defp reparent_opponent_attached_energy(
          game_id,

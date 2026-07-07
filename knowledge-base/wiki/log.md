@@ -1,5 +1,12 @@
 # Wiki Log
 
+## [2026-07-07] codebase update | Goal 2 N's Zoroark queue opener support
+
+- Task attempted: opened the large N's Zoroark ex Goal 2 queue by caching `ASC-155`, `CRI-083`, `JTG-026`, and `JTG-027`; authored executable behavior for N's Zekrom, N's Darumaka, and N's Darmanitan; added reusable Back Draft-style opponent-discard Basic Energy damage and Flamebody Cannon-style all-attached-Energy discard plus opponent-Bench damage support; left Transformation Tome intentionally unimplemented pending a paired-Item replacement primitive.
+- Files changed: `lib/prizmo/tcg/cards/behaviors/asc.ex`, `lib/prizmo/tcg/cards/behaviors/jtg.ex`, `lib/prizmo/tcg_engine/attack_damage.ex`, `lib/prizmo/tcg_engine/attack_effects.ex`, `lib/prizmo/tcg_engine/game_view.ex`, `lib/prizmo_web/spa/features/home/routes/index.tsx`, `priv/tcg/cards/tcgdex/cards/ASC-155.json`, `priv/tcg/cards/tcgdex/cards/CRI-083.json`, `priv/tcg/cards/tcgdex/cards/JTG-026.json`, `priv/tcg/cards/tcgdex/cards/JTG-027.json`, `knowledge-base/wiki/engine/goal-2-top-30-latest-limitless-coverage-scope.md`, `knowledge-base/wiki/engine/ash-backed-tcg-engine-playtest-handoff.md`, `knowledge-base/wiki/log.md`.
+- Validation: TCGdex endpoint checks; `mix format`; `mix compile --warnings-as-errors`; `mix test test/prizmo/tcg/cards/metadata_test.exs`; `node_modules/.bin/tsc --noEmit`; Tidewave runtime evals for coverage, Back Draft damage, Flamebody Cannon discard/Bench damage, and GameView flags; `mix test test/prizmo/tcg_engine/mechanics_test.exs`; `mix prizmo.goal2.corpus` confirmed `supported=203` / `generic-supported=8` / `partial=9` / `unimplemented=157` and `cached=222` / `missing=155`; final `mix check` passed.
+- Remaining/blocking notes: `ASC-155`, `JTG-026`, and `JTG-027` are no longer in N's Zoroark ex's incomplete list. `CRI-083` is cached but remains the top unimplemented card because Transformation Tome needs a dedicated paired-Item replacement primitive; if deferred, continue with `JTG-064`, `JTG-097`, `JTG-098`, and `JTG-116`.
+
 ## [2026-07-07] codebase update | Goal 2 Hisuian Growlithe line support
 
 - Task attempted: closed the high-share cached Dragapult-only `TWM-099` / `TWM-100` Hisuian Growlithe line after Explorer's Guidance. Authored executable behavior for Growlithe `Blazing Destruction` / `Take Down`, Arcanine `Proud Fangs` / `Searing Flame`, and reusable Burn attack/checkup support with deterministic persisted-RNG Burn recovery coin flips.

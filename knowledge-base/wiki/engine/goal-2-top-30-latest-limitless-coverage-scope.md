@@ -64,13 +64,13 @@ Those reports are the canonical starting point for autonomous Goal 2 implementat
 - Tracked top archetypes: `30`
 - Tracked cards with usage greater than `0.00`: `377`
 - Coverage buckets from `mix prizmo.goal2.corpus`:
-  - `supported=200`
+  - `supported=203`
   - `generic-supported=8`
   - `partial=9`
-  - `unimplemented=160`
+  - `unimplemented=157`
 - Metadata buckets:
-  - `cached=218`
-  - `missing=159`
+  - `cached=222`
+  - `missing=155`
 
 Important interpretation:
 
@@ -118,14 +118,16 @@ The latest Goal 2 engine batch closed `TEF-147` Explorer's Guidance as the remai
 
 The newest Goal 2 engine batch closed the high-share cached Dragapult-only `TWM-099` / `TWM-100` Hisuian Growlithe line. `TWM-099` now supports `Blazing Destruction` as a Stadium-discarding zero-damage attack plus `Take Down` as 40 damage with 10 self-damage. `TWM-100` now supports `Proud Fangs` as 30 base damage plus 90 damage when any of the attacker's Benched Pokémon have damage counters, and `Searing Flame` as 90 damage plus Burn. The batch also introduced reusable Burn attack/checkup support: Burn is applied through the existing status path, Pokémon Checkup places 2 damage counters on Burned Active Pokémon, flips a deterministic persisted-RNG coin when possible, and clears Burn on heads.
 
+The latest Goal 2 engine batch opened the large N's Zoroark ex queue and closed three of its first four report entries. `ASC-155` N's Zekrom, `CRI-083` Transformation Tome, `JTG-026` N's Darumaka, and `JTG-027` N's Darmanitan now have committed TCGdex metadata. Executable behavior now covers N's Zekrom `Shred` / `Rampaging Thunder`, Darumaka `Rolling Tackle` / `Flare`, and Darmanitan `Back Draft` / `Flamebody Cannon`. The batch added reusable attack support for damage scaling from Basic Energy in the opponent's discard pile and for discarding all Energy attached to the attacker before damaging one opponent Benched Pokémon through the GameView/temporary React Bench-target resolver. `CRI-083` remains intentionally unimplemented because Transformation Tome needs a dedicated paired-Item plus Basic Pokémon replacement primitive that preserves attachments, damage, Special Conditions, turns in play, and other effects.
+
 ### Highest-priority remaining `unimplemented` cards from current report
 
 | Card | Archetypes | Total share | Notes |
 | --- | --- | --- | --- |
-| `ASC-155` N's Zekrom | `1` | `8.02%` | N's Zoroark ex metadata-missing blocker; first entry in a large coherent N's Zoroark queue. |
-| `CRI-083` Transformation Tome | `1` | `8.02%` | N's Zoroark ex metadata-missing Trainer blocker adjacent to the large N's queue. |
-| `JTG-026` N's Darumaka | `1` | `8.02%` | N's Zoroark ex metadata-missing Pokémon blocker in the same coherent N's queue. |
-| `JTG-027` N's Darmanitan | `1` | `8.02%` | N's Zoroark ex metadata-missing Pokémon blocker adjacent to `JTG-026`. |
+| `CRI-083` Transformation Tome | `1` | `8.02%` | Metadata is now cached, but behavior remains unimplemented; needs a dedicated paired-Item replacement primitive. |
+| `JTG-064` N's Sigilyph | `1` | `8.02%` | N's Zoroark ex metadata-missing Pokémon blocker; first simple-looking follow-up after the Tome primitive is deferred. |
+| `JTG-097` N's Zorua | `1` | `8.02%` | N's Zoroark ex metadata-missing Pokémon blocker adjacent to the core Zoroark line. |
+| `JTG-098` N's Zoroark ex | `1` | `8.02%` | N's Zoroark ex metadata-missing core archetype card; likely deserves a dedicated line batch with `JTG-097`. |
 
 ### Shared `partial` cards worth finishing after the broad unimplemented slice
 
@@ -152,8 +154,8 @@ That means prior Goal 1 and six-deck coverage was not wasted; it now acts as see
 
 ## Recommended next implementation order
 
-1. Treat the large N's Zoroark ex metadata-missing queue (`ASC-155`, `CRI-083`, `JTG-*`, `MEG-107`, `PFL-*`, `POR-051`, `PRE-*`, `SSP-165`, `TWM-164`, `WHT-055`) as the next default coherent Goal 2 implementation target now that the high-share Dragapult cached pair is closed.
-2. Split the N's Zoroark queue into coherent metadata/behavior batches after confirming printed text and shared primitives; `ASC-155` / `CRI-083` / early `JTG-*` entries are the current top report entries by weighted share.
+1. Keep the large N's Zoroark ex queue as the next default coherent Goal 2 implementation target. `ASC-155`, `JTG-026`, and `JTG-027` are closed; `CRI-083` is cached but remains behavior-blocked on a paired-Item replacement primitive.
+2. If taking `CRI-083`, first design the shared primitive for playing two copies at once and replacing an in-play Basic Pokémon with a Basic Pokémon from discard while preserving attachments, damage counters, Special Conditions, turns in play, and other effects. If deferring that primitive, continue with the early N's Pokémon line (`JTG-064`, `JTG-097`, `JTG-098`, `JTG-116`) after confirming printed text.
 3. Treat the remaining Mega Greninja ex single-archetype blockers (`CRI-022`, `PRE-054`, plus partial `WHT-086`) as adjacent but lower-priority cleanup unless a coherent Mega Greninja batch is explicitly selected.
 4. Finish the remaining shared partials only after the broad unimplemented slice unless another batch naturally extends existing primitives; if returning to Energy work soon, `WHT-086`, `POR-086`, and `TWM-167` are the strongest shared partials.
 5. Keep using `mix prizmo.goal2.corpus` after each batch to re-rank the next blockers by archetype count and weighted share.

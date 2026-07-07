@@ -57,6 +57,12 @@ defmodule Prizmo.Tcg.Cards.Behaviors.ASC do
     attack(:cruel_arrow, effect: %{type: :damage_any_opponent_pokemon, amount: 20})
   end
 
+  card "ASC-155" do
+    attack(:shred, effect: %{type: :damage_unaffected_by_effects_on_opponent_active})
+
+    attack(:rampaging_thunder, effect: %{type: :attacker_cannot_attack_next_turn})
+  end
+
   card "ASC-162" do
     attack(:comet_punch,
       damage: 0,

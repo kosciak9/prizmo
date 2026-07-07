@@ -187,7 +187,8 @@ defmodule Prizmo.TcgEngine.GameView do
       pending_attack_requires_bench_damage_target:
         pending_attack_effect_type in [
           :damage_opponent_bench,
-          :shuffle_attached_energy_into_deck_then_damage_opponent_bench
+          :shuffle_attached_energy_into_deck_then_damage_opponent_bench,
+          :discard_all_attached_energy_then_damage_opponent_bench
         ],
       pending_attack_requires_bench_damage_counters:
         pending_attack_effect_type == :opponent_bench_damage_counters,
