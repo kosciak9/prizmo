@@ -50,7 +50,7 @@ jobs:
           echo "elixir=$(awk '/^elixir / {print $2}' .tool-versions)" >> "$GITHUB_OUTPUT"
           echo "otp=$(awk '/^erlang / {print $2}' .tool-versions)" >> "$GITHUB_OUTPUT"
           echo "node=$(awk '/^nodejs / {print $2}' .tool-versions)" >> "$GITHUB_OUTPUT"
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ steps.versions.outputs.node }}
           cache: npm
