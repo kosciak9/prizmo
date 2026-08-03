@@ -66,4 +66,4 @@ jobs:
         with:
           name: lcov
           path: cover/lcov.info
-      - uses: k1LoW/octocov-action@v1
+      - uses: k1LoW/octocov-action@v1.5.1
