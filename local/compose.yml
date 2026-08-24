@@ -8,7 +8,7 @@
 
 services:
   db:
-    image: paradedb/paradedb:0.23.4-pg18@sha256:52345be0965458c7b8e8e94657db5060aa8880dfaa10e3cc3c0c90115a7a309f
+    image: paradedb/paradedb:v0.25.3-pg18@sha256:82d0c8bb0263c4320cb321591dd6831ecdd04b4b27328ef658358a9a8c383ac5
     container_name: ${COMPOSE_PROJECT_NAME:-prizmo}-postgres
     environment:
       POSTGRES_USER: postgres
